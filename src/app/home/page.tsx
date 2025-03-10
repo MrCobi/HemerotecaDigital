@@ -171,31 +171,32 @@ const TrendsSection = () => {
     const fetchTrends = async () => {
       try {
         const response = await fetch("/api/trends");
-        const { topFavorites, topCommented, newsApiTrends } =
-          await response.json();
+        const { data } = await response.json(); // Cambio clave aquí
 
         setTrends({
-          api: newsApiTrends.slice(0, 8),
-          favorites: topFavorites
+          api: data.trends.slice(0, 8), // Acceder a través de data.trends
+          favorites: data.favorites
             .map(
               (item: {
                 _count: { sourceId: number };
                 sourceName: string;
                 sourceId: string;
               }) => ({
-                ...item,
+                sourceId: item.sourceId,
+                sourceName: item.sourceName,
                 count: item._count.sourceId,
               })
             )
             .slice(0, 8),
-          comments: topCommented
+          comments: data.comments
             .map(
               (item: {
                 _count: { sourceId: number };
                 sourceName: string;
                 sourceId: string;
               }) => ({
-                ...item,
+                sourceId: item.sourceId,
+                sourceName: item.sourceName,
                 count: item._count.sourceId,
               })
             )
@@ -257,30 +258,44 @@ const TrendsSection = () => {
       <CardContent className="space-y-4">
         {activeTab === "api" && (
           <>
-            {trends.api.map((trend, i) => (
-              <div
-                key={i}
-                className="p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
-                onClick={() => handleTrendClick(trend, "api")}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="bg-blue-100 dark:bg-blue-900/30 p-1 rounded">
-                      <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    </span>
-                    <span className="text-sm font-medium line-clamp-1 text-gray-800 dark:text-gray-200">
-                      {trend.title}
-                    </span>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="text-blue-600 dark:text-blue-400"
-                  >
-                    Nuevo
-                  </Badge>
+            {trends.api.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/20 mb-4">
+                  <TrendingUp className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                 </div>
+                <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">
+                  No hay tendencias recientes
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  Las noticias más populares aparecerán aquí
+                </p>
               </div>
-            ))}
+            ) : (
+              trends.api.map((trend, i) => (
+                <div
+                  key={i}
+                  className="p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
+                  onClick={() => handleTrendClick(trend, "api")}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="bg-blue-100 dark:bg-blue-900/30 p-1 rounded">
+                        <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </span>
+                      <span className="text-sm font-medium line-clamp-1 text-gray-800 dark:text-gray-200">
+                        {trend.title}
+                      </span>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-blue-600 dark:text-blue-400"
+                    >
+                      Nuevo
+                    </Badge>
+                  </div>
+                </div>
+              ))
+            )}
           </>
         )}
 

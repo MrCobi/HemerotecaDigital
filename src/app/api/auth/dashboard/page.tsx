@@ -50,7 +50,6 @@ export default function DashboardPage() {
 
   const remainingCount =
     favoriteSources.length > 6 ? favoriteSources.length - 5 : 0;
-    
 
   type Activity = {
     id: string;
@@ -68,7 +67,7 @@ export default function DashboardPage() {
     user_name?: string;
     created_at: string; // Usar created_at
   };
-  
+
   useEffect(() => {
     const loadFavorites = async () => {
       if (session?.user?.id) {
@@ -262,24 +261,28 @@ export default function DashboardPage() {
       label: "Seguidores",
       value: followersCount,
       color: "text-blue-500",
+      path: `/users/${user.username}/followers`,
     },
     {
       icon: UserCheck,
       label: "Seguidos",
       value: followingCount,
       color: "text-green-500",
+      path: `/users/${user.username}/following`,
     },
     {
       icon: MessageSquare,
       label: "Comentarios",
       value: commentCount,
       color: "text-purple-500",
+      path: `/users/${user.username}/comments`,
     },
     {
       icon: Calendar,
       label: "Días activo",
       value: activeDays || 0,
       color: "text-yellow-500",
+      path: undefined,
     },
   ];
 
@@ -547,9 +550,10 @@ export default function DashboardPage() {
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-12">
                   {stats.map((stat, index) => (
-                    <div
+                    <Link
                       key={index}
-                      className="relative group bg-gradient-to-br from-white/90 to-white/60 dark:from-gray-800/90 dark:to-gray-800/60 rounded-xl p-5 text-center backdrop-blur-sm border border-white/20 dark:border-gray-700/20 hover:border-white/40 dark:hover:border-gray-700/40 transition-all shadow-md hover:shadow-lg"
+                      href={stat.path || "#"} // Asegurar un fallback para stats sin path
+                      className="relative group bg-gradient-to-br from-white/90 to-white/60 dark:from-gray-800/90 dark:to-gray-800/60 rounded-xl p-5 text-center backdrop-blur-sm border border-white/20 dark:border-gray-700/20 hover:border-white/40 dark:hover:border-gray-700/40 transition-all shadow-md hover:shadow-lg cursor-pointer"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       <div className="relative">
@@ -571,7 +575,7 @@ export default function DashboardPage() {
                           {stat.label}
                         </p>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </div>

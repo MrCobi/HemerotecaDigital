@@ -1,45 +1,86 @@
+"use client";
+
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { UserCard } from "@/src/app/components/UserCard";
 import { FollowButton } from "@/src/app/components/FollowButton";
+import { Skeleton } from "@/src/app/components/ui/skeleton";
+import { useToast } from "@/src/app/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 
-type Follower = {
-  id: string;
-  name: string;
-  username: string;
-  image: string;
-  bio?: string;
-  followingSince?: Date;
-};
+export default function FollowersPage() {
+  const { username } = useParams();
+  const { data: session } = useSession();
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [followingStatus, setFollowingStatus] = useState<Record<string, boolean>>({});
+  const { toast } = useToast();
+  const router = useRouter();
 
-export default async function FollowersPage({
-  params,
-}: {
-  params: Promise<{ username: string }>; // Update params to be a Promise
-}) {
-  const { username } = await params; // Await the params
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Obtener ID del usuario
+        const userRes = await fetch(`/api/users/username/${username}`);
+        const userData = await userRes.json();
+        
+        // Obtener seguidores
+        const followersRes = await fetch(`/api/users/${userData.id}/followers`);
+        const followersData = await followersRes.json();
+        
+        setFollowers(followersData.data);
+        
+        // Obtener estado de seguimiento
+        const ids = followersData.data.map((f: any) => f.id);
+        const statusRes = await fetch(`/api/users/follow-status?ids=${ids.join(",")}`);
+        const status = await statusRes.json();
+        setFollowingStatus(status);
+      } catch (error) {
+        toast({ title: "Error", description: "Error cargando seguidores", variant: "destructive" });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Fetch user by username
-  const userRes = await fetch(`/api/users/by-username/${username}`);
-  if (!userRes.ok) return <div>Usuario no encontrado</div>;
-  const user = await userRes.json();
-
-  // Fetch followers
-  const followersRes = await fetch(`/api/users/${user.id}/followers`);
-  if (!followersRes.ok) return <div>Error cargando seguidores</div>;
-  const { data: followers } = await followersRes.json();
+    fetchData();
+  }, [username, toast]);
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Seguidores de {user.name}</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {followers.map((follower: Follower) => (
-          <UserCard
-            key={follower.id}
-            user={follower}
-            action={<FollowButton targetUserId={follower.id} />}
-            variant="follower"
-          />
-        ))}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Seguidores</h1>
+        <Button onClick={() => router.back()}>Volver</Button>
       </div>
+      
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} className="h-[220px] w-full rounded-xl" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {followers.map((follower) => (
+            <UserCard
+              key={follower.id}
+              user={follower}
+              action={
+                <FollowButton
+                  targetUserId={follower.id}
+                  isFollowing={followingStatus[follower.id]}
+                  onSuccess={(isFollowing) => {
+                    setFollowingStatus(prev => ({
+                      ...prev,
+                      [follower.id]: isFollowing
+                    }));
+                  }}
+                />
+              }
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

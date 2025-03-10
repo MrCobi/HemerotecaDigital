@@ -1,7 +1,10 @@
-// src/app/api/trends/route.ts
 import prisma from "@/lib/db";
 import { NextResponse } from "next/server";
 import { Article } from "@/src/interface/article";
+
+type NewsApiTrend = Article & {
+  localSourceId: string | null;
+};
 
 async function fetchWithRetry(url: string, retries = 3, delay = 1000) {
   for (let i = 0; i < retries; i++) {
@@ -9,25 +12,43 @@ async function fetchWithRetry(url: string, retries = 3, delay = 1000) {
       const response = await fetch(url);
       console.log(`Intento ${i + 1}: Status ${response.status}`);
 
-      if (response.ok) return response;
+      if (!response.ok) {
+        const errorData = await response.json();
+        const errorPayload = {
+          status: response.status,
+          code: errorData.code || 'unknown',
+          message: errorData.message || 'Error desconocido',
+          isRateLimit: response.status === 429 // Nueva propiedad
+        };
 
-      const errorData = await response.json();
-      console.error("Error de NewsAPI:", errorData);
-      return NextResponse.json(
-        { error: errorData.message || "NewsAPI Error" },
-        { status: response.status }
-      );
+        // Lanzar como objeto para mejor manejo
+        throw errorPayload;
+      }
+
+      return await response.json();
+      
     } catch (error) {
-      console.error(`Error de red: ${error}`);
+      console.error(`Error en fetchWithRetry:`, error);
+      
+      // Verificar si es error de rate limit
+      if ((error as any).isRateLimit) {
+        console.log('Error 429 detectado, abortando reintentos');
+        throw error;
+      }
+
+      if (i === retries - 1) {
+        throw error;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
     }
-    await new Promise(resolve => setTimeout(resolve, delay));
   }
   throw new Error(`Failed after ${retries} retries`);
 }
 
 export async function GET() {
   try {
-    // 1. Fuentes más favoritadas con el nombre del source
+    // 1. Fuentes más favoritadas
     const topFavorites = await prisma.favoriteSource.groupBy({
       by: ["sourceId"],
       _count: { sourceId: true },
@@ -41,12 +62,12 @@ export async function GET() {
         });
         return {
           ...favorite,
-          sourceName: source?.name || "Unknown Source",
+          sourceName: source?.name || "Fuente desconocida",
         };
       }));
     });
 
-    // 2. Fuentes con más comentarios con el nombre del source
+    // 2. Fuentes con más comentarios
     const topCommented = await prisma.comment.groupBy({
       by: ["sourceId"],
       _count: { sourceId: true },
@@ -60,45 +81,57 @@ export async function GET() {
         });
         return {
           ...comment,
-          sourceName: source?.name || "Unknown Source",
+          sourceName: source?.name || "Fuente desconocida",
         };
       }));
     });
 
-    // 3. Artículos trending desde NewsAPI
-    const newsApiResponse = await fetchWithRetry(
-      `https://newsapi.org/v2/top-headlines?country=us&pageSize=8&apiKey=${process.env.NEXT_PUBLIC_NEWS_API_KEY}`
-    );
+    // 3. Manejo de artículos trending
+    let newsApiTrends: NewsApiTrend[] = [];
+    let rateLimitWarning = '';
+    
+    try {
+      const newsApiData = await fetchWithRetry(
+        `https://newsapi.org/v2/top-headlines?country=us&pageSize=8&apiKey=${process.env.NEXT_PUBLIC_NEWS_API_KEY}`
+      );
 
-    if (!(newsApiResponse instanceof Response)) {
-      return newsApiResponse; // Devuelve el error ya manejado
+      newsApiTrends = await Promise.all(
+        (newsApiData.articles || []).map(async (article: Article) => {
+          const source = await prisma.source.findFirst({
+            where: { url: article.url },
+          });
+          return {
+            ...article,
+            localSourceId: source?.id || null,
+          };
+        })
+      );
+    } catch (error) {
+      console.error('Error en NewsAPI:', error);
+      
+      if ((error as any).isRateLimit) {
+        rateLimitWarning = 'Límite de solicitudes excedido. Datos de noticias no disponibles.';
+      }
     }
 
-    const newsApiData = await newsApiResponse.json();
-
-    // Mapear datos para incluir información de fuente local
-    const newsWithSources = await Promise.all(
-      newsApiData.articles.map(async (article: Article) => {
-        const source = await prisma.source.findFirst({
-          where: { url: article.url },
-        });
-        return {
-          ...article,
-          localSourceId: source?.id || null,
-        };
-      })
-    );
-
     return NextResponse.json({
-      topFavorites,
-      topCommented,
-      newsApiTrends: newsWithSources,
+      success: true,
+      data: {
+        favorites: topFavorites,
+        comments: topCommented,
+        trends: newsApiTrends
+      },
+      warnings: rateLimitWarning ? [rateLimitWarning] : []
     });
 
   } catch (error) {
     console.error("Error completo:", error);
     return NextResponse.json(
-      { error: "Error interno - Ver logs del servidor" },
+      { 
+        success: false,
+        error: "Error interno del servidor",
+        details: (error as Error).message || 'Error desconocido'
+      },
       { status: 500 }
     );
   }

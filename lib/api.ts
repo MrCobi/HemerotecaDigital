@@ -15,7 +15,7 @@ export async function fetchArticlesBySource(
     apiUrl.searchParams.set("pageSize", "6");
     apiUrl.searchParams.set("sortBy", sortBy);
     apiUrl.searchParams.set("language", language);
-    apiUrl.searchParams.set("apiKey", process.env.NEXT_PUBLIC_NEWS_API_KEY!!);
+    apiUrl.searchParams.set("apiKey", process.env.NEXT_PUBLIC_NEWS_API_KEY!);
 
     const response = await fetch(apiUrl.toString());
     if (!response.ok) return [];
