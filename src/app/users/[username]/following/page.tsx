@@ -14,17 +14,20 @@ type FollowingUser = {
 export default async function FollowingPage({
   params,
 }: {
-  params: Promise<{ username: string }>;
+  params: { username: string }; // 1. Corregir definición de params
 }) {
-  const { username } = await params;
+  const { username } = await params; // 2. Obtener directamente sin await
 
+  // 3. Usar URL absoluta para fetch
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  
   // Obtener usuario por username
-  const userRes = await fetch(`/api/users/by-username/${username}`);
+  const userRes = await fetch(`${baseUrl}/api/users/by-username/${username}`);
   if (!userRes.ok) return <div>Usuario no encontrado</div>;
   const user = await userRes.json();
 
   // Obtener seguidos desde la API
-  const followingRes = await fetch(`/api/users/${user.id}/following`);
+  const followingRes = await fetch(`${baseUrl}/api/users/${user.id}/following`);
   if (!followingRes.ok) return <div>Error cargando seguidos</div>;
   const { data: following } = await followingRes.json();
 

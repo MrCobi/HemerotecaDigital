@@ -22,7 +22,7 @@ export default function FollowersPage() {
     const fetchData = async () => {
       try {
         // Obtener ID del usuario
-        const userRes = await fetch(`/api/users/username/${username}`);
+        const userRes = await fetch(`/api/users/by-username/${username}`);
         const userData = await userRes.json();
         
         // Obtener seguidores
