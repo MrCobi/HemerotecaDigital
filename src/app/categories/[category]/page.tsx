@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Loader2, Tag, ExternalLink } from "lucide-react";
+import { Tag, ExternalLink } from "lucide-react";
 import { Source } from "@/src/interface/source";
 import SourcesPage from "@/src/app/components/SourceList";
 import { Button } from "@/components/ui/button";

@@ -344,7 +344,7 @@ const useHorizontalScroll = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
-  const [momentum, setMomentum] = useState({ x: 0, timestamp: 0 });
+  const [_momentum, _setMomentum] = useState({ x: 0, timestamp: 0 });
   const animationRef = useRef<number | null>(null);
   const velocityRef = useRef(0);
   const lastTimeRef = useRef(0);
