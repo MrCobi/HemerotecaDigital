@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: { category: string } }
 ) {
   try {
-    const decodedCategory = decodeURIComponent(params.category);
+    const decodedCategory = await decodeURIComponent(params.category);
     
     const sources = await prisma.source.findMany({
       where: {

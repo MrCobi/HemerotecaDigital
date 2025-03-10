@@ -1,24 +1,13 @@
 // src/app/categories/[category]/page.tsx
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/src/app/components/ui/card';
-import { Button } from '@/components/ui/button';
-import Image from 'next/image';
-import { Loader2 } from 'lucide-react';
-import Link from 'next/link';
-
-interface Source {
-  id: string;
-  name: string;
-  description: string;
-  url: string;
-  imageUrl: string | null;
-  category: string;
-  language: string;
-  country: string;
-}
+import { useEffect, useState, useCallback } from "react";
+import { useParams } from "next/navigation";
+import { Loader2, Tag, ExternalLink } from "lucide-react";
+import { Source } from "@/src/interface/source";
+import SourcesPage from "@/src/app/components/SourceList";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function CategoryPage() {
   const { category } = useParams();
@@ -26,120 +15,105 @@ export default function CategoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchSources = async () => {
-      try {
-        if (!category) {
-          throw new Error('Categoría no especificada');
-        }
+  const fetchSources = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      if (!category) throw new Error("Categoría no especificada");
 
-        const categoryName = Array.isArray(category) ? category[0] : category;
-        const encodedCategory = encodeURIComponent(categoryName);
-        
-        const response = await fetch(`/api/sources/categories/${encodedCategory}`);
-        
-        if (!response.ok) {
-          throw new Error('Error al cargar las fuentes');
-        }
+      const categoryName = Array.isArray(category) ? category[0] : category;
+      const response = await fetch(
+        `/api/sources/categories/${encodeURIComponent(categoryName)}`
+      );
 
-        const data = await response.json();
-        setSources(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error desconocido');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      if (!response.ok) throw new Error("Error al cargar las fuentes");
 
-    fetchSources();
+      setSources(await response.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setIsLoading(false);
+    }
   }, [category]);
+
+  useEffect(() => {
+    fetchSources();
+  }, [fetchSources]);
 
   const getCategoryName = () => {
     try {
       return decodeURIComponent(category as string);
     } catch {
-      return 'Categoría desconocida';
+      return "Categoría desconocida";
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto"></div>
+          <p className="mt-4 text-blue-600">Buscando fuentes...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen text-red-500">
-        {error}
+      <div className="min-h-screen flex items-center justify-center text-red-500">
+        <div className="text-center">
+          <Tag className="h-16 w-16 mx-auto text-red-400 mb-4" />
+          <p className="text-xl">{error}</p>
+          <Link href="/sources" className="mt-6 inline-block">
+            <Button variant="outline" className="flex items-center">
+              Volver a fuentes
+              <ExternalLink className="h-4 w-4 ml-2" />
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <main className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800 dark:text-white">
-        Fuentes en la categoría: {getCategoryName()}
-      </h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sources.map((source) => (
-          <Card key={source.id} className="hover:shadow-lg transition-shadow duration-300">
-            <CardHeader>
-              <CardTitle className="text-xl font-semibold text-gray-800 dark:text-white">
-                {source.name}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {source.imageUrl && (
-                <div className="relative h-48 mb-4 rounded-lg overflow-hidden">
-                  <Image
-                    src={source.imageUrl}
-                    alt={source.name}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                  />
-                </div>
-              )}
-              
-              <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3">
-                {source.description}
-              </p>
-
-              <div className="flex flex-wrap gap-2 mb-4">
-                <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 rounded-full text-sm">
-                  {source.category}
-                </span>
-                <span className="px-3 py-1 bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 rounded-full text-sm">
-                  {source.language}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <Link href={source.url} target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline">
-                    Visitar Sitio
-                  </Button>
-                </Link>
-                <Link href={`/sources/${source.id}`}>
-                  <Button>
-                    Ver Detalles
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
+            <Tag className="h-8 w-8 mr-2 text-blue-500" />
+            Categoría: {getCategoryName()}
+          </h1>
+          <Link href="/sources">
+            <Button variant="outline" className="flex items-center">
+              Ver todas las fuentes
+              <ExternalLink className="h-4 w-4 ml-2" />
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {sources.length === 0 && (
-        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-          No se encontraron fuentes en esta categoría
+      {sources.length === 0 ? (
+        <div className="text-center py-12 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-blue-100 dark:border-gray-700">
+          <Tag className="h-16 w-16 mx-auto text-blue-400 mb-4" />
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            No se encontraron fuentes en esta categoría
+          </p>
+          <Link href="/sources">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+              Explorar todas las fuentes
+            </Button>
+          </Link>
+        </div>
+      ) : (
+        <div>
+          <SourcesPage
+            sources={sources}
+            showFilters={true}
+            showPagination={true}
+            isFavoritePage={false}
+          />
         </div>
       )}
-    </main>
+    </div>
   );
 }
