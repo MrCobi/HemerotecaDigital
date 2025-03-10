@@ -598,7 +598,7 @@ export default function HomePage() {
       try {
         const response = await fetch("/api/categories");
         const data = await response.json();
-        
+
         // Asegurar que data sea siempre un array
         if (Array.isArray(data)) {
           setCategories(data);
@@ -606,7 +606,6 @@ export default function HomePage() {
           console.error("Formato de categorías inválido:", data);
           setCategories([]);
         }
-        
       } catch (error) {
         console.error("Error fetching categories:", error);
         setCategories([]);
@@ -813,13 +812,13 @@ export default function HomePage() {
           >
             {[
               {
-                title: "La Revolución Industrial en España",
+                title: "La Caixa vuelve a Barcelona: sigue el traspaso de poder a Cataluña",
                 excerpt:
-                  "Análisis detallado del impacto de la industrialización en la península ibérica durante el siglo XIX.",
+                  "Por muy comentada que era esta posibilidad en los despachos nobles de Barcelona, una mezcla de chascarrillo económico, conspiración y deseo taimado que había cobrado cuerpo tras...",
                 image:
-                  "https://images.unsplash.com/photo-1566041510639-8d95a2490bfb?w=800&h=500&fit=crop",
+                  "https://phantom-elmundo.uecdn.es/ba70709cc1abb63ed3ec1bb4d3483f53/crop/0x0/1280x853/resize/1200/f/webp/assets/multimedia/imagenes/2025/03/05/17412089159738.jpg",
                 date: "12 Jun 1892",
-                source: "El Imparcial",
+                source: "El Mundo",
                 category: "Economía",
               },
               {
@@ -1107,9 +1106,26 @@ export default function HomePage() {
                       </p>
                     </div>
                   ) : followingActivity.length === 0 ? (
-                    <p className="text-gray-600 dark:text-gray-400 text-center py-4">
-                      No hay actividad reciente de los usuarios que sigues.
-                    </p>
+                    <div className="text-center py-12 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-800/30 mb-4">
+                        <Clock className="h-8 w-8 text-blue-500 dark:text-blue-400" />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">
+                        Sin actividad reciente
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-4">
+                        Los usuarios que sigues no han realizado actividades
+                        recientemente. ¡Sigue a más usuarios para ver su
+                        actividad aquí!
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/40"
+                        onClick={() => router.push("/explore")}
+                      >
+                        Explorar usuarios
+                      </Button>
+                    </div>
                   ) : (
                     <div className="space-y-4">
                       {followingActivity.map((activity) => (
