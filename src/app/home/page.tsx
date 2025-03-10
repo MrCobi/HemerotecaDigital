@@ -35,6 +35,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/src/app/components/ui/tabs";
 import { Avatar } from "@/src/app/components/ui/avatar";
 import Image from "next/image";
 import Link from "next/link";
+import { Article } from "@/src/interface/article";
+import { fetchArticulosDestacados } from "@/lib/api";
 
 interface Activity {
   id: string;
@@ -508,6 +510,7 @@ export default function HomePage() {
   const [totalActivities, setTotalActivities] = useState<number>(0);
   const itemsPerPage = 5;
   const [categories, setCategories] = useState<string[]>([]);
+  const [featuredArticles, setFeaturedArticles] = useState<Article[]>([]);
 
   const horizontalScroll = useHorizontalScroll();
 
@@ -530,6 +533,25 @@ export default function HomePage() {
     };
     loadStats();
   }, [session]);
+
+  useEffect(() => {
+    const loadFeaturedArticles = async () => {
+      try {
+        const articles = await fetchArticulosDestacados();
+
+        // Seleccionar 3 aleatorios
+        const randomArticles = articles
+          .sort(() => 0.5 - Math.random())
+          .slice(0, 3);
+
+        setFeaturedArticles(randomArticles);
+      } catch (error) {
+        console.error("Error loading featured articles:", error);
+      }
+    };
+
+    loadFeaturedArticles();
+  }, []);
 
   useEffect(() => {
     const loadFollowingActivity = async () => {
@@ -820,93 +842,123 @@ export default function HomePage() {
             transition={{ duration: 0.5 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
-            {[
-              {
-                title:
-                  "La Caixa vuelve a Barcelona: sigue el traspaso de poder a Cataluña",
-                excerpt:
-                  "Por muy comentada que era esta posibilidad en los despachos nobles de Barcelona, una mezcla de chascarrillo económico, conspiración y deseo taimado que había cobrado cuerpo tras...",
-                image:
-                  "https://phantom-elmundo.uecdn.es/ba70709cc1abb63ed3ec1bb4d3483f53/crop/0x0/1280x853/resize/1200/f/webp/assets/multimedia/imagenes/2025/03/05/17412089159738.jpg",
-                date: "12 Jun 1892",
-                source: "El Mundo",
-                category: "Economía",
-              },
-              {
-                title: "Crónicas de la Guerra Civil",
-                excerpt:
-                  "Testimonios y reportajes periodísticos sobre los acontecimientos más relevantes del conflicto.",
-                image:
-                  "https://images.unsplash.com/photo-1566041510639-8d95a2490bfb?w=800&h=500&fit=crop",
-                date: "3 Mar 1937",
-                source: "ABC",
-                category: "Política",
-              },
-              {
-                title: "El Descubrimiento de la Penicilina",
-                excerpt:
-                  "Cobertura periodística sobre uno de los avances médicos más importantes del siglo XX.",
-                image:
-                  "https://images.unsplash.com/photo-1566041510639-8d95a2490bfb?w=800&h=500&fit=crop",
-                date: "24 Sep 1945",
-                source: "La Vanguardia",
-                category: "Ciencia",
-              },
-            ].map((article, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{
-                  opacity: isVisible.featured ? 1 : 0,
-                  y: isVisible.featured ? 0 : 20,
-                }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-                className="group cursor-pointer"
-                onClick={() => router.push(`/articulos/${i}`)}
+            {featuredArticles.map((article, i) => (
+              <article
+                key={article.url}
+                className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
               >
-                <Card className="overflow-hidden border-blue-100 dark:border-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300 hover:shadow-lg">
-                  <div className="relative h-48 overflow-hidden">
+                <figure className="relative h-40 sm:h-48">
+                  {article.urlToImage ? (
                     <Image
-                      src={article.image}
+                      src={article.urlToImage}
                       alt={article.title}
-                      width={800}
-                      height={500}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <div className="absolute bottom-0 left-0 right-0 p-4">
-                      <div className="flex justify-between items-center">
-                        <Badge className="bg-blue-600 hover:bg-blue-700">
-                          {article.category}
-                        </Badge>
-                        <span className="text-xs text-white/80">
-                          {article.date}
-                        </span>
-                      </div>
+                  ) : (
+                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                      <svg
+                        className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
                     </div>
-                  </div>
-                  <CardContent className="p-4">
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  )}
+                </figure>
+
+                <div className="p-4 sm:p-6">
+                  <header>
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 line-clamp-2 hover:text-blue-600">
                       {article.title}
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
-                      {article.excerpt}
+                  </header>
+
+                  {article.description && (
+                    <p className="text-sm sm:text-base text-gray-600 mb-4 line-clamp-3">
+                      {article.description}
                     </p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        Fuente: {article.source}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-blue-600 dark:text-blue-400 p-0 h-auto"
-                      >
-                        Leer más
-                      </Button>
+                  )}
+
+                  <footer className="mt-auto">
+                    <div className="flex items-center justify-between text-xs sm:text-sm text-gray-500 mb-4">
+                      {article.author && (
+                        <span className="flex items-center">
+                          <svg
+                            className="w-3 h-3 sm:w-4 sm:h-4 mr-1"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                          <span className="truncate max-w-[80px] sm:max-w-[120px]">
+                            {article.author}
+                          </span>
+                        </span>
+                      )}
+                      <time className="flex items-center">
+                        <svg
+                          className="w-3 h-3 sm:w-4 sm:h-4 mr-1"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                        {new Date(article.publishedAt).toLocaleDateString(
+                          "es-ES",
+                          {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                          }
+                        )}
+                      </time>
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors text-sm sm:text-base"
+                    >
+                      Leer más
+                      <svg
+                        className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M14 5l7 7m0 0l-7 7m7-7H3"
+                        />
+                      </svg>
+                    </a>
+                  </footer>
+                </div>
+              </article>
             ))}
           </motion.div>
         </div>
