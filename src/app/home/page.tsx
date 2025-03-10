@@ -34,6 +34,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/src/app/components/ui/tabs";
 import { Avatar } from "@/src/app/components/ui/avatar";
 import Image from "next/image";
+import Link from "next/link";
 
 interface Activity {
   id: string;
@@ -691,24 +692,33 @@ export default function HomePage() {
               descubre nuevas perspectivas del pasado.
             </p>
 
-            <div className="relative max-w-2xl">
-              <div className="flex">
+            <div className="relative max-w-2xl z-20">
+              {" "}
+              {/* Añade z-index alto */}
+              <div className="flex relative">
+                {" "}
+                {/* Contenedor relativo */}
                 <Input
                   type="text"
                   placeholder="Buscar por título, autor, fecha o palabra clave..."
-                  className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-blue-200 focus-visible:ring-white/30 focus-visible:border-white/30"
+                  className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-blue-200 focus-visible:ring-white/30 focus-visible:border-white/30 pr-12 py-5" // Añade padding
                 />
-                <Button className="ml-2 bg-white text-blue-600 hover:bg-blue-50">
-                  <Search className="h-4 w-4 mr-2" /> Buscar
+                <Button className="ml-2 bg-white text-blue-600 hover:bg-blue-50 absolute right-0 top-1/2 -translate-y-1/2">
+                  <Search className="h-5 w-5" /> {/* Icono más grande */}
                 </Button>
               </div>
-              <div className="flex items-center mt-2 text-sm text-blue-200">
-                <Button
-                  variant="link"
-                  className="text-blue-200 hover:text-white p-0 h-auto"
-                >
-                  <Filter className="h-3 w-3 mr-1" /> Búsqueda avanzada
-                </Button>
+              <div className="flex items-center mt-2 text-sm text-blue-200 relative z-10">
+                <Link href="/Articulos" passHref legacyBehavior>
+                  <Button
+                    variant="link"
+                    className="text-blue-200 hover:text-white p-0 h-auto"
+                    asChild
+                  >
+                    <a className="flex items-center px-2 py-1 -ml-2 hover:bg-blue-600/10 rounded-md transition-colors">
+                      <Filter className="h-3 w-3 mr-1" /> Búsqueda avanzada
+                    </a>
+                  </Button>
+                </Link>
               </div>
             </div>
           </motion.div>
@@ -812,7 +822,8 @@ export default function HomePage() {
           >
             {[
               {
-                title: "La Caixa vuelve a Barcelona: sigue el traspaso de poder a Cataluña",
+                title:
+                  "La Caixa vuelve a Barcelona: sigue el traspaso de poder a Cataluña",
                 excerpt:
                   "Por muy comentada que era esta posibilidad en los despachos nobles de Barcelona, una mezcla de chascarrillo económico, conspiración y deseo taimado que había cobrado cuerpo tras...",
                 image:
