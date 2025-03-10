@@ -598,9 +598,18 @@ export default function HomePage() {
       try {
         const response = await fetch("/api/categories");
         const data = await response.json();
-        setCategories(data);
+        
+        // Asegurar que data sea siempre un array
+        if (Array.isArray(data)) {
+          setCategories(data);
+        } else {
+          console.error("Formato de categorías inválido:", data);
+          setCategories([]);
+        }
+        
       } catch (error) {
         console.error("Error fetching categories:", error);
+        setCategories([]);
       }
     };
     fetchCategories();
@@ -938,7 +947,7 @@ export default function HomePage() {
                 // Traducción de categorías (inglés a español)
                 const categoryTranslations: Record<string, string> = {
                   general: "General",
-                  bussiness: "Bussiness",
+                  business: "Bussiness",
                   politics: "Política",
                   economy: "Economía",
                   science: "Ciencia",
@@ -947,6 +956,7 @@ export default function HomePage() {
                   sports: "Deportes",
                   technology: "Tecnología",
                   education: "Educación",
+                  entertainment: "Entretenimiento",
                   health: "Salud",
                   environment: "Medio Ambiente",
                 };
@@ -1010,7 +1020,7 @@ export default function HomePage() {
                         <Button
                           onClick={() =>
                             router.push(
-                              `/categorias/${encodeURIComponent(
+                              `/categories/${encodeURIComponent(
                                 category.toLowerCase()
                               )}`
                             )

@@ -4,20 +4,27 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    // Obtener las categorías únicas de las fuentes
     const categories = await prisma.source.findMany({
-      select: {
-        category: true,
-      },
+      select: { category: true },
       distinct: ["category"],
+      where: {
+        category: {
+          not: "" 
+        }
+      }
     });
 
-    // Devolver las categorías
-    return NextResponse.json(categories.map((c) => c.category));
+    // Limpiar y validar categorías
+    const validCategories = categories
+      .map(c => c.category?.trim())
+      .filter((c): c is string => !!c && typeof c === "string");
+
+    return NextResponse.json(validCategories);
+    
   } catch (error) {
     console.error("Error fetching categories:", error);
     return NextResponse.json(
-      { error: "Error interno - Ver logs del servidor" },
+      { error: "Error interno del servidor" },
       { status: 500 }
     );
   }
