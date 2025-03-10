@@ -344,43 +344,133 @@ const useHorizontalScroll = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [momentum, setMomentum] = useState({ x: 0, timestamp: 0 });
+  const animationRef = useRef<number | null>(null);
+  const velocityRef = useRef(0);
+  const lastTimeRef = useRef(0);
+  const lastPositionRef = useRef(0);
+
+  // Función para aplicar inercia al scroll
+  const applyMomentum = () => {
+    if (!scrollRef.current || Math.abs(velocityRef.current) < 0.5) {
+      animationRef.current = null;
+      return;
+    }
+
+    // Aplicar fricción para desacelerar gradualmente
+    velocityRef.current *= 0.95;
+
+    // Aplicar el desplazamiento basado en la velocidad actual
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft -= velocityRef.current;
+    }
+
+    // Continuar la animación
+    animationRef.current = requestAnimationFrame(applyMomentum);
+  };
 
   const onMouseDown = (e: React.MouseEvent) => {
     if (!scrollRef.current) return;
-    setIsDragging(true);
-    setStartX(e.pageX - scrollRef.current.offsetLeft);
-    setScrollLeft(scrollRef.current.scrollLeft);
-  };
 
-  const onMouseUp = () => {
-    setIsDragging(false);
+    // Detener cualquier animación de inercia en curso
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+
+    setIsDragging(true);
+    setStartX(e.clientX);
+    setScrollLeft(scrollRef.current.scrollLeft);
+    lastTimeRef.current = Date.now();
+    lastPositionRef.current = e.clientX;
+    velocityRef.current = 0;
+
+    // Cambiar el cursor durante el arrastre
+    document.body.style.cursor = "grabbing";
   };
 
   const onMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !scrollRef.current) return;
     e.preventDefault();
-    const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX) * 2;
+
+    // Calcular la velocidad del movimiento
+    const now = Date.now();
+    const dt = now - lastTimeRef.current;
+    const dx = e.clientX - lastPositionRef.current;
+
+    if (dt > 0) {
+      // Suavizar la velocidad con un factor de amortiguación
+      velocityRef.current = 0.8 * velocityRef.current + 0.2 * (dx / dt) * 16;
+    }
+
+    lastTimeRef.current = now;
+    lastPositionRef.current = e.clientX;
+
+    // Aplicar un factor de suavizado para el desplazamiento
+    const walk = (e.clientX - startX) * 1.2; // Factor reducido para mayor suavidad
     scrollRef.current.scrollLeft = scrollLeft - walk;
+  };
+
+  const onMouseUp = () => {
+    setIsDragging(false);
+    document.body.style.cursor = "";
+
+    // Iniciar la animación de inercia cuando se suelta el mouse
+    if (Math.abs(velocityRef.current) > 0.5) {
+      animationRef.current = requestAnimationFrame(applyMomentum);
+    }
   };
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (!scrollRef.current) return;
+
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+
     setIsDragging(true);
-    setStartX(e.touches[0].pageX - scrollRef.current.offsetLeft);
+    setStartX(e.touches[0].clientX);
     setScrollLeft(scrollRef.current.scrollLeft);
+    lastTimeRef.current = Date.now();
+    lastPositionRef.current = e.touches[0].clientX;
+    velocityRef.current = 0;
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
     if (!isDragging || !scrollRef.current) return;
-    const x = e.touches[0].pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX) * 2;
+
+    const now = Date.now();
+    const dt = now - lastTimeRef.current;
+    const dx = e.touches[0].clientX - lastPositionRef.current;
+
+    if (dt > 0) {
+      velocityRef.current = 0.8 * velocityRef.current + 0.2 * (dx / dt) * 16;
+    }
+
+    lastTimeRef.current = now;
+    lastPositionRef.current = e.touches[0].clientX;
+
+    const walk = (e.touches[0].clientX - startX) * 1.2;
     scrollRef.current.scrollLeft = scrollLeft - walk;
   };
 
   const onTouchEnd = () => {
     setIsDragging(false);
+
+    if (Math.abs(velocityRef.current) > 0.5) {
+      animationRef.current = requestAnimationFrame(applyMomentum);
+    }
   };
+
+  // Limpiar animaciones al desmontar
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, []);
 
   return {
     scrollRef,
@@ -805,20 +895,37 @@ export default function HomePage() {
 
       <section id="collections-section" className="py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-2">
+                Categorías
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300">
+                Explora documentos históricos por categoría temática
+              </p>
+            </div>
+          </div>
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{
               opacity: isVisible.collections ? 1 : 0,
               y: isVisible.collections ? 0 : 20,
             }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
             className="relative"
           >
             <div
               ref={horizontalScroll.scrollRef}
-              className={`flex overflow-x-auto pb-6 scrollbar-hide snap-x snap-mandatory ${
+              className={`flex overflow-x-auto pb-6 scrollbar-hide snap-x snap-mandatory gap-4 select-none ${
                 horizontalScroll.isDragging ? "cursor-grabbing" : "cursor-grab"
               }`}
+              style={{
+                scrollBehavior: "auto",
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
+                WebkitOverflowScrolling: "touch", // Para scroll más suave en iOS
+              }}
               onMouseDown={horizontalScroll.onMouseDown}
               onMouseUp={horizontalScroll.onMouseUp}
               onMouseLeave={horizontalScroll.onMouseUp}
@@ -827,27 +934,133 @@ export default function HomePage() {
               onTouchMove={horizontalScroll.onTouchMove}
               onTouchEnd={horizontalScroll.onTouchEnd}
             >
-              {categories.map((category, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{
-                    opacity: isVisible.collections ? 1 : 0,
-                    scale: isVisible.collections ? 1 : 0.9,
-                  }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
-                  className="snap-start flex-shrink-0"
-                  style={{ width: "280px" }}
-                >
-                  <Image
-                    src="/category-bg.jpg"
-                    alt={category}
-                    width={280}
-                    height={160}
-                    className="h-48 object-cover"
-                  />
-                </motion.div>
-              ))}
+              {categories.map((category, i) => {
+                // Traducción de categorías (inglés a español)
+                const categoryTranslations: Record<string, string> = {
+                  general: "General",
+                  bussiness: "Bussiness",
+                  politics: "Política",
+                  economy: "Economía",
+                  science: "Ciencia",
+                  culture: "Cultura",
+                  society: "Sociedad",
+                  sports: "Deportes",
+                  technology: "Tecnología",
+                  education: "Educación",
+                  health: "Salud",
+                  environment: "Medio Ambiente",
+                };
+
+                const displayName =
+                  categoryTranslations[category.toLowerCase()] || category;
+
+                // Generar un color basado en el nombre de la categoría
+                const colors = [
+                  "from-blue-500 to-blue-700",
+                  "from-green-500 to-green-700",
+                  "from-red-500 to-red-700",
+                  "from-yellow-500 to-yellow-700",
+                  "from-purple-500 to-purple-700",
+                  "from-pink-500 to-pink-700",
+                  "from-indigo-500 to-indigo-700",
+                  "from-teal-500 to-teal-700",
+                ];
+                const bgColor = colors[i % colors.length];
+
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{
+                      opacity: isVisible.collections ? 1 : 0,
+                      scale: isVisible.collections ? 1 : 0.9,
+                    }}
+                    whileHover={{
+                      scale: 1.05,
+                      boxShadow:
+                        "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                      transition: { duration: 0.3, ease: "easeOut" },
+                    }}
+                    transition={{
+                      duration: 0.5,
+                      delay: i * 0.1,
+                      ease: "easeOut",
+                    }}
+                    className="snap-start flex-shrink-0 relative"
+                    style={{ width: "280px" }}
+                  >
+                    <div
+                      className={`h-48 rounded-xl overflow-hidden relative bg-gradient-to-br ${bgColor} shadow-lg transform transition-all duration-300`}
+                    >
+                      <div className="absolute inset-0 opacity-20 pointer-events-none">
+                        <Image
+                          src="https://img.freepik.com/foto-gratis/textura-pared-cemento-viejo_1149-1280.jpg"
+                          alt={displayName}
+                          width={280}
+                          height={160}
+                          className="h-full w-full object-cover mix-blend-overlay select-none"
+                          draggable="false"
+                          unoptimized
+                        />
+                      </div>
+                      <div className="absolute inset-0 flex flex-col justify-between p-4 select-none">
+                        <h3 className="text-xl font-bold text-white drop-shadow-md">
+                          {displayName}
+                        </h3>
+                        <Button
+                          onClick={() =>
+                            router.push(
+                              `/categorias/${encodeURIComponent(
+                                category.toLowerCase()
+                              )}`
+                            )
+                          }
+                          className="bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white self-start mt-auto transition-all duration-300 hover:scale-105"
+                        >
+                          Explorar <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-center mt-6 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (horizontalScroll.scrollRef.current) {
+                    const scrollAmount =
+                      horizontalScroll.scrollRef.current.clientWidth * 0.75;
+                    horizontalScroll.scrollRef.current.scrollBy({
+                      left: -scrollAmount,
+                      behavior: "smooth",
+                    });
+                  }
+                }}
+                className="rounded-full w-10 h-10 p-0 flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 transition-all duration-300"
+              >
+                <ArrowRight className="h-4 w-4 rotate-180" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (horizontalScroll.scrollRef.current) {
+                    const scrollAmount =
+                      horizontalScroll.scrollRef.current.clientWidth * 0.75;
+                    horizontalScroll.scrollRef.current.scrollBy({
+                      left: scrollAmount,
+                      behavior: "smooth",
+                    });
+                  }
+                }}
+                className="rounded-full w-10 h-10 p-0 flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 transition-all duration-300"
+              >
+                <ArrowRight className="h-4 w-4" />
+              </Button>
             </div>
           </motion.div>
         </div>

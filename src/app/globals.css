@@ -246,3 +246,15 @@ nav a:hover {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* En tu archivo global CSS */
+.scroll-container {
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+}
+
+.scroll-item {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
