@@ -65,7 +65,10 @@ function Navbar() {
           <div className="flex items-center">
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center">
-              <Link href="/" className="flex items-center group">
+              <Link
+                href={session ? "/home" : "/"}
+                className="flex items-center group"
+              >
                 <div className="relative w-8 h-8 sm:w-10 sm:h-10 overflow-hidden rounded-lg transform transition-transform group-hover:scale-105">
                   <Image
                     src="/images/default_periodico.jpg"
@@ -84,7 +87,7 @@ function Navbar() {
             {session && (
               <nav className="hidden sm:ml-6 sm:flex sm:space-x-1">
                 {[
-                  { href: "/", label: "Home" },
+                  { href: "/home", label: "Home" },
                   { href: "/Articulos", label: "Artículos" },
                   { href: "/sources", label: "Fuentes" },
                   { href: "/explore", label: "Descubrir Usuarios" },
@@ -153,7 +156,7 @@ function Navbar() {
               { href: "/", label: "Home" },
               { href: "/Articulos", label: "Artículos" },
               { href: "/sources", label: "Fuentes" },
-              { href: "/explore", label: "Explorar Usuarios"},
+              { href: "/explore", label: "Explorar Usuarios" },
             ].map((link) => (
               <Link
                 key={link.href}
