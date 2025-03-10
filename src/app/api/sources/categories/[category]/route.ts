@@ -6,8 +6,10 @@ export async function GET(
   { params }: { params: { category: string } }
 ) {
   try {
-    const decodedCategory = await decodeURIComponent(params.category);
-    
+    // Await the params object before accessing its properties
+    const { category } = await params;
+    const decodedCategory = decodeURIComponent(category);
+
     const sources = await prisma.source.findMany({
       where: {
         category: decodedCategory
