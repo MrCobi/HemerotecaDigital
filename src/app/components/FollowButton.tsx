@@ -1,6 +1,6 @@
 "use client";
 
-import { useState} from "react";
+import { useEffect, useState} from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "./ui/button";
@@ -14,7 +14,7 @@ type FollowStatusResponse = {
 
 export function FollowButton({
   targetUserId,
-  isFollowing: initialFollowingStatus,
+  isFollowing: initialFollowingStatus = false,
   onSuccess,
 }: {
   targetUserId: string;
@@ -23,9 +23,13 @@ export function FollowButton({
 }) {
   const { data: session, update } = useSession();
   const { toast } = useToast();
-  const [isFollowing, setIsFollowing] = useState(initialFollowingStatus || false);
+  const [isFollowing, setIsFollowing] = useState(initialFollowingStatus);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  useEffect(() => {
+    setIsFollowing(initialFollowingStatus);
+  }, [initialFollowingStatus]);
+  
   const handleFollow = async () => {
     if (!session) return;
 
@@ -51,6 +55,11 @@ export function FollowButton({
       if (!res.ok) throw new Error();
 
       const data: FollowStatusResponse = await res.json();
+      onSuccess?.(!originalState);
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("visibilitychange"));
+      }
       
       // Actualizar contador global de seguidores
       if (data.followerCount !== undefined) {

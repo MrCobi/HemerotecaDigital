@@ -89,10 +89,10 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url);
     const targetUserId = searchParams.get("targetUserId");
 
-    // Validación mejorada con mensajes claros
+    // Validación simplificada
     if (!targetUserId) {
       return NextResponse.json(
-        { error: "Parámetro 'targetUserId' requerido en la URL" },
+        { error: "Parámetro 'targetUserId' requerido" },
         { status: 400 }
       );
     }
