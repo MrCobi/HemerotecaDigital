@@ -12,6 +12,7 @@ import { Search, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type User = {
+  stats: any;
   id: string;
   name: string;
   username: string;
@@ -91,17 +92,39 @@ export default function ExplorePage() {
     if (session) loadSuggestions();
   }, [session, loadSuggestions]);
 
-  const handleFollowUpdate = (userId: string, isFollowing: boolean) => {
+  const handleFollowUpdate = (
+    userId: string,
+    isFollowing: boolean,
+    serverFollowerCount?: number
+  ) => {
     setFollowingStatus((prev) => ({
       ...prev,
       [userId]: isFollowing,
     }));
 
+    setUsers((prevUsers) =>
+      prevUsers.map((user) =>
+        user.id === userId
+          ? {
+              ...user,
+              stats: {
+                ...user.stats,
+                followers:
+                  serverFollowerCount ??
+                  (isFollowing
+                    ? (user.stats?.followers || 0) + 1
+                    : Math.max(0, (user.stats?.followers || 0) - 1)),
+              },
+            }
+          : user
+      )
+    );
+
     toast({
-      title: "Success!",
-      description: `Successfully ${
-        isFollowing ? "followed" : "unfollowed"
-      } user`,
+      title: "¡Éxito!",
+      description: `Has ${
+        isFollowing ? "seguido" : "dejado de seguir"
+      } al usuario`,
     });
   };
 

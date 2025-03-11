@@ -207,30 +207,31 @@ export default function UserProfilePage() {
                       </p>
                     )}
                   </div>
-
                   {/* Botón de Seguir */}
                   {session?.user?.id !== user.id && (
                     <FollowButton
-                    targetUserId={user.id}
-                    isFollowing={isFollowing}
-                    onSuccess={(newStatus, serverFollowerCount) => {
-                      setIsFollowing(newStatus);
-                      if (serverFollowerCount !== undefined) {
-                        setUserData(prev => ({
-                          ...prev!,
-                          user: {
-                            ...prev!.user,
-                            stats: {
-                              ...prev!.user.stats,
-                              followers: serverFollowerCount
-                            }
-                          }
-                        }));
-                      }
-                    }}
-                  />
+                      targetUserId={user.id}
+                      isFollowing={isFollowing}
+                      onSuccess={(newStatus, serverFollowerCount) => {
+                        setIsFollowing(newStatus);
+                        setUserData((prev) => {
+                          if (!prev) return prev;
+                          return {
+                            ...prev,
+                            user: {
+                              ...prev.user,
+                              stats: {
+                                ...prev.user.stats,
+                                followers:
+                                  serverFollowerCount ??
+                                  prev.user.stats.followers,
+                              },
+                            },
+                          };
+                        });
+                      }}
+                    />
                   )}
-
                   {/* Stats Grid */}
                   <div className="grid grid-cols-2 gap-4 max-w-xs mx-auto sm:mx-0">
                     <div className="relative group bg-gradient-to-br from-white/90 to-white/60 dark:from-gray-800/90 dark:to-gray-800/60 rounded-xl p-5 text-center backdrop-blur-sm border border-white/20 dark:border-gray-700/20 hover:border-white/40 dark:hover:border-gray-700/40 transition-all shadow-md hover:shadow-lg">

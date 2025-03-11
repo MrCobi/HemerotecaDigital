@@ -28,7 +28,8 @@ export function FollowButton({
 
   useEffect(() => {
     setIsFollowing(initialFollowingStatus);
-  }, [initialFollowingStatus]); // Añadir esta dependencia
+  }, [initialFollowingStatus]);
+
   const handleFollow = async () => {
     if (!session) return;
 
@@ -36,7 +37,7 @@ export function FollowButton({
     const originalState = isFollowing;
 
     try {
-      // Actualización optimista SOLO del estado del botón
+      // Actualización optimista solo del botón
       setIsFollowing(!originalState);
 
       const method = originalState ? "DELETE" : "POST";
@@ -47,22 +48,17 @@ export function FollowButton({
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body:
-          method === "POST"
-            ? JSON.stringify({ followingId: targetUserId })
-            : undefined,
+        body: method === "POST" 
+          ? JSON.stringify({ followingId: targetUserId })
+          : undefined,
       });
 
       if (!res.ok) throw new Error();
 
       const data: FollowStatusResponse = await res.json();
-
-      // Ejecutar onSuccess SOLO aquí con los datos reales del servidor
+      
+      // Actualización basada en respuesta del servidor
       onSuccess?.(data.isFollowing, data.followerCount);
-
-      if (data.followerCount !== undefined) {
-        await update({ followerCount: data.followerCount });
-      }
 
       toast({
         title: data.isFollowing ? "¡Nuevo seguidor!" : "Dejaste de seguir",

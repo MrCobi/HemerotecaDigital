@@ -6,6 +6,8 @@ import { motion } from "framer-motion";
 import { Card } from "@/src/app/components/ui/card";
 import { Badge } from "@/src/app/components/ui/badge";
 import Link from "next/link";
+import { memo } from "react";
+
 
 interface UserCardProps {
   user: Pick<User, "id" | "name" | "username" | "image"> & {
@@ -15,7 +17,7 @@ interface UserCardProps {
   variant?: string;
 }
 
-export function UserCard({ user, action }: UserCardProps) {
+export const UserCard = memo(function UserCard({ user, action }: UserCardProps) {
   const getGradient = (username: string) => {
     const gradients = [
       "from-blue-600 to-indigo-900",
@@ -85,4 +87,4 @@ export function UserCard({ user, action }: UserCardProps) {
       <div className="flex justify-center mt-2 pb-4">{action}</div>
     </Card>
   );
-}
+})
