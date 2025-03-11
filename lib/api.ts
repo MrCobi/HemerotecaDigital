@@ -94,7 +94,7 @@ export async function fetchArticulosDestacados(): Promise<Article[]> {
     apiUrl.searchParams.set("language", "es");
     apiUrl.searchParams.set("sortBy", "publishedAt");
     apiUrl.searchParams.set("pageSize", "21");
-    apiUrl.searchParams.set("apiKey", process.env.NEXT_PUBLIC_NEWS_API_KEY!!);
+    apiUrl.searchParams.set("apiKey", process.env.NEXT_PUBLIC_NEWS_API_KEY!);
 
     const response = await fetch(apiUrl.toString());
     
@@ -104,7 +104,7 @@ export async function fetchArticulosDestacados(): Promise<Article[]> {
 
     const data = await response.json();
     
-    const articles = data.articles.map((article: any) => ({
+    const articles = data.articles.map((article: Article) => ({
       source: article.source?.name || "NewsAPI",
       author: article.author || "Anónimo",
       title: article.title,

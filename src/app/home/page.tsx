@@ -885,7 +885,7 @@ export default function HomePage() {
             transition={{ duration: 0.5 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
-            {featuredArticles.map((article, i) => (
+            {featuredArticles.map((article) => (
               <article
                 key={article.url}
                 className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"

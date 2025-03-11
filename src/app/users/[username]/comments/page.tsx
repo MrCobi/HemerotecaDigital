@@ -1,17 +1,27 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Skeleton } from "@/src/app/components/ui/skeleton";
 import { useToast } from "@/src/app/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Image from "next/image";
+
+interface CommentType {
+  id: string;
+  userImage?: string;
+  username: string;
+  createdAt: string;
+  content: string;
+  sourceId: string;
+  sourceName: string;
+}
+
 
 export default function CommentsPage() {
   const { username } = useParams();
-  const { data: session } = useSession();
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<CommentType[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const router = useRouter();
@@ -28,7 +38,7 @@ export default function CommentsPage() {
         const { comments: commentsData } = await commentsRes.json();
         
         setComments(commentsData);
-      } catch (error) {
+      } catch {
         toast({ 
           title: "Error", 
           description: "Error cargando comentarios", 
@@ -63,7 +73,7 @@ export default function CommentsPage() {
               className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow"
             >
               <div className="flex items-start gap-3">
-                <img 
+                <Image 
                   src={comment.userImage || '/default-avatar.png'} 
                   className="w-10 h-10 rounded-full"
                   alt="Avatar"

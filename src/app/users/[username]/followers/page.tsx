@@ -1,6 +1,5 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { UserCard } from "@/src/app/components/UserCard";
@@ -9,10 +8,16 @@ import { Skeleton } from "@/src/app/components/ui/skeleton";
 import { useToast } from "@/src/app/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 
+interface Follower {
+  id: string;
+  username: string;
+  name: string | null; // Añadido para coincidir con el modelo User
+  image: string | null; // Corregido de 'userImage' a 'image'
+}
+
 export default function FollowersPage() {
   const { username } = useParams();
-  const { data: session } = useSession();
-  const [followers, setFollowers] = useState<any[]>([]);
+  const [followers, setFollowers] = useState<Follower[]>([]);
   const [loading, setLoading] = useState(true);
   const [followingStatus, setFollowingStatus] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
@@ -32,11 +37,11 @@ export default function FollowersPage() {
         setFollowers(followersData.data);
         
         // Obtener estado de seguimiento
-        const ids = followersData.data.map((f: any) => f.id);
+        const ids = followersData.data.map((f: Follower) => f.id);
         const statusRes = await fetch(`/api/users/follow-status?ids=${ids.join(",")}`);
         const status = await statusRes.json();
         setFollowingStatus(status);
-      } catch (error) {
+      } catch {
         toast({ title: "Error", description: "Error cargando seguidores", variant: "destructive" });
       } finally {
         setLoading(false);

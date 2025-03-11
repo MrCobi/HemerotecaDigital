@@ -211,27 +211,24 @@ export default function UserProfilePage() {
                   {/* Botón de Seguir */}
                   {session?.user?.id !== user.id && (
                     <FollowButton
-                      targetUserId={user.id}
-                      isFollowing={isFollowing} // Pasar el estado actualizado
-                      onSuccess={(newStatus) => {
-                        setIsFollowing(newStatus);
-                        setUserData((prev) => {
-                          if (!prev) return prev;
-                          return {
-                            ...prev,
-                            user: {
-                              ...prev.user,
-                              stats: {
-                                ...prev.user.stats,
-                                followers: newStatus
-                                  ? prev.user.stats.followers + 1
-                                  : prev.user.stats.followers - 1,
-                              },
-                            },
-                          };
-                        });
-                      }}
-                    />
+                    targetUserId={user.id}
+                    isFollowing={isFollowing}
+                    onSuccess={(newStatus, serverFollowerCount) => {
+                      setIsFollowing(newStatus);
+                      if (serverFollowerCount !== undefined) {
+                        setUserData(prev => ({
+                          ...prev!,
+                          user: {
+                            ...prev!.user,
+                            stats: {
+                              ...prev!.user.stats,
+                              followers: serverFollowerCount
+                            }
+                          }
+                        }));
+                      }
+                    }}
+                  />
                   )}
 
                   {/* Stats Grid */}

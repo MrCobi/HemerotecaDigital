@@ -6,6 +6,23 @@ type NewsApiTrend = Article & {
   localSourceId: string | null;
 };
 
+// Define a custom error interface
+interface ApiError {
+  status: number;
+  code: string;
+  message: string;
+  isRateLimit: boolean;
+}
+
+// Type guard for ApiError
+function isApiError(error: unknown): error is ApiError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "isRateLimit" in error
+  );
+}
+
 async function fetchWithRetry(url: string, retries = 3, delay = 1000) {
   for (let i = 0; i < retries; i++) {
     try {
@@ -14,25 +31,25 @@ async function fetchWithRetry(url: string, retries = 3, delay = 1000) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        const errorPayload = {
+        const errorPayload: ApiError = {
           status: response.status,
           code: errorData.code || 'unknown',
           message: errorData.message || 'Error desconocido',
-          isRateLimit: response.status === 429 // Nueva propiedad
+          isRateLimit: response.status === 429, // Nueva propiedad
         };
 
-        // Lanzar como objeto para mejor manejo
+        // Lanzar el objeto de error para un mejor manejo
         throw errorPayload;
       }
 
       return await response.json();
       
-    } catch (error) {
-      console.error(`Error en fetchWithRetry:`, error);
+    } catch (error: unknown) {
+      console.error("Error en fetchWithRetry:", error);
       
-      // Verificar si es error de rate limit
-      if ((error as any).isRateLimit) {
-        console.log('Error 429 detectado, abortando reintentos');
+      // Usar el type guard para verificar si es un error de rate limit
+      if (isApiError(error) && error.isRateLimit) {
+        console.log("Error 429 detectado, abortando reintentos");
         throw error;
       }
 
@@ -55,16 +72,18 @@ export async function GET() {
       orderBy: { _count: { sourceId: "desc" } },
       take: 8,
     }).then(async (favorites) => {
-      return await Promise.all(favorites.map(async (favorite) => {
-        const source = await prisma.source.findUnique({
-          where: { id: favorite.sourceId },
-          select: { name: true },
-        });
-        return {
-          ...favorite,
-          sourceName: source?.name || "Fuente desconocida",
-        };
-      }));
+      return await Promise.all(
+        favorites.map(async (favorite) => {
+          const source = await prisma.source.findUnique({
+            where: { id: favorite.sourceId },
+            select: { name: true },
+          });
+          return {
+            ...favorite,
+            sourceName: source?.name || "Fuente desconocida",
+          };
+        })
+      );
     });
 
     // 2. Fuentes con más comentarios
@@ -74,21 +93,23 @@ export async function GET() {
       orderBy: { _count: { sourceId: "desc" } },
       take: 8,
     }).then(async (commented) => {
-      return await Promise.all(commented.map(async (comment) => {
-        const source = await prisma.source.findUnique({
-          where: { id: comment.sourceId },
-          select: { name: true },
-        });
-        return {
-          ...comment,
-          sourceName: source?.name || "Fuente desconocida",
-        };
-      }));
+      return await Promise.all(
+        commented.map(async (comment) => {
+          const source = await prisma.source.findUnique({
+            where: { id: comment.sourceId },
+            select: { name: true },
+          });
+          return {
+            ...comment,
+            sourceName: source?.name || "Fuente desconocida",
+          };
+        })
+      );
     });
 
     // 3. Manejo de artículos trending
     let newsApiTrends: NewsApiTrend[] = [];
-    let rateLimitWarning = '';
+    let rateLimitWarning = "";
     
     try {
       const newsApiData = await fetchWithRetry(
@@ -106,11 +127,12 @@ export async function GET() {
           };
         })
       );
-    } catch (error) {
-      console.error('Error en NewsAPI:', error);
+    } catch (error: unknown) {
+      console.error("Error en NewsAPI:", error);
       
-      if ((error as any).isRateLimit) {
-        rateLimitWarning = 'Límite de solicitudes excedido. Datos de noticias no disponibles.';
+      if (isApiError(error) && error.isRateLimit) {
+        rateLimitWarning =
+          "Límite de solicitudes excedido. Datos de noticias no disponibles.";
       }
     }
 
@@ -119,18 +141,17 @@ export async function GET() {
       data: {
         favorites: topFavorites,
         comments: topCommented,
-        trends: newsApiTrends
+        trends: newsApiTrends,
       },
-      warnings: rateLimitWarning ? [rateLimitWarning] : []
+      warnings: rateLimitWarning ? [rateLimitWarning] : [],
     });
-
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error completo:", error);
     return NextResponse.json(
-      { 
+      {
         success: false,
         error: "Error interno del servidor",
-        details: (error as Error).message || 'Error desconocido'
+        details: error instanceof Error ? error.message : "Error desconocido",
       },
       { status: 500 }
     );

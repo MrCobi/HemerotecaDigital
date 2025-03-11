@@ -18,8 +18,8 @@ export function FollowButton({
   onSuccess,
 }: {
   targetUserId: string;
-  isFollowing?: boolean; // Recibir estado desde el padre
-  onSuccess?: (newStatus: boolean) => void;
+  isFollowing?: boolean;
+  onSuccess?: (newStatus: boolean, serverFollowerCount?: number) => void;
 }) {
   const { data: session, update } = useSession();
   const { toast } = useToast();
@@ -36,9 +36,8 @@ export function FollowButton({
     const originalState = isFollowing;
 
     try {
-      // Actualización optimista
+      // Actualización optimista SOLO del estado del botón
       setIsFollowing(!originalState);
-      onSuccess?.(!originalState);
 
       const method = originalState ? "DELETE" : "POST";
       const url = originalState
@@ -57,22 +56,19 @@ export function FollowButton({
       if (!res.ok) throw new Error();
 
       const data: FollowStatusResponse = await res.json();
-      onSuccess?.(!originalState);
 
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("visibilitychange"));
-      }
+      // Ejecutar onSuccess SOLO aquí con los datos reales del servidor
+      onSuccess?.(data.isFollowing, data.followerCount);
 
-      // Actualizar contador global de seguidores
       if (data.followerCount !== undefined) {
         await update({ followerCount: data.followerCount });
       }
 
       toast({
-        title: originalState ? "Dejaste de seguir" : "¡Nuevo seguidor!",
-        description: originalState
-          ? "Has dejado de seguir a este usuario"
-          : "Ahora estás siguiendo a este usuario",
+        title: data.isFollowing ? "¡Nuevo seguidor!" : "Dejaste de seguir",
+        description: data.isFollowing
+          ? "Ahora estás siguiendo a este usuario"
+          : "Has dejado de seguir a este usuario",
       });
     } catch {
       // Revertir en caso de error

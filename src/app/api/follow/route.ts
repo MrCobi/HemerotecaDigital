@@ -71,7 +71,12 @@ export async function POST(req: Request) {
     revalidateTag(`user-${session.user.id}-following`);
     revalidateTag(`user-${session.user.id}-activity`);
 
-    return NextResponse.json(newFollow);
+    return NextResponse.json({
+      isFollowing: true,
+      followerCount: await prisma.follow.count({
+        where: { followingId: followingId }
+      })
+    });
   } catch (error) {
     console.error("Error following user:", error);
     return NextResponse.json(
@@ -143,14 +148,17 @@ export async function DELETE(req: Request) {
     revalidateTag(`user-${session.user.id}-following`);
     revalidateTag(`user-${session.user.id}-activity`);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      message: "Dejaste de seguir al usuario correctamente"
+      isFollowing: false,
+      followerCount: await prisma.follow.count({
+        where: { followingId: targetUserId }
+      })
     });
   } catch (error: unknown) {
     console.error("Error detallado:", error);
     return NextResponse.json(
-      { 
+      {
         error: "Error al procesar la solicitud",
         details: (error instanceof Error) ? error.message : "Unknown error"
       },
