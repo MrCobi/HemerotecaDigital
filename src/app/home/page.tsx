@@ -753,8 +753,8 @@ export default function HomePage() {
               Bienvenido, {session?.user?.name || "Investigador"}
             </h1>
             <p className="text-sm sm:text-base md:text-lg text-blue-100 mb-6 sm:mb-8 max-w-2xl">
-              Continúa explorando nuestra colección de documentos históricos y
-              descubre nuevas perspectivas del pasado.
+              Continúa explorando nuestra colección de documentos y
+              descubre nuevas perspectivas de las noticias.
             </p>
 
             <div className="relative max-w-2xl z-20">
@@ -765,7 +765,7 @@ export default function HomePage() {
                 {/* Contenedor relativo */}
                 <Input
                   type="text"
-                  placeholder="Buscar por título, autor, fecha o palabra clave..."
+                  placeholder="Buscar por título o palabra clave..."
                   className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-blue-200 focus-visible:ring-white/30 focus-visible:border-white/30 pr-12 py-5" // Añade padding
                 />
                 <Button className="ml-2 bg-white text-blue-600 hover:bg-blue-50 absolute right-0 top-1/2 -translate-y-1/2 z-20">

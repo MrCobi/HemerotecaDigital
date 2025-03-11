@@ -23,7 +23,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { FollowButton } from "@/src/app/components/FollowButton";
 
-
 type Activity = {
   id: string;
   type: string;
@@ -54,6 +53,7 @@ export default function UserProfilePage() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  const [isFollowing, setIsFollowing] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -69,6 +69,14 @@ export default function UserProfilePage() {
             stats: data.stats,
           },
         });
+        const followStatusResponse = await fetch(
+          `/api/users/follow-status?ids=${data.id}`,
+          {
+            headers: { Authorization: `Bearer ${session?.user?.id}` },
+          }
+        );
+        const followStatus = await followStatusResponse.json();
+        setIsFollowing(followStatus[data.id] || false);
         setFavorites(data.favorites || []);
         setActivity(data.activity || []);
         setPrivacy(
@@ -202,26 +210,28 @@ export default function UserProfilePage() {
 
                   {/* Botón de Seguir */}
                   {session?.user?.id !== user.id && (
-                    <div className="flex justify-center sm:justify-start">
-                      <FollowButton
-                        targetUserId={user.id}
-                        onSuccess={() => {
-                          setUserData((prev) => {
-                            if (!prev) return prev; // Si prev es null, retorna null
-                            return {
-                              ...prev,
-                              user: {
-                                ...prev.user,
-                                stats: {
-                                  ...prev.user.stats,
-                                  followers: prev.user.stats.followers + 1,
-                                },
+                    <FollowButton
+                      targetUserId={user.id}
+                      isFollowing={isFollowing} // Pasar el estado actualizado
+                      onSuccess={(newStatus) => {
+                        setIsFollowing(newStatus);
+                        setUserData((prev) => {
+                          if (!prev) return prev;
+                          return {
+                            ...prev,
+                            user: {
+                              ...prev.user,
+                              stats: {
+                                ...prev.user.stats,
+                                followers: newStatus
+                                  ? prev.user.stats.followers + 1
+                                  : prev.user.stats.followers - 1,
                               },
-                            };
-                          });
-                        }}
-                      />
-                    </div>
+                            },
+                          };
+                        });
+                      }}
+                    />
                   )}
 
                   {/* Stats Grid */}
