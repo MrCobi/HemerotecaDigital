@@ -60,9 +60,9 @@ export default function UserProfilePage() {
       try {
         const response = await fetch(`/api/users/by-username/${username}`);
         const data = await response.json();
-
+  
         if (!response.ok) throw new Error(data.error || "User not found");
-
+  
         setUserData({
           user: {
             ...data,
@@ -92,7 +92,8 @@ export default function UserProfilePage() {
       }
     };
     loadProfile();
-  }, [username]);
+  }, [username, session?.user?.id]);
+  
 
   function renderActivityMessage(
     type: string,

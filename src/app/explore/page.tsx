@@ -11,8 +11,12 @@ import { motion } from "framer-motion";
 import { Search, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+type Stats = {
+  followers?: number;
+};
+
 type User = {
-  stats: any;
+  stats: Stats;
   id: string;
   name: string;
   username: string;

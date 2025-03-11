@@ -21,7 +21,7 @@ export function FollowButton({
   isFollowing?: boolean;
   onSuccess?: (newStatus: boolean, serverFollowerCount?: number) => void;
 }) {
-  const { data: session, update } = useSession();
+  const { data: session } = useSession();
   const { toast } = useToast();
   const [isFollowing, setIsFollowing] = useState(initialFollowingStatus);
   const [isUpdating, setIsUpdating] = useState(false);

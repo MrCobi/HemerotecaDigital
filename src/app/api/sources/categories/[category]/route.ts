@@ -3,11 +3,11 @@ import prisma from "@/lib/db";
 
 export async function GET(
   request: Request,
-  { params }: { params: { category: string } }
+  context: { params: Promise<{ category: string }> }
 ) {
   try {
     // Await the params object before accessing its properties
-    const { category } = await params;
+    const { category } = await context.params;
     const decodedCategory = decodeURIComponent(category);
 
     const sources = await prisma.source.findMany({

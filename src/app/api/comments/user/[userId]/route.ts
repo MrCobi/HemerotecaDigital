@@ -4,12 +4,13 @@ import prisma from "@/lib/db";
 
 export async function GET(
   _: Request,
-  { params }: { params: { userId: string } }
+  context: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const { userId } = await context.params;
     const comments = await prisma.comment.findMany({
       where: {
-        userId: params.userId,
+        userId: userId,
         isDeleted: false
       },
       include: {

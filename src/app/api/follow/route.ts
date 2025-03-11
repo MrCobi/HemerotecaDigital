@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     }
 
     // Crear el follow
-    const newFollow = await prisma.follow.create({
+    const _newFollow = await prisma.follow.create({
       data: {
         followerId: session.user.id,
         followingId: followingId
