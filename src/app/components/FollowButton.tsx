@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState} from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "./ui/button";
@@ -28,8 +28,7 @@ export function FollowButton({
 
   useEffect(() => {
     setIsFollowing(initialFollowingStatus);
-  }, [initialFollowingStatus]);
-  
+  }, [initialFollowingStatus]); // Añadir esta dependencia
   const handleFollow = async () => {
     if (!session) return;
 
@@ -42,14 +41,17 @@ export function FollowButton({
       onSuccess?.(!originalState);
 
       const method = originalState ? "DELETE" : "POST";
-      const url = originalState 
+      const url = originalState
         ? `/api/follow?targetUserId=${targetUserId}`
         : "/api/follow";
 
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: method === "POST" ? JSON.stringify({ followingId: targetUserId }) : undefined,
+        body:
+          method === "POST"
+            ? JSON.stringify({ followingId: targetUserId })
+            : undefined,
       });
 
       if (!res.ok) throw new Error();
@@ -60,7 +62,7 @@ export function FollowButton({
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("visibilitychange"));
       }
-      
+
       // Actualizar contador global de seguidores
       if (data.followerCount !== undefined) {
         await update({ followerCount: data.followerCount });
