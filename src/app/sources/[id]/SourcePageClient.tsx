@@ -14,6 +14,7 @@ import CommentList from "@/src/app/components/Comments/CommentList";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import { useCallback } from "react";
 import { Heart } from "lucide-react";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 interface SourcePageClientProps {
   source: Source;
@@ -47,7 +48,7 @@ export default function SourcePageClient({
     const loadFavorites = async () => {
       if (session?.user?.id) {
         try {
-          const response = await fetch("/api/favorites/list");
+          const response = await fetch(API_ROUTES.favorites.list);
           if (response.ok) {
             const data = await response.json();
             setFavorites(new Set(data.favoriteIds));
@@ -67,7 +68,7 @@ export default function SourcePageClient({
     }
     try {
       if (favorites.has(sourceId)) {
-        await fetch("/api/favorites/remove", {
+        await fetch(API_ROUTES.favorites.remove(sourceId), {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sourceId }),
@@ -78,7 +79,7 @@ export default function SourcePageClient({
           return newFav;
         });
       } else {
-        await fetch("/api/favorites/add", {
+        await fetch(API_ROUTES.favorites.add, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sourceId }),
@@ -129,7 +130,7 @@ export default function SourcePageClient({
     setIsLoadingComments(true);
     try {
       const response = await fetch(
-        `/api/comments/list/${source.id}?page=${currentPage}`
+        API_ROUTES.comments.list(source.id, currentPage)
       );
       if (response.ok) {
         const _data = await response.json();
@@ -147,9 +148,8 @@ export default function SourcePageClient({
       const controller = new AbortController();
 
       try {
-        const url = `/api/comments/count/${source.id}${
-          invalidateCache ? `?t=${Date.now()}` : ""
-        }`;
+        const baseUrl = API_ROUTES.comments.count(source.id);
+        const url = `${baseUrl}${invalidateCache ? `?t=${Date.now()}` : ""}`;
 
         const response = await fetch(url, {
           signal: controller.signal,
@@ -167,7 +167,7 @@ export default function SourcePageClient({
 
       return () => controller.abort();
     },
-    [source.id, setCommentsCount] // Dependencias actualizadas
+    [source.id, setCommentsCount]
   );
 
   useEffect(() => {

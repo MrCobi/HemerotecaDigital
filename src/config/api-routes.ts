@@ -26,7 +26,14 @@ export const API_ROUTES = {
     details: "/api/sources/details"
   },
   favorites: {
-    list: "/api/favorites/list"
+    list: "/api/favorites/list",
+    add: "/api/favorites/add",
+    remove: (sourceId: string) => `/api/favorites/remove/${sourceId}`,
+  },
+  comments: {
+    list: (sourceId: string, page: number) => 
+      `/api/comments/list/${sourceId}?page=${page}`,
+    count: (sourceId: string) => `/api/comments/count/${sourceId}`
   },
   trends: {
     list: "/api/trends"
