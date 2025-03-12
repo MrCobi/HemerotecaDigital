@@ -7,6 +7,7 @@ import SourcesPage from "@/src/app/components/SourceList";
 import { Button } from "@/src/app/components/ui/button";
 import { Star, ExternalLink, Heart } from "lucide-react";
 import Link from "next/link";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 export default function FavoritesPage() {
   const { data: session } = useSession();
@@ -17,22 +18,25 @@ export default function FavoritesPage() {
     if (session?.user?.id) {
       try {
         setLoading(true);
-        const favoritesResponse = await fetch("/api/favorites/list");
+        
+        // Actualizado con API_ROUTES
+        const favoritesResponse = await fetch(API_ROUTES.favorites.list);
         const favoritesData = await favoritesResponse.json();
         const favoriteIds = favoritesData.favoriteIds;
-
-        const detailsResponse = await fetch("/api/sources/details", {
+  
+        // Actualizado con API_ROUTES
+        const detailsResponse = await fetch(API_ROUTES.sources.details, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ sourceIds: favoriteIds }),
         });
-
+  
         if (!detailsResponse.ok) {
           throw new Error("Error al obtener detalles de los periódicos");
         }
-
+  
         const detailsData = await detailsResponse.json();
         setFavoriteSources(detailsData.sources || []);
       } catch (error) {
