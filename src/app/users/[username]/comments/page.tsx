@@ -7,6 +7,7 @@ import { useToast } from "@/src/app/components/ui/use-toast";
 import { Button } from "@/src/app/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 interface CommentType {
   id: string;
@@ -30,11 +31,11 @@ export default function CommentsPage() {
     const fetchData = async () => {
       try {
         // Obtener ID del usuario
-        const userRes = await fetch(`/api/users/by-username/${username}`);
+        const userRes = await fetch(API_ROUTES.users.byUsername(username as string));
         const userData = await userRes.json();
         
         // Obtener comentarios con información extendida
-        const commentsRes = await fetch(`/api/comments/user/${userData.id}`);
+        const commentsRes = await fetch(API_ROUTES.comments.byUser(userData.id));
         const { comments: commentsData } = await commentsRes.json();
         
         setComments(commentsData);
@@ -48,7 +49,7 @@ export default function CommentsPage() {
         setLoading(false);
       }
     };
-
+  
     fetchData();
   }, [username, toast]);
 

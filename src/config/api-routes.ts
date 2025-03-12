@@ -6,19 +6,20 @@ export const API_ROUTES = {
       create: "/api/users/create",
       update: (id: string) => `/api/users/edit/${id}`,
     },
-    stats: "/api/users/stats", // Nueva ruta
+    stats: "/api/users/stats",
     followStatus: (ids: string[]) => `/api/users/follow-status?ids=${ids.join(",")}`,
-    suggestions: (query: string) => `/api/users/suggestions?query=${encodeURIComponent(query)}`
+    suggestions: (query: string) => `/api/users/suggestions?query=${encodeURIComponent(query)}`,
+    byUsername: (username: string) => `/api/users/by-username/${username}`, // Nueva ruta añadida
   },
   activity: {
     following: (page: number, limit: number) => 
-      `/api/activity/following?page=${page}&limit=${limit}` // Nueva ruta
+      `/api/activity/following?page=${page}&limit=${limit}`
   },
   categories: {
-    list: "/api/categories" // Nueva ruta
+    list: "/api/categories"
   },
   articles: {
-    featured: "/api/articles/featured" // Nueva ruta (asumiendo que existe)
+    featured: "/api/articles/featured"
   },
   sources: {
     byCategory: (category: string) => 
@@ -33,7 +34,8 @@ export const API_ROUTES = {
   comments: {
     list: (sourceId: string, page: number) => 
       `/api/comments/list/${sourceId}?page=${page}`,
-    count: (sourceId: string) => `/api/comments/count/${sourceId}`
+    count: (sourceId: string) => `/api/comments/count/${sourceId}`,
+    byUser: (userId: string) => `/api/comments/user/${userId}`, // Nueva ruta añadida
   },
   trends: {
     list: "/api/trends"
