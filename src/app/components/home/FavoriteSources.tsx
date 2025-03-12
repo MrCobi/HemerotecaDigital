@@ -1,7 +1,7 @@
 "use client";
 
 import { Card } from "@/src/app/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/src/app/components/ui/button";
 import { Star, MessageSquare, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";

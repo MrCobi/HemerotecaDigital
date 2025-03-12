@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/app/components/ui/card";
 import { Avatar } from "@/src/app/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/src/app/components/ui/button";
 import { Plus } from "lucide-react";
 import Image from "next/image";
 

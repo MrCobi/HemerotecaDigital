@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/src/app/components/ui/button";
 import { Textarea } from "@/src/app/components/ui/textarea";
 import { MessageSquare, AlertCircle } from "lucide-react";
 

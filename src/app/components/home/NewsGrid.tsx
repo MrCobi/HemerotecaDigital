@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/app/components/ui/card";
 import { Badge } from "@/src/app/components/ui/badge";
 import { Avatar } from "@/src/app/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/src/app/components/ui/button";
 import { Bookmark, MessageSquare, Share2 } from "lucide-react";
 import Image from "next/image";
 

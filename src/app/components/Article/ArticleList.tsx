@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Article } from "../../../src/interface/article";
+import { Article } from "../../../interface/article";
 import Image from "next/image";
 import Link from "next/link";
 import { Calendar, User, ArrowRight } from "lucide-react";

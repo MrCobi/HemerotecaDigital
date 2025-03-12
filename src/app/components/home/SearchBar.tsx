@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/src/app/components/ui/input";
+import { Button } from "@/src/app/components/ui/button";
 import { Search, Filter, X } from "lucide-react";
 import { Card } from "@/src/app/components/ui/card";
 

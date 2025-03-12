@@ -3,7 +3,7 @@
 "use client";
 
 import { Switch } from "@/src/app/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { Label } from "@/src/app/components/ui/label";
 import { updatePrivacySettings } from "@/lib/api";
 import { useState } from "react";
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Source } from "../../../src/interface/source";
+import { Source } from "../../../interface/source";
 import { Autocomplete, TextField, CircularProgress } from "@mui/material";
-import { fetchSources } from "../../../src/app/services/SourcesbyLanguageService";
+import { fetchSources } from "../../services/SourcesbyLanguageService";
 interface SearchFormProps {
   searchParams: {
     q: string;
