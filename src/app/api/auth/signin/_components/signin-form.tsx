@@ -9,9 +9,9 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+} from "@/src/app/components/ui/form";
+import { Input } from "@/src/app/components/ui/input";
+import { Button } from "@/src/app/components/ui/button";
 import { z } from "zod";
 import { loginSchema } from "@/lib/zod";
 import { zodResolver } from "@hookform/resolvers/zod";
