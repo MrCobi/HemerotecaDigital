@@ -22,6 +22,7 @@ import { Source } from "@/src/interface/source";
 import Link from "next/link";
 import { Button } from "@/src/app/components/ui/button";
 import { FollowButton } from "@/src/app/components/FollowButton";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 type Activity = {
   id: string;
@@ -58,11 +59,13 @@ export default function UserProfilePage() {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const response = await fetch(`/api/users/by-username/${username}`);
+        const response = await fetch(
+          API_ROUTES.users.byUsername(username as string)
+        );
         const data = await response.json();
-  
+
         if (!response.ok) throw new Error(data.error || "User not found");
-  
+
         setUserData({
           user: {
             ...data,
@@ -70,7 +73,7 @@ export default function UserProfilePage() {
           },
         });
         const followStatusResponse = await fetch(
-          `/api/users/follow-status?ids=${data.id}`,
+          API_ROUTES.users.followStatus([data.id]), // Array con el ID
           {
             headers: { Authorization: `Bearer ${session?.user?.id}` },
           }
@@ -93,7 +96,6 @@ export default function UserProfilePage() {
     };
     loadProfile();
   }, [username, session?.user?.id]);
-  
 
   function renderActivityMessage(
     type: string,
