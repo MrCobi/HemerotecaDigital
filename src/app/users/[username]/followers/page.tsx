@@ -6,7 +6,7 @@ import { UserCard } from "@/src/app/components/UserCard";
 import { FollowButton } from "@/src/app/components/FollowButton";
 import { Skeleton } from "@/src/app/components/ui/skeleton";
 import { useToast } from "@/src/app/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/src/app/components/ui/button";
 
 interface Follower {
   id: string;

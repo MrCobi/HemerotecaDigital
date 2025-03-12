@@ -22,8 +22,8 @@ import {
   Plus,
   User2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/src/app/components/ui/button";
+import { Input } from "@/src/app/components/ui/input";
 import { Badge } from "@/src/app/components/ui/badge";
 import {
   Card,

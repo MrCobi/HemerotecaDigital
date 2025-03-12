@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { Tag, ExternalLink } from "lucide-react";
 import { Source } from "@/src/interface/source";
 import SourcesPage from "@/src/app/components/SourceList";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/src/app/components/ui/button";
 import Link from "next/link";
 
 export default function CategoryPage() {

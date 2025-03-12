@@ -20,7 +20,7 @@ import {
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 import { Source } from "@/src/interface/source";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/src/app/components/ui/button";
 import { FollowButton } from "@/src/app/components/FollowButton";
 
 type Activity = {

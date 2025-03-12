@@ -6,10 +6,10 @@ import { UserCard } from "@/src/app/components/UserCard";
 import { FollowButton } from "@/src/app/components/FollowButton";
 import { Skeleton } from "@/src/app/components/ui/skeleton";
 import { useToast } from "@/src/app/components/ui/use-toast";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/src/app/components/ui/input";
 import { motion } from "framer-motion";
 import { Search, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/src/app/components/ui/button";
 
 type Stats = {
   followers?: number;

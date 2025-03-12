@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Skeleton } from "@/src/app/components/ui/skeleton";
 import { useToast } from "@/src/app/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/src/app/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -77,6 +77,8 @@ export default function CommentsPage() {
                   src={comment.userImage || '/default-avatar.png'} 
                   className="w-10 h-10 rounded-full"
                   alt="Avatar"
+                  width={100}
+                  height={100}
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
