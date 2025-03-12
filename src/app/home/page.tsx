@@ -37,6 +37,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Article } from "@/src/interface/article";
 import { fetchArticulosDestacados } from "@/lib/api";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 interface Activity {
   id: string;
@@ -170,11 +171,11 @@ const TrendsSection = () => {
   useEffect(() => {
     const fetchTrends = async () => {
       try {
-        const response = await fetch("/api/trends");
-        const { data } = await response.json(); // Cambio clave aquí
-
+        const response = await fetch(API_ROUTES.trends.list); // Usando la ruta centralizada
+        const { data } = await response.json();
+  
         setTrends({
-          api: data.trends.slice(0, 8), // Acceder a través de data.trends
+          api: data.trends.slice(0, 8),
           favorites: data.favorites
             .map(
               (item: {
@@ -561,7 +562,7 @@ export default function HomePage() {
     const loadStats = async () => {
       if (session?.user?.id) {
         try {
-          const response = await fetch("/api/users/stats");
+          const response = await fetch(API_ROUTES.users.stats);
           const data = await response.json();
           setUserStats({
             favoriteCount: data.favoriteCount,
@@ -602,7 +603,7 @@ export default function HomePage() {
         setIsLoadingFollowingActivity(true);
         try {
           const response = await fetch(
-            `/api/activity/following?page=${currentPage}&limit=${itemsPerPage}`
+            API_ROUTES.activity.following(currentPage, itemsPerPage)
           );
           if (response.ok) {
             const { data, total } = await response.json();
@@ -662,10 +663,9 @@ export default function HomePage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch("/api/categories");
+        const response = await fetch(API_ROUTES.categories.list);
         const data = await response.json();
-
-        // Asegurar que data sea siempre un array
+  
         if (Array.isArray(data)) {
           setCategories(data);
         } else {
@@ -753,8 +753,8 @@ export default function HomePage() {
               Bienvenido, {session?.user?.name || "Investigador"}
             </h1>
             <p className="text-sm sm:text-base md:text-lg text-blue-100 mb-6 sm:mb-8 max-w-2xl">
-              Continúa explorando nuestra colección de documentos y
-              descubre nuevas perspectivas de las noticias.
+              Continúa explorando nuestra colección de documentos y descubre
+              nuevas perspectivas de las noticias.
             </p>
 
             <div className="relative max-w-2xl z-20">
