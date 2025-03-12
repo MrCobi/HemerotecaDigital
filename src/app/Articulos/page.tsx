@@ -3,11 +3,11 @@ import React, { useEffect, useState, useCallback } from "react";
 import { fetchTopHeadlines } from "../services/NewsEverythingService";
 import { Article } from "../../interface/article";
 import Image from "next/image";
-import ArticleList from "../components/ArticleList";
+import ArticleList from "@/components/app/Article/ArticleList";
 import Loading from "../components/Loading";
-import NoArticlesError from "../components/NoArticlesError";
-import ArticleForm from "../components/ArticleForm";
-import Pagination from "../components/Pagination";
+import NoArticlesError from "@/components/app/Article/NoArticlesError";
+import ArticleForm from "@/components/app/Article/ArticleForm";
+import Pagination from "@/components/app/Article/Pagination";
 import { useSearchParams } from "next/navigation";
 
 const defaultSearchParams = {
