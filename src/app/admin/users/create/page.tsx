@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 export default function CreateUserPage() {
   const [form, setForm] = useState({
@@ -38,7 +39,7 @@ export default function CreateUserPage() {
     e.preventDefault();
     setError("");
 
-    const res = await fetch("/api/users/create", {
+    const res = await fetch(API_ROUTES.users.crud.create, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),

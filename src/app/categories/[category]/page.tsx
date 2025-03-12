@@ -8,6 +8,7 @@ import { Source } from "@/src/interface/source";
 import SourcesPage from "@/src/app/components/SourceList";
 import { Button } from "@/src/app/components/ui/button";
 import Link from "next/link";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 export default function CategoryPage() {
   const { category } = useParams();
@@ -21,9 +22,8 @@ export default function CategoryPage() {
       if (!category) throw new Error("Categoría no especificada");
 
       const categoryName = Array.isArray(category) ? category[0] : category;
-      const response = await fetch(
-        `/api/sources/categories/${encodeURIComponent(categoryName)}`
-      );
+      // Línea actualizada usando API_ROUTES
+      const response = await fetch(API_ROUTES.sources.byCategory(categoryName));
 
       if (!response.ok) throw new Error("Error al cargar las fuentes");
 

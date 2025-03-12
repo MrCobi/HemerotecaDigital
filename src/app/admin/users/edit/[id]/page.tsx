@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import { CustomUser as User} from "@/src/interface/user";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 export default function EditUserPage() {
   const { id } = useParams();
@@ -18,7 +19,7 @@ export default function EditUserPage() {
 
   useEffect(() => {
     async function fetchUser() {
-      const res = await fetch(`/api/users/${id}`);
+      const res = await fetch(API_ROUTES.users.crud.get(id as string));
       if (res.ok) {
         const data = await res.json();
         setForm({ name: data.name, email: data.email, password: "", role: data.role });
@@ -49,7 +50,7 @@ export default function EditUserPage() {
     e.preventDefault();
     setError("");
 
-    const res = await fetch(`/api/users/edit/${id}`, {
+    const res = await fetch(API_ROUTES.users.crud.update(id as string), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useState } from "react";
 import styled from "styled-components";
 import { CustomUser as User} from "@/src/interface/user";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 export default function DashboardPage() {
   const { id } = useParams();
@@ -16,7 +17,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchUser() {
       try {
-        const res = await fetch(`/api/users/${id}`);
+        const res = await fetch(API_ROUTES.users.crud.get(id as string));
         if (res.ok) {
           const data = await res.json();
           setUserInfo(data);

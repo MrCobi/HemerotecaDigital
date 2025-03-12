@@ -3,6 +3,7 @@ import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { CustomUser as User} from "@/src/interface/user";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 
 export default function DeleteUserPage() {
@@ -13,7 +14,7 @@ export default function DeleteUserPage() {
 
   useEffect(() => {
     async function fetchUser() {
-      const res = await fetch(`/api/users/${id}`);
+      const res = await fetch(API_ROUTES.users.crud.get(id as string));
       if (res.ok) {
         const data = await res.json();
         setUser(data);
@@ -24,7 +25,9 @@ export default function DeleteUserPage() {
 
   const handleDelete = async () => {
     setIsLoading(true);
-    const res = await fetch(`/api/users/delete/${id}`, { method: "DELETE" });
+    const res = await fetch(API_ROUTES.users.crud.delete(id as string), { // Ruta actualizada
+      method: "DELETE"
+    });
 
     if (res.ok) {
       router.push("/admin/users");
