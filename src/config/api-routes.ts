@@ -9,7 +9,9 @@ export const API_ROUTES = {
     stats: "/api/users/stats",
     followStatus: (ids: string[]) => `/api/users/follow-status?ids=${ids.join(",")}`,
     suggestions: (query: string) => `/api/users/suggestions?query=${encodeURIComponent(query)}`,
-    byUsername: (username: string) => `/api/users/by-username/${username}`, // Nueva ruta añadida
+    byUsername: (username: string) => `/api/users/by-username/${username}`,
+    followers: (userId: string) => `/api/users/${userId}/followers`,
+    following: (userId: string) => `/api/users/${userId}/following`, // Nueva ruta añadida
   },
   activity: {
     following: (page: number, limit: number) => 
@@ -35,7 +37,7 @@ export const API_ROUTES = {
     list: (sourceId: string, page: number) => 
       `/api/comments/list/${sourceId}?page=${page}`,
     count: (sourceId: string) => `/api/comments/count/${sourceId}`,
-    byUser: (userId: string) => `/api/comments/user/${userId}`, // Nueva ruta añadida
+    byUser: (userId: string) => `/api/comments/user/${userId}`,
   },
   trends: {
     list: "/api/trends"

@@ -7,6 +7,7 @@ import { FollowButton } from "@/src/app/components/FollowButton";
 import { Skeleton } from "@/src/app/components/ui/skeleton";
 import { useToast } from "@/src/app/components/ui/use-toast";
 import { Button } from "@/src/app/components/ui/button";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 interface Follower {
   id: string;
@@ -27,18 +28,18 @@ export default function FollowersPage() {
     const fetchData = async () => {
       try {
         // Obtener ID del usuario
-        const userRes = await fetch(`/api/users/by-username/${username}`);
+        const userRes = await fetch(API_ROUTES.users.byUsername(username as string));
         const userData = await userRes.json();
         
         // Obtener seguidores
-        const followersRes = await fetch(`/api/users/${userData.id}/followers`);
+        const followersRes = await fetch(API_ROUTES.users.followers(userData.id));
         const followersData = await followersRes.json();
         
         setFollowers(followersData.data);
         
         // Obtener estado de seguimiento
         const ids = followersData.data.map((f: Follower) => f.id);
-        const statusRes = await fetch(`/api/users/follow-status?ids=${ids.join(",")}`);
+        const statusRes = await fetch(API_ROUTES.users.followStatus(ids));
         const status = await statusRes.json();
         setFollowingStatus(status);
       } catch {
@@ -47,7 +48,7 @@ export default function FollowersPage() {
         setLoading(false);
       }
     };
-
+  
     fetchData();
   }, [username, toast]);
 
