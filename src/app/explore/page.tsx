@@ -10,6 +10,7 @@ import { Input } from "@/src/app/components/ui/input";
 import { motion } from "framer-motion";
 import { Search, Users } from "lucide-react";
 import { Button } from "@/src/app/components/ui/button";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 type Stats = {
   followers?: number;
@@ -54,11 +55,9 @@ export default function ExplorePage() {
       setError(null);
 
       const response = await fetch(
-        `/api/users/suggestions?query=${debouncedQuery}`,
+        API_ROUTES.users.suggestions(debouncedQuery),
         {
-          headers: {
-            Authorization: `Bearer ${session?.user?.id}`,
-          },
+          headers: { Authorization: `Bearer ${session?.user?.id}` },
         }
       );
 
@@ -70,12 +69,9 @@ export default function ExplorePage() {
       // Check follow status for all users in one request
       if (data.length > 0) {
         const ids = data.map((user: User) => user.id);
-        const statusResponse = await fetch(
-          `/api/users/follow-status?ids=${ids.join(",")}`,
-          {
-            headers: { Authorization: `Bearer ${session?.user?.id}` },
-          }
-        );
+        const statusResponse = await fetch(API_ROUTES.users.followStatus(ids), {
+          headers: { Authorization: `Bearer ${session?.user?.id}` },
+        });
         const status = await statusResponse.json();
         setFollowingStatus(status);
       }
