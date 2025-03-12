@@ -23,6 +23,7 @@ import {
 import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
 import { toast } from "sonner";
 import Image from "next/image";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 export default function EditUserPage() {
   const router = useRouter();
@@ -102,7 +103,7 @@ export default function EditUserPage() {
     setSaving(true);
 
     try {
-      const response = await fetch(`/api/users/${session?.user.id}`, {
+      const response = await fetch(API_ROUTES.users.crud.update(session?.user.id!), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
