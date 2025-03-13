@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { Menu } from "@mui/material";
 import styled from "styled-components";
-import Image from "next/image";
+import { CldImage } from 'next-cloudinary';
 
 const AuthButton = () => {
   const { data: session } = useSession();
@@ -45,14 +45,14 @@ const AuthButton = () => {
         >
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full overflow-hidden">
-              <Image
-                src={`${session.user.image}?${Date.now()}`}
+              <CldImage
+                src={session.user.image || 'default_avatar'}
                 alt={session.user?.name || "Usuario"}
                 width={48}
                 height={48}
+                crop="fill"
+                gravity="face"
                 className="w-full h-full object-cover"
-                unoptimized={true} // Ajusta la calidad de la imagen
-                quality={100} // Ajusta la calidad de la imagen
               />
             </div>
             <div className="flex flex-col items-start">

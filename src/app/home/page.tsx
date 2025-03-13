@@ -33,7 +33,7 @@ import {
 } from "@/src/app/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/src/app/components/ui/tabs";
 import { Avatar } from "@/src/app/components/ui/avatar";
-import Image from "next/image";
+import { CldImage } from 'next-cloudinary';
 import Link from "next/link";
 import { Article } from "@/src/interface/article";
 import { fetchArticulosDestacados } from "@/lib/api";
@@ -893,11 +893,12 @@ export default function HomePage() {
               >
                 <figure className="relative h-40 sm:h-48">
                   {article.urlToImage ? (
-                    <Image
+                    <CldImage
                       src={article.urlToImage}
                       alt={article.title}
-                      fill
-                      className="object-cover"
+                      width={280}
+                      height={160}
+                      className="h-full w-full object-cover"
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   ) : (
@@ -1027,7 +1028,7 @@ export default function HomePage() {
               opacity: isVisible.collections ? 1 : 0,
               y: isVisible.collections ? 0 : 20,
             }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            transition={{ duration: 0.5 }}
             className="relative"
           >
             <div
@@ -1109,7 +1110,7 @@ export default function HomePage() {
                       className={`h-48 rounded-xl overflow-hidden relative bg-gradient-to-br ${bgColor} shadow-lg transform transition-all duration-300`}
                     >
                       <div className="absolute inset-0 opacity-20 pointer-events-none">
-                        <Image
+                        <CldImage
                           src="https://img.freepik.com/foto-gratis/textura-pared-cemento-viejo_1149-1280.jpg"
                           alt={displayName}
                           width={280}
@@ -1239,13 +1240,15 @@ export default function HomePage() {
                           <div className="flex items-center space-x-3">
                             <div className="flex-shrink-0">
                               <Avatar className="h-10 w-10">
-                                <Image
+                                <CldImage
                                   src={
-                                    activity.user.image || "/default-avatar.png"
+                                    activity.user.image || "default_avatar"
                                   }
                                   alt={activity.user.name}
                                   width={40}
                                   height={40}
+                                  crop="fill"
+                                  gravity="face"
                                   className="h-10 w-10 rounded-full"
                                 />
                               </Avatar>

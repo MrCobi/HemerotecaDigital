@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
 import { toast } from "sonner";
-import Image from "next/image";
+import { CldImage } from 'next-cloudinary';
 import { API_ROUTES } from "@/src/config/api-routes";
 
 export default function EditUserPage() {
@@ -196,14 +196,16 @@ export default function EditUserPage() {
               <div className="flex flex-col items-center space-y-4">
                 <div className="relative group">
                   <div className="relative w-48 h-48 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl transition-all duration-300">
-                    <Image
+                    <CldImage
                       src={
-                        formData.image || "/images/AvatarPredeterminado.webp"
+                        formData.image || "default_avatar"
                       }
                       alt={user?.name || "Avatar"}
-                      layout="fill"
+                      width={192}
+                      height={192}
+                      crop="fill"
+                      gravity="face"
                       className="object-cover"
-                      priority
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.src = "/images/AvatarPredeterminado.webp";
