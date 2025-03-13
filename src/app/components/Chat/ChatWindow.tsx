@@ -6,6 +6,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { UnreadMessagesContext, UnreadMessagesContextType } from "@/src/app/contexts/UnreadMessagesContext";
+import { CldImage } from 'next-cloudinary';
 
 interface User {
   id: string;
@@ -127,7 +128,24 @@ export function ChatWindow({ otherUser, currentUserId, onMessageSent }: {
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 mb-4 p-3 border-b border-blue-800">
         <Avatar>
-          <AvatarImage src={otherUser.image || ''} />
+          {otherUser.image && (otherUser.image.includes('cloudinary') || 
+          (!otherUser.image.startsWith('/') && !otherUser.image.startsWith('http'))) ? (
+            <CldImage
+              src={otherUser.image}
+              alt={otherUser.username || 'Usuario'}
+              width={40}
+              height={40}
+              crop="fill"
+              gravity="face"
+              className="h-10 w-10 rounded-full"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = "/images/AvatarPredeterminado.webp";
+              }}
+            />
+          ) : (
+            <AvatarImage src={otherUser.image || ''} />
+          )}
           <AvatarFallback>
             {otherUser.username?.[0]?.toUpperCase() || 'U'}
           </AvatarFallback>

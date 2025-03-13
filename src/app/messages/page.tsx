@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/src/app/components/ui/avatar";
 import { Input } from "@/src/app/components/ui/input";
 import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
+import { CldImage } from 'next-cloudinary';
 
 interface User {
   id: string;
@@ -350,7 +351,24 @@ export default function MessagesPage() {
                       onClick={() => startNewConversation(user.id)}
                     >
                       <Avatar>
-                        <AvatarImage src={user.image || ''} />
+                        {user.image && (user.image.includes('cloudinary') || 
+                        (!user.image.startsWith('/') && !user.image.startsWith('http'))) ? (
+                          <CldImage
+                            src={user.image}
+                            alt={user.username || 'Usuario'}
+                            width={40}
+                            height={40}
+                            crop="fill"
+                            gravity="face"
+                            className="h-10 w-10 rounded-full"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = "/images/AvatarPredeterminado.webp";
+                            }}
+                          />
+                        ) : (
+                          <AvatarImage src={user.image || ''} />
+                        )}
                         <AvatarFallback>
                           {user.username?.[0]?.toUpperCase() || 'U'}
                         </AvatarFallback>
@@ -394,7 +412,24 @@ export default function MessagesPage() {
                   onClick={() => setSelectedConversation(conversation.id)}
                 >
                   <Avatar className="h-12 w-12 mr-3">
-                    <AvatarImage src={otherUser.image || ''} />
+                    {otherUser.image && (otherUser.image.includes('cloudinary') || 
+                    (!otherUser.image.startsWith('/') && !otherUser.image.startsWith('http'))) ? (
+                      <CldImage
+                        src={otherUser.image}
+                        alt={otherUser.username || 'Usuario'}
+                        width={48}
+                        height={48}
+                        crop="fill"
+                        gravity="face"
+                        className="h-12 w-12 rounded-full"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
+                      />
+                    ) : (
+                      <AvatarImage src={otherUser.image || ''} />
+                    )}
                     <AvatarFallback>
                       {otherUser.username?.[0]?.toUpperCase() || 'U'}
                     </AvatarFallback>

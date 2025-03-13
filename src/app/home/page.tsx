@@ -683,7 +683,10 @@ export default function HomePage() {
   }, []);
 
   const PaginationControls = () => {
-    const totalPages = Math.ceil(totalActivities / itemsPerPage) || 1;
+    // Limitar a un máximo de 10 páginas
+    const maxPages = 10;
+    const calculatedTotalPages = Math.ceil(totalActivities / itemsPerPage) || 1;
+    const totalPages = Math.min(calculatedTotalPages, maxPages);
 
     return (
       <div className="flex justify-center gap-2 mt-4">
@@ -696,6 +699,7 @@ export default function HomePage() {
 
         <span className="flex items-center px-4 text-sm">
           Página {currentPage} de {totalPages}
+          {calculatedTotalPages > maxPages && " (máximo)"}
         </span>
 
         <Button

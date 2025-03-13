@@ -6,6 +6,7 @@ import { Avatar } from "@/src/app/components/ui/avatar";
 import { Badge } from "@/src/app/components/ui/badge";
 import { Activity } from "lucide-react";
 import Image from "next/image";
+import { CldImage } from 'next-cloudinary';
 
 const activities = [
   {
@@ -59,7 +60,34 @@ export function ActivityStream() {
             className="flex items-start gap-3 group"
           >
             <Avatar className="h-8 w-8 border-2 border-background">
-              <Image src={activity.user.avatar} alt={activity.user.name} />
+              {activity.user.avatar && (activity.user.avatar.includes('cloudinary') || 
+              (!activity.user.avatar.startsWith('http') && !activity.user.avatar.startsWith('/'))) ? (
+                <CldImage
+                  src={activity.user.avatar}
+                  alt={activity.user.name}
+                  width={32}
+                  height={32}
+                  crop="fill"
+                  gravity="face"
+                  className="h-8 w-8 rounded-full"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/AvatarPredeterminado.webp";
+                  }}
+                />
+              ) : (
+                <Image
+                  src={activity.user.avatar || "/images/AvatarPredeterminado.webp"}
+                  alt={activity.user.name}
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 rounded-full"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/AvatarPredeterminado.webp";
+                  }}
+                />
+              )}
             </Avatar>
             <div className="flex-1">
               <p className="text-sm">

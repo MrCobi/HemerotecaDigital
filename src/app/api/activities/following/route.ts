@@ -19,20 +19,30 @@ export async function GET(req: Request) {
     page = isNaN(page) || page < 1 ? 1 : page;
     limit = isNaN(limit) || limit < 1 || limit > 100 ? 10 : limit;
 
-    // Obtener los IDs de los usuarios seguidos
+    // Obtener los IDs de los usuarios seguidos con información de showActivity
     const following = await prisma.follow.findMany({
       where: { followerId: session.user.id },
-      select: { followingId: true },
+      include: {
+        following: {
+          select: {
+            id: true,
+            showActivity: true
+          }
+        }
+      }
     });
 
-    const followingIds = following.map((f) => f.followingId);
+    // Filtrar solo los usuarios que tienen su actividad pública (showActivity = true)
+    const followingIds = following
+      .filter(f => f.following.showActivity)
+      .map(f => f.followingId);
 
-    // Obtener total de actividades
+    // Obtener total de actividades solo de usuarios con actividad pública
     const total = await prisma.activityHistory.count({
       where: { userId: { in: followingIds } },
     });
 
-    // Obtener actividades paginadas
+    // Obtener actividades paginadas solo de usuarios con actividad pública
     const activities = await prisma.activityHistory.findMany({
       where: { userId: { in: followingIds } },
       include: {
