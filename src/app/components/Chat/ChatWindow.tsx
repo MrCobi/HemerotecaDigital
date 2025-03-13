@@ -1,10 +1,11 @@
 // src/app/components/Chat/ChatWindow.tsx
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { UnreadMessagesContext, UnreadMessagesContextType } from "@/src/app/contexts/UnreadMessagesContext";
 
 interface User {
   id: string;
@@ -31,6 +32,7 @@ export function ChatWindow({ otherUser, currentUserId, onMessageSent }: {
   const [newMessage, setNewMessage] = useState('');
   const [isMutualFollow, setIsMutualFollow] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const unreadContext = useContext<UnreadMessagesContextType>(UnreadMessagesContext);
 
   // Verificar si existe seguimiento mutuo
   const checkMutualFollow = async () => {
@@ -62,6 +64,9 @@ export function ChatWindow({ otherUser, currentUserId, onMessageSent }: {
       await fetch(`/api/messages/read?senderId=${otherUser.id}`, {
         method: 'POST'
       });
+      
+      // Actualizar el contador global de mensajes no leídos
+      unreadContext.updateUnreadCount();
     }
     
     setMessages(data);
@@ -119,7 +124,7 @@ export function ChatWindow({ otherUser, currentUserId, onMessageSent }: {
   }
 
   return (
-    <div className="flex flex-col h-96">
+    <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 mb-4 p-3 border-b border-blue-800">
         <Avatar>
           <AvatarImage src={otherUser.image || ''} />

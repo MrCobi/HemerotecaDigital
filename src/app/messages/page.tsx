@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ChatWindow } from "@/src/app/components/Chat/ChatWindow";
@@ -14,6 +14,7 @@ import {
 } from "@/src/app/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/src/app/components/ui/avatar";
 import { Input } from "@/src/app/components/ui/input";
+import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 
 interface User {
   id: string;
@@ -51,7 +52,8 @@ export default function MessagesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  
+  const { updateUnreadCount } = useContext(UnreadMessagesContext);
+
   // Obtener el ID de conversación de la URL si existe
   const conversationId = searchParams.get('conversationWith');
 
@@ -138,15 +140,20 @@ export default function MessagesPage() {
     : mutualFollowers;
 
   // Iniciar nueva conversación
-  const startNewConversation = (userId: string) => {
-    // Añadir la conversación a la lista actual
-    const otherUser = mutualFollowers.find(user => user.id === userId);
-    if (otherUser && session?.user) {
+  const startNewConversation = async (userId: string) => {
+    if (!session?.user) return;
+    
+    try {
+      // Cerrar el diálogo inmediatamente para mejorar la experiencia del usuario
       setDialogOpen(false);
       
-      // Crear una nueva conversación temporal
-      const newConversation: Conversation = {
-        id: `temp-${Date.now()}`,
+      // Mostrar una conversación temporal mientras se crea en el servidor
+      const otherUser = mutualFollowers.find(user => user.id === userId);
+      if (!otherUser) return;
+      
+      const tempId = `temp-${Date.now()}`;
+      const tempConversation: Conversation = {
+        id: tempId,
         senderId: session.user.id,
         receiverId: otherUser.id,
         createdAt: new Date().toISOString(),
@@ -159,9 +166,52 @@ export default function MessagesPage() {
         unreadCount: 0
       };
       
-      const updatedConversations = [newConversation, ...conversations];
-      setConversations(updatedConversations);
-      setSelectedConversation(newConversation.id);
+      // Añadir temporalmente a la UI
+      setConversations(prev => [tempConversation, ...prev]);
+      setSelectedConversation(tempId);
+      
+      // Crear la conversación en el servidor
+      const response = await fetch('/api/messages/conversations/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al crear la conversación');
+      }
+      
+      // Actualizar la lista de conversaciones desde el servidor
+      const fetchConversations = async () => {
+        const res = await fetch('/api/messages/conversations');
+        if (res.ok) {
+          const data = await res.json();
+          const sortedConversations = data.sort((a: Conversation, b: Conversation) => {
+            const dateA = a.lastMessage?.createdAt || a.createdAt;
+            const dateB = b.lastMessage?.createdAt || b.createdAt;
+            return new Date(dateB).getTime() - new Date(dateA).getTime();
+          });
+          
+          setConversations(sortedConversations);
+          
+          // Encontrar la conversación recién creada y seleccionarla
+          const newConversation = sortedConversations.find(conv => {
+            const otherUserId = conv.senderId === session.user.id ? conv.receiverId : conv.senderId;
+            return otherUserId === userId;
+          });
+          
+          if (newConversation) {
+            setSelectedConversation(newConversation.id);
+          }
+        }
+      };
+      
+      fetchConversations();
+      
+    } catch (error) {
+      console.error('Error al iniciar conversación:', error);
     }
   };
 
@@ -195,6 +245,47 @@ export default function MessagesPage() {
       day: 'numeric',
     }).format(date);
   };
+
+  // Marcar los mensajes como leídos cuando se selecciona una conversación
+  useEffect(() => {
+    if (selectedConversation) {
+      const markMessagesAsRead = async () => {
+        try {
+          await fetch(`/api/messages/read?senderId=${selectedConversation}`, {
+            method: 'POST'
+          });
+          
+          // Actualizar el contador global de mensajes no leídos
+          updateUnreadCount();
+          
+          // Actualizar la lista de conversaciones para reflejar que los mensajes están leídos
+          const fetchConversations = async () => {
+            try {
+              const res = await fetch('/api/messages/conversations');
+              if (!res.ok) throw new Error('Error al cargar conversaciones');
+              const data = await res.json();
+              
+              // Ordenar conversaciones por fecha del último mensaje (más reciente primero)
+              const sortedConversations = data.sort((a: Conversation, b: Conversation) => {
+                const dateA = a.lastMessage?.createdAt || a.createdAt;
+                const dateB = b.lastMessage?.createdAt || b.createdAt;
+                return new Date(dateB).getTime() - new Date(dateA).getTime();
+              });
+              
+              setConversations(sortedConversations);
+            } catch (error) {
+              console.error('Error:', error);
+            }
+          };
+          fetchConversations();
+        } catch (error) {
+          console.error('Error al marcar mensajes como leídos:', error);
+        }
+      };
+      
+      markMessagesAsRead();
+    }
+  }, [selectedConversation]);
 
   if (status === "loading" || loading) {
     return (

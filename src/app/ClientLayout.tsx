@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Suspense } from "react";
 import { MessageBadge } from "@/src/app/components/MessageBadge";
+import { UnreadMessagesProvider } from "@/src/app/contexts/UnreadMessagesContext";
 
 export default function ClientLayout({
   children,
@@ -15,25 +16,27 @@ export default function ClientLayout({
 }) {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <Navbar />
+      <UnreadMessagesProvider>
+        <Navbar />
 
-      <main className="flex-1 mt-16 sm:mt-20">
-        <Suspense
-          fallback={
-            <div className="flex items-center justify-center min-h-[60vh]">
-              <div className="animate-pulse text-blue-600">Cargando...</div>
-            </div>
-          }
-        >
-          {children}
-        </Suspense>
-      </main>
+        <main className="flex-1 mt-16 sm:mt-20">
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="animate-pulse text-blue-600">Cargando...</div>
+              </div>
+            }
+          >
+            {children}
+          </Suspense>
+        </main>
 
-      <footer className="bg-gradient-to-br from-blue-600 to-indigo-900 text-white py-8 mt-auto">
-        <div className="border-blue-400/20 text-center text-sm text-blue-100">
-          <p> 2025 Hemeroteca Digital. Todos los derechos reservados.</p>
-        </div>
-      </footer>
+        <footer className="bg-gradient-to-br from-blue-600 to-indigo-900 text-white py-8 mt-auto">
+          <div className="border-blue-400/20 text-center text-sm text-blue-100">
+            <p> 2025 Hemeroteca Digital. Todos los derechos reservados.</p>
+          </div>
+        </footer>
+      </UnreadMessagesProvider>
     </div>
   );
 }
