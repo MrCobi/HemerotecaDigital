@@ -1,59 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-enum Role {
-  user
-  admin
-}
-
 model User {
-  id            String          @id @default(cuid())
-  name          String?
-  username      String?         @unique
-  password      String
-  email         String          @unique
-  emailVerified DateTime?       @map("email_verified")
-  image         String?
-  bio           String?
-  role          Role            @default(user)
-  accounts      Account[]
+  id              String            @id @default(cuid())
+  name            String?
+  username        String?           @unique
+  password        String
+  email           String            @unique
+  emailVerified   DateTime?         @map("email_verified")
+  image           String?
+  role            Role              @default(user)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  bio             String?
+  showActivity    Boolean           @default(true) @map("show_activity")
+  showFavorites   Boolean           @default(true) @map("show_favorites")
+  accounts        Account[]
+  activityHistory ActivityHistory[]
+  comments        Comment[]
   favoriteSources FavoriteSource[]
-  ratings       Rating[]
-  comments      Comment[]
-  followers     Follow[]        @relation("follower")
-  following     Follow[]        @relation("following")
-  activityHistory ActivityHistory[] // Relación añadida
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
-  showFavorites Boolean @default(true) @map("show_favorites")
-  showActivity  Boolean @default(true) @map("show_activity")
+  followers       Follow[]          @relation("follower")
+  following       Follow[]          @relation("following")
+  ratings         Rating[]
 
   @@map("users")
 }
 
 model Account {
-  id                       String  @id @default(cuid())
-  userId                   String  @map("user_id")
+  id                       String   @id @default(cuid())
+  userId                   String   @map("user_id")
   type                     String
   provider                 String
-  providerAccountId        String  @map("provider_account_id")
-  refresh_token            String? @db.Text
-  access_token             String? @db.Text
+  providerAccountId        String   @map("provider_account_id")
+  refresh_token            String?  @db.Text
+  access_token             String?  @db.Text
   expires_at               Int?
   token_type               String?
   scope                    String?
-  id_token                 String? @db.Text
+  id_token                 String?  @db.Text
   session_state            String?
   refresh_token_expires_in Int?
-  user                     User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt                DateTime @default(now()) @map("created_at")
   updatedAt                DateTime @updatedAt @map("updated_at")
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@index([userId])
@@ -70,65 +65,67 @@ model VerificationToken {
 }
 
 model Source {
-  id          String @id @default(cuid())
-  name        String
-  description String
-  url         String  @db.VarChar(512)  // Añade @unique aquí
-  imageUrl    String? @db.VarChar(512) @map("image_url")
-  category    String
-  language    String
-  country     String
+  id              String           @id @default(cuid())
+  name            String
+  description     String
+  url             String           @db.VarChar(512)
+  imageUrl        String?          @map("image_url") @db.VarChar(512)
+  category        String
+  language        String
+  country         String
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  comments        Comment[]
   favoriteSources FavoriteSource[]
-  ratings     Rating[]
-  comments    Comment[]
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  ratings         Rating[]
 
   @@fulltext([name, description])
   @@map("sources")
 }
 
 model FavoriteSource {
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  source    Source @relation(fields: [sourceId], references: [id])
-  userId    String @map("user_id")
-  sourceId  String @map("source_id")
-  createdAt DateTime @default(now()) @map("created_at") // Añade esta línea
-  updatedAt DateTime @updatedAt @map("updated_at") // Añade esta línea
+  userId    String   @map("user_id")
+  sourceId  String   @map("source_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  source    Source   @relation(fields: [sourceId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, sourceId])
+  @@index([sourceId], map: "favorite_sources_source_id_fkey")
   @@map("favorite_sources")
 }
 
 model Rating {
-  id        String  @id @default(cuid())
-  userId    String  @map("user_id")
-  sourceId  String  @map("source_id")
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  sourceId  String   @map("source_id")
   value     Int
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  source    Source  @relation(fields: [sourceId], references: [id])
+  source    Source   @relation(fields: [sourceId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, sourceId])
+  @@index([sourceId], map: "ratings_source_id_fkey")
   @@map("ratings")
 }
 
 model Comment {
-  id        String   @id @default(cuid())
-  content   String   @db.Text
-  userId    String   @map("user_id")
-  sourceId  String   @map("source_id")
-  isDeleted Boolean  @default(false) @map("is_deleted")
-  parentId  String?  @map("parent_id")
-  depth     Int      @default(1)
-  path      String   @default("/")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  source    Source   @relation(fields: [sourceId], references: [id])
-  parent    Comment? @relation("CommentHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  content   String    @db.Text
+  userId    String    @map("user_id")
+  sourceId  String    @map("source_id")
+  isDeleted Boolean   @default(false) @map("is_deleted")
+  parentId  String?   @map("parent_id")
+  depth     Int       @default(1)
+  path      String    @default("/")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  parent    Comment?  @relation("CommentHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   replies   Comment[] @relation("CommentHierarchy")
+  source    Source    @relation(fields: [sourceId], references: [id])
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([sourceId])
@@ -138,11 +135,11 @@ model Comment {
 }
 
 model Follow {
-  followerId   String   @map("follower_id")
-  followingId  String   @map("following_id")
-  createdAt    DateTime @default(now()) @map("created_at")
-  follower     User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
-  following    User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+  followerId  String   @map("follower_id")
+  followingId String   @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@id([followerId, followingId])
   @@index([followerId])
@@ -151,14 +148,19 @@ model Follow {
 }
 
 model ActivityHistory {
-  id          String    @id @default(cuid())
-  userId      String    @map("user_id")
-  type        String
-  sourceName  String?   @map("source_name")
-  userName    String?   @map("user_name")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  type       String
+  sourceName String?  @map("source_name")
+  userName   String?  @map("user_name")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("activity_history")
+}
+
+enum Role {
+  user
+  admin
 }

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "./ui/button";
 import { Loader2, UserCheck, UserPlus } from "lucide-react";
 import { useToast } from "@/src/app/components/ui/use-toast";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 type FollowStatusResponse = {
   isFollowing: boolean;
@@ -42,8 +43,8 @@ export function FollowButton({
 
       const method = originalState ? "DELETE" : "POST";
       const url = originalState
-        ? `/api/follow?targetUserId=${targetUserId}`
-        : "/api/follow";
+        ? API_ROUTES.relationships.unfollow(targetUserId)
+        : API_ROUTES.relationships.follow;
 
       const res = await fetch(url, {
         method,

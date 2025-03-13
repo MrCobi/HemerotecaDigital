@@ -1,8 +1,8 @@
 "use client";
 import { useSession, signOut } from "next-auth/react";
-import { Menu } from "@mui/material";
-import Link from "next/link";
 import React from "react";
+import Link from "next/link";
+import { Menu } from "@mui/material";
 import styled from "styled-components";
 import Image from "next/image";
 
@@ -18,11 +18,21 @@ const AuthButton = () => {
     setAnchorEl(null);
   };
 
-  const handleSignOut = () => {
-    signOut({
-      callbackUrl: "/",
-    });
+  const handleSignOut = async () => {
+    // Cerrar el menú primero
     handleClose();
+    
+    try {
+      // Usar la función de NextAuth directamente
+      await signOut({ 
+        redirect: true,
+        callbackUrl: "/"
+      });
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+      // Como plan B, redirigir manualmente si falla
+      window.location.href = "/";
+    }
   };
 
   if (session) {

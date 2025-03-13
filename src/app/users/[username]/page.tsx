@@ -26,10 +26,20 @@ import { API_ROUTES } from "@/src/config/api-routes";
 
 type Activity = {
   id: string;
-  type: string;
-  createdAt: string;
-  sourceName?: string;
-  userName?: string;
+  type:
+  | "favorite_added"
+  | "favorite_removed"
+  | "comment"
+  | "rating_added"
+  | "rating_removed"
+  | "follow"
+  | "comment_reply"
+  | "comment_deleted"
+  | "unfollow"
+  | "favorite";
+  source_name?: string; // Usar source_name
+  user_name?: string;
+  created_at: string; // Usar created_at
 };
 
 interface UserStats {
@@ -96,26 +106,6 @@ export default function UserProfilePage() {
     };
     loadProfile();
   }, [username, session?.user?.id]);
-
-  function renderActivityMessage(
-    type: string,
-    sourceName?: string,
-    userName?: string
-  ) {
-    const messages = {
-      favorite_added: `Agregó ${sourceName || "un periódico"} a favoritos`,
-      comment: `Comentó en ${sourceName || "un periódico"}`,
-      follow: `Comenzó a seguir a ${userName || "un usuario"}`,
-      unfollow: `Dejó de seguir a ${userName || "un usuario"}`,
-      rating_added: `Calificó ${sourceName || "un periódico"}`,
-      rating_removed: `Eliminó calificación de ${sourceName || "un periódico"}`,
-      comment_reply: `Respondió un comentario en ${
-        sourceName || "un periódico"
-      }`,
-    };
-
-    return messages[type as keyof typeof messages] || "Realizó una acción";
-  }
 
   if (loading) return <LoadingSpinner />;
 
@@ -370,23 +360,23 @@ export default function UserProfilePage() {
                         (currentPage - 1) * itemsPerPage,
                         currentPage * itemsPerPage
                       )
-                      .map((act) => (
+                      .map((activity) => (
                         <div
-                          key={act.id}
+                          key={activity.id}
                           className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl shadow-sm transition-all duration-300 hover:shadow-md"
                         >
                           <div className="flex items-center space-x-3">
                             <div className="flex-shrink-0">
-                              {act.type === "favorite_added" && (
+                              {(activity.type === "favorite_added" || activity.type === "favorite") && (
                                 <Heart className="h-5 w-5 text-red-500 fill-red-500" />
                               )}
-                              {act.type === "favorite_removed" && (
+                              {activity.type === "favorite_removed" && (
                                 <Heart className="h-5 w-5 text-red-500" />
                               )}
-                              {act.type === "comment" && (
+                              {activity.type === "comment" && (
                                 <MessageSquare className="h-5 w-5 text-green-500" />
                               )}
-                              {act.type === "rating_added" && (
+                              {activity.type === "rating_added" && (
                                 <div className="relative flex items-center justify-center">
                                   <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
                                   <div className="absolute -top-1 -right-1 bg-white dark:bg-gray-800 rounded-full w-3.5 h-3.5 flex items-center justify-center border border-yellow-500">
@@ -394,7 +384,7 @@ export default function UserProfilePage() {
                                   </div>
                                 </div>
                               )}
-                              {act.type === "rating_removed" && (
+                              {activity.type === "rating_removed" && (
                                 <div className="relative flex items-center justify-center">
                                   <Star className="h-5 w-5 text-purple-500" />
                                   <div className="absolute -top-1 -right-1 bg-white dark:bg-gray-800 rounded-full w-3.5 h-3.5 flex items-center justify-center border border-purple-500">
@@ -402,36 +392,78 @@ export default function UserProfilePage() {
                                   </div>
                                 </div>
                               )}
-                              {act.type === "follow" && (
+                              {activity.type === "follow" && (
                                 <User2 className="h-5 w-5 text-blue-500" />
                               )}
-                              {act.type === "comment_reply" && (
+                              {activity.type === "comment_reply" && (
                                 <MessageSquare className="h-5 w-5 text-green-500" />
                               )}
-                              {act.type === "comment_deleted" && (
+                              {activity.type === "comment_deleted" && (
                                 <MessageSquare className="h-5 w-5 text-red-500" />
                               )}
-                              {act.type === "unfollow" && (
+                              {activity.type === "unfollow" && (
                                 <User2 className="h-5 w-5 text-red-500" />
                               )}
+                              {/* Fallback icon para tipos no reconocidos */}
+                              {!["favorite_added", "favorite_removed", "comment", "rating_added",
+                                "rating_removed", "follow", "comment_reply", "comment_deleted",
+                                "unfollow", "favorite"].includes(activity.type) && (
+                                  <Activity className="h-5 w-5 text-blue-500" />
+                                )}
                             </div>
                             <div>
                               <p className="text-sm text-gray-600 dark:text-gray-400">
-                                {renderActivityMessage(
-                                  act.type,
-                                  act.sourceName,
-                                  act.userName
-                                )}
+                                {activity.type === "favorite_added" &&
+                                  `Agregaste ${activity.source_name || "una fuente"
+                                  } a favoritos.`}
+                                {activity.type === "favorite_removed" &&
+                                  `Eliminaste ${activity.source_name || "una fuente"
+                                  } de favoritos.`}
+                                {activity.type === "comment" &&
+                                  `Comentaste en ${activity.source_name || "una fuente"
+                                  }.`}
+                                {activity.type === "rating_added" &&
+                                  `Valoraste ${activity.source_name || "una fuente"
+                                  }.`}
+                                {activity.type === "rating_removed" &&
+                                  `Eliminaste la valoración de ${activity.source_name || "una fuente"
+                                  }.`}
+                                {activity.type === "follow" &&
+                                  `Comenzaste a seguir a ${activity.user_name || "un usuario"
+                                  }.`}
+                                {activity.type === "comment_reply" &&
+                                  `Respondiste a un comentario en ${activity.source_name || "una fuente"
+                                  }.`}
+                                {activity.type === "comment_deleted" &&
+                                  `Eliminaste un comentario en ${activity.source_name || "una fuente"
+                                  }.`}
+                                {activity.type === "unfollow" &&
+                                  `Dejaste de seguir a ${activity.user_name || "un usuario"
+                                  }.`}
+                                {activity.type === "favorite" &&
+                                  `Marcaste como favorito a ${activity.source_name || "una fuente"
+                                  }.`}
+                                {/* Texto de fallback para tipos no reconocidos */}
+                                {!["favorite_added", "favorite_removed", "comment", "rating_added",
+                                  "rating_removed", "follow", "comment_reply", "comment_deleted",
+                                  "unfollow", "favorite"].includes(activity.type) &&
+                                  `Actividad: ${activity.type || "desconocida"} ${activity.source_name ? `en ${activity.source_name}` :
+                                    activity.user_name ? `con ${activity.user_name}` :
+                                      ""
+                                  }`}
                               </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {new Date(act.createdAt).toLocaleDateString(
-                                  "es-ES",
-                                  {
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {activity.created_at
+                                  ? new Date(
+                                    activity.created_at
+                                  ).toLocaleDateString("es-ES", {
                                     day: "numeric",
                                     month: "long",
                                     year: "numeric",
-                                  }
-                                )}
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                  : "Fecha no disponible"}
                               </p>
                             </div>
                           </div>

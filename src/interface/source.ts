@@ -10,3 +10,13 @@ export interface Source {
   createdAt: Date;     // Fecha de creación del registro
   updatedAt: Date;     // Fecha de última actualización del registro
 }
+
+export interface Rating {
+  id: string;           // Identificador único de la calificación
+  value: number;        // Valor numérico de la calificación (ej: 1-5)
+  userId: string;       // ID del usuario que realizó la calificación
+  sourceId: string;     // ID de la fuente que fue calificada
+  comment?: string;     // Comentario opcional sobre la calificación
+  createdAt: Date;      // Fecha de creación del registro
+  updatedAt: Date;      // Fecha de última actualización del registro
+}

@@ -1,70 +1,81 @@
-// src/app/api/favorites/remove/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-import prisma from "@/lib/db";
 
-export async function DELETE(request: Request) {
-  const session = await auth();
+// Esta es una ruta de compatibilidad transitoria
+// que redirige las solicitudes a la API actualizada en /api/favorites
 
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
-  }
-
-  const { sourceId } = await request.json();
-
+export async function DELETE(req: Request) {
   try {
-    const _result = await prisma.$transaction(async (tx) => {
-      // 1. Eliminar de favoritos
-      await tx.favoriteSource.delete({
-        where: {
-          userId_sourceId: {
-            userId: session.user.id,
-            sourceId,
-          },
-        },
-      });
+    let sourceId;
+    
+    // Intentar obtener el sourceId del body
+    try {
+      const body = await req.json();
+      sourceId = body.sourceId;
+    } catch {
+      // Si no hay body o no se puede parsear, intentar obtener de los parámetros
+      const { searchParams } = new URL(req.url);
+      sourceId = searchParams.get("sourceId");
+    }
 
-      // 2. Obtener nombre del periódico
-      const source = await tx.source.findUnique({
-        where: { id: sourceId },
-        select: { name: true },
-      });
+    if (!sourceId) {
+      return NextResponse.json(
+        { error: "sourceId es requerido" },
+        { status: 400 }
+      );
+    }
 
-      // 3. Registrar en historial de actividades
-      // Falta el campo userName
-      // En src/app/api/favorites/add/route.ts y remove/route.ts
-      await tx.activityHistory.create({
-        data: {
-          userId: session.user.id,
-          type: "favorite_removed", // o "favorite_removed"
-          sourceName: source?.name || "Fuente desconocida",
-          userName: session.user.name, // Agregar esta línea
-          createdAt: new Date(),
-        },
-      });
-
-      // 4. Limitar a 20 actividades
-      const activities = await tx.activityHistory.findMany({
-        where: { userId: session.user.id },
-        orderBy: { createdAt: "desc" },
-      });
-
-      if (activities.length > 20) {
-        const toDelete = activities.slice(20);
-        await tx.activityHistory.deleteMany({
-          where: { id: { in: toDelete.map(a => a.id) } },
-        });
-      }
-
-      return true;
+    // Reenviar la solicitud al endpoint principal de favoritos
+    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/favorites?sourceId=${sourceId}`, {
+      method: "DELETE",
+      headers: {
+        // Pasar la cookie de autenticación
+        "Cookie": req.headers.get("cookie") || "",
+      },
     });
 
-    return NextResponse.json({ message: "Fuente eliminada de favoritos" });
-
+    // Devolver la respuesta tal cual la recibimos
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error("Error al eliminar fuente de favoritos:", error);
+    console.error("Error en la compatibilidad transitoria de eliminar favorito:", error);
     return NextResponse.json(
-      { message: "Error al eliminar fuente de favoritos" },
+      { error: "Error al procesar la solicitud para eliminar favorito" },
+      { status: 500 }
+    );
+  }
+}
+
+// Añadimos el método POST para mayor compatibilidad
+export async function POST(req: Request) {
+  try {
+    // Extraer los datos del cuerpo de la solicitud
+    const body = await req.json();
+    const sourceId = body.sourceId;
+
+    if (!sourceId) {
+      return NextResponse.json(
+        { error: "sourceId es requerido" },
+        { status: 400 }
+      );
+    }
+
+    // Reenviar la solicitud al endpoint principal de favoritos
+    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/favorites?sourceId=${sourceId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        // Pasar la cookie de autenticación
+        "Cookie": req.headers.get("cookie") || "",
+      },
+    });
+
+    // Devolver la respuesta tal cual la recibimos
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error("Error en la compatibilidad transitoria de eliminar favorito (POST):", error);
+    return NextResponse.json(
+      { error: "Error al procesar la solicitud para eliminar favorito" },
       { status: 500 }
     );
   }

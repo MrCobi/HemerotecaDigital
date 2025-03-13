@@ -10,13 +10,20 @@ import {
   MessageSquare, 
   UserPlus, 
   Bookmark,
-  Activity
+  Activity,
+  X,
+  Reply,
+  Trash
 } from "lucide-react";
 
 const activityIcons = {
   favorite: <Bookmark className="h-4 w-4 text-blue-500" />,
+  favorite_removed: <X className="h-4 w-4 text-red-500" />,
   rating: <Star className="h-4 w-4 text-yellow-500" />,
+  rating_added: <Star className="h-4 w-4 text-yellow-500" />,
   comment: <MessageSquare className="h-4 w-4 text-green-500" />,
+  comment_deleted: <Trash className="h-4 w-4 text-red-500" />,
+  comment_reply: <Reply className="h-4 w-4 text-green-500" />,
   follow: <UserPlus className="h-4 w-4 text-purple-500" />,
   default: <Activity className="h-4 w-4 text-gray-500" />
 };
@@ -58,13 +65,20 @@ function getActivityMessage(activity: ActivityHistory): string {
   switch (activity.type) {
     case 'favorite':
       return `Guardaste "${activity.sourceName}" en favoritos`;
+    case 'favorite_removed':
+      return `Eliminaste "${activity.sourceName}" de favoritos`;
     case 'rating':
+    case 'rating_added':
       return `Valoraste la fuente "${activity.sourceName}"`;
     case 'comment':
       return `Comentaste en "${activity.sourceName}"`;
+    case 'comment_deleted':
+      return `Eliminaste un comentario en "${activity.sourceName}"`;
+    case 'comment_reply':
+      return `Respondiste a un comentario en "${activity.sourceName}"`;
     case 'follow':
       return `Comenzaste a seguir a ${activity.userName}`;
     default:
-      return 'Actividad no especificada';
+      return `Realizaste una acción: ${activity.type}`;
   }
 }

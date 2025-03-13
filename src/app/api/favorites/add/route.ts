@@ -1,69 +1,31 @@
-// src/app/api/favorites/add/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-import prisma from "@/lib/db";
 
-export async function POST(request: Request) {
-  const session = await auth();
+// Esta es una ruta de compatibilidad transitoria
+// que redirige las solicitudes a la API actualizada en /api/favorites
 
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
-  }
-
-  const { sourceId } = await request.json();
-
+export async function POST(req: Request) {
   try {
-    // Transacción para ambas operaciones
-    const _result = await prisma.$transaction(async (tx) => {
-      // 1. Agregar a favoritos
-      await tx.favoriteSource.create({
-        data: {
-          userId: session.user.id,
-          sourceId,
-        },
-      });
+    // Extraer los datos del cuerpo de la solicitud
+    const body = await req.json();
 
-      // 2. Obtener nombre del periódico
-      const source = await tx.source.findUnique({
-        where: { id: sourceId },
-        select: { name: true },
-      });
-
-      // 3. Registrar en historial de actividades
-      await tx.activityHistory.create({
-        data: {
-          userId: session.user.id,
-          type: "favorite_added", // o "favorite_removed"
-          sourceName: source?.name || "Fuente desconocida",
-          userName: session.user.name, // Agregar esta línea
-          createdAt: new Date(),
-        },
-      });
-
-      // 4. Limitar a 20 actividades
-      const activities = await tx.activityHistory.findMany({
-        where: { userId: session.user.id },
-        orderBy: { createdAt: "desc" },
-      });
-
-      if (activities.length > 20) {
-        const toDelete = activities.slice(20);
-        await tx.activityHistory.deleteMany({
-          where: {
-            id: { in: toDelete.map((a) => a.id) },
-          },
-        });
-      }
-
-      return true;
+    // Reenviar la solicitud al endpoint principal de favoritos
+    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/favorites`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // Pasar la cookie de autenticación
+        "Cookie": req.headers.get("cookie") || "",
+      },
+      body: JSON.stringify(body),
     });
 
-    return NextResponse.json({ message: "Fuente agregada a favoritos" });
-
+    // Devolver la respuesta tal cual la recibimos
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error("Error al agregar fuente a favoritos:", error);
+    console.error("Error en la compatibilidad transitoria de añadir favorito:", error);
     return NextResponse.json(
-      { message: "Error al agregar fuente a favoritos" },
+      { error: "Error al procesar la solicitud para añadir favorito" },
       { status: 500 }
     );
   }

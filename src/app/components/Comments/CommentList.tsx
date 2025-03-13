@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import { useSession } from "next-auth/react";
 import type { Session } from "next-auth";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 interface Comment {
   id: string;
@@ -365,7 +366,7 @@ export default function CommentList({
     async (signal?: AbortSignal) => {
       try {
         const response = await fetch(
-          `/api/comments/list/${sourceId}?page=${currentPage}&limit=${commentsPerPage}`,
+          API_ROUTES.comments.list(sourceId, currentPage, commentsPerPage),
           { signal }
         );
 
@@ -399,8 +400,16 @@ export default function CommentList({
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchComments(controller.signal);
-    return () => controller.abort();
+    
+    // Agregar un pequeño retraso para evitar múltiples solicitudes rápidas que se cancelan
+    const timer = setTimeout(() => {
+      fetchComments(controller.signal);
+    }, 50);
+    
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [sourceId, refreshKey, currentPage, fetchComments]);
 
   useEffect(() => {
@@ -412,7 +421,7 @@ export default function CommentList({
 
   const confirmDelete = async () => {
     try {
-      const response = await fetch(`/api/comments/${deleteState.commentId}`, {
+      const response = await fetch(API_ROUTES.comments.delete(deleteState.commentId), {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Error al eliminar");
@@ -431,7 +440,7 @@ export default function CommentList({
 
   const handleReply = async (commentId: string) => {
     try {
-      const response = await fetch(`/api/comments/${commentId}/replies`, {
+      const response = await fetch(API_ROUTES.comments.replies(commentId), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: replyContent, sourceId }),

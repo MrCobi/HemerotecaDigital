@@ -3,15 +3,21 @@ import { revalidateTag } from "next/cache";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
 
+// POST para seguir a un usuario
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
     const { followingId } = await req.json();
 
     if (!followingId) {
-      return NextResponse.json({ error: "Missing followingId" }, { status: 400 });
+      return NextResponse.json({ error: "ID de usuario a seguir no proporcionado" }, { status: 400 });
+    }
+
+    // Verificar que no intenta seguirse a sí mismo
+    if (followingId === session.user.id) {
+      return NextResponse.json({ error: "No puedes seguirte a ti mismo" }, { status: 400 });
     }
 
     // Verificar si ya existe el follow
@@ -31,7 +37,7 @@ export async function POST(req: Request) {
     // Obtener información del usuario que se está siguiendo
     const followingUser = await prisma.user.findUnique({
       where: { id: followingId },
-      select: { username: true }
+      select: { username: true, name: true }
     });
 
     if (!followingUser) {
@@ -62,7 +68,7 @@ export async function POST(req: Request) {
         userId: session.user.id,
         type: "follow",
         sourceName: null,
-        userName: followingUser.username,
+        userName: followingUser.username || followingUser.name,
         createdAt: new Date()
       }
     });
@@ -72,20 +78,22 @@ export async function POST(req: Request) {
     revalidateTag(`user-${session.user.id}-activity`);
 
     return NextResponse.json({
+      success: true,
       isFollowing: true,
       followerCount: await prisma.follow.count({
         where: { followingId: followingId }
       })
     });
   } catch (error) {
-    console.error("Error following user:", error);
+    console.error("Error al seguir usuario:", error);
     return NextResponse.json(
-      { error: "Failed to follow user" },
+      { error: "Error al procesar la solicitud de seguimiento" },
       { status: 500 }
     );
   }
 }
 
+// DELETE para dejar de seguir a un usuario
 export async function DELETE(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -94,7 +102,7 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url);
     const targetUserId = searchParams.get("targetUserId");
 
-    // Validación simplificada
+    // Validación de parámetros
     if (!targetUserId) {
       return NextResponse.json(
         { error: "Parámetro 'targetUserId' requerido" },
@@ -102,27 +110,21 @@ export async function DELETE(req: Request) {
       );
     }
 
-    if (!/^[a-z0-9-]{20,}$/i.test(targetUserId)) {
-      return NextResponse.json(
-        { error: "Formato de ID inválido. Debe contener letras, números y guiones, con mínimo 20 caracteres" },
-        { status: 400 }
-      );
-    }
-
-    // Verificar existencia del usuario con manejo de errores
+    // Verificar existencia del usuario
     const userExists = await prisma.user.findUnique({
       where: { id: targetUserId },
-    }).catch(() => null);
+      select: { id: true, username: true, name: true }
+    });
 
     if (!userExists) {
       return NextResponse.json(
-        { error: `Usuario con ID ${targetUserId} no encontrado` },
+        { error: `Usuario no encontrado` },
         { status: 404 }
       );
     }
 
-    // Eliminar relación con validación de existencia
-    const deleteResult = await prisma.follow.delete({
+    // Verificar si existe la relación
+    const followExists = await prisma.follow.findUnique({
       where: {
         followerId_followingId: {
           followerId: session.user.id,
@@ -131,7 +133,22 @@ export async function DELETE(req: Request) {
       }
     });
 
-    if (!deleteResult) throw new Error("No se pudo eliminar la relación");
+    if (!followExists) {
+      return NextResponse.json(
+        { error: "No estás siguiendo a este usuario" },
+        { status: 404 }
+      );
+    }
+
+    // Eliminar relación
+    await prisma.follow.delete({
+      where: {
+        followerId_followingId: {
+          followerId: session.user.id,
+          followingId: targetUserId
+        }
+      }
+    });
 
     // Registrar la actividad de "unfollow"
     await prisma.activityHistory.create({
@@ -139,7 +156,7 @@ export async function DELETE(req: Request) {
         userId: session.user.id,
         type: "unfollow",
         sourceName: null,
-        userName: userExists.username,
+        userName: userExists.username || userExists.name,
         createdAt: new Date()
       }
     });
@@ -155,12 +172,13 @@ export async function DELETE(req: Request) {
         where: { followingId: targetUserId }
       })
     });
-  } catch (error: unknown) {
-    console.error("Error detallado:", error);
+  } catch (error) {
+    console.error("Error al dejar de seguir usuario:", error);
+    const errorMessage = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json(
       {
         error: "Error al procesar la solicitud",
-        details: (error instanceof Error) ? error.message : "Unknown error"
+        details: errorMessage
       },
       { status: 500 }
     );

@@ -62,7 +62,8 @@ export default function DashboardPage() {
       | "follow"
       | "comment_reply"
       | "comment_deleted"
-      | "unfollow";
+      | "unfollow"
+      | "favorite";
     source_name?: string; // Usar source_name
     user_name?: string;
     created_at: string; // Usar created_at
@@ -148,7 +149,7 @@ export default function DashboardPage() {
       if (session?.user?.id) {
         try {
           const response = await fetch(
-            `/api/activity/${session.user.id}?page=${currentPage}&limit=${itemsPerPage}`
+            `/api/activities/${session.user.id}?page=${currentPage}&limit=${itemsPerPage}`
           );
           const data = await response.json();
 
@@ -535,9 +536,7 @@ export default function DashboardPage() {
                       <div>
                         <Button
                           className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
-                          onClick={() =>
-                            router.push(`/users/edit/${user.username}`)
-                          }
+                          onClick={() => router.push(`/users/edit/${user.username}`)}
                         >
                           <Settings className="h-4 w-4 mr-2" />
                           Editar perfil
@@ -677,7 +676,7 @@ export default function DashboardPage() {
                         >
                           <div className="flex items-center space-x-3">
                             <div className="flex-shrink-0">
-                              {activity.type === "favorite_added" && (
+                              {(activity.type === "favorite_added" || activity.type === "favorite") && (
                                 <Heart className="h-5 w-5 text-red-500 fill-red-500" />
                               )}
                               {activity.type === "favorite_removed" && (
@@ -713,6 +712,12 @@ export default function DashboardPage() {
                               )}
                               {activity.type === "unfollow" && (
                                 <User2 className="h-5 w-5 text-red-500" />
+                              )}
+                              {/* Fallback icon para tipos no reconocidos */}
+                              {!["favorite_added", "favorite_removed", "comment", "rating_added", 
+                                  "rating_removed", "follow", "comment_reply", "comment_deleted", 
+                                  "unfollow", "favorite"].includes(activity.type) && (
+                                <Activity className="h-5 w-5 text-blue-500" />
                               )}
                             </div>
                             <div>
@@ -753,6 +758,19 @@ export default function DashboardPage() {
                                   `Dejaste de seguir a ${
                                     activity.user_name || "un usuario"
                                   }.`}
+                                {activity.type === "favorite" &&
+                                  `Marcaste como favorito a ${
+                                    activity.source_name || "una fuente"
+                                  }.`}
+                                {/* Texto de fallback para tipos no reconocidos */}
+                                {!["favorite_added", "favorite_removed", "comment", "rating_added", 
+                                   "rating_removed", "follow", "comment_reply", "comment_deleted", 
+                                   "unfollow", "favorite"].includes(activity.type) &&
+                                   `Actividad: ${activity.type || "desconocida"} ${
+                                     activity.source_name ? `en ${activity.source_name}` : 
+                                     activity.user_name ? `con ${activity.user_name}` : 
+                                     ""
+                                   }`}
                               </p>
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                 {activity.created_at

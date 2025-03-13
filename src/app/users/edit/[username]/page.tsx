@@ -103,7 +103,12 @@ export default function EditUserPage() {
     setSaving(true);
 
     try {
-      const response = await fetch(API_ROUTES.users.crud.update(session?.user.id!), {
+      // Verificar que session y user existan antes de acceder a id
+      if (!session?.user?.id) {
+        throw new Error("No hay sesión de usuario");
+      }
+      
+      const response = await fetch(API_ROUTES.users.crud.update(session.user.id), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

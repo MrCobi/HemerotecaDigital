@@ -50,7 +50,8 @@ interface Activity {
     | "follow"
     | "unfollow"
     | "comment_reply"
-    | "comment_deleted";
+    | "comment_deleted"
+    | "favorite";
   sourceName: string | null;
   userName: string | null;
   createdAt: string;
@@ -603,13 +604,13 @@ export default function HomePage() {
         setIsLoadingFollowingActivity(true);
         try {
           const response = await fetch(
-            API_ROUTES.activity.following(currentPage, itemsPerPage)
+            API_ROUTES.activities.following(currentPage, itemsPerPage)
           );
           if (response.ok) {
-            const { data, total } = await response.json();
-            if (Array.isArray(data)) {
-              setFollowingActivity(data);
-              setTotalActivities(total);
+            const data = await response.json();
+            if (Array.isArray(data.data)) {
+              setFollowingActivity(data.data);
+              setTotalActivities(data.total);
             }
           }
         } catch (error) {
@@ -738,8 +739,8 @@ export default function HomePage() {
               }}
             />
           ))}
-          <div className="absolute top-8 sm:top-1/4 right-[10%] w-16 h-16 sm:w-24 sm:h-24 md:w-40 md:h-40 bg-gradient-to-tr from-purple-400/10 to-pink-500/10 rounded-full opacity-40 blur-lg animate-pulse"></div>
-          <div className="absolute top-16 sm:bottom-1/3 left-[15%] w-20 h-20 sm:w-32 sm:h-32 md:w-48 md:h-48 bg-gradient-to-br from-blue-300/10 to-cyan-400/10 rounded-full opacity-40 blur-lg animate-pulse"></div>
+          <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-blue-500/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2"></div>
         </div>
 
         <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 flex flex-col justify-center">
@@ -1181,10 +1182,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section
-        id="recent-section"
-        className="py-12 sm:py-16 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 dark:from-blue-900/30 dark:to-indigo-900/30"
-      >
+      <section id="recent-section" className="py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <motion.div
@@ -1297,6 +1295,10 @@ export default function HomePage() {
                                     return (
                                       <MessageSquare className="h-5 w-5 text-red-500" />
                                     );
+                                  case "favorite":
+                                    return (
+                                      <Heart className="h-5 w-5 text-red-500 fill-red-500" />
+                                    );
                                   default:
                                     return null;
                                 }
@@ -1328,6 +1330,8 @@ export default function HomePage() {
                                         return "respondió a un comentario en";
                                       case "comment_deleted":
                                         return "eliminó un comentario en";
+                                      case "favorite":
+                                        return "agregó un favorito";
                                       default:
                                         return "";
                                     }

@@ -117,7 +117,7 @@ export default function SourcesPage({
     try {
       if (favorites.has(sourceId)) {
         await fetch("/api/favorites/remove", {
-          method: "DELETE",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sourceId }),
         });

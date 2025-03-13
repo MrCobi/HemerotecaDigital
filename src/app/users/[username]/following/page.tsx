@@ -23,28 +23,47 @@ export default function FollowingPage() {
   const [following, setFollowing] = useState<FollowingUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [followingStatus, setFollowingStatus] = useState<Record<string, boolean>>({});
+  const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
 
+  // Primero obtenemos el ID del usuario una sola vez
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchUserId = async () => {
       try {
-        // Obtener ID del usuario
         const userRes = await fetch(API_ROUTES.users.byUsername(username as string));
         const userData = await userRes.json();
-        
-        // Obtener lista de seguidos
-        const followingRes = await fetch(API_ROUTES.users.following(userData.id));
+        setUserId(userData.id);
+      } catch {
+        toast({ title: "Error", description: "No se pudo encontrar el usuario", variant: "destructive" });
+      }
+    };
+
+    fetchUserId();
+  }, [username, toast]);
+
+  // Luego cargamos los usuarios seguidos cuando tenemos el ID
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchFollowing = async () => {
+      try {
+        // Usar la ruta correcta de API para obtener usuarios seguidos
+        const followingRes = await fetch(API_ROUTES.relationships.following(userId));
         const followingData = await followingRes.json();
         
-        setFollowing(followingData.data);
+        // Usar followingData.following en lugar de followingData.data
+        setFollowing(followingData.following || []);
         
-        // Obtener estado de seguimiento
-        const ids = followingData.data.map((u: FollowingUser) => u.id);
-        const statusRes = await fetch(API_ROUTES.users.followStatus(ids));
-        const status = await statusRes.json();
-        setFollowingStatus(status);
-      } catch {
+        // Obtener estado de seguimiento si hay usuarios seguidos
+        if (followingData.following && followingData.following.length > 0) {
+          const ids = followingData.following.map((u: FollowingUser) => u.id);
+          const statusRes = await fetch(API_ROUTES.users.followStatus(ids));
+          const status = await statusRes.json();
+          setFollowingStatus(status);
+        }
+      } catch (error) {
+        console.error("Error loading following users:", error);
         toast({ 
           title: "Error", 
           description: "Error cargando seguidos", 
@@ -54,9 +73,9 @@ export default function FollowingPage() {
         setLoading(false);
       }
     };
-
-    fetchData();
-  }, [username, toast]);
+  
+    fetchFollowing();
+  }, [userId, toast]);
 
   return (
     <div className="container mx-auto p-4">
@@ -71,7 +90,7 @@ export default function FollowingPage() {
             <Skeleton key={i} className="h-[220px] w-full rounded-xl" />
           ))}
         </div>
-      ) : (
+      ) : following.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {following.map((user) => (
             <UserCard
@@ -92,6 +111,10 @@ export default function FollowingPage() {
               variant="following"
             />
           ))}
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Este usuario no sigue a nadie aún</p>
         </div>
       )}
     </div>

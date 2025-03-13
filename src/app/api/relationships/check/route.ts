@@ -2,19 +2,20 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
 
+// GET para verificar si un usuario sigue a otro
 export async function GET(req: Request) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   try {
     const { searchParams } = new URL(req.url);
-    // Cambiar de userId a targetUserId
     const targetUserId = searchParams.get("targetUserId");
     
     if (!targetUserId) {
-      return NextResponse.json({ error: "Missing targetUserId" }, { status: 400 });
+      return NextResponse.json({ error: "Falta el parámetro targetUserId" }, { status: 400 });
     }
 
+    // Verificar que el usuario objetivo existe
     const userExists = await prisma.user.findUnique({
       where: { id: targetUserId },
       select: { id: true }
@@ -24,20 +25,29 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
+    // Verificar si existe la relación de seguimiento
     const existingFollow = await prisma.follow.findUnique({
       where: {
         followerId_followingId: {
           followerId: session.user.id,
-          followingId: targetUserId // Usar targetUserId
+          followingId: targetUserId
         }
       }
     });
 
-    return NextResponse.json({ isFollowing: !!existingFollow });
+    // Obtener el número de seguidores del usuario objetivo
+    const followerCount = await prisma.follow.count({
+      where: { followingId: targetUserId }
+    });
+
+    return NextResponse.json({
+      isFollowing: !!existingFollow,
+      followerCount
+    });
   } catch (error) {
-    console.error("Error checking follow status:", error);
+    console.error("Error al verificar estado de seguimiento:", error);
     return NextResponse.json(
-      { error: "Failed to check follow status" },
+      { error: "Error al verificar estado de seguimiento" },
       { status: 500 }
     );
   }
