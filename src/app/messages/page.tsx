@@ -291,7 +291,7 @@ export default function MessagesPage() {
               </DialogTrigger>
 
               {/* Diálogo nuevo mensaje */}
-              <DialogContent className="max-w-md p-0 bg-white dark:bg-gray-800 rounded-lg overflow-hidden">
+              <DialogContent className="max-w-md p-0 bg-white dark:bg-gray-800 rounded-lg overflow">
                 <DialogHeader className="px-6 pt-6">
                   <DialogTitle className="text-lg font-semibold flex items-center gap-2">
                     <Users2 className="h-5 w-5 text-blue-500" />
