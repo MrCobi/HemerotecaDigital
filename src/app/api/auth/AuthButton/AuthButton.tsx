@@ -46,7 +46,7 @@ const AuthButton = () => {
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full overflow-hidden">
               <CldImage
-                src={session.user.image || 'default_avatar'}
+                src={session.user.image || "default_avatar"}
                 alt={session.user?.name || "Usuario"}
                 width={48}
                 height={48}

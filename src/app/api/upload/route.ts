@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { v2 as cloudinary } from 'cloudinary';
-
-// Configurar Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,31 +23,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'El archivo es demasiado grande (máx. 5MB)' }, { status: 400 });
     }
 
-    // Convertir el archivo a un buffer y luego a base64
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const base64Data = `data:${file.type};base64,${buffer.toString('base64')}`;
+    
+    const publicPath = path.join(process.cwd(), 'public', 'uploads');
+    await mkdir(publicPath, { recursive: true });
 
-    // Subir imagen a Cloudinary
-    const result = await new Promise<any>((resolve, reject) => {
-      cloudinary.uploader.upload(
-        base64Data,
-        {
-          folder: 'periodico_web',
-          resource_type: 'auto',
-        },
-        (error, result) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(result);
-          }
-        }
-      );
-    });
+    const filename = `${Date.now()}-${file.name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9_.-]/g, '')}`;
 
-    // Retornar la URL de la imagen subida
-    return NextResponse.json({ url: result.secure_url });
+    const filePath = path.join(publicPath, filename);
+    await writeFile(filePath, buffer);
+    
+    return NextResponse.json({ url: `/uploads/${filename}` });
+
   } catch (error) {
     console.error('Error subiendo archivo:', error);
     return NextResponse.json(

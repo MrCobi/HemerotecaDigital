@@ -3,7 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CldImage } from 'next-cloudinary';
+import Image from "next/image";
 import Link from "next/link";
 import { Source } from "@/src/interface/source";
 import { Button } from "@/src/app/components/ui/button";
@@ -299,12 +299,10 @@ export default function DashboardPage() {
         <div className="lg:hidden flex items-center justify-between mb-6">
           <Link href="/" className="flex items-center space-x-2">
             <div className="relative w-10 h-10">
-              <CldImage
-                src="default_periodico"
+              <Image
+                src="/images/default_periodico.jpg"
                 alt="Logo"
-                width={40}
-                height={40}
-                crop="fill"
+                layout="fill"
                 className="rounded-lg object-cover"
                 priority
               />
@@ -340,13 +338,10 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center space-x-3">
                   <div className="relative w-12 h-12 rounded-full overflow-hidden">
-                    <CldImage
-                      src={user?.image || "default_avatar"}
+                    <Image
+                      src={user?.image || "/images/AvatarPredeterminado.webp"}
                       alt={user?.name || "Avatar"}
-                      width={48}
-                      height={48}
-                      crop="fill"
-                      gravity="face"
+                      layout="fill"
                       className="object-cover"
                       priority
                     />
@@ -416,12 +411,10 @@ export default function DashboardPage() {
                 className={`flex items-center ${!isOpen && "justify-center"}`}
               >
                 <div className="relative w-10 h-10">
-                  <CldImage
-                    src="default_periodico"
+                  <Image
+                    src="/images/default_periodico.jpg"
                     alt="Logo"
-                    width={40}
-                    height={40}
-                    crop="fill"
+                    layout="fill"
                     className="rounded-lg object-cover"
                     priority
                   />
@@ -486,14 +479,12 @@ export default function DashboardPage() {
                 <div className="flex flex-col items-center sm:flex-row sm:items-center gap-8">
                   <div className="relative group">
                     <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl transition-all duration-300 group-hover:scale-[1.03] z-10">
-                      <CldImage
-                        src={user?.image || "default_avatar"}
+                      <Image
+                        src={user?.image || "/images/AvatarPredeterminado.webp"}
                         alt={user?.name || "Avatar"}
-                        width={192}
-                        height={192}
-                        crop="fill"
-                        gravity="face"
+                        layout="fill"
                         className="object-cover"
+                        priority
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.src = "/images/AvatarPredeterminado.webp";

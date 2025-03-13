@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { CldImage } from 'next-cloudinary';
+import Image from "next/image";
 import { useState } from "react";
 import styled from "styled-components";
 import { CustomUser as User} from "@/src/interface/user";
@@ -94,13 +94,11 @@ export default function DashboardPage() {
                 {/* Avatar Section */}
                 <div className="md:w-1/4">
                   <div className="relative">
-                    <CldImage
-                      src={user?.image || "default_avatar"}
+                    <Image
+                      src={user?.image || "/images/default_periodico.jpg"}
                       alt={user?.name || "Avatar"}
                       width={260}
                       height={260}
-                      crop="fill"
-                      gravity="face"
                       className="rounded-full border-4 border-blue-500"
                     />
                   </div>

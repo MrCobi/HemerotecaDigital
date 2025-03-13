@@ -1,7 +1,7 @@
 "use client";
 
 import { User } from "@prisma/client";
-import { CldImage } from 'next-cloudinary';
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { Card } from "@/src/app/components/ui/card";
 import { Badge } from "@/src/app/components/ui/badge";
@@ -50,14 +50,13 @@ export const UserCard = memo(function UserCard({ user, action }: UserCardProps) 
           >
             <div className="absolute left-1/2 top-0 transform -translate-x-1/2 -translate-y-1/2">
               <div className="relative w-20 h-20 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-800 shadow-lg group-hover:ring-blue-200 dark:group-hover:ring-blue-900 transition-all duration-300">
-                <CldImage
-                  src={user.image || "default_avatar"}
+                <Image
+                  src={user.image || "/default-avatar.png"}
                   alt={user.name || "User"}
                   width={80}
                   height={80}
-                  crop="fill"
-                  gravity="face"
                   className="object-cover"
+                  priority={false}
                 />
               </div>
             </div>

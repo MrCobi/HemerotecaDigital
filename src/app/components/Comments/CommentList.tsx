@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, memo, useCallback } from "react";
-import Image from "next/image";
+import { CldImage } from 'next-cloudinary';
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import { useSession } from "next-auth/react";
@@ -133,11 +133,13 @@ const CommentItem = memo(
             <div className="flex items-start gap-3 md:gap-4 flex-1">
               <div className="relative flex-shrink-0">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-indigo-600/20 rounded-full animate-pulse-slow"></div>
-                <Image
-                  src={comment.user.image ?? "/default-avatar.png"}
+                <CldImage
+                  src={comment.user.image || "default_avatar"}
                   alt={comment.user.username}
                   width={40}
                   height={40}
+                  crop="fill"
+                  gravity="face"
                   className="rounded-full border-2 border-gray-100 dark:border-gray-700 object-cover z-10 relative"
                 />
               </div>
