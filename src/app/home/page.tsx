@@ -38,6 +38,7 @@ import Link from "next/link";
 import { Article } from "@/src/interface/article";
 import { fetchArticulosDestacados } from "@/lib/api";
 import { API_ROUTES } from "@/src/config/api-routes";
+import { CldImage } from 'next-cloudinary';
 
 interface Activity {
   id: string;
@@ -1027,7 +1028,7 @@ export default function HomePage() {
               opacity: isVisible.collections ? 1 : 0,
               y: isVisible.collections ? 0 : 20,
             }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            transition={{ duration: 0.5 }}
             className="relative"
           >
             <div
@@ -1239,15 +1240,34 @@ export default function HomePage() {
                           <div className="flex items-center space-x-3">
                             <div className="flex-shrink-0">
                               <Avatar className="h-10 w-10">
-                                <Image
-                                  src={
-                                    activity.user.image || "/default-avatar.png"
-                                  }
-                                  alt={activity.user.name}
-                                  width={40}
-                                  height={40}
-                                  className="h-10 w-10 rounded-full"
-                                />
+                                {activity.user.image && (activity.user.image.includes('cloudinary') || 
+                                (!activity.user.image.startsWith('/') && !activity.user.image.startsWith('http'))) ? (
+                                  <CldImage
+                                    src={activity.user.image}
+                                    alt={activity.user.name}
+                                    width={40}
+                                    height={40}
+                                    crop="fill"
+                                    gravity="face"
+                                    className="h-10 w-10 rounded-full"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = "/images/AvatarPredeterminado.webp";
+                                    }}
+                                  />
+                                ) : (
+                                  <Image
+                                    src={activity.user.image || "/images/AvatarPredeterminado.webp"}
+                                    alt={activity.user.name}
+                                    width={40}
+                                    height={40}
+                                    className="h-10 w-10 rounded-full"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = "/images/AvatarPredeterminado.webp";
+                                    }}
+                                  />
+                                )}
                               </Avatar>
                             </div>
                             <div className="flex-shrink-0">

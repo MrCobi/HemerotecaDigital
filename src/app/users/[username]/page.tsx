@@ -23,6 +23,7 @@ import Link from "next/link";
 import { Button } from "@/src/app/components/ui/button";
 import { FollowButton } from "@/src/app/components/FollowButton";
 import { API_ROUTES } from "@/src/config/api-routes";
+import { CldImage } from 'next-cloudinary';
 
 type Activity = {
   id: string;
@@ -171,17 +172,36 @@ export default function UserProfilePage() {
             <div className="flex flex-col items-center sm:flex-row sm:items-center gap-8">
               <div className="relative group">
                 <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl transition-all duration-300 group-hover:scale-[1.03] z-10">
-                  <Image
-                    src={user.image || "/default-avatar.png"}
-                    alt={user.name || "Avatar"}
-                    layout="fill"
-                    className="object-cover"
-                    priority
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = "/default-avatar.png";
-                    }}
-                  />
+                  {user.image && (user.image.includes('cloudinary') || 
+                  (!user.image.startsWith('/') && !user.image.startsWith('http'))) ? (
+                    <CldImage
+                      src={user.image}
+                      alt={user.name || "Avatar"}
+                      width={200}
+                      height={200}
+                      crop="fill"
+                      gravity="face"
+                      className="object-cover w-full h-full"
+                      priority
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : (
+                    <Image
+                      src={user.image || "/images/AvatarPredeterminado.webp"}
+                      alt={user.name || "Avatar"}
+                      width={200}
+                      height={200}
+                      className="object-cover w-full h-full"
+                      priority
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  )}
                 </div>
               </div>
 

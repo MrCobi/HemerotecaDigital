@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Menu } from "@mui/material";
 import styled from "styled-components";
 import { CldImage } from 'next-cloudinary';
+import Image from 'next/image';
 
 const AuthButton = () => {
   const { data: session } = useSession();
@@ -45,15 +46,34 @@ const AuthButton = () => {
         >
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full overflow-hidden">
-              <CldImage
-                src={session.user.image || "default_avatar"}
-                alt={session.user?.name || "Usuario"}
-                width={48}
-                height={48}
-                crop="fill"
-                gravity="face"
-                className="w-full h-full object-cover"
-              />
+              {session.user.image && (session.user.image.includes('cloudinary') || 
+              (!session.user.image.startsWith('/') && !session.user.image.startsWith('http'))) ? (
+                <CldImage
+                  src={session.user.image}
+                  alt={session.user?.name || "Usuario"}
+                  width={48}
+                  height={48}
+                  crop="fill"
+                  gravity="face"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/AvatarPredeterminado.webp";
+                  }}
+                />
+              ) : (
+                <Image
+                  src={session.user.image || "/images/AvatarPredeterminado.webp"}
+                  alt={session.user?.name || "Usuario"}
+                  width={48}
+                  height={48}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/AvatarPredeterminado.webp";
+                  }}
+                />
+              )}
             </div>
             <div className="flex flex-col items-start">
               <span className="text-sm font-medium text-white">

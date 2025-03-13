@@ -7,7 +7,7 @@ import { Card } from "@/src/app/components/ui/card";
 import { Badge } from "@/src/app/components/ui/badge";
 import Link from "next/link";
 import { memo } from "react";
-
+import { CldImage } from 'next-cloudinary';
 
 interface UserCardProps {
   user: Pick<User, "id" | "name" | "username" | "image"> & {
@@ -50,14 +50,34 @@ export const UserCard = memo(function UserCard({ user, action }: UserCardProps) 
           >
             <div className="absolute left-1/2 top-0 transform -translate-x-1/2 -translate-y-1/2">
               <div className="relative w-20 h-20 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-800 shadow-lg group-hover:ring-blue-200 dark:group-hover:ring-blue-900 transition-all duration-300">
-                <Image
-                  src={user.image || "/default-avatar.png"}
-                  alt={user.name || "User"}
-                  width={80}
-                  height={80}
-                  className="object-cover"
-                  priority={false}
-                />
+                {user.image && (user.image.includes('cloudinary') || 
+                (!user.image.startsWith('/') && !user.image.startsWith('http'))) ? (
+                  <CldImage
+                    src={user.image}
+                    alt={user.name || "User"}
+                    width={80}
+                    height={80}
+                    crop="fill"
+                    gravity="face"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/images/AvatarPredeterminado.webp";
+                    }}
+                  />
+                ) : (
+                  <Image
+                    src={user.image || "/images/AvatarPredeterminado.webp"}
+                    alt={user.name || "User"}
+                    width={80}
+                    height={80}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/images/AvatarPredeterminado.webp";
+                    }}
+                  />
+                )}
               </div>
             </div>
 

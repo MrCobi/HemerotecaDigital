@@ -24,6 +24,7 @@ import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
 import { toast } from "sonner";
 import Image from "next/image";
 import { API_ROUTES } from "@/src/config/api-routes";
+import { CldImage } from 'next-cloudinary';
 
 export default function EditUserPage() {
   const router = useRouter();
@@ -99,116 +100,160 @@ export default function EditUserPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     setSaving(true);
-
     try {
-      // Verificar que session y user existan antes de acceder a id
-      if (!session?.user?.id) {
-        throw new Error("No hay sesión de usuario");
+      // Primero, actualizar la foto de perfil si cambió
+      let imageUrl = formData.image;
+      
+      // Si la imagen es un dataURL (base64), cargarla a Cloudinary
+      if (imageUrl && imageUrl.startsWith('data:image/')) {
+        const imageFormData = new FormData();
+        // Convertir dataURL a Blob
+        const blob = await (await fetch(imageUrl)).blob();
+        imageFormData.append('file', blob);
+        
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: imageFormData,
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error('Error al subir la imagen');
+        }
+        
+        const uploadData = await uploadResponse.json();
+        imageUrl = uploadData.public_id; // Guardar el ID público de Cloudinary
       }
       
-      const response = await fetch(API_ROUTES.users.crud.update(session.user.id), {
+      // Verificar que user.id exista antes de usarlo
+      if (!user?.id) {
+        throw new Error("No se pudo identificar al usuario");
+      }
+      
+      const response = await fetch(API_ROUTES.users.crud.update(user.id), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          ...formData,
+          id: user.id,
+          name: formData.name,
+          username: formData.username,
           password: formData.password || undefined,
+          image: imageUrl,
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("Error actualizando usuario");
+        throw new Error(data.error || "Error al actualizar el perfil");
       }
 
+      // Actualizar la sesión con los nuevos datos
       await update({
         ...session,
         user: {
           ...session?.user,
           name: formData.name,
           username: formData.username,
-          image: formData.image,
+          image: imageUrl,
         },
       });
 
       toast.success("Perfil actualizado correctamente");
-      router.push("/dashboard");
-    } catch (error: unknown) {
-      setError("Error al guardar los cambios");
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Error desconocido al actualizar el perfil"
-      );
+      router.push(`/users/${formData.username}`);
+    } catch (error: any) {
+      console.error("Error en actualización:", error);
+      setError(error.message || "Error al guardar los cambios");
+      toast.error(error.message || "Error al guardar los cambios");
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading || status === "loading") {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20 flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent dark:border-blue-400"></div>
-          <p className="mt-4 text-blue-800 dark:text-blue-300 font-medium">
-            Cargando perfil...
-          </p>
-        </div>
+      <div className="min-h-screen flex justify-center items-center">
+        <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20 p-8 flex items-center justify-center">
+      <div className="min-h-screen flex justify-center items-center p-4">
         <Alert variant="destructive" className="max-w-md">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
+          <div className="mt-4">
+            <Button asChild variant="outline">
+              <Link href="/">Volver al inicio</Link>
+            </Button>
+          </div>
         </Alert>
       </div>
     );
   }
 
-  if (!user) return null;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
-        <Link
-          href="/api/auth/dashboard"
-          className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors mb-8"
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20 py-12 px-4">
+      <div className="max-w-2xl mx-auto">
+        <Button
+          variant="ghost"
+          className="mb-6"
+          onClick={() => router.back()}
         >
-          <ArrowLeft className="mr-2 h-5 w-5" />
-          Volver al dashboard
-        </Link>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Volver
+        </Button>
 
-        <Card className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg shadow-xl border-0">
-          <div className="p-6 sm:p-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8 flex items-center">
-              <UserCircle2 className="h-8 w-8 mr-3 text-blue-600 dark:text-blue-400" />
-              Editar Perfil
+        <Card className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg shadow-xl border-0 p-6">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Editar perfil
             </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Actualiza tu información personal
+            </p>
+          </div>
 
-            <form onSubmit={handleSubmit} className="space-y-8">
+          <form onSubmit={handleSubmit} className="space-y-8">
+            <div className="grid md:grid-cols-2 gap-8">
               {/* Profile Image Section */}
               <div className="flex flex-col items-center space-y-4">
                 <div className="relative group">
                   <div className="relative w-48 h-48 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl transition-all duration-300">
-                    <Image
-                      src={
-                        formData.image || "/images/AvatarPredeterminado.webp"
-                      }
-                      alt={user?.name || "Avatar"}
-                      layout="fill"
-                      className="object-cover"
-                      priority
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
-                    />
+                    {formData.image && (formData.image.includes('cloudinary') || 
+                    (!formData.image.startsWith('/') && !formData.image.startsWith('http') && !formData.image.startsWith('data:'))) ? (
+                      <CldImage
+                        src={formData.image}
+                        alt={user?.name || "Avatar"}
+                        width={200}
+                        height={200}
+                        crop="fill"
+                        gravity="face"
+                        className="object-cover w-full h-full"
+                        priority
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
+                      />
+                    ) : (
+                      <Image
+                        src={formData.image || "/images/AvatarPredeterminado.webp"}
+                        alt={user?.name || "Avatar"}
+                        width={200}
+                        height={200}
+                        className="object-cover w-full h-full"
+                        priority
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
+                      />
+                    )}
                   </div>
                   <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300">
                     <input
@@ -220,12 +265,11 @@ export default function EditUserPage() {
                     />
                     <Button
                       type="button"
-                      variant="secondary"
                       size="sm"
+                      className="rounded-full"
                       onClick={() => document.getElementById("image")?.click()}
-                      className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-lg"
                     >
-                      <Camera className="mr-2 h-4 w-4" />
+                      <Camera className="h-4 w-4 mr-2" />
                       Cambiar foto
                     </Button>
                   </div>
@@ -233,13 +277,10 @@ export default function EditUserPage() {
               </div>
 
               {/* Form Fields */}
-              <div className="grid gap-6 sm:grid-cols-2">
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label
-                    htmlFor="name"
-                    className="text-gray-700 dark:text-gray-300 flex items-center"
-                  >
-                    <UserIcon className="h-4 w-4 mr-2 text-blue-600 dark:text-blue-400" />
+                  <Label htmlFor="name" className="flex items-center">
+                    <UserIcon className="h-4 w-4 mr-2" />
                     Nombre completo
                   </Label>
                   <Input
@@ -247,17 +288,15 @@ export default function EditUserPage() {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    className="bg-white/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-400"
                     placeholder="Tu nombre completo"
+                    className="border-gray-300 dark:border-gray-700"
+                    required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label
-                    htmlFor="username"
-                    className="text-gray-700 dark:text-gray-300 flex items-center"
-                  >
-                    <Mail className="h-4 w-4 mr-2 text-blue-600 dark:text-blue-400" />
+                  <Label htmlFor="username" className="flex items-center">
+                    <UserCircle2 className="h-4 w-4 mr-2" />
                     Nombre de usuario
                   </Label>
                   <Input
@@ -265,18 +304,16 @@ export default function EditUserPage() {
                     name="username"
                     value={formData.username}
                     onChange={handleChange}
-                    className="bg-white/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-400"
-                    placeholder="@username"
+                    placeholder="Nombre de usuario único"
+                    className="border-gray-300 dark:border-gray-700"
+                    required
                   />
                 </div>
 
-                <div className="space-y-2 sm:col-span-2">
-                  <Label
-                    htmlFor="password"
-                    className="text-gray-700 dark:text-gray-300 flex items-center"
-                  >
-                    <Key className="h-4 w-4 mr-2 text-blue-600 dark:text-blue-400" />
-                    Nueva contraseña
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="flex items-center">
+                    <Key className="h-4 w-4 mr-2" />
+                    Contraseña (dejar en blanco para mantener la actual)
                   </Label>
                   <Input
                     id="password"
@@ -284,29 +321,33 @@ export default function EditUserPage() {
                     type="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className="bg-white/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-400"
-                    placeholder="Dejar en blanco para mantener la actual"
+                    placeholder="••••••••"
+                    className="border-gray-300 dark:border-gray-700"
                   />
                 </div>
               </div>
+            </div>
 
-              {/* Submit Button */}
-              <div className="pt-6">
-                <Button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
-                >
-                  {saving ? (
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="mr-2 h-5 w-5" />
-                  )}
-                  {saving ? "Guardando cambios..." : "Guardar cambios"}
-                </Button>
-              </div>
-            </form>
-          </div>
+            <div className="flex justify-center mt-6">
+              <Button
+                type="submit"
+                className="w-full md:w-auto px-8"
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Guardar cambios
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
         </Card>
       </div>
     </div>

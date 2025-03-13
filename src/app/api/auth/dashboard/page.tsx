@@ -3,7 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { CldImage } from "next-cloudinary";
 import Link from "next/link";
 import { Source } from "@/src/interface/source";
 import { Button } from "@/src/app/components/ui/button";
@@ -29,6 +29,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
+import Image from "next/image";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -197,7 +198,10 @@ export default function DashboardPage() {
   }, [session]);
 
   const PaginationControls = () => {
-    const totalPages = Math.ceil(Math.min(totalActivities, 20) / itemsPerPage);
+    // Limitar a un máximo de 5 páginas
+    const maxTotalItems = 5 * itemsPerPage;
+    const effectiveTotalItems = Math.min(totalActivities, maxTotalItems);
+    const totalPages = Math.ceil(effectiveTotalItems / itemsPerPage);
 
     return (
       <div className="flex justify-center gap-2 mt-4">
@@ -209,8 +213,7 @@ export default function DashboardPage() {
         </Button>
 
         <span className="flex items-center px-4 text-sm">
-          Página {currentPage} de{" "}
-          {Math.ceil(Math.min(totalActivities, 20) / itemsPerPage)}
+          Página {currentPage} de {totalPages}
         </span>
 
         <Button
@@ -302,7 +305,8 @@ export default function DashboardPage() {
               <Image
                 src="/images/default_periodico.jpg"
                 alt="Logo"
-                layout="fill"
+                width={40}
+                height={40}
                 className="rounded-lg object-cover"
                 priority
               />
@@ -337,14 +341,55 @@ export default function DashboardPage() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center space-x-3">
-                  <div className="relative w-12 h-12 rounded-full overflow-hidden">
-                    <Image
-                      src={user?.image || "/images/AvatarPredeterminado.webp"}
-                      alt={user?.name || "Avatar"}
-                      layout="fill"
-                      className="object-cover"
-                      priority
-                    />
+                  <div className="relative group">
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl transition-all duration-300 group-hover:scale-[1.03] z-10">
+                      {user?.image && user?.image.includes('cloudinary') ? (
+                        // Si la imagen tiene un formato de Cloudinary público (URL completa)
+                        <CldImage
+                          src={user.image}
+                          alt={user?.name || "Avatar"}
+                          width={48}
+                          height={48}
+                          crop="fill"
+                          gravity="face"
+                          className="object-cover"
+                          priority
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
+                      ) : user?.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
+                        // Si la imagen es un public_id de Cloudinary (sin https:// o /)
+                        <CldImage
+                          src={user.image}
+                          alt={user?.name || "Avatar"}
+                          width={48}
+                          height={48}
+                          crop="fill"
+                          gravity="face"
+                          className="object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
+                      ) : (
+                        // Para imágenes locales o fallback
+                        <Image
+                          src={user?.image || "/images/AvatarPredeterminado.webp"}
+                          alt={user?.name || "Avatar"}
+                          width={48}
+                          height={48}
+                          className="object-cover"
+                          priority
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -390,7 +435,7 @@ export default function DashboardPage() {
                     );
                   }}
                 >
-                  <LogOut className="h-5 w-5 mr-2" />
+                  <LogOut className="h-5 w-5" />
                   Cerrar sesión
                 </Button>
               </nav>
@@ -414,7 +459,8 @@ export default function DashboardPage() {
                   <Image
                     src="/images/default_periodico.jpg"
                     alt="Logo"
-                    layout="fill"
+                    width={40}
+                    height={40}
                     className="rounded-lg object-cover"
                     priority
                   />
@@ -479,17 +525,52 @@ export default function DashboardPage() {
                 <div className="flex flex-col items-center sm:flex-row sm:items-center gap-8">
                   <div className="relative group">
                     <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl transition-all duration-300 group-hover:scale-[1.03] z-10">
-                      <Image
-                        src={user?.image || "/images/AvatarPredeterminado.webp"}
-                        alt={user?.name || "Avatar"}
-                        layout="fill"
-                        className="object-cover"
-                        priority
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = "/images/AvatarPredeterminado.webp";
-                        }}
-                      />
+                      {user?.image && user?.image.includes('cloudinary') ? (
+                        // Si la imagen tiene un formato de Cloudinary público (URL completa)
+                        <CldImage
+                          src={user.image}
+                          alt={user?.name || "Avatar"}
+                          width={192}
+                          height={192}
+                          crop="fill"
+                          gravity="face"
+                          className="object-cover w-full h-full"
+                          priority
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
+                      ) : user?.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
+                        // Si la imagen es un public_id de Cloudinary (sin https:// o /)
+                        <CldImage
+                          src={user.image}
+                          alt={user?.name || "Avatar"}
+                          width={192}
+                          height={192}
+                          crop="fill"
+                          gravity="face"
+                          className="object-cover w-full h-full"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
+                      ) : (
+                        // Para imágenes locales o fallback
+                        <Image
+                          src={user?.image || "/images/AvatarPredeterminado.webp"}
+                          alt={user?.name || "Avatar"}
+                          width={192}
+                          height={192}
+                          className="object-cover w-full h-full"
+                          priority
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
 
