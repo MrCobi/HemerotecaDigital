@@ -202,28 +202,59 @@ export default function UserProfilePage() {
                   </div>
                   {/* Botón de Seguir */}
                   {session?.user?.id !== user.id && (
-                    <FollowButton
-                      targetUserId={user.id}
-                      isFollowing={isFollowing}
-                      onSuccess={(newStatus, serverFollowerCount) => {
-                        setIsFollowing(newStatus);
-                        setUserData((prev) => {
-                          if (!prev) return prev;
-                          return {
-                            ...prev,
-                            user: {
-                              ...prev.user,
-                              stats: {
-                                ...prev.user.stats,
-                                followers:
-                                  serverFollowerCount ??
-                                  prev.user.stats.followers,
+                    <div className="flex gap-2">
+                      <FollowButton
+                        targetUserId={user.id}
+                        isFollowing={isFollowing}
+                        onSuccess={(newStatus, serverFollowerCount) => {
+                          setIsFollowing(newStatus);
+                          setUserData((prev) => {
+                            if (!prev) return prev;
+                            return {
+                              ...prev,
+                              user: {
+                                ...prev.user,
+                                stats: {
+                                  ...prev.user.stats,
+                                  followers:
+                                    serverFollowerCount ??
+                                    prev.user.stats.followers,
+                                },
                               },
-                            },
-                          };
-                        });
-                      }}
-                    />
+                            };
+                          });
+                        }}
+                      />
+                      
+                      {/* Botón de Enviar Mensaje (solo visible si hay seguimiento mutuo) */}
+                      {isFollowing && (
+                        <Button
+                          onClick={async () => {
+                            // Verificar si hay seguimiento mutuo
+                            try {
+                              const res = await fetch(`/api/relationships/check?targetUserId=${user.id}`);
+                              const data = await res.json();
+                              
+                              if (data.isMutualFollow) {
+                                // Redirigir a la página de mensajes
+                                window.location.href = "/messages";
+                              } else {
+                                // Mostrar una alerta si no hay seguimiento mutuo
+                                alert("Para enviar mensajes, ambos usuarios deben seguirse mutuamente.");
+                              }
+                            } catch (error) {
+                              console.error("Error:", error);
+                              alert("Hubo un error al intentar iniciar la conversación.");
+                            }
+                          }}
+                          variant="outline"
+                          className="bg-blue-600 hover:bg-blue-700 text-white border-0"
+                        >
+                          <MessageSquare className="mr-2 h-4 w-4" />
+                          Enviar mensaje
+                        </Button>
+                      )}
+                    </div>
                   )}
                   {/* Stats Grid */}
                   <div className="grid grid-cols-2 gap-4 max-w-xs mx-auto sm:mx-0">
