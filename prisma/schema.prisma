@@ -172,8 +172,8 @@ model DirectMessage {
   sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 
-  @@index([senderId])
-  @@index([receiverId])
+ @@index([senderId, receiverId])
+  @@index([createdAt])
   @@map("direct_messages")
 }
 

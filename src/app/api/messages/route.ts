@@ -1,45 +1,30 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { broadcastMessage } from "@/lib/websocket";
 import { NextResponse } from 'next/server';
 
 // Enviar mensaje
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-  }
+  if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
 
-  const { receiverId, content } = await req.json();
+  const { receiverId, content } = await request.json();
   
-  // Verificar seguimiento mutuo
-  const isMutualFollow = await prisma.follow.findFirst({
-    where: {
-      followerId: session.user.id,
-      followingId: receiverId,
-      following: {
-        followers: {
-          some: {
-            followerId: receiverId
-          }
-        }
-      }
-    }
-  });
-
-  if (!isMutualFollow) {
-    return NextResponse.json({ error: 'Deben seguirse mutuamente' }, { status: 403 });
-  }
-
   const message = await prisma.directMessage.create({
     data: {
       content,
       senderId: session.user.id,
       receiverId,
-      read: false
+    },
+    include: {
+      sender: true,
+      receiver: true
     }
   });
 
-  return NextResponse.json(message);
+  await broadcastMessage(receiverId, message);
+  
+  return new Response(JSON.stringify(message), { status: 201 });
 }
 
 // Obtener conversación

@@ -12,52 +12,46 @@ export async function GET(request: NextRequest) {
   const userId = request.nextUrl.searchParams.get('userId');
   if (!userId) return new Response('Missing userId', { status: 400 });
 
-  const encoder = new TextEncoder();
-  let isConnectionClosed = false;
-
   const stream = new ReadableStream({
     async start(controller) {
-      // Función para verificar mensajes
+      const encoder = new TextEncoder();
+      let isActive = true;
+      let lastChecked = new Date();
+
       const checkMessages = async () => {
-        if (isConnectionClosed) return;
-        
         try {
           const messages = await prisma.directMessage.findMany({
             where: {
               OR: [
-                { AND: [{ senderId: session.user.id }, { receiverId: userId }] },
-                { AND: [{ senderId: userId }, { receiverId: session.user.id }] }
-              ]
+                { senderId: session.user.id, receiverId: userId },
+                { senderId: userId, receiverId: session.user.id }
+              ],
+              createdAt: { gt: lastChecked }
             },
             orderBy: { createdAt: 'desc' },
             take: 1
           });
 
-          if (messages.length > 0 && !isConnectionClosed) {
+          if (messages.length > 0) {
+            lastChecked = new Date();
             const data = `data: ${JSON.stringify(messages[0])}\n\n`;
             controller.enqueue(encoder.encode(data));
           }
         } catch (error) {
-          if (!isConnectionClosed) {
-            console.error('Error:', error);
-            controller.error(error);
-          }
+          console.error('Error checking messages:', error);
         }
       };
 
-      // Intervalo de verificación
       const interval = setInterval(checkMessages, 2000);
 
-      // Manejar cierre de conexión
       request.signal.addEventListener('abort', () => {
-        isConnectionClosed = true;
+        isActive = false;
         clearInterval(interval);
         controller.close();
       });
 
-      // Limpieza
       return () => {
-        isConnectionClosed = true;
+        isActive = false;
         clearInterval(interval);
       };
     }
@@ -67,7 +61,7 @@ export async function GET(request: NextRequest) {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      'Connection': 'keep-alive'
     },
   });
 }
