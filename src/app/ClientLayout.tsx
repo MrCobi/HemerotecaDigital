@@ -6,6 +6,7 @@ import AuthButton from "@/src/app/api/auth/AuthButton/AuthButton";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Suspense } from "react";
+import { MessageBadge } from "@/src/app/components/MessageBadge";
 
 export default function ClientLayout({
   children,
@@ -30,7 +31,7 @@ export default function ClientLayout({
 
       <footer className="bg-gradient-to-br from-blue-600 to-indigo-900 text-white py-8 mt-auto">
         <div className="border-blue-400/20 text-center text-sm text-blue-100">
-          <p>© 2025 Hemeroteca Digital. Todos los derechos reservados.</p>
+          <p> 2025 Hemeroteca Digital. Todos los derechos reservados.</p>
         </div>
       </footer>
     </div>
@@ -91,6 +92,15 @@ function Navbar() {
                   { href: "/Articulos", label: "Artículos" },
                   { href: "/sources", label: "Fuentes" },
                   { href: "/explore", label: "Descubrir Usuarios" },
+                  {
+                    href: "/messages",
+                    label: (
+                      <div className="flex items-center">
+                        Mensajes
+                        <MessageBadge />
+                      </div>
+                    ),
+                  },
                 ].map((link) => (
                   <Link
                     key={link.href}
@@ -157,6 +167,15 @@ function Navbar() {
               { href: "/Articulos", label: "Artículos" },
               { href: "/sources", label: "Fuentes" },
               { href: "/explore", label: "Explorar Usuarios" },
+              {
+                href: "/messages",
+                label: (
+                  <div className="flex items-center">
+                    Mensajes
+                    <MessageBadge />
+                  </div>
+                ),
+              },
             ].map((link) => (
               <Link
                 key={link.href}

@@ -34,7 +34,8 @@ export async function POST(req: Request) {
     data: {
       content,
       senderId: session.user.id,
-      receiverId
+      receiverId,
+      read: false
     }
   });
 
@@ -63,9 +64,27 @@ export async function GET(req: Request) {
       ]
     },
     orderBy: { createdAt: 'asc' },
-    include: {
-      sender: { select: { id: true, username: true, image: true } },
-      receiver: { select: { id: true, username: true, image: true } }
+    select: {
+      id: true,
+      content: true,
+      senderId: true,
+      receiverId: true,
+      read: true,
+      createdAt: true,
+      sender: {
+        select: {
+          id: true,
+          username: true,
+          image: true
+        }
+      },
+      receiver: {
+        select: {
+          id: true,
+          username: true,
+          image: true
+        }
+      }
     }
   });
 

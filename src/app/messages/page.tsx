@@ -1,10 +1,10 @@
 "use client"
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ChatWindow } from "@/src/app/components/Chat/ChatWindow";
 import { Button } from "@/src/app/components/ui/button";
-import { MessageSquarePlus } from "lucide-react";
+import { MessageSquarePlus, MessageCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,15 @@ interface User {
   image: string | null;
 }
 
+interface Message {
+  id: string;
+  content: string;
+  senderId: string;
+  receiverId: string;
+  read: boolean;
+  createdAt: string;
+}
+
 interface Conversation {
   id: string;
   senderId: string;
@@ -28,16 +37,23 @@ interface Conversation {
   createdAt: string;
   sender: User;
   receiver: User;
+  lastMessage?: Message;
+  unreadCount?: number;
 }
 
 export default function MessagesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [mutualFollowers, setMutualFollowers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  
+  // Obtener el ID de conversación de la URL si existe
+  const conversationId = searchParams.get('conversationWith');
 
   useEffect(() => {
     // Redirigir si no está autenticado
@@ -52,7 +68,30 @@ export default function MessagesPage() {
           const res = await fetch('/api/messages/conversations');
           if (!res.ok) throw new Error('Error al cargar conversaciones');
           const data = await res.json();
-          setConversations(data);
+          
+          // Ordenar conversaciones por fecha del último mensaje (más reciente primero)
+          const sortedConversations = data.sort((a: Conversation, b: Conversation) => {
+            const dateA = a.lastMessage?.createdAt || a.createdAt;
+            const dateB = b.lastMessage?.createdAt || b.createdAt;
+            return new Date(dateB).getTime() - new Date(dateA).getTime();
+          });
+          
+          setConversations(sortedConversations);
+          
+          // Si hay un ID en la URL, seleccionarlo
+          if (conversationId) {
+            const targetConversation = sortedConversations.find((conv: Conversation) => {
+              const otherUserId = conv.senderId === session.user.id ? conv.receiverId : conv.senderId;
+              return otherUserId === conversationId;
+            });
+            
+            if (targetConversation) {
+              setSelectedConversation(targetConversation.id);
+            }
+          } else if (sortedConversations.length > 0) {
+            // Si no hay ID en la URL pero hay conversaciones, seleccionar la primera
+            setSelectedConversation(sortedConversations[0].id);
+          }
         } catch (error) {
           console.error('Error:', error);
         } finally {
@@ -61,8 +100,12 @@ export default function MessagesPage() {
       };
 
       fetchConversations();
+      
+      // Configurar intervalo para actualizar las conversaciones cada 10 segundos
+      const interval = setInterval(fetchConversations, 10000);
+      return () => clearInterval(interval);
     }
-  }, [session, status, router]);
+  }, [session, status, router, conversationId]);
 
   // Función para cargar usuarios con seguimiento mutuo
   const loadMutualFollowers = async () => {
@@ -112,11 +155,45 @@ export default function MessagesPage() {
           username: session.user.username || null,
           image: session.user.image || null
         },
-        receiver: otherUser
+        receiver: otherUser,
+        unreadCount: 0
       };
       
-      setConversations([...conversations, newConversation]);
+      const updatedConversations = [newConversation, ...conversations];
+      setConversations(updatedConversations);
+      setSelectedConversation(newConversation.id);
     }
+  };
+
+  // Formatear la fecha del último mensaje
+  const formatMessageDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    
+    // Si es hoy, mostrar sólo la hora
+    if (date.toDateString() === today.toDateString()) {
+      return new Intl.DateTimeFormat('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(date);
+    }
+    
+    // Si es esta semana, mostrar el día
+    const diffTime = Math.abs(today.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays <= 7) {
+      return new Intl.DateTimeFormat('es-ES', {
+        weekday: 'long',
+      }).format(date);
+    }
+    
+    // Si es más antiguo, mostrar la fecha
+    return new Intl.DateTimeFormat('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(date);
   };
 
   if (status === "loading" || loading) {
@@ -128,6 +205,14 @@ export default function MessagesPage() {
       </div>
     );
   }
+
+  // Obtener la conversación seleccionada
+  const selectedConversationData = conversations.find(conv => conv.id === selectedConversation);
+  const selectedUser = selectedConversationData ? 
+    (selectedConversationData.senderId === session?.user?.id ? 
+      selectedConversationData.receiver : 
+      selectedConversationData.sender) 
+    : null;
 
   return (
     <div className="container mx-auto p-4">
@@ -195,21 +280,91 @@ export default function MessagesPage() {
           <p className="text-blue-300 mt-2">Inicia una nueva conversación haciendo clic en el botón superior.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {conversations.map((conversation) => {
-            const otherUser = conversation.senderId === session?.user?.id 
-              ? conversation.receiver 
-              : conversation.sender;
+        <div className="flex h-[calc(100vh-150px)] bg-blue-900 rounded-lg overflow-hidden">
+          {/* Lista de conversaciones (estilo WhatsApp) */}
+          <div className="w-1/3 border-r border-blue-800 overflow-y-auto">
+            {conversations.map((conversation) => {
+              const otherUser = conversation.senderId === session?.user?.id 
+                ? conversation.receiver 
+                : conversation.sender;
               
-            return (
-              <div key={conversation.id} className="border rounded-lg p-4 bg-blue-900">
-                <ChatWindow 
-                  otherUser={otherUser} 
-                  currentUserId={session?.user?.id as string}
-                />
+              const isSelected = conversation.id === selectedConversation;
+              const lastMessage = conversation.lastMessage?.content || "Inicia una conversación";
+              const lastMessageTime = conversation.lastMessage?.createdAt || conversation.createdAt;
+              const formattedTime = formatMessageDate(lastMessageTime);
+              const hasUnread = (conversation.unreadCount || 0) > 0;
+                
+              return (
+                <div 
+                  key={conversation.id} 
+                  className={`flex items-center p-4 border-b border-blue-800 cursor-pointer hover:bg-blue-800/50 transition-colors
+                    ${isSelected ? 'bg-blue-800' : ''}
+                  `}
+                  onClick={() => setSelectedConversation(conversation.id)}
+                >
+                  <Avatar className="h-12 w-12 mr-3">
+                    <AvatarImage src={otherUser.image || ''} />
+                    <AvatarFallback>
+                      {otherUser.username?.[0]?.toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-semibold text-white truncate">
+                        {otherUser.username || 'Usuario'}
+                      </h3>
+                      <span className="text-xs text-blue-300">{formattedTime}</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center mt-1">
+                      <p className={`text-sm truncate ${hasUnread ? 'text-white font-medium' : 'text-blue-300'}`}>
+                        {lastMessage.length > 30 ? `${lastMessage.substring(0, 30)}...` : lastMessage}
+                      </p>
+                      
+                      {hasUnread && (
+                        <div className="rounded-full bg-green-500 text-white text-xs min-w-[20px] h-5 flex items-center justify-center px-1">
+                          {conversation.unreadCount}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Ventana de chat seleccionada */}
+          <div className="flex-1 bg-blue-950/30">
+            {selectedUser ? (
+              <ChatWindow 
+                otherUser={selectedUser} 
+                currentUserId={session?.user?.id as string}
+                onMessageSent={() => {
+                  // Actualizar la lista de conversaciones después de enviar un mensaje
+                  const fetchConversations = async () => {
+                    const res = await fetch('/api/messages/conversations');
+                    if (res.ok) {
+                      const data = await res.json();
+                      setConversations(data.sort((a: Conversation, b: Conversation) => {
+                        const dateA = a.lastMessage?.createdAt || a.createdAt;
+                        const dateB = b.lastMessage?.createdAt || b.createdAt;
+                        return new Date(dateB).getTime() - new Date(dateA).getTime();
+                      }));
+                    }
+                  };
+                  fetchConversations();
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center p-4">
+                  <MessageCircle className="h-16 w-16 text-blue-500/40 mx-auto mb-4" />
+                  <p className="text-blue-300">Selecciona una conversación para comenzar a chatear</p>
+                </div>
               </div>
-            );
-          })}
+            )}
+          </div>
         </div>
       )}
     </div>
