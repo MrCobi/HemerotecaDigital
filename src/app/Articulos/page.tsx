@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { fetchTopHeadlines } from "../services/NewsEverythingService";
 import { Article } from "../../interface/article";
 import Image from "next/image";
@@ -29,6 +29,8 @@ const Page = () => {
   const [totalPages, setTotalPages] = useState(1);
   const router = useSearchParams();
   const urlQuery = router.get("q");
+  const searchPerformed = useRef(false);
+  const queryProcessed = useRef(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -37,15 +39,23 @@ const Page = () => {
       const savedCurrentPage = sessionStorage.getItem("currentPage");
       const savedTotalPages = sessionStorage.getItem("totalPages");
 
-      setSearchParams(
-        savedParams ? JSON.parse(savedParams) : defaultSearchParams
-      );
-      setArticles(savedArticles ? JSON.parse(savedArticles) : []);
-      setCurrentPage(savedCurrentPage ? parseInt(savedCurrentPage, 10) : 1);
-      setTotalPages(savedTotalPages ? parseInt(savedTotalPages, 10) : 1);
-      setFirstVisit(!savedArticles);
+      // Solo cargamos parámetros guardados si no hay una búsqueda en la URL
+      if (!urlQuery) {
+        setSearchParams(
+          savedParams ? JSON.parse(savedParams) : defaultSearchParams
+        );
+        setArticles(savedArticles ? JSON.parse(savedArticles) : []);
+        setCurrentPage(savedCurrentPage ? parseInt(savedCurrentPage, 10) : 1);
+        setTotalPages(savedTotalPages ? parseInt(savedTotalPages, 10) : 1);
+        setFirstVisit(!savedArticles);
+      } else if (!queryProcessed.current) {
+        // Si hay consulta en la URL, establecemos los parámetros de búsqueda
+        queryProcessed.current = true;
+        setSearchParams(prev => ({ ...prev, q: urlQuery }));
+        setFirstVisit(false);
+      }
     }
-  }, []);
+  }, [urlQuery]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -57,13 +67,18 @@ const Page = () => {
   const handleSearch = useCallback(
     async (e?: React.FormEvent | null) => {
       if (e) e.preventDefault();
+      
+      // Evitar búsquedas duplicadas
+      if (searchPerformed.current) return;
+      searchPerformed.current = true;
 
       if (!searchParams.q.trim() && !searchParams.sources) {
         setError(
           "No se han encontrado artículos. Busque por palabra clave o seleccione una fuente."
         );
         setImagePath(getRandomImage());
-        setFirstVisit(false); // Desactivar firstVisit en caso de error
+        setFirstVisit(false);
+        searchPerformed.current = false;
         return;
       }
 
@@ -82,7 +97,7 @@ const Page = () => {
             "No se han encontrado artículos. Intente una búsqueda diferente."
           );
           setImagePath(getRandomImage());
-          setFirstVisit(false); // Desactivar firstVisit en caso de error
+          setFirstVisit(false);
         } else {
           setArticles(data.articles);
           const totalArticles = data.articles.length;
@@ -95,25 +110,30 @@ const Page = () => {
           sessionStorage.setItem("totalPages", calculatedTotalPages.toString());
           setCurrentPage(1);
           sessionStorage.setItem("currentPage", "1");
-          setFirstVisit(false); // Desactivar firstVisit cuando hay resultados
+          setFirstVisit(false);
         }
-      } catch {
+      } catch (error) {
+        console.error("Error searching articles:", error);
         setError("Error fetching news");
         setImagePath(getRandomImage());
-        setFirstVisit(false); // Desactivar firstVisit en caso de error
+        setFirstVisit(false);
       } finally {
         setLoading(false);
+        // Reset search performed flag to allow future searches
+        setTimeout(() => {
+          searchPerformed.current = false;
+        }, 500);
       }
     },
     [searchParams]
   );
 
+  // Ejecutar búsqueda cuando cambian los parámetros de búsqueda desde URL
   useEffect(() => {
-    if (urlQuery) {
-      setSearchParams((prev) => ({ ...prev, q: urlQuery }));
+    if (queryProcessed.current && searchParams.q && !searchPerformed.current) {
       handleSearch();
     }
-  }, [urlQuery, handleSearch]);
+  }, [searchParams, handleSearch]);
 
   const getPaginatedArticles = () => {
     const storedArticles = JSON.parse(

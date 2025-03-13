@@ -534,9 +534,9 @@ const useHorizontalScroll = () => {
 };
 
 export default function HomePage() {
-  const { data: session, status } = useSession();
-  const [mounted, setMounted] = useState(false);
+  const { data: session } = useSession();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [isVisible, setIsVisible] = useState({
     stats: false,
     featured: false,
@@ -557,6 +557,7 @@ export default function HomePage() {
   const itemsPerPage = 5;
   const [categories, setCategories] = useState<string[]>([]);
   const [featuredArticles, setFeaturedArticles] = useState<Article[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const horizontalScroll = useHorizontalScroll();
 
@@ -657,10 +658,10 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (status === "unauthenticated" && mounted) {
-      redirect("/");
+    if (session === null && mounted) {
+      router.push("/");
     }
-  }, [status, mounted]);
+  }, [session, mounted, router]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -712,7 +713,7 @@ export default function HomePage() {
     );
   };
 
-  if (!mounted || status === "loading") {
+  if (!mounted || session === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-900">
         <div className="text-center">
@@ -773,8 +774,22 @@ export default function HomePage() {
                   type="text"
                   placeholder="Buscar por título o palabra clave..."
                   className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-blue-200 focus-visible:ring-white/30 focus-visible:border-white/30 pr-12 py-5" // Añade padding
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && searchQuery.trim()) {
+                      router.push(`/Articulos?q=${encodeURIComponent(searchQuery.trim())}`);
+                    }
+                  }}
                 />
-                <Button className="ml-2 bg-white text-blue-600 hover:bg-blue-50 absolute right-0 top-1/2 -translate-y-1/2 z-20">
+                <Button 
+                  className="ml-2 bg-white text-blue-600 hover:bg-blue-50 absolute right-0 top-1/2 -translate-y-1/2 z-20"
+                  onClick={() => {
+                    if (searchQuery.trim()) {
+                      router.push(`/Articulos?q=${encodeURIComponent(searchQuery.trim())}`);
+                    }
+                  }}
+                >
                   <Search className="h-5 w-5" /> {/* Icono más grande */}
                 </Button>
               </div>
