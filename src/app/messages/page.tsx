@@ -197,7 +197,7 @@ export default function MessagesPage() {
           setConversations(sortedConversations);
           
           // Encontrar la conversación recién creada y seleccionarla
-          const newConversation = sortedConversations.find(conv => {
+          const newConversation = sortedConversations.find((conv: Conversation) => {
             const otherUserId = conv.senderId === session.user.id ? conv.receiverId : conv.senderId;
             return otherUserId === userId;
           });
