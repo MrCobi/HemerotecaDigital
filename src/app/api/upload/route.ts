@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
+import { v2 as cloudinary } from 'cloudinary';
+
+// Configurar Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,25 +29,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'El archivo es demasiado grande (máx. 5MB)' }, { status: 400 });
     }
 
+    // Convertir el archivo a un buffer para subirlo a Cloudinary
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    
-    const publicPath = path.join(process.cwd(), 'public', 'uploads');
-    await mkdir(publicPath, { recursive: true });
 
-    const filename = `${Date.now()}-${file.name
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, '_')
-      .replace(/[^a-zA-Z0-9_.-]/g, '')}`;
+    // Generar un identificador único para el archivo
+    const timestamp = Date.now();
+    const uniqueId = `user_uploads/user_${timestamp}`;
 
-    const filePath = path.join(publicPath, filename);
-    await writeFile(filePath, buffer);
-    
-    return NextResponse.json({ url: `/uploads/${filename}` });
+    // Crear una promesa para la carga a Cloudinary
+    const cloudinaryUpload = new Promise<string>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          public_id: uniqueId,
+          folder: 'hemeroteca_digital', // Opcional: carpeta en tu cuenta de Cloudinary
+          resource_type: 'image',
+        },
+        (error, result) => {
+          if (error) {
+            console.error('Error de Cloudinary:', error);
+            reject(error);
+          } else {
+            // Retornamos solo el public_id que se usará con CldImage
+            resolve(result?.public_id || '');
+          }
+        }
+      );
+
+      // Escribir el buffer en el stream de carga
+      const cloudinaryBuffer = Buffer.from(buffer);
+      uploadStream.end(cloudinaryBuffer);
+    });
+
+    // Esperar a que se complete la carga
+    const publicId = await cloudinaryUpload;
+
+    // Retornar el public_id para usar con CldImage - solo devolvemos el ID, no la URL completa
+    return NextResponse.json({ url: publicId });
 
   } catch (error) {
-    console.error('Error subiendo archivo:', error);
+    console.error('Error subiendo archivo a Cloudinary:', error);
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
