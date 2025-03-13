@@ -150,6 +150,35 @@ export async function DELETE(req: Request) {
       }
     });
 
+    // Verificar si ya no hay seguimiento mutuo
+    const mutualFollowExists = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: targetUserId,
+          followingId: session.user.id
+        }
+      }
+    });
+
+    // Si ya no hay seguimiento mutuo, eliminar todos los mensajes entre los usuarios
+    if (!mutualFollowExists) {
+      // Eliminar todos los mensajes entre ambos usuarios en ambas direcciones
+      await prisma.directMessage.deleteMany({
+        where: {
+          OR: [
+            {
+              senderId: session.user.id,
+              receiverId: targetUserId
+            },
+            {
+              senderId: targetUserId,
+              receiverId: session.user.id
+            }
+          ]
+        }
+      });
+    }
+
     // Registrar la actividad de "unfollow"
     await prisma.activityHistory.create({
       data: {

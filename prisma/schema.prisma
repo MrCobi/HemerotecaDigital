@@ -28,6 +28,8 @@ model User {
   followers       Follow[]          @relation("follower")
   following       Follow[]          @relation("following")
   ratings         Rating[]
+  sentMessages    DirectMessage[]   @relation("SentMessages")
+  receivedMessages DirectMessage[]  @relation("ReceivedMessages")
 
   @@map("users")
 }
@@ -158,6 +160,21 @@ model ActivityHistory {
 
   @@index([userId])
   @@map("activity_history")
+}
+
+model DirectMessage {
+  id         String   @id @default(cuid())
+  content    String   @db.Text
+  senderId   String   @map("sender_id")
+  receiverId String   @map("receiver_id")
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@map("direct_messages")
 }
 
 enum Role {

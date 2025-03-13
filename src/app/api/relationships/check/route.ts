@@ -35,6 +35,16 @@ export async function GET(req: Request) {
       }
     });
 
+    // Verificar si el usuario objetivo también sigue al usuario actual
+    const reverseFollow = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: targetUserId,
+          followingId: session.user.id
+        }
+      }
+    });
+
     // Obtener el número de seguidores del usuario objetivo
     const followerCount = await prisma.follow.count({
       where: { followingId: targetUserId }
@@ -42,6 +52,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       isFollowing: !!existingFollow,
+      isMutualFollow: !!existingFollow && !!reverseFollow,
       followerCount
     });
   } catch (error) {

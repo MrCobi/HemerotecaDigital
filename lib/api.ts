@@ -58,19 +58,41 @@ export async function updatePrivacySettings(settings: {
   showFavorites?: boolean;
   showActivity?: boolean;
 }) {
-  const session = await getSession();
-  
-  if (!session?.user?.id) {
-    throw new Error("No autenticado");
-  }
-
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: {
-      showFavorites: settings.showFavorites,
-      showActivity: settings.showActivity
+  try {
+    const response = await fetch('/api/user/privacy', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(settings),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Error al actualizar configuración');
     }
-  });
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error al actualizar configuración:', error);
+    throw error;
+  }
+}
+
+export async function getUserPrivacySettings() {
+  try {
+    const response = await fetch('/api/user/privacy');
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Error al obtener configuración');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error al obtener configuración:', error);
+    throw error;
+  }
 }
 
 export async function fetchArticulosDestacados(): Promise<Article[]> {
