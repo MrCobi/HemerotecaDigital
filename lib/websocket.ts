@@ -1,5 +1,5 @@
 import { WebSocket, WebSocketServer } from 'ws';
-import prisma from '@/lib/db';
+
 
 const wss = new WebSocketServer({ noServer: true });
 

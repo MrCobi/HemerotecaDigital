@@ -2,7 +2,6 @@
 import { Article } from "@/src/interface/article";
 import { Source } from "@prisma/client";
 import prisma from "./db";
-import { getSession } from "next-auth/react";
 
 export async function fetchArticlesBySource(
   sourceId: string,

@@ -3,7 +3,7 @@ import { useState, useEffect, useContext, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarFallback } from "../ui/avatar";
 import {
   UnreadMessagesContext,
   UnreadMessagesContextType,
@@ -35,7 +35,6 @@ interface Message {
 export function ChatWindow({
   otherUser,
   currentUserId,
-  onMessageSent,
   isOpen,
   onClose,
   isMobile,
@@ -51,13 +50,13 @@ export function ChatWindow({
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isMutualFollow, setIsMutualFollow] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [_isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const unreadContext = useContext<UnreadMessagesContextType>(
     UnreadMessagesContext
   );
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const _eventSourceRef = useRef<EventSource | null>(null);
 
   // Verificar si existe seguimiento mutuo
   const checkMutualFollow = async () => {
@@ -96,70 +95,37 @@ export function ChatWindow({
     setMessages(data);
   };
 
-  // Configurar SSE para actualizaciones en tiempo real
+  // ChatWindow.tsx - Reemplazar los useEffect de SSE con este:
   useEffect(() => {
-    if (session && isOpen) {
-      // Cerrar conexión SSE existente si hay una
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-
-      // Crear nueva conexión SSE
-      const eventSource = new EventSource(
-        `/api/messages/sse?userId=${otherUser.id}`
-      );
-
-      eventSource.onmessage = (event) => {
-        const newMessage = JSON.parse(event.data);
-        setMessages((prev) => {
-          // Evitar duplicados
-          if (!prev.some((msg) => msg.id === newMessage.id)) {
-            return [...prev, newMessage];
-          }
-          return prev;
-        });
-      };
-
-      eventSourceRef.current = eventSource;
-
-      return () => {
-        eventSource.close();
-        eventSourceRef.current = null;
-      };
-    }
-  }, [session, otherUser.id, isOpen]);
-
-  useEffect(() => {
+    let eventSource: EventSource | null = null;
     let reconnectTimer: NodeJS.Timeout;
-    
+
     const setupSSE = () => {
       if (session && isOpen && otherUser.id) {
-        const eventSource = new EventSource(
-          `/api/messages/sse?userId=${otherUser.id}`
-        );
-  
+        eventSource = new EventSource(`/api/messages/sse?userId=${otherUser.id}`);
+
         eventSource.onmessage = (event) => {
           try {
             const newMessage = JSON.parse(event.data);
-            setMessages(prev => {
-              const exists = prev.some(msg => msg.id === newMessage.id);
-              return exists ? prev : [...prev, newMessage];
-            });
+            setMessages(prev =>
+              prev.some(msg => msg.id === newMessage.id) ? prev : [...prev, newMessage]
+            );
           } catch (error) {
             console.error('Error parsing message:', error);
           }
         };
-  
+
         eventSource.onerror = () => {
-          eventSource.close();
+          if (eventSource) eventSource.close();
           reconnectTimer = setTimeout(setupSSE, 3000);
         };
       }
     };
-  
+
     setupSSE();
-  
+
     return () => {
+      if (eventSource) eventSource.close();
       clearTimeout(reconnectTimer);
     };
   }, [session, otherUser.id, isOpen]);
@@ -176,43 +142,46 @@ export function ChatWindow({
     }
   }, [session, otherUser.id, isOpen]);
 
-  const handleSend = async () => {
-    if (!session || !newMessage.trim() || !isMutualFollow || isSending) return;
-  
-    setIsSending(true);
-    const optimisticMessage: Message = {
-      id: `temp-${Date.now()}`,
-      content: newMessage,
-      senderId: currentUserId,
-      receiverId: otherUser.id,
-      createdAt: new Date().toISOString(),
-      read: false,
-    };
-  
-    try {
-      setMessages(prev => [...prev, optimisticMessage]);
-      setNewMessage("");
-  
-      const response = await fetch("/api/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          receiverId: otherUser.id,
-          content: newMessage,
-        }),
-      });
-  
-      if (!response.ok) throw new Error("Error al enviar mensaje");
-      
-      await fetchMessages();
-      
-    } catch (error) {
-      console.error("Error:", error);
-      setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
-    } finally {
-      setIsSending(false);
-    }
+// ChatWindow.tsx - Modificar handleSend:
+const handleSend = async () => {
+  if (!session || !newMessage.trim() || !isMutualFollow || isSending) return;
+
+  const tempId = `temp-${Date.now()}`;
+  const optimisticMessage: Message = {
+    id: tempId,
+    content: newMessage,
+    senderId: currentUserId,
+    receiverId: otherUser.id,
+    createdAt: new Date().toISOString(),
+    read: false,
   };
+
+  setIsSending(true);
+  setMessages(prev => [...prev, optimisticMessage]);
+  setNewMessage("");
+
+  try {
+    const res = await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ receiverId: otherUser.id, content: newMessage }),
+    });
+
+    if (!res.ok) throw new Error();
+    
+    // Reemplazar mensaje temporal con el real
+    const realMessage = await res.json();
+    setMessages(prev => 
+      prev.map(msg => msg.id === tempId ? realMessage : msg)
+    );
+
+  } catch {
+    setMessages(prev => prev.filter(msg => msg.id !== tempId)); // Rollback
+    alert("Error al enviar el mensaje");
+  } finally {
+    setIsSending(false);
+  }
+};
 
   const groupMessagesByDate = () => {
     const groups: { [key: string]: Message[] } = {};
@@ -234,12 +203,12 @@ export function ChatWindow({
     // Convertir formato español a ISO (YYYY-MM-DD)
     const [day, month, year] = dateStr.split("/");
     const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    
+
     const date = new Date(isoDate);
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-  
+
     if (date.toDateString() === today.toDateString()) {
       return "Hoy";
     } else if (date.toDateString() === yesterday.toDateString()) {
@@ -254,7 +223,7 @@ export function ChatWindow({
     }
   };
 
-  const toggleConversation = () => {
+  const _toggleConversation = () => {
     if (isOpen) {
       onClose();
     } else {
@@ -327,18 +296,16 @@ export function ChatWindow({
                 {msgs.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${
-                      message.senderId === currentUserId
+                    className={`flex ${message.senderId === currentUserId
                         ? "justify-end"
                         : "justify-start"
-                    }`}
+                      }`}
                   >
                     <div
-                      className={`p-3 rounded-lg max-w-[80%] ${
-                        message.senderId === currentUserId
+                      className={`p-3 rounded-lg max-w-[80%] ${message.senderId === currentUserId
                           ? "bg-blue-500 text-white ml-auto rounded-br-none"
                           : "bg-gray-100 dark:bg-gray-700 mr-auto rounded-bl-none"
-                      }`}
+                        }`}
                     >
                       <p className="text-sm break-words">{message.content}</p>
                       <div className="flex items-center justify-end gap-1 mt-2">

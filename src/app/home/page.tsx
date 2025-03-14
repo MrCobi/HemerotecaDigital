@@ -1,7 +1,6 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";

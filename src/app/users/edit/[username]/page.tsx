@@ -15,7 +15,6 @@ import {
   Loader2,
   User as UserIcon,
   CheckCircle2,
-  Mail,
   Key,
   UserCircle2,
   AlertCircle,
