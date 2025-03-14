@@ -50,20 +50,17 @@ export function ChatWindow({
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isMutualFollow, setIsMutualFollow] = useState<boolean | null>(null);
-  const [_isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const unreadContext = useContext<UnreadMessagesContextType>(
-    UnreadMessagesContext
-  );
-  const _eventSourceRef = useRef<EventSource | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const unreadContext = useContext<UnreadMessagesContextType>(UnreadMessagesContext);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Verificar si existe seguimiento mutuo
+  // Verificar seguimiento mutuo
   const checkMutualFollow = async () => {
     try {
-      const res = await fetch(
-        `/api/relationships/check?targetUserId=${otherUser.id}`
-      );
+      const res = await fetch(`/api/relationships/check?targetUserId=${otherUser.id}`);
       const data = await res.json();
       setIsMutualFollow(data.isMutualFollow);
     } catch (error) {
@@ -74,50 +71,54 @@ export function ChatWindow({
     }
   };
 
+  // Obtener mensajes
   const fetchMessages = async () => {
     if (!session) return;
 
-    const res = await fetch(`/api/messages?userId=${otherUser.id}`);
-    const data = await res.json();
+    try {
+      const res = await fetch(`/api/messages?userId=${otherUser.id}`);
+      const data = await res.json();
 
-    // Marcar mensajes como leídos si son recibidos y no leídos
-    const hasUnreadMessages = data.some(
-      (msg: Message) => msg.receiverId === currentUserId && !msg.read
-    );
+      // Marcar mensajes como leídos
+      const hasUnread = data.some((msg: Message) => 
+        msg.receiverId === currentUserId && !msg.read
+      );
 
-    if (hasUnreadMessages) {
-      await fetch(`/api/messages/read?senderId=${otherUser.id}`, {
-        method: "POST",
-      });
-      unreadContext.updateUnreadCount();
+      if (hasUnread) {
+        await fetch(`/api/messages/read?senderId=${otherUser.id}`, { method: "POST" });
+        unreadContext.updateUnreadCount();
+      }
+
+      setMessages(data);
+    } catch (error) {
+      console.error("Error cargando mensajes:", error);
     }
-
-    setMessages(data);
   };
 
-  // ChatWindow.tsx - Reemplazar los useEffect de SSE con este:
+  // Conexión SSE con reconexión automática
   useEffect(() => {
-    let eventSource: EventSource | null = null;
     let reconnectTimer: NodeJS.Timeout;
-
+    
     const setupSSE = () => {
       if (session && isOpen && otherUser.id) {
-        eventSource = new EventSource(`/api/messages/sse?userId=${otherUser.id}`);
+        eventSourceRef.current = new EventSource(`/api/messages/sse?userId=${otherUser.id}`);
 
-        eventSource.onmessage = (event) => {
+        eventSourceRef.current.onmessage = (event) => {
           try {
-            const newMessage = JSON.parse(event.data);
-            setMessages(prev =>
-              prev.some(msg => msg.id === newMessage.id) ? prev : [...prev, newMessage]
+            const newMsg = JSON.parse(event.data);
+            setMessages(prev => 
+              prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]
             );
           } catch (error) {
-            console.error('Error parsing message:', error);
+            console.error("Error parsing message:", error);
           }
         };
 
-        eventSource.onerror = () => {
-          if (eventSource) eventSource.close();
-          reconnectTimer = setTimeout(setupSSE, 3000);
+        eventSourceRef.current.onerror = () => {
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            reconnectTimer = setTimeout(setupSSE, 3000);
+          }
         };
       }
     };
@@ -125,16 +126,32 @@ export function ChatWindow({
     setupSSE();
 
     return () => {
-      if (eventSource) eventSource.close();
+      if (eventSourceRef.current) eventSourceRef.current.close();
       clearTimeout(reconnectTimer);
     };
   }, [session, otherUser.id, isOpen]);
 
-  // Scroll al último mensaje cuando cambian los mensajes
+  // Scroll automático y persistencia de posición
+  useEffect(() => {
+    const savedPosition = localStorage.getItem('chatScrollPosition');
+    if (messagesContainerRef.current && savedPosition) {
+      messagesContainerRef.current.scrollTop = parseInt(savedPosition);
+    }
+  }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    
+    return () => {
+      if (messagesContainerRef.current) {
+        localStorage.setItem('chatScrollPosition', 
+          messagesContainerRef.current.scrollTop.toString()
+        );
+      }
+    };
   }, [messages]);
 
+  // Cargar datos iniciales
   useEffect(() => {
     if (session && isOpen) {
       checkMutualFollow();
@@ -142,106 +159,83 @@ export function ChatWindow({
     }
   }, [session, otherUser.id, isOpen]);
 
-// ChatWindow.tsx - Modificar handleSend:
-const handleSend = async () => {
-  if (!session || !newMessage.trim() || !isMutualFollow || isSending) return;
+  // Enviar mensaje
+  const handleSend = async () => {
+    if (!session || !newMessage.trim() || !isMutualFollow || isSending) return;
 
-  const tempId = `temp-${Date.now()}`;
-  const optimisticMessage: Message = {
-    id: tempId,
-    content: newMessage,
-    senderId: currentUserId,
-    receiverId: otherUser.id,
-    createdAt: new Date().toISOString(),
-    read: false,
+    const tempId = `temp-${Date.now()}`;
+    const tempMessage: Message = {
+      id: tempId,
+      content: newMessage,
+      senderId: currentUserId,
+      receiverId: otherUser.id,
+      createdAt: new Date().toISOString(),
+      read: false,
+    };
+
+    setIsSending(true);
+    setMessages(prev => [...prev, tempMessage]);
+    setNewMessage("");
+
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          receiverId: otherUser.id, 
+          content: newMessage 
+        }),
+      });
+
+      if (!res.ok) throw new Error("Error enviando mensaje");
+      
+      const realMessage = await res.json();
+      setMessages(prev => 
+        prev.map(msg => msg.id === tempId ? realMessage : msg)
+      );
+
+    } catch (error) {
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
+      alert("Error al enviar el mensaje");
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  setIsSending(true);
-  setMessages(prev => [...prev, optimisticMessage]);
-  setNewMessage("");
-
-  try {
-    const res = await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ receiverId: otherUser.id, content: newMessage }),
-    });
-
-    if (!res.ok) throw new Error();
-    
-    // Reemplazar mensaje temporal con el real
-    const realMessage = await res.json();
-    setMessages(prev => 
-      prev.map(msg => msg.id === tempId ? realMessage : msg)
-    );
-
-  } catch {
-    setMessages(prev => prev.filter(msg => msg.id !== tempId)); // Rollback
-    alert("Error al enviar el mensaje");
-  } finally {
-    setIsSending(false);
-  }
-};
-
+  // Agrupar mensajes por fecha
   const groupMessagesByDate = () => {
-    const groups: { [key: string]: Message[] } = {};
-
-    messages.forEach((message) => {
+    return messages.reduce((groups: { [key: string]: Message[] }, message) => {
       const date = new Date(message.createdAt).toLocaleDateString("es-ES");
-      if (!groups[date]) {
-        groups[date] = [];
-      }
+      if (!groups[date]) groups[date] = [];
       groups[date].push(message);
-    });
-
-    return groups;
+      return groups;
+    }, {});
   };
 
-  const messageGroups = groupMessagesByDate();
-
+  // Formatear fecha
   const formatDateHeader = (dateStr: string) => {
-    // Convertir formato español a ISO (YYYY-MM-DD)
     const [day, month, year] = dateStr.split("/");
-    const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-
-    const date = new Date(isoDate);
+    const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) {
-      return "Hoy";
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return "Ayer";
-    } else {
-      return date.toLocaleDateString("es-ES", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
-    }
-  };
-
-  const _toggleConversation = () => {
-    if (isOpen) {
-      onClose();
-    } else {
-      fetchMessages(); // Ensure messages are fetched when opening
-    }
+    if (date.toDateString() === today.toDateString()) return "Hoy";
+    if (date.toDateString() === yesterday.toDateString()) return "Ayer";
+    
+    return date.toLocaleDateString("es-ES", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
   };
 
   if (!session) return null;
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-r from-blue-600/10 to-indigo-600/10 dark:from-blue-900/30 dark:to-indigo-900/30 ">
-      {/* Decorative elements */}
-      <div className=" inset-0 pointer-events-none">
-        <div className=" top-0 left-0 w-1/2 h-1/2 bg-blue-500/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
-        <div className="bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2"></div>
-      </div>
-
-      {/* Header */}
+    <div className="flex flex-col h-full bg-gradient-to-r from-blue-600/10 to-indigo-600/10 dark:from-blue-900/30 dark:to-indigo-900/30">
+      {/* Cabecera */}
       <div className="flex items-center p-4 border-b border-blue-200/30 dark:border-blue-800/30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm z-10 shadow-sm">
         {isMobile && (
           <Button
@@ -254,23 +248,23 @@ const handleSend = async () => {
           </Button>
         )}
         <Avatar className="h-10 w-10 ring-2 ring-blue-200/50 dark:ring-blue-700/50">
-          {otherUser.image ? (
+          {otherUser?.image ? (
             <CldImage
               src={otherUser.image}
-              alt={otherUser.username || "Usuario"}
+              alt={otherUser?.username || "Usuario"}
               width={40}
               height={40}
               className="rounded-full"
             />
           ) : (
             <AvatarFallback className="bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300">
-              {otherUser.username?.[0] || "U"}
+              {otherUser?.username?.[0] || "U"}
             </AvatarFallback>
           )}
         </Avatar>
         <div className="ml-3">
           <h2 className="font-semibold text-gray-800 dark:text-white">
-            {otherUser.username}
+            {otherUser?.username || "Usuario desconocido"}
           </h2>
           {isMutualFollow && (
             <div className="flex items-center text-xs text-green-600 dark:text-green-400">
@@ -281,10 +275,13 @@ const handleSend = async () => {
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Mensajes */}
+      <div 
+        className="flex-1 overflow-y-auto"
+        ref={messagesContainerRef}
+      >
         <div className="max-w-3xl mx-auto px-4 pb-4 h-[calc(100vh-180px)]">
-          {Object.entries(messageGroups).map(([date, msgs]) => (
+          {Object.entries(groupMessagesByDate()).map(([date, msgs]) => (
             <div key={date}>
               <div className="sticky top-2 z-20 mb-4">
                 <div className="inline-flex px-4 py-1 text-xs font-medium bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700">
@@ -296,22 +293,21 @@ const handleSend = async () => {
                 {msgs.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${message.senderId === currentUserId
-                        ? "justify-end"
-                        : "justify-start"
-                      }`}
+                    className={`flex ${message.senderId === currentUserId ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`p-3 rounded-lg max-w-[80%] ${message.senderId === currentUserId
+                      className={`p-3 rounded-lg max-w-[80%] ${
+                        message.senderId === currentUserId
                           ? "bg-blue-500 text-white ml-auto rounded-br-none"
                           : "bg-gray-100 dark:bg-gray-700 mr-auto rounded-bl-none"
-                        }`}
+                      }`}
                     >
                       <p className="text-sm break-words">{message.content}</p>
                       <div className="flex items-center justify-end gap-1 mt-2">
                         <span className="text-xs opacity-75">
                           {new Date(message.createdAt).toLocaleTimeString([], {
-                            timeStyle: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
                           })}
                         </span>
                         {message.senderId === currentUserId &&
@@ -331,7 +327,7 @@ const handleSend = async () => {
         </div>
       </div>
 
-      {/* Input */}
+      {/* Entrada de mensajes */}
       {isMutualFollow ? (
         <div className="p-4 border-t border-blue-200/30 dark:border-blue-800/30 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm z-10">
           <form
