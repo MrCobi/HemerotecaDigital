@@ -10,20 +10,26 @@ export async function GET() {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // 1. Obtener IDs de seguidores mutuos en una sola consulta
+    // Consulta corregida para seguidores mutuos
     const mutualRelationships = await prisma.$queryRaw`
-      SELECT f1.followerId 
-      FROM Follow f1
-      INNER JOIN Follow f2 
-        ON f1.followerId = f2.followingId 
-        AND f1.followingId = f2.followerId
-      WHERE f1.followingId = ${session.user.id}
+      SELECT f1.follower_id as followerId
+      FROM follows f1
+      INNER JOIN follows f2 
+        ON f1.follower_id = f2.following_id 
+        AND f1.following_id = f2.follower_id
+      WHERE f1.following_id = ${session.user.id}
     `;
 
+    // Extraer IDs válidos y filtrar undefined
     const mutualIds = (mutualRelationships as { followerId: string }[])
-      .map(rel => rel.followerId);
+      .map(rel => rel.followerId)
+      .filter(id => typeof id === "string");
 
-    // 2. Obtener detalles de los usuarios mutuos
+    // Si no hay IDs válidos, retornar array vacío
+    if (mutualIds.length === 0) {
+      return NextResponse.json([]);
+    }
+
     const mutualUsers = await prisma.user.findMany({
       where: { id: { in: mutualIds } },
       select: {
@@ -35,7 +41,6 @@ export async function GET() {
       }
     });
 
-    // 3. Formatear respuesta asegurando campos requeridos
     const formattedUsers = mutualUsers.map(user => ({
       id: user.id,
       username: user.username || `user_${user.id.slice(0, 6)}`,

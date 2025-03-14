@@ -105,7 +105,7 @@ export default function MessagesPage() {
 
       const updatedConversations = receivedConversations.map((conv: any) => ({
         id: conv.id,
-        senderId: session.user.id, // El remitente siempre es el usuario actual
+        senderId: session.user.id,
         receiverId: conv.receiver.id,
         createdAt: conv.createdAt,
         sender: {
@@ -151,8 +151,13 @@ export default function MessagesPage() {
 
   useEffect(() => {
     const combineLists = () => {
+      const currentUserId = session?.user?.id;
       const existingUserIds = new Set(
-        conversations.map((c) => c.receiverId) // Solo receiverId pues el sender es siempre el usuario actual
+        conversations.flatMap(c => [
+          c.senderId === currentUserId ? c.receiverId : c.senderId,
+          c.senderId,
+          c.receiverId
+        ])
       );
 
       const newCombined = [
@@ -163,7 +168,7 @@ export default function MessagesPage() {
           lastInteraction: new Date(c.lastMessage?.createdAt || c.createdAt),
         })),
         ...mutualFollowers
-          .filter((user) => !existingUserIds.has(user.id))
+          .filter((user) => user.id !== currentUserId && !existingUserIds.has(user.id))
           .map((user) => ({
             id: `mutual-${user.id}`,
             isConversation: false,
@@ -201,7 +206,10 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/api/auth/signin");
-    if (status === "authenticated") fetchConversations();
+    if (status === "authenticated") {
+      fetchConversations();
+      loadMutualFollowers();
+    }
   }, [status, router, fetchConversations]);
 
   useEffect(() => {
@@ -236,27 +244,22 @@ export default function MessagesPage() {
       const data = await res.json();
 
       const existingUserIds = new Set(
-        conversations.map((conv) =>
-          conv.senderId === session.user.id ? conv.receiverId : conv.senderId
-        )
+        conversations.flatMap(conv => [conv.senderId, conv.receiverId])
       );
 
       setMutualFollowers(
-        data.filter((user: User) => !existingUserIds.has(user.id))
-      );
+        data.filter((user: User) => 
+          user.id !== session.user.id && 
+          !existingUserIds.has(user.id)
+      ));
     } catch (error) {
       console.error("Error:", error);
     }
   };
 
-  const filteredUsers = searchTerm
-    ? mutualFollowers.filter((user) =>
-        user.username?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : mutualFollowers;
-
   const startNewConversation = async (userId: string) => {
     try {
+      setMutualFollowers(prev => prev.filter(user => user.id !== userId));
       setDialogOpen(false);
       const res = await fetch("/api/messages/conversations/create", {
         method: "POST",
@@ -410,7 +413,7 @@ export default function MessagesPage() {
                 const user = item.data as User;
                 return (
                   <div
-                    key={`mutual-${user.id}-${Date.now()}`}
+                    key={`mutual-${user.id}`}
                     className="group flex items-center p-3 gap-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer rounded-xl m-2"
                     onClick={() => startNewConversation(user.id)}
                   >

@@ -97,7 +97,6 @@ ORDER BY lastMessageDate DESC
           content: message.content,
           createdAt: message.createdAt,
           read: message.read,
-          isInitial: message.content === "¡Hola! He iniciado una conversación contigo."
         },
         unreadCount: unreadCounts.find(u => u.senderId === otherUser.id)?._count._all || 0,
         createdAt: message.createdAt
