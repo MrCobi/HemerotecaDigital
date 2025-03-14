@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useContext, useRef } from "react";
+import { useState, useEffect, useContext, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -50,7 +50,6 @@ export function ChatWindow({
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isMutualFollow, setIsMutualFollow] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -58,28 +57,24 @@ export function ChatWindow({
   const eventSourceRef = useRef<EventSource | null>(null);
 
   // Verificar seguimiento mutuo
-  const checkMutualFollow = async () => {
+  const checkMutualFollow = useCallback(async () => {
     try {
       const res = await fetch(`/api/relationships/check?targetUserId=${otherUser.id}`);
       const data = await res.json();
       setIsMutualFollow(data.isMutualFollow);
-    } catch (error) {
-      console.error("Error al verificar seguimiento mutuo:", error);
+    } catch  {
       setIsMutualFollow(false);
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [otherUser.id]);
 
   // Obtener mensajes
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     if (!session) return;
 
     try {
       const res = await fetch(`/api/messages?userId=${otherUser.id}`);
       const data = await res.json();
 
-      // Marcar mensajes como leídos
       const hasUnread = data.some((msg: Message) => 
         msg.receiverId === currentUserId && !msg.read
       );
@@ -93,7 +88,7 @@ export function ChatWindow({
     } catch (error) {
       console.error("Error cargando mensajes:", error);
     }
-  };
+  }, [session, otherUser.id, currentUserId, unreadContext]);
 
   // Conexión SSE con reconexión automática
   useEffect(() => {
@@ -133,22 +128,22 @@ export function ChatWindow({
 
   // Scroll automático y persistencia de posición
   useEffect(() => {
+    const container = messagesContainerRef.current;
     const savedPosition = localStorage.getItem('chatScrollPosition');
-    if (messagesContainerRef.current && savedPosition) {
-      messagesContainerRef.current.scrollTop = parseInt(savedPosition);
+    
+    if (container && savedPosition) {
+      container.scrollTop = parseInt(savedPosition);
     }
+
+    return () => {
+      if (container) {
+        localStorage.setItem('chatScrollPosition', container.scrollTop.toString());
+      }
+    };
   }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    
-    return () => {
-      if (messagesContainerRef.current) {
-        localStorage.setItem('chatScrollPosition', 
-          messagesContainerRef.current.scrollTop.toString()
-        );
-      }
-    };
   }, [messages]);
 
   // Cargar datos iniciales
@@ -157,7 +152,7 @@ export function ChatWindow({
       checkMutualFollow();
       fetchMessages();
     }
-  }, [session, otherUser.id, isOpen]);
+  }, [session, otherUser.id, isOpen, checkMutualFollow, fetchMessages]);
 
   // Enviar mensaje
   const handleSend = async () => {
@@ -194,7 +189,7 @@ export function ChatWindow({
         prev.map(msg => msg.id === tempId ? realMessage : msg)
       );
 
-    } catch (error) {
+    } catch  {
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
       alert("Error al enviar el mensaje");
     } finally {

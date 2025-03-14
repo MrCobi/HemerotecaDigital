@@ -3,6 +3,12 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
 
+interface ConversationPair {
+  user1: string;
+  user2: string;
+  lastMessageDate: Date;
+}
+
 export interface ConversationResponse {
   id: string;
   receiver: {
@@ -31,22 +37,21 @@ export async function GET() {
       );
     }
 
-    // 1. Obtener todas las conversaciones únicas
-    // route.ts (corregir consulta SQL)
-    const uniqueConversations = await prisma.$queryRaw`
-SELECT 
-  LEAST(sender_id, receiver_id) as user1,
-  GREATEST(sender_id, receiver_id) as user2,
-  MAX(created_at) as lastMessageDate
-FROM direct_messages
-WHERE sender_id = ${session.user.id} 
-  OR receiver_id = ${session.user.id}
-GROUP BY user1, user2
-ORDER BY lastMessageDate DESC
-`;
+    // 1. Obtener conversaciones únicas con tipo explícito
+    const uniqueConversations = await prisma.$queryRaw<ConversationPair[]>`
+      SELECT 
+        LEAST(sender_id, receiver_id) as user1,
+        GREATEST(sender_id, receiver_id) as user2,
+        MAX(created_at) as lastMessageDate
+      FROM direct_messages
+      WHERE sender_id = ${session.user.id} 
+        OR receiver_id = ${session.user.id}
+      GROUP BY user1, user2
+      ORDER BY lastMessageDate DESC
+    `;
 
-    // 2. Obtener IDs de los últimos mensajes
-    const conversationPairs = (uniqueConversations as any[]).map(conv => ({
+    // 2. Obtener IDs de los últimos mensajes con tipo seguro
+    const conversationPairs = uniqueConversations.map(conv => ({
       user1: conv.user1,
       user2: conv.user2
     }));

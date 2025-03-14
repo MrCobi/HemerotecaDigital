@@ -10,7 +10,6 @@ export async function GET(request: NextRequest) {
     return new Response('Unauthorized', { 
       status: 401,
       headers: {
-        'Access-Control-Allow-Origin': '*',
         'Content-Type': 'application/json'
       }
     });
@@ -20,7 +19,6 @@ export async function GET(request: NextRequest) {
   if (!userId) return new Response('Missing userId', { 
     status: 400,
     headers: {
-      'Access-Control-Allow-Origin': '*',
       'Content-Type': 'application/json'
     }
   });
@@ -31,8 +29,11 @@ export async function GET(request: NextRequest) {
         const encoder = new TextEncoder();
         let isActive = true;
         let lastChecked = new Date();
+        let interval = 2000; // Intervalo inicial de 2s
 
         const checkMessages = async () => {
+          if (!isActive) return;
+
           try {
             const messages = await prisma.directMessage.findMany({
               where: {
@@ -46,29 +47,36 @@ export async function GET(request: NextRequest) {
               take: 1
             });
 
-            if (messages.length > 0) {
+            if (messages.length > 0 && isActive) {
               lastChecked = new Date();
               const data = `data: ${JSON.stringify(messages[0])}\n\n`;
               controller.enqueue(encoder.encode(data));
+              interval = 2000; // Resetear intervalo si hay mensajes
+            } else {
+              interval = Math.min(interval * 2, 30000); // Aumentar gradualmente hasta 30s
             }
           } catch (error) {
             console.error('Error checking messages:', error);
+            interval = 30000; // Intervalo más largo en errores
+          } finally {
+            if (isActive) {
+              setTimeout(checkMessages, interval);
+            }
           }
         };
 
-        const interval = setInterval(checkMessages, 2000);
-
-        // Manejar cierre de conexión
-        request.signal.addEventListener('abort', () => {
-          clearInterval(interval);
+        const cleanup = () => {
+          isActive = false;
           controller.close();
-        });
+        };
 
-        // Verificación inicial
+        request.signal.addEventListener('abort', cleanup);
         await checkMessages();
-      },
-      cancel() {
-        console.log('Connection closed by client');
+
+        return () => {
+          request.signal.removeEventListener('abort', cleanup);
+          cleanup();
+        };
       }
     });
 
@@ -76,9 +84,7 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET'
+        'Connection': 'keep-alive'
       },
     });
     
@@ -87,7 +93,6 @@ export async function GET(request: NextRequest) {
     return new Response('Internal Server Error', { 
       status: 500,
       headers: {
-        'Access-Control-Allow-Origin': '*',
         'Content-Type': 'application/json'
       }
     });

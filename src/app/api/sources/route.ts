@@ -17,7 +17,10 @@ export async function GET(req: Request) {
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
     // Construir condiciones de filtro
-    const where: Record<string, any> = {};
+    const where: {
+      OR?: { name?: { contains: string }; description?: { contains: string } }[];
+      category?: string;
+    } = {};
     
     if (search) {
       where.OR = [

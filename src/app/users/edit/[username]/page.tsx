@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { User} from "@/src/interface/user";
+import { User } from "@/src/interface/user";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
 import { Label } from "@/src/app/components/ui/label";
@@ -43,7 +43,7 @@ export default function EditUserPage() {
   });
 
   useEffect(() => {
-    if (status === "loading") return; // Esperar a que termine la carga
+    if (status === "loading") return;
 
     if (status === "unauthenticated" || !session?.user) {
       setError("Usuario no autenticado");
@@ -57,7 +57,6 @@ export default function EditUserPage() {
       return;
     }
 
-    // Solo inicializar cuando la sesión esté disponible
     if (status === "authenticated") {
       setUser(session.user as User);
       setFormData({
@@ -68,7 +67,7 @@ export default function EditUserPage() {
       });
       setLoading(false);
     }
-  }, [session, status, username]); // Añade status a las dependencias
+  }, [session, status, username]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -101,13 +100,10 @@ export default function EditUserPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      // Primero, actualizar la foto de perfil si cambió
       let imageUrl = formData.image;
       
-      // Si la imagen es un dataURL (base64), cargarla a Cloudinary
       if (imageUrl && imageUrl.startsWith('data:image/')) {
         const imageFormData = new FormData();
-        // Convertir dataURL a Blob
         const blob = await (await fetch(imageUrl)).blob();
         imageFormData.append('file', blob);
         
@@ -121,10 +117,9 @@ export default function EditUserPage() {
         }
         
         const uploadData = await uploadResponse.json();
-        imageUrl = uploadData.public_id; // Guardar el ID público de Cloudinary
+        imageUrl = uploadData.public_id;
       }
       
-      // Verificar que user.id exista antes de usarlo
       if (!user?.id) {
         throw new Error("No se pudo identificar al usuario");
       }
@@ -149,7 +144,6 @@ export default function EditUserPage() {
         throw new Error(data.error || "Error al actualizar el perfil");
       }
 
-      // Actualizar la sesión con los nuevos datos
       await update({
         ...session,
         user: {
@@ -162,10 +156,13 @@ export default function EditUserPage() {
 
       toast.success("Perfil actualizado correctamente");
       router.push(`/users/${formData.username}`);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error en actualización:", error);
-      setError(error.message || "Error al guardar los cambios");
-      toast.error(error.message || "Error al guardar los cambios");
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Error al guardar los cambios";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -219,7 +216,7 @@ export default function EditUserPage() {
 
           <form onSubmit={handleSubmit} className="space-y-8">
             <div className="grid md:grid-cols-2 gap-8">
-              {/* Profile Image Section */}
+              {/* Sección de imagen de perfil */}
               <div className="flex flex-col items-center space-y-4">
                 <div className="relative group">
                   <div className="relative w-48 h-48 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-2xl transition-all duration-300">
@@ -234,7 +231,7 @@ export default function EditUserPage() {
                         gravity="face"
                         className="object-cover w-full h-full"
                         priority
-                        onError={(e) => {
+                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                           const target = e.target as HTMLImageElement;
                           target.src = "/images/AvatarPredeterminado.webp";
                         }}
@@ -247,7 +244,7 @@ export default function EditUserPage() {
                         height={200}
                         className="object-cover w-full h-full"
                         priority
-                        onError={(e) => {
+                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                           const target = e.target as HTMLImageElement;
                           target.src = "/images/AvatarPredeterminado.webp";
                         }}
@@ -275,7 +272,7 @@ export default function EditUserPage() {
                 </div>
               </div>
 
-              {/* Form Fields */}
+              {/* Campos del formulario */}
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="flex items-center">

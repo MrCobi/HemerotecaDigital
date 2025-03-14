@@ -10,6 +10,19 @@ import { Star, ExternalLink, Heart, User } from "lucide-react";
 import Link from "next/link";
 import { API_ROUTES } from "@/src/config/api-routes";
 
+interface Favorite {
+  id: string;
+  source: Source;
+  userId: string;
+  createdAt: string;
+}
+
+interface UserData {
+  id: string;
+  name: string;
+  username: string;
+}
+
 export default function UserFavoritesPage() {
   const params = useParams();
   const username = params.username as string;
@@ -17,20 +30,18 @@ export default function UserFavoritesPage() {
   const [favoriteSources, setFavoriteSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userData, setUserData] = useState<{ id: string; name: string } | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
 
   const loadUserData = useCallback(async () => {
     try {
-      // Get user data by username
       const userResponse = await fetch(API_ROUTES.users.byUsername(username));
       
       if (!userResponse.ok) {
         throw new Error("Usuario no encontrado");
       }
       
-      const userData = await userResponse.json();
+      const userData: UserData = await userResponse.json();
       setUserData(userData);
-      
       return userData.id;
     } catch (error) {
       setError("No se pudo encontrar al usuario");
@@ -44,22 +55,19 @@ export default function UserFavoritesPage() {
       setLoading(true);
       setError(null);
       
-      // Get user's favorites
       const favoritesResponse = await fetch(API_ROUTES.favorites.user(userId, 1, 50));
       
       if (!favoritesResponse.ok) {
-        const errorData = await favoritesResponse.json();
+        const errorData: { error?: string } = await favoritesResponse.json();
         throw new Error(errorData.error || "Error al obtener favoritos");
       }
       
-      const favoritesData = await favoritesResponse.json();
-      
-      // Extract sources from the favorites data
-      const sources = favoritesData.favorites.map((fav: any) => fav.source);
+      const favoritesData: { favorites: Favorite[] } = await favoritesResponse.json();
+      const sources = favoritesData.favorites.map((fav: Favorite) => fav.source);
       setFavoriteSources(sources || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error al cargar favoritos:", error);
-      setError(error.message || "Error al cargar favoritos");
+      setError(error instanceof Error ? error.message : "Error desconocido");
     } finally {
       setLoading(false);
     }

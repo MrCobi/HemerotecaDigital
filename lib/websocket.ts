@@ -1,8 +1,16 @@
 import { WebSocket, WebSocketServer } from 'ws';
 
+// Definir interfaz para el mensaje
+interface Message {
+  id: string;
+  content: string;
+  senderId: string;
+  receiverId: string;
+  read: boolean;
+  createdAt: string;
+}
 
 const wss = new WebSocketServer({ noServer: true });
-
 const connections = new Map<string, WebSocket[]>();
 
 wss.on('connection', (ws: WebSocket, request: { url: string }) => {
@@ -24,7 +32,8 @@ wss.on('connection', (ws: WebSocket, request: { url: string }) => {
   });
 });
 
-export const broadcastMessage = async (receiverId: string, message: any) => {
+// Usar la interfaz Message en lugar de any
+export const broadcastMessage = async (receiverId: string, message: Message) => {
   const receivers = [receiverId, message.senderId];
   
   receivers.forEach(id => {

@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Image from "next/image";
 import { CldImage } from "next-cloudinary";
 import { CustomUser as User} from "@/src/interface/user";
 import { API_ROUTES } from "@/src/config/api-routes";

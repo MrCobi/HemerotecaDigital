@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { Follow, FollowerResponse } from "@/src/interface/relationship";
+import { FollowerResponse } from "@/src/interface/relationship";
 
 // GET para obtener los seguidores de un usuario
 export async function GET(req: Request, context: { params: Promise<{ userId: string }> }) {
