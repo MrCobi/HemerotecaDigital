@@ -172,9 +172,9 @@ model DirectMessage {
   sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 
- @@index([senderId, receiverId])
+  @@map("direct_messages") // Nombre real de la tabla en MySQL
+  @@index([senderId, receiverId])
   @@index([createdAt])
-  @@map("direct_messages")
 }
 
 enum Role {

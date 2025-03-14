@@ -31,43 +31,44 @@ export async function GET() {
       );
     }
 
-    // 1. Obtener conversaciones agrupadas optimizadas
-    const groupedMessages = await prisma.directMessage.groupBy({
-      by: ["senderId", "receiverId"],
-      where: {
-        OR: [
-          { senderId: session.user.id },
-          { receiverId: session.user.id }
-        ]
-      },
-      orderBy: {
-        _max: {
-          createdAt: "desc"
-        }
-      },
-      _max: {
-        id: true,
-        createdAt: true
-      },
-      _count: {
-        _all: true
-      }
-    });
+    // 1. Obtener todas las conversaciones únicas
+    // route.ts (corregir consulta SQL)
+    const uniqueConversations = await prisma.$queryRaw`
+SELECT 
+  LEAST(sender_id, receiver_id) as user1,
+  GREATEST(sender_id, receiver_id) as user2,
+  MAX(created_at) as lastMessageDate
+FROM direct_messages
+WHERE sender_id = ${session.user.id} 
+  OR receiver_id = ${session.user.id}
+GROUP BY user1, user2
+ORDER BY lastMessageDate DESC
+`;
 
-    // 2. Obtener últimos mensajes con relaciones
-    const lastMessageIds = groupedMessages
-      .map(g => g._max.id)
-      .filter((id): id is string => !!id);
+    // 2. Obtener IDs de los últimos mensajes
+    const conversationPairs = (uniqueConversations as any[]).map(conv => ({
+      user1: conv.user1,
+      user2: conv.user2
+    }));
 
     const lastMessages = await prisma.directMessage.findMany({
-      where: { id: { in: lastMessageIds } },
+      where: {
+        OR: conversationPairs.map(pair => ({
+          AND: [
+            { OR: [{ senderId: pair.user1 }, { senderId: pair.user2 }] },
+            { OR: [{ receiverId: pair.user1 }, { receiverId: pair.user2 }] }
+          ]
+        }))
+      },
+      orderBy: { createdAt: "desc" },
+      distinct: ['senderId', 'receiverId'],
       include: {
         sender: true,
         receiver: true
       }
     });
 
-    // 3. Obtener mensajes no leídos optimizado
+    // 3. Obtener mensajes no leídos
     const unreadCounts = await prisma.directMessage.groupBy({
       by: ["senderId"],
       where: {
@@ -78,48 +79,48 @@ export async function GET() {
     });
 
     // 4. Construir respuesta final
-    const formattedConversations: ConversationResponse[] = groupedMessages.map(g => {
-      const otherUserId = g.senderId === session.user.id 
-        ? g.receiverId 
-        : g.senderId;
-
-      const lastMessage = lastMessages.find(m => m.id === g._max.id);
-      const unread = unreadCounts.find(u => u.senderId === otherUserId)?._count._all || 0;
+    const formattedConversations: ConversationResponse[] = lastMessages.map(message => {
+      const otherUser = message.senderId === session.user.id ? message.receiver : message.sender;
+      const conversationId = [message.senderId, message.receiverId]
+        .sort()
+        .join('-');
 
       return {
-        id: `${session.user.id}-${otherUserId}`,
+        id: conversationId,
         receiver: {
-          id: otherUserId,
-          username: lastMessage?.receiver.username || null,
-          name: lastMessage?.receiver.name || null,
-          image: lastMessage?.receiver.image || null
+          id: otherUser.id,
+          username: otherUser.username,
+          name: otherUser.name,
+          image: otherUser.image
         },
-        lastMessage: lastMessage ? {
-          content: lastMessage.content,
-          createdAt: lastMessage.createdAt,
-          read: lastMessage.read,
-          isInitial: lastMessage.content === "¡Hola! He iniciado una conversación contigo."
-        } : undefined,
-        unreadCount: unread,
-        createdAt: g._max.createdAt || new Date()
+        lastMessage: {
+          content: message.content,
+          createdAt: message.createdAt,
+          read: message.read,
+          isInitial: message.content === "¡Hola! He iniciado una conversación contigo."
+        },
+        unreadCount: unreadCounts.find(u => u.senderId === otherUser.id)?._count._all || 0,
+        createdAt: message.createdAt
       };
     });
 
-    // 5. Ordenar por última interacción
-    const sortedConversations = formattedConversations.sort((a, b) => 
-      new Date(b.lastMessage?.createdAt || b.createdAt).getTime() - 
-      new Date(a.lastMessage?.createdAt || a.createdAt).getTime()
+    // Eliminar duplicados y ordenar
+    const uniqueConversationsMap = new Map(
+      formattedConversations.map(conv => [conv.id, conv])
     );
+
+    const sortedConversations = Array.from(uniqueConversationsMap.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     return NextResponse.json({
       conversations: sortedConversations,
-      total: groupedMessages.length
+      total: sortedConversations.length
     });
 
   } catch (error) {
     console.error("Error al obtener conversaciones:", error);
     return NextResponse.json(
-      { 
+      {
         error: "Error interno del servidor",
         details: error instanceof Error ? error.message : "Error desconocido"
       },

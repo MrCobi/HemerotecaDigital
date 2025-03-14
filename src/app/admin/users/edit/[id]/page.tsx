@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
+import { CldImage } from "next-cloudinary";
 import { CustomUser as User} from "@/src/interface/user";
 import { API_ROUTES } from "@/src/config/api-routes";
 
@@ -81,7 +82,7 @@ export default function EditUserPage() {
             <div className="md:w-1/3 bg-gradient-to-b from-blue-600 to-blue-800 p-8 text-white">
               <div className="text-center">
                 <div className="relative w-32 h-32 mx-auto mb-4">
-                  <Image
+                  <CldImage
                     src={preview}
                     alt="Preview"
                     fill

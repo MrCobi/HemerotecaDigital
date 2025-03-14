@@ -343,7 +343,10 @@ export default function MessagesPage() {
 
                 return (
                   <div
-                    key={conversation.id}
+                    key={`conv-${conversation.id}-${
+                      conversation.lastMessage?.createdAt ||
+                      conversation.createdAt
+                    }`}
                     className={`group flex items-center p-3 gap-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer rounded-xl m-2 ${
                       selectedConversation === conversation.id
                         ? "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 shadow-sm"
@@ -352,17 +355,18 @@ export default function MessagesPage() {
                     onClick={() => handleConversationSelect(conversation.id)}
                   >
                     <Avatar className="h-14 w-14 border-2 border-blue-200 dark:border-blue-800 group-hover:border-blue-500">
-                      {otherUser?.image ? (
+                      {currentOtherUser?.image ? (
                         <CldImage
-                          src={otherUser.image}
-                          alt={otherUser?.username || "Usuario"}
+                          src={currentOtherUser.image}
+                          alt={currentOtherUser?.username || "Usuario"}
                           width={56}
                           height={56}
                           className="rounded-full object-cover"
                         />
                       ) : (
                         <AvatarFallback className="bg-blue-100 dark:bg-blue-800 text-lg font-medium">
-                          {otherUser?.username?.[0]?.toUpperCase() || "U"}
+                          {currentOtherUser?.username?.[0]?.toUpperCase() ||
+                            "U"}
                         </AvatarFallback>
                       )}
                     </Avatar>
@@ -406,16 +410,28 @@ export default function MessagesPage() {
                 const user = item.data as User;
                 return (
                   <div
-                    key={`mutual-${user.id}`}
+                    key={`mutual-${user.id}-${Date.now()}`}
                     className="group flex items-center p-3 gap-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer rounded-xl m-2"
                     onClick={() => startNewConversation(user.id)}
                   >
                     <Avatar className="h-14 w-14 border-2 border-blue-200 dark:border-blue-800">
-                      {/* Render de avatar */}
+                      {user?.image ? (
+                        <CldImage
+                          src={user.image}
+                          alt={user?.username || "Usuario"}
+                          width={56}
+                          height={56}
+                          className="rounded-full object-cover"
+                        />
+                      ) : (
+                        <AvatarFallback className="bg-blue-100 dark:bg-blue-800 text-lg font-medium">
+                          {user?.username?.[0]?.toUpperCase() || "U"}
+                        </AvatarFallback>
+                      )}
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-gray-800 dark:text-gray-200">
-                        {user.username}
+                        {user.username || "Usuario sin nombre"}
                       </h3>
                       <p className="text-sm text-blue-500 italic">
                         Nuevo chat disponible
