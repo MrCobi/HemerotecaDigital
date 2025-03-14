@@ -231,11 +231,15 @@ export function ChatWindow({
   const messageGroups = groupMessagesByDate();
 
   const formatDateHeader = (dateStr: string) => {
-    const date = new Date(dateStr.split(",")[0]);
+    // Convertir formato español a ISO (YYYY-MM-DD)
+    const [day, month, year] = dateStr.split("/");
+    const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    
+    const date = new Date(isoDate);
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-
+  
     if (date.toDateString() === today.toDateString()) {
       return "Hoy";
     } else if (date.toDateString() === yesterday.toDateString()) {
@@ -263,9 +267,9 @@ export function ChatWindow({
   return (
     <div className="flex flex-col h-full bg-gradient-to-r from-blue-600/10 to-indigo-600/10 dark:from-blue-900/30 dark:to-indigo-900/30 ">
       {/* Decorative elements */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-blue-500/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
-        <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2"></div>
+      <div className=" inset-0 pointer-events-none">
+        <div className=" top-0 left-0 w-1/2 h-1/2 bg-blue-500/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
+        <div className="bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2"></div>
       </div>
 
       {/* Header */}

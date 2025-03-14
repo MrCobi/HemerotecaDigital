@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   Users2,
   Search,
+  UserCheck,
 } from "lucide-react";
 import {
   Dialog,
@@ -63,7 +64,9 @@ export default function MessagesPage() {
   const [mutualFollowers, setMutualFollowers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<
+    string | null
+  >(null);
   const [mobileView, setMobileView] = useState(false);
   const { updateUnreadCount } = useContext(UnreadMessagesContext);
 
@@ -75,46 +78,62 @@ export default function MessagesPage() {
 
   const fetchConversations = useCallback(async () => {
     if (!session?.user?.id) return;
-  
+
     try {
       const res = await fetch(
         `/api/messages/conversations?page=${currentPage}&limit=${CONVERSATIONS_PER_PAGE}`
       );
       if (!res.ok) throw new Error("Error al cargar conversaciones");
-      
+
       const data = await res.json();
-      
+
       // Añadir verificación de data.conversations
       const receivedConversations = data.conversations || [];
-      
-      const updatedConversations = receivedConversations.map((conv: Conversation) => ({
-        ...conv,
-        lastMessage: conv.lastMessage ? {
-          ...conv.lastMessage,
-          createdAt: new Date(conv.lastMessage.createdAt)
-        } : null
-      }));
-  
-      setConversations(prev => {
-        const merged = [...updatedConversations, ...prev.filter(c => 
-          !updatedConversations.some((uc: Conversation) => uc.id === c.id)
-        )];
-        return merged.sort((a, b) => 
-          new Date(b.lastMessage?.createdAt || b.createdAt).getTime() - 
-          new Date(a.lastMessage?.createdAt || a.createdAt).getTime()
+
+      const updatedConversations = receivedConversations.map(
+        (conv: Conversation) => ({
+          ...conv,
+          lastMessage: conv.lastMessage
+            ? {
+                ...conv.lastMessage,
+                createdAt: new Date(conv.lastMessage.createdAt),
+              }
+            : null,
+        })
+      );
+
+      setConversations((prev) => {
+        const merged = [
+          ...updatedConversations,
+          ...prev.filter(
+            (c) =>
+              !updatedConversations.some((uc: Conversation) => uc.id === c.id)
+          ),
+        ];
+        return merged.sort(
+          (a, b) =>
+            new Date(b.lastMessage?.createdAt || b.createdAt).getTime() -
+            new Date(a.lastMessage?.createdAt || a.createdAt).getTime()
         );
       });
-  
+
       setTotalPages(
-        Math.ceil((data.total || updatedConversations.length) / CONVERSATIONS_PER_PAGE)
+        Math.ceil(
+          (data.total || updatedConversations.length) / CONVERSATIONS_PER_PAGE
+        )
       );
-  
+
       if (conversationId) {
-        const targetConversation = updatedConversations.find((conv: Conversation) => {
-          const otherUserId = conv.senderId === session.user.id ? conv.receiverId : conv.senderId;
-          return otherUserId === conversationId;
-        });
-  
+        const targetConversation = updatedConversations.find(
+          (conv: Conversation) => {
+            const otherUserId =
+              conv.senderId === session.user.id
+                ? conv.receiverId
+                : conv.senderId;
+            return otherUserId === conversationId;
+          }
+        );
+
         if (targetConversation) {
           setSelectedConversation(targetConversation.id);
         }
@@ -181,10 +200,10 @@ export default function MessagesPage() {
   };
 
   const filteredUsers = searchTerm
-  ? mutualFollowers.filter((user) => 
-      user.username?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  : mutualFollowers;
+    ? mutualFollowers.filter((user) =>
+        user.username?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : mutualFollowers;
 
   const startNewConversation = async (userId: string) => {
     if (!session?.user) return;
@@ -278,85 +297,169 @@ export default function MessagesPage() {
       {(!mobileView || !selectedConversation) && (
         <div className="w-full md:w-96 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           {/* Header con botón nuevo mensaje */}
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  className="w-full bg-blue-500 hover:bg-blue-600 text-white shadow-sm"
-                  onClick={loadMutualFollowers}
-                >
-                  <MessageSquarePlus className="h-4 w-4 mr-2" />
-                  Nuevo mensaje
-                </Button>
-              </DialogTrigger>
+          <div className="w-full md:w-96 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 relative">
+            {/* Fondo degradado decorativo */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute top-0 left-0 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2" />
+              <div className="absolute bottom-0 right-0 w-72 h-72 bg-indigo-500/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2" />
+            </div>
 
-              {/* Diálogo nuevo mensaje */}
-              <DialogContent className="max-w-md p-0 bg-white dark:bg-gray-800 rounded-lg overflow">
-                <DialogHeader className="px-6 pt-6">
-                  <DialogTitle className="text-lg font-semibold flex items-center gap-2">
-                    <Users2 className="h-5 w-5 text-blue-500" />
+            {/* Header con botón nuevo mensaje */}
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg transition-all"
+                    onClick={loadMutualFollowers}
+                  >
+                    <MessageSquarePlus className="h-5 w-5 mr-2" />
                     Nuevo mensaje
-                  </DialogTitle>
-                </DialogHeader>
+                  </Button>
+                </DialogTrigger>
 
-                <div className="px-6 pb-6">
-                  <div className="relative mb-4">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Buscar contacto..."
-                      className="pl-10 rounded-lg bg-gray-100 dark:bg-gray-700 border-none"
-                    />
-                  </div>
+                {/* Diálogo nuevo mensaje */}
+                <DialogContent className="max-w-md p-0 bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                <DialogHeader className="px-6 pt-6">
+                    <DialogTitle className="text-xl font-bold flex items-center gap-3">
+                      <Users2 className="h-6 w-6 text-blue-500" />
+                      <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                        Nuevo mensaje
+                      </span>
+                    </DialogTitle>
+                  </DialogHeader>
 
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {filteredUsers.map((user) => (
-                      <div
-                        key={user.id}
-                        className="flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors"
-                        onClick={() => startNewConversation(user.id)}
-                      >
-                        <Avatar className="h-10 w-10">
-                          {user.image ? (
-                            <CldImage
-                              src={user.image}
-                              alt={user.username || "Usuario"}
-                              width={40}
-                              height={40}
-                              className="rounded-full"
-                            />
-                          ) : (
-                            <AvatarFallback className="bg-blue-100 dark:bg-blue-800">
-                              {user.username?.[0] || "U"}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        <div className="ml-3">
-                          <p className="font-medium text-gray-800 dark:text-gray-200">
-                            {user.username}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Seguimiento mutuo
+                  <div className="px-6 pb-6">
+                    <div className="relative mb-4">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Buscar contacto..."
+                        className="pl-10 rounded-xl bg-gray-100 dark:bg-gray-700 border-0 focus-visible:ring-2 ring-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {filteredUsers.map((user) => (
+                        <div
+                          key={user.id}
+                          className="flex items-center p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-all group"
+                          onClick={() => startNewConversation(user.id)}
+                        >
+                          <Avatar className="h-12 w-12 border-2 border-blue-200 dark:border-blue-800 group-hover:border-blue-500 transition-colors">
+                            {user.image ? (
+                              <CldImage
+                                src={user.image}
+                                alt={user.username || "Usuario"}
+                                width={48}
+                                height={48}
+                                className="rounded-full object-cover"
+                              />
+                            ) : (
+                              <AvatarFallback className="bg-blue-100 dark:bg-blue-800 text-lg font-medium">
+                                {user.username?.[0]?.toUpperCase() || "U"}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                          <div className="ml-4">
+                            <p className="font-semibold text-gray-800 dark:text-gray-200">
+                              {user.username}
+                            </p>
+                            <p className="text-sm text-blue-500 dark:text-blue-400 flex items-center gap-1">
+                              <UserCheck className="h-4 w-4" />
+                              Seguimiento mutuo
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+
+                      {filteredUsers.length === 0 && (
+                        <div className="text-center py-8">
+                          <Users2 className="h-16 w-16 mx-auto text-gray-400 mb-3" />
+                          <p className="text-gray-600 dark:text-gray-300 font-medium">
+                            No se encontraron usuarios
                           </p>
                         </div>
-                      </div>
-                    ))}
-
-                    {filteredUsers.length === 0 && (
-                      <div className="text-center py-8">
-                        <Users2 className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                        <p className="text-gray-600 dark:text-gray-300 font-medium">
-                          No se encontraron usuarios
-                        </p>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {/* Lista de conversaciones */}
+            <div className="overflow-y-auto h-[calc(100vh-160px)] px-2 pb-4">
+              {conversations.map((conversation) => {
+                const currentOtherUser =
+                  conversation.senderId === session?.user?.id
+                    ? conversation.receiver
+                    : conversation.sender;
+
+                return (
+                  <div
+                    key={conversation.id}
+                    className={`group flex items-center p-3 gap-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer rounded-xl m-2 ${
+                      selectedConversation === conversation.id
+                        ? "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 shadow-sm"
+                        : ""
+                    }`}
+                    onClick={() => handleConversationSelect(conversation.id)}
+                  >
+                    <Avatar className="h-14 w-14 border-2 border-blue-200 dark:border-blue-800 group-hover:border-blue-500">
+                      {currentOtherUser.image ? (
+                        <CldImage
+                          src={currentOtherUser.image}
+                          alt={currentOtherUser.username || "Usuario"}
+                          width={56}
+                          height={56}
+                          className="rounded-full object-cover"
+                        />
+                      ) : (
+                        <AvatarFallback className="bg-blue-100 dark:bg-blue-800 text-lg font-medium">
+                          {currentOtherUser.username?.[0]?.toUpperCase() || "U"}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center mb-1 gap-2">
+                        <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate">
+                          {currentOtherUser.username}
+                        </h3>
+                        {conversation.lastMessage && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                            {new Date(
+                              conversation.lastMessage.createdAt
+                            ).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        {conversation.lastMessage ? (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                            {conversation.lastMessage.content}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-blue-500 italic">
+                            Nuevo chat
+                          </p>
+                        )}
+                        {(conversation.unreadCount ?? 0) > 0 && (
+                          <span className="bg-red-500 text-white rounded-full px-2 py-1 text-xs min-w-[24px] flex justify-center items-center">
+                            {conversation.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Lista de conversaciones */}
-          <div className="overflow-y-auto h-[calc(100vh-160px)]">
+          <div className="overflow-y-auto">
             {conversations.map((conversation) => {
               const currentOtherUser =
                 conversation.senderId === session?.user?.id
@@ -410,47 +513,47 @@ export default function MessagesPage() {
       )}
 
       {/* Área de chat */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col ">
         {selectedConversation && otherUser ? (
           <ChatWindow
-            otherUser={otherUser}
-            currentUserId={session?.user?.id || ""}
-            onMessageSent={() => {
-              const fetchConversations = async () => {
-                const res = await fetch("/api/messages/conversations");
-                if (res.ok) {
-                  const data = await res.json();
-                  const sortedConversations = data.sort(
-                    (a: Conversation, b: Conversation) => {
-                      const dateA = a.lastMessage?.createdAt || a.createdAt;
-                      const dateB = b.lastMessage?.createdAt || b.createdAt;
-                      return (
-                        new Date(dateB).getTime() - new Date(dateA).getTime()
-                      );
-                    }
-                  );
-                  setConversations(sortedConversations);
-                }
-              };
-              fetchConversations();
-            }}
-            isOpen={true}
-            onClose={handleBackToList}
-            isMobile={mobileView}
-          />
-        ) : (
-          <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800">
-            <div className="text-center p-8">
-              <MessageCircle className="h-12 w-12 mx-auto text-blue-500 dark:text-blue-400 mb-4" />
-              <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">
-                Selecciona una conversación
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Elige una conversación existente o inicia una nueva
-              </p>
-            </div>
+          otherUser={otherUser}
+          currentUserId={session?.user?.id || ""}
+          onMessageSent={() => {
+            const fetchConversations = async () => {
+              const res = await fetch("/api/messages/conversations");
+              if (res.ok) {
+                const data = await res.json();
+                const sortedConversations = data.sort(
+                  (a: Conversation, b: Conversation) => {
+                    const dateA = a.lastMessage?.createdAt || a.createdAt;
+                    const dateB = b.lastMessage?.createdAt || b.createdAt;
+                    return (
+                      new Date(dateB).getTime() - new Date(dateA).getTime()
+                    );
+                  }
+                );
+                setConversations(sortedConversations);
+              }
+            };
+            fetchConversations();
+          }}
+          isOpen={true}
+          onClose={handleBackToList}
+          isMobile={mobileView}
+        />
+      ) : (
+        <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800">
+          <div className="text-center p-8">
+            <MessageCircle className="h-12 w-12 mx-auto text-blue-500 dark:text-blue-400 mb-4" />
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">
+              Selecciona una conversación
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Elige una conversación existente o inicia una nueva
+            </p>
           </div>
-        )}
+        </div>
+      )}
       </div>
     </div>
   );
