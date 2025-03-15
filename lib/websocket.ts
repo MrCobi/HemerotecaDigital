@@ -1,3 +1,4 @@
+// @/lib/websocket.ts
 import { WebSocket, WebSocketServer } from 'ws';
 
 // Definir interfaz para el mensaje
