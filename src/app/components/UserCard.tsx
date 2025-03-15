@@ -1,6 +1,6 @@
 "use client";
 
-import { User } from "@prisma/client";
+import { UserPrisma as User } from "@/src/interface/user"
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Card } from "@/src/app/components/ui/card";

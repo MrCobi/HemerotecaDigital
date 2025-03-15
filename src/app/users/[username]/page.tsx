@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { User } from "@prisma/client";
+import { UserPrisma as User } from "@/src/interface/user"
 import { Card } from "@/src/app/components/ui/card";
 import {
   User2,

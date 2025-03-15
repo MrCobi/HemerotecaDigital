@@ -2,7 +2,7 @@
 
 import { ScrollArea } from "@/src/app/components/ui/scroll-area";
 import { Card } from "@/src/app/components/ui/card";
-import { ActivityHistory } from "@prisma/client";
+import { ActivityHistory } from "@/src/interface/ActivityHistory";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import { 
