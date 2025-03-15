@@ -33,7 +33,7 @@ model User {
   receivedMessages DirectMessage[]  @relation("ReceivedMessages")
 
 @@index([emailVerified]) // Si haces queries de usuarios verificados
-  @@map("users")
+@@map("users")
   
 }
 
