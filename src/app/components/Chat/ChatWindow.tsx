@@ -64,7 +64,7 @@ export function ChatWindow({
       };
 
       ws.onclose = () => {
-        setTimeout(connectWebSocket, 1000);
+        setTimeout(connectWebSocket, 500);
       };
 
       ws.onerror = (error) => {
