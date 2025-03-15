@@ -46,25 +46,47 @@ export function ChatWindow({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const unreadContext = useContext(UnreadMessagesContext);
   const wsRef = useRef<WebSocket | null>(null);
+  const messageBuffer = useRef<Message[]>([]);
 
-  // Configurar WebSocket
+  // Configurar WebSocket optimizado
   useEffect(() => {
     if (!session || !isOpen || !otherUser.id) return;
 
     const connectWebSocket = () => {
-      const ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}?userId=${currentUserId}`);
+      const ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}?userId=${currentUserId}&token=${session?.user?.accessToken}`);
       
+      let batchTimeout: NodeJS.Timeout;
+    
       ws.onopen = () => {
         wsRef.current = ws;
+        // Enviar mensajes en buffer cada 50ms
+        batchTimeout = setInterval(() => {
+          if (messageBuffer.current.length > 0 && ws.readyState === WebSocket.OPEN) {
+            const batch = messageBuffer.current.splice(0, 50); // Enviar lotes de 50 mensajes
+            ws.send(JSON.stringify(batch));
+          }
+        }, 50);
       };
 
       ws.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        setMessages(prev => prev.some(m => m.id === message.id) ? prev : [...prev, message]);
+        try {
+          const data = JSON.parse(event.data);
+          if (Array.isArray(data)) {
+            setMessages(prev => [
+              ...prev,
+              ...data.filter((msg: Message) => !prev.some(m => m.id === msg.id))
+            ]);
+          } else {
+            setMessages(prev => prev.some(m => m.id === data.id) ? prev : [...prev, data]);
+          }
+        } catch (error) {
+          console.error('Error procesando mensaje:', error);
+        }
       };
 
       ws.onclose = () => {
-        setTimeout(connectWebSocket, 500);
+        clearInterval(batchTimeout);
+        setTimeout(connectWebSocket, 300);
       };
 
       ws.onerror = (error) => {
@@ -76,22 +98,24 @@ export function ChatWindow({
     };
 
     const ws = connectWebSocket();
-
     return () => {
-      if (ws.readyState === WebSocket.OPEN) ws.close();
+      ws.close();
+      if (wsRef.current) wsRef.current = null;
     };
   }, [session, isOpen, currentUserId, otherUser.id]);
 
-  // Cargar mensajes iniciales y verificar seguimiento
+  // Cargar mensajes iniciales optimizado
   const initializeChat = useCallback(async () => {
     try {
       const [messagesRes, followRes] = await Promise.all([
-        fetch(`/api/messages?userId=${otherUser.id}`),
+        fetch(`/api/messages?userId=${otherUser.id}&cache=${Date.now()}`),
         fetch(`/api/relationships/check?targetUserId=${otherUser.id}`)
       ]);
       
-      const messagesData = await messagesRes.json();
-      const followData = await followRes.json();
+      const [messagesData, followData] = await Promise.all([
+        messagesRes.json(),
+        followRes.json()
+      ]);
       
       setMessages(messagesData);
       setIsMutualFollow(followData.isMutualFollow);
@@ -109,12 +133,18 @@ export function ChatWindow({
     if (session && isOpen) initializeChat();
   }, [session, isOpen, initializeChat]);
 
-  // Manejar scroll
+  // Scroll automático optimizado
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = messagesContainerRef.current;
+    if (container) {
+      const isNearBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 100;
+      if (isNearBottom) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    }
   }, [messages]);
 
-  // Enviar mensaje con actualización optimista
+  // Envío optimizado con buffer local
   const handleSend = async () => {
     if (!session || !newMessage.trim() || !isMutualFollow || isSending) return;
 
@@ -131,6 +161,7 @@ export function ChatWindow({
     setIsSending(true);
     setMessages(prev => [...prev, tempMessage]);
     setNewMessage("");
+    messageBuffer.current.push(tempMessage);
 
     try {
       const response = await fetch("/api/messages", {
@@ -143,10 +174,6 @@ export function ChatWindow({
       const realMessage = await response.json();
       
       setMessages(prev => prev.map(msg => msg.id === tempId ? realMessage : msg));
-
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify(realMessage));
-      }
     } catch (error) {
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
       console.error("Error al enviar mensaje:", error);
@@ -155,23 +182,23 @@ export function ChatWindow({
     }
   };
 
-  // Agrupar mensajes por fecha
-  const groupMessagesByDate = () => {
-    return messages.reduce((groups: { [key: string]: Message[] }, message) => {
+  // Agrupación eficiente de mensajes
+  const groupMessagesByDate = useCallback(() => {
+    const groups: { [key: string]: Message[] } = {};
+    for (const message of messages) {
       const date = new Date(message.createdAt).toLocaleDateString("es-ES");
-      if (!groups[date]) groups[date] = [];
+      groups[date] = groups[date] || [];
       groups[date].push(message);
-      return groups;
-    }, {});
-  };
+    }
+    return groups;
+  }, [messages]);
 
-  // Formatear fecha
-  const formatDateHeader = (dateStr: string) => {
-    const [day, month, year] = dateStr.split("/");
-    const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+  // Formateo de fecha memoizado
+  const formatDateHeader = useCallback((dateStr: string) => {
+    const date = new Date(dateStr.split('/').reverse().join('-'));
     const today = new Date();
     const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setDate(today.getDate() - 1);
 
     if (date.toDateString() === today.toDateString()) return "Hoy";
     if (date.toDateString() === yesterday.toDateString()) return "Ayer";
@@ -182,7 +209,7 @@ export function ChatWindow({
       month: "long",
       year: "numeric",
     });
-  };
+  }, []);
 
   if (!session) return null;
 

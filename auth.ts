@@ -1,4 +1,4 @@
-// src/auth.ts
+// @/auth.ts
 import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import prisma from "@/lib/db";
@@ -6,10 +6,12 @@ import type { Role } from "@prisma/client";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { loginSchema } from "@/lib/zod";
+import jwt from "jsonwebtoken"; // Añadir esta importación
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma) as any,
   trustHost: true,
+  secret: process.env.AUTH_SECRET, // Asegúrate de tener esto en tu .env
   pages: {
     signIn: "/login",
     error: "/auth/error"
@@ -51,6 +53,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const isValid = await bcrypt.compare(parsed.data.password, user.password);
           if (!isValid) return null;
 
+          // Generar accessToken
+          const accessToken = jwt.sign(
+            { userId: user.id },
+            process.env.AUTH_SECRET!,
+            { expiresIn: '1h' }
+          );
+
           return {
             id: user.id,
             email: user.email,
@@ -59,7 +68,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             username: user.username,
             image: user.image,
             createdAt: user.createdAt,
-            favoriteSourceIds: user.favoriteSources.map(fs => fs.sourceId)
+            favoriteSourceIds: user.favoriteSources.map(fs => fs.sourceId),
+            accessToken // Añadir el token aquí
           };
         } catch (error) {
           return null;
@@ -78,6 +88,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.image = user.image;
         token.createdAt = user.createdAt;
         token.favoriteSourceIds = (user as any).favoriteSourceIds;
+        token.accessToken = (user as any).accessToken; // Añadir esta línea
       }
       return token;
     },
@@ -92,9 +103,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           username: token.username as string | null,
           email: token.email as string | null,
           image: token.image as string | null,
-          createdAt: token.createdAt as Date | undefined,
+          createdAt: token.createdAt as Date,
           favoriteSourceIds: token.favoriteSourceIds as string[] | undefined
-        }
+        },
+        accessToken: token.accessToken as string // Añadir esta línea
       };
     }
   }

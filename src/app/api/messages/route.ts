@@ -19,31 +19,20 @@ export async function POST(request: Request) {
       },
       select: {
         id: true,
-        content: true,
-        senderId: true,
-        receiverId: true,
-        read: true,
         createdAt: true,
-        sender: { select: { id: true, username: true, image: true } },
-        receiver: { select: { id: true, username: true, image: true } }
+        read: true
       }
     });
-
+    
     const optimizedMessage = {
-      ...message,
-      createdAt: message.createdAt.toISOString(),
-      sender: {
-        ...message.sender,
-        username: message.sender.username || null,
-        image: message.sender.image || null
-      },
-      receiver: {
-        ...message.receiver,
-        username: message.receiver.username || null,
-        image: message.receiver.image || null
-      }
+      id: message.id,
+      content,
+      senderId: session.user.id,
+      receiverId,
+      read: message.read,
+      createdAt: message.createdAt.toISOString()
     };
-
+    
     await broadcastMessage(receiverId, optimizedMessage);
     
     return new Response(JSON.stringify(optimizedMessage), { 

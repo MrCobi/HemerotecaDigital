@@ -28,7 +28,7 @@ export async function GET() {
       }
 
       // Conversión explícita a string y validación
-      const creationDateString = session.user.createdAt as string;
+      const creationDateString = session.user.createdAt as unknown as string;
       const creationDate = new Date(creationDateString);
       
       if (isNaN(creationDate.getTime())) {

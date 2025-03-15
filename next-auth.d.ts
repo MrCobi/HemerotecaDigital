@@ -1,13 +1,16 @@
-// next-auth.d.ts
-import { DefaultSession } from "next-auth";
-import "next-auth";
+// types/next-auth.d.ts
+import { DefaultSession, DefaultUser } from "next-auth";
+import { Role } from "@prisma/client";
 
 declare module "next-auth" {
-  interface User {
+  interface User extends DefaultUser {
     id: string;
     emailVerified?: Date | null;
-    role: string;
+    role: Role;
     username?: string | null;
+    createdAt: Date;
+    favoriteSourceIds?: string[];
+    accessToken?: string;
   }
 
   interface Session extends DefaultSession {
@@ -15,8 +18,29 @@ declare module "next-auth" {
       id: string;
       role: Role;
       username?: string | null;
-      createdAt?: string; // Asegúrate de que el tipo sea correcto
+      createdAt?: Date;
       favoriteSourceIds?: string[];
+      accessToken?: string;
     } & DefaultSession["user"];
+  }
+
+  interface JWT {
+    id?: string;
+    role?: Role;
+    username?: string | null;
+    createdAt?: Date;
+    favoriteSourceIds?: string[];
+    accessToken?: string;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id?: string;
+    role?: Role;
+    username?: string | null;
+    createdAt?: Date;
+    favoriteSourceIds?: string[];
+    accessToken?: string;
   }
 }
