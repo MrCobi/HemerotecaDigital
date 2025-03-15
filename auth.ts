@@ -55,7 +55,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
           // Generar accessToken
           const accessToken = jwt.sign(
-            { userId: user.id },
+            { 
+              userId: user.id,
+              role: user.role,
+              username: user.username
+            }, // Añadir más claims necesarios
             process.env.AUTH_SECRET!,
             { expiresIn: '1h' }
           );
