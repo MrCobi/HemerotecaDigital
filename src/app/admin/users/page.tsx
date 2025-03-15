@@ -1,6 +1,3 @@
-'use server';
-
-import prisma from "@/lib/db";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
@@ -9,25 +6,19 @@ import { CustomUser } from "@/src/interface/user";
 export default async function UsersPage() {
   const session = await auth();
 
-  // Si no hay sesión, redirige a login
-  if (!session) {
-    redirect("/login");
-  }
+  if (!session) redirect("/login");
+  if (session.user.role !== "admin") redirect("/acceso-denegado");
 
-  // Si el usuario no es administrador, redirige a la página de acceso denegado
-  if (session.user.role !== "admin") {
-    redirect("/acceso-denegado");
-  }
-
-  // Obtener la lista de usuarios
-  const users = await prisma.user.findMany();
+  // Fetch desde API Route
+  const usersResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/users`, {
+    next: { revalidate: 60 } // Revalidar cada 60 segundos
+  });
+  const { users } = await usersResponse.json();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="sm:flex sm:items-center sm:justify-between mb-8">
-        <h1 className="text-3xl font-bold text-foreground">
-          Gestión de Usuarios
-        </h1>
+        <h1 className="text-3xl font-bold text-foreground">Gestión de Usuarios</h1>
         <Link
           href="/admin/users/create"
           className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors duration-200"

@@ -1,28 +1,23 @@
-// lib/db.ts
-
 import { PrismaClient, Prisma } from '@prisma/client';
 
-// 1. Tipo para la instancia de Prisma con extensiones
+// ============ Validación inicial ============
+if (typeof window !== "undefined") {
+  throw new Error("Prisma solo puede usarse en el servidor");
+}
+
+// ============ Tipos y Configs ============
 type EnhancedPrismaClient = PrismaClient<{
   log: Array<Prisma.LogLevel | Prisma.LogDefinition>;
-}>;
-
-// 2. Configuración de conexión adaptativa
-const connectionConfig = {
-  pool: {
-    max: process.env.NODE_ENV === 'production' ? 15 : 5,
-    min: process.env.NODE_ENV === 'production' ? 5 : 2,
-    acquire: 30000,
-    idle: 10000
-  },
-  log: {
-    queries: {
-      threshold: process.env.NODE_ENV === 'production' ? 200 : 500
-    }
-  }
+}> & {
+  $on(event: 'query', callback: (e: Prisma.QueryEvent) => void): void;
 };
 
-// 3. Factory function mejorada con tipos correctos
+declare global {
+   // eslint-disable-next-line no-var -- Global declaration for prismaGlobal must use var
+  var prismaGlobal: EnhancedPrismaClient | undefined;
+}
+
+// ============ Factory Function ============
 const createPrismaClient = (): EnhancedPrismaClient => {
   const logOptions: Array<Prisma.LogLevel | Prisma.LogDefinition> = [
     { level: 'warn', emit: 'event' },
@@ -33,36 +28,51 @@ const createPrismaClient = (): EnhancedPrismaClient => {
     logOptions.push({ level: 'info', emit: 'event' });
   }
 
+  const dbUrl = new URL(process.env.DATABASE_URL!);
+  dbUrl.searchParams.set("connection_limit", 
+    process.env.NODE_ENV === "production" ? "20" : "5"
+  );
+  dbUrl.searchParams.set("pool_timeout", "10");
+
   const client = new PrismaClient({
     log: logOptions,
     datasources: {
       db: {
-        url: `${process.env.DATABASE_URL}?connection_limit=${
-          process.env.NODE_ENV === 'production' ? 20 : 5
-        }&pool_timeout=10`
+        url: dbUrl.toString()
       }
     }
-  });
+  }) as EnhancedPrismaClient;
 
-  // 4. Middleware de logging de consultas lentas con tipo correcto
-  client.$on('query' as never, (e: Prisma.QueryEvent) => {
-    if (e.duration > connectionConfig.log.queries.threshold) {
-      console.warn(`[SLOW QUERY] ${e.query} - ${e.duration}ms`);
+  client.$on('query', (e: Prisma.QueryEvent) => {
+    if (e.duration > (process.env.NODE_ENV === 'production' ? 200 : 500)) {
+      console.warn(`[SLOW QUERY] ${e.query} (${e.duration}ms)`);
     }
   });
 
   return client;
 };
 
-// 5. Gestión de instancia global con seguridad TypeScript
-declare global {
-  // eslint-disable-next-line no-var
-  var prismaGlobal: EnhancedPrismaClient | undefined;
-}
-
-// 6. Inicialización segura con tipos
+// ============ Gestión Global ============
 const prisma: EnhancedPrismaClient = globalThis.prismaGlobal || createPrismaClient();
 
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.prismaGlobal = prisma;
+}
 
-// 8. Exportación optimizada
+// ============ Manejo de cierre ============
+const gracefulShutdown = async () => {
+  try {
+    await prisma.$disconnect();
+    console.log('Prisma connection closed');
+  } catch (error) {
+    console.error('Error closing Prisma:', error);
+  }
+};
+
+if (process.env.NODE_ENV === 'production') {
+  process.on('beforeExit', gracefulShutdown);
+  process.on('SIGTERM', gracefulShutdown);
+  process.on('uncaughtException', gracefulShutdown);
+}
+
 export default prisma;
