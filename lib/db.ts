@@ -1,4 +1,5 @@
 // lib/db.ts
+
 import { PrismaClient, Prisma } from '@prisma/client';
 
 // 1. Tipo para la instancia de Prisma con extensiones
@@ -62,20 +63,6 @@ declare global {
 // 6. Inicialización segura con tipos
 const prisma: EnhancedPrismaClient = globalThis.prismaGlobal || createPrismaClient();
 
-// 7. Configuración de cierre para entornos serverless
-if (process.env.NODE_ENV !== 'production') {
-  globalThis.prismaGlobal = prisma;
-} else {
-  process.on('beforeExit', async () => {
-    await prisma.$disconnect();
-    console.log('Prisma connection closed gracefully');
-  });
-
-  process.on('SIGTERM', async () => {
-    await prisma.$disconnect();
-    process.exit(0);
-  });
-}
 
 // 8. Exportación optimizada
 export default prisma;
