@@ -7,7 +7,6 @@ import { Article } from "@/src/interface/article";
 import { SourceImage } from "./SourceImage.client";
 import { StarRating } from "@/src/app/components/StarRating.client";
 import Image from "next/image";
-import { fetchArticlesBySource } from "@/lib/api";
 import { useSession } from "next-auth/react";
 import CommentForm from "@/src/app/components/Comments/CommentForm";
 import CommentList from "@/src/app/components/Comments/CommentList";
@@ -94,17 +93,24 @@ export default function SourcePageClient({
   const loadArticles = async (order: typeof sortBy) => {
     const cacheKey = `articles_${source.id}_${order}`;
     const cachedArticles = sessionStorage.getItem(cacheKey);
-
+  
     if (cachedArticles) {
       setArticles(JSON.parse(cachedArticles));
     } else {
-      const fetchedArticles = await fetchArticlesBySource(
-        source.id,
-        order,
-        source.language
-      );
-      setArticles(fetchedArticles);
-      sessionStorage.setItem(cacheKey, JSON.stringify(fetchedArticles));
+      try {
+        const response = await fetch(
+          `/api/sources/${source.id}/articles?sortBy=${order}&language=${source.language}`
+        );
+        
+        if (!response.ok) throw new Error("Error fetching articles");
+        
+        const fetchedArticles = await response.json();
+        setArticles(fetchedArticles);
+        sessionStorage.setItem(cacheKey, JSON.stringify(fetchedArticles));
+      } catch (error) {
+        console.error("Error fetching articles:", error);
+        setArticles([]);
+      }
     }
   };
 

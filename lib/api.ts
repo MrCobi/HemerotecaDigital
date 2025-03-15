@@ -1,96 +1,46 @@
 // lib/api.ts
 import { Article } from "@/src/interface/article";
-import { Source } from "@prisma/client";
-import prisma from "./db";
 
-export async function fetchArticlesBySource(
-  sourceId: string,
-  sortBy: string = "popularity",
-  language: string = "es"
-): Promise<Article[]> {
-  try {
-    const apiUrl = new URL("https://newsapi.org/v2/everything");
-    apiUrl.searchParams.set("sources", sourceId);
-    apiUrl.searchParams.set("pageSize", "6");
-    apiUrl.searchParams.set("sortBy", sortBy);
-    apiUrl.searchParams.set("language", language);
-    apiUrl.searchParams.set("apiKey", process.env.NEXT_PUBLIC_NEWS_API_KEY!);
+export type PrivacySettings = {
+  showFavorites: boolean;
+  showActivity: boolean;
+};
 
-    const response = await fetch(apiUrl.toString());
-    if (!response.ok) return [];
-    
-    const data = await response.json();
-    return data.articles?.map((article: Article) => ({
-      sourceId: article.source?.id || sourceId,
-      author: article.author || null,
-      title: article.title,
-      description: article.description || null,
-      url: article.url,
-      urlToImage: article.urlToImage || null,
-      publishedAt: article.publishedAt,
-      content: article.content || null,
-    })) || [];
-
-  } catch (error) {
-    console.error("Error fetching articles:", error);
-    return [];
-  }
-}
-
-export async function fetchSourceById(id: string): Promise<Source | null> {
-  try {
-    return await prisma.source.findUnique({
-      where: { id },
-      include: {
-        ratings: true,
-        comments: true,
-        favoriteSources: true
-      }
-    });
-  } catch (error) {
-    console.error("Error fetching source:", error);
-    return null;
-  }
-}
-
-export async function updatePrivacySettings(settings: {
-  showFavorites?: boolean;
-  showActivity?: boolean;
-}) {
+export async function updatePrivacySettings(settings: PrivacySettings) {
   try {
     const response = await fetch('/api/user/privacy', {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(settings),
     });
     
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Error al actualizar configuración');
+      const error = await response.text();
+      throw new Error(error || 'Error al actualizar configuración');
     }
     
     return await response.json();
   } catch (error) {
-    console.error('Error al actualizar configuración:', error);
-    throw error;
+    console.error('Error:', error);
+    throw new Error('No se pudo conectar con el servidor');
   }
 }
 
-export async function getUserPrivacySettings() {
+export async function getUserPrivacySettings(): Promise<PrivacySettings> {
   try {
-    const response = await fetch('/api/user/privacy');
+    const response = await fetch('/api/user/privacy', {
+      next: { tags: ['privacy-settings'] }
+    });
     
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Error al obtener configuración');
+      const error = await response.text();
+      throw new Error(error || 'Error al obtener configuración');
     }
     
     return await response.json();
   } catch (error) {
-    console.error('Error al obtener configuración:', error);
-    throw error;
+    console.error('Error:', error);
+    throw new Error('No se pudo obtener la configuración');
   }
 }
 

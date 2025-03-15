@@ -13,7 +13,6 @@ export interface CustomUser {
   updatedAt: Date;
 }
 
-// src/interface/user.ts
 export interface User {
   id: string; // Identificador único del usuario
   name?: string | null; // Nombre completo del usuario (opcional)
@@ -46,4 +45,9 @@ export interface UserPrisma {
   showFavorites: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface PrivacySettings {
+  showFavorites: boolean;
+  showActivity: boolean;
 }

@@ -1,13 +1,13 @@
 // src/app/sources/[id]/page.server.tsx
-import { fetchSourceById, fetchArticlesBySource } from "@/lib/api";
 import { Source } from "@/src/interface/source";
 import { Article } from "@/src/interface/article";
 import SourcePageClient from "./SourcePageClient";
 
-export type Props = { params: Promise<{ id: string }> };
-
-export default async function SourcePage({ params }: Props) {
-  const { id: sourceId } = await params;
+export default async function SourcePage(
+  context: { params: Promise<{ id: string }> }
+) {
+  // Espera a resolver la promesa para obtener el id
+  const { id: sourceId } = await context.params;
 
   if (!sourceId || sourceId.trim() === "") {
     return (
@@ -19,7 +19,32 @@ export default async function SourcePage({ params }: Props) {
     );
   }
 
-  const source: Source | null = await fetchSourceById(sourceId);
+  let source: Source | null = null;
+  let articles: Article[] = [];
+
+  try {
+    // Obtener fuente desde el endpoint de la API
+    const sourceResponse = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/sources/${sourceId}`
+    );
+
+    if (sourceResponse.ok) {
+      source = await sourceResponse.json();
+    }
+
+    // Obtener artículos desde el endpoint de la API
+    if (source) {
+      const articlesResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/sources/${sourceId}/articles?sortBy=popularity&language=${source.language}`
+      );
+
+      if (articlesResponse.ok) {
+        articles = await articlesResponse.json();
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching data:", error);
+  }
 
   if (!source) {
     return (
@@ -30,13 +55,6 @@ export default async function SourcePage({ params }: Props) {
       </div>
     );
   }
-
-  // Modificación clave: añadir parámetros de orden e idioma
-  const articles: Article[] = await fetchArticlesBySource(
-    sourceId,
-    "popularity", // Orden predeterminado
-    source.language // Idioma de la fuente
-  );
 
   return <SourcePageClient source={source} articles={articles} />;
 }

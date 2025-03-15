@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { auth } from "@/auth";
 
-// GET para obtener la configuración de privacidad
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const session = await auth();
   
@@ -27,15 +28,14 @@ export async function GET() {
       showActivity: user?.showActivity ?? true
     });
   } catch (error) {
-    console.error("Error al obtener configuración de privacidad:", error);
+    console.error("Error al obtener configuración:", error);
     return NextResponse.json(
-      { error: "Error al obtener configuración" },
+      { error: "Error interno del servidor" },
       { status: 500 }
     );
   }
 }
 
-// PATCH para actualizar la configuración de privacidad
 export async function PATCH(request: Request) {
   const session = await auth();
   
@@ -48,16 +48,13 @@ export async function PATCH(request: Request) {
 
   try {
     const data = await request.json();
-    const { showFavorites, showActivity } = data;
-    
-    // Prepara un objeto con solo los campos que se están actualizando
     const updateData: { 
       showFavorites?: boolean;
       showActivity?: boolean;
     } = {};
     
-    if (showFavorites !== undefined) updateData.showFavorites = showFavorites;
-    if (showActivity !== undefined) updateData.showActivity = showActivity;
+    if (typeof data.showFavorites === 'boolean') updateData.showFavorites = data.showFavorites;
+    if (typeof data.showActivity === 'boolean') updateData.showActivity = data.showActivity;
 
     await prisma.user.update({
       where: { id: session.user.id },
@@ -66,9 +63,9 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error al actualizar configuración de privacidad:", error);
+    console.error("Error al actualizar configuración:", error);
     return NextResponse.json(
-      { error: "Error al actualizar configuración" },
+      { error: "Error interno del servidor" },
       { status: 500 }
     );
   }

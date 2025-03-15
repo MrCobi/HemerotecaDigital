@@ -1,23 +1,25 @@
 // app/components/PrivacySettings.tsx
-
 "use client";
 
 import { Switch } from "@/src/app/components/ui/switch";
 import { Label } from "@/src/app/components/ui/label";
 import { updatePrivacySettings } from "@/lib/api";
 import { useState } from "react";
+import type { PrivacySettings } from "@/src/interface/user";
 
 export function PrivacySettings({ initialSettings }: {
-  initialSettings: {
-    showFavorites: boolean;
-    showActivity: boolean;
-  }
+  initialSettings: PrivacySettings
 }) {
-  const [settings, setSettings] = useState(initialSettings);
+  const [settings, setSettings] = useState<PrivacySettings>(initialSettings);
 
-  const handleChange = async (field: keyof typeof settings, value: boolean) => {
-    setSettings(prev => ({ ...prev, [field]: value }));
-    await updatePrivacySettings({ [field]: value });
+  const handleChange = async (field: keyof PrivacySettings, value: boolean) => {
+    const newSettings = {
+      ...settings,
+      [field]: value
+    };
+    
+    setSettings(newSettings);
+    await updatePrivacySettings(newSettings);
   };
 
   return (
