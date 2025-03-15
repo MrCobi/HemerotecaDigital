@@ -1,35 +1,23 @@
-// src/app/api/messages/sse/route.ts
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/db';
 import { auth } from "@/auth";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   const session = await auth();
-  
-  if (!session?.user?.id) {
-    return new Response('Unauthorized', { 
-      status: 401,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-  }
+  if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
 
   const userId = request.nextUrl.searchParams.get('userId');
-  if (!userId) return new Response('Missing userId', { 
-    status: 400,
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  });
+  if (!userId) return new Response('Missing userId', { status: 400 });
 
   try {
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
         let isActive = true;
-        let lastChecked = new Date();
-        let interval = 2000; // Intervalo inicial de 2s
+        let lastChecked = Date.now();
+        let interval = 800;
 
         const checkMessages = async () => {
           if (!isActive) return;
@@ -41,27 +29,33 @@ export async function GET(request: NextRequest) {
                   { senderId: session.user.id, receiverId: userId },
                   { senderId: userId, receiverId: session.user.id }
                 ],
-                createdAt: { gt: lastChecked }
+                createdAt: { gt: new Date(lastChecked) }
               },
               orderBy: { createdAt: 'desc' },
-              take: 1
+              take: 5,
+              select: {
+                id: true,
+                content: true,
+                senderId: true,
+                receiverId: true,
+                read: true,
+                createdAt: true
+              }
             });
 
-            if (messages.length > 0 && isActive) {
-              lastChecked = new Date();
-              const data = `data: ${JSON.stringify(messages[0])}\n\n`;
-              controller.enqueue(encoder.encode(data));
-              interval = 2000; // Resetear intervalo si hay mensajes
+            if (messages.length > 0) {
+              lastChecked = Date.now();
+              controller.enqueue(encoder.encode(
+                `data: ${JSON.stringify({ messages, _ts: Date.now() })}\n\n`
+              ));
+              interval = 800;
             } else {
-              interval = Math.min(interval * 2, 30000); // Aumentar gradualmente hasta 30s
+              interval = Math.min(interval * 1.5, 5000);
             }
           } catch (error) {
-            console.error('Error checking messages:', error);
-            interval = 30000; // Intervalo más largo en errores
+            interval = 2000;
           } finally {
-            if (isActive) {
-              setTimeout(checkMessages, interval);
-            }
+            if (isActive) setTimeout(checkMessages, interval);
           }
         };
 
@@ -84,17 +78,13 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-      },
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no' // Importante para Nginx
+      }
     });
     
   } catch (error) {
     console.error('SSE Error:', error);
-    return new Response('Internal Server Error', { 
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    return new Response('Internal Server Error', { status: 500 });
   }
 }

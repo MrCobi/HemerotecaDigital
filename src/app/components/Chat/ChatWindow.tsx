@@ -4,18 +4,9 @@ import { useSession } from "next-auth/react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Avatar, AvatarFallback } from "../ui/avatar";
-import {
-  UnreadMessagesContext,
-  UnreadMessagesContextType,
-} from "@/src/app/contexts/UnreadMessagesContext";
+import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 import { CldImage } from "next-cloudinary";
-import {
-  Send,
-  UserCheck,
-  Clock,
-  MessageCircle,
-  ChevronLeft,
-} from "lucide-react";
+import { Send, UserCheck, Clock, MessageCircle, ChevronLeft } from "lucide-react";
 
 interface User {
   id: string;
@@ -53,108 +44,77 @@ export function ChatWindow({
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const unreadContext = useContext<UnreadMessagesContextType>(UnreadMessagesContext);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const unreadContext = useContext(UnreadMessagesContext);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  // Verificar seguimiento mutuo
-  const checkMutualFollow = useCallback(async () => {
+  // Configurar WebSocket
+  useEffect(() => {
+    if (!session || !isOpen || !otherUser.id) return;
+
+    const connectWebSocket = () => {
+      const ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}?userId=${currentUserId}`);
+      
+      ws.onopen = () => {
+        wsRef.current = ws;
+      };
+
+      ws.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        setMessages(prev => prev.some(m => m.id === message.id) ? prev : [...prev, message]);
+      };
+
+      ws.onclose = () => {
+        setTimeout(connectWebSocket, 1000);
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        ws.close();
+      };
+
+      return ws;
+    };
+
+    const ws = connectWebSocket();
+
+    return () => {
+      if (ws.readyState === WebSocket.OPEN) ws.close();
+    };
+  }, [session, isOpen, currentUserId, otherUser.id]);
+
+  // Cargar mensajes iniciales y verificar seguimiento
+  const initializeChat = useCallback(async () => {
     try {
-      const res = await fetch(`/api/relationships/check?targetUserId=${otherUser.id}`);
-      const data = await res.json();
-      setIsMutualFollow(data.isMutualFollow);
-    } catch  {
-      setIsMutualFollow(false);
-    }
-  }, [otherUser.id]);
+      const [messagesRes, followRes] = await Promise.all([
+        fetch(`/api/messages?userId=${otherUser.id}`),
+        fetch(`/api/relationships/check?targetUserId=${otherUser.id}`)
+      ]);
+      
+      const messagesData = await messagesRes.json();
+      const followData = await followRes.json();
+      
+      setMessages(messagesData);
+      setIsMutualFollow(followData.isMutualFollow);
 
-  // Obtener mensajes
-  const fetchMessages = useCallback(async () => {
-    if (!session) return;
-
-    try {
-      const res = await fetch(`/api/messages?userId=${otherUser.id}`);
-      const data = await res.json();
-
-      const hasUnread = data.some((msg: Message) => 
-        msg.receiverId === currentUserId && !msg.read
-      );
-
-      if (hasUnread) {
+      if (messagesData.some((msg: Message) => !msg.read && msg.receiverId === currentUserId)) {
         await fetch(`/api/messages/read?senderId=${otherUser.id}`, { method: "POST" });
         unreadContext.updateUnreadCount();
       }
-
-      setMessages(data);
     } catch (error) {
-      console.error("Error cargando mensajes:", error);
+      console.error("Error inicializando chat:", error);
     }
-  }, [session, otherUser.id, currentUserId, unreadContext]);
+  }, [otherUser.id, currentUserId, unreadContext]);
 
-  // Conexión SSE con reconexión automática
   useEffect(() => {
-    let reconnectTimer: NodeJS.Timeout;
-    
-    const setupSSE = () => {
-      if (session && isOpen && otherUser.id) {
-        eventSourceRef.current = new EventSource(`/api/messages/sse?userId=${otherUser.id}`);
+    if (session && isOpen) initializeChat();
+  }, [session, isOpen, initializeChat]);
 
-        eventSourceRef.current.onmessage = (event) => {
-          try {
-            const newMsg = JSON.parse(event.data);
-            setMessages(prev => 
-              prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]
-            );
-          } catch (error) {
-            console.error("Error parsing message:", error);
-          }
-        };
-
-        eventSourceRef.current.onerror = () => {
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            reconnectTimer = setTimeout(setupSSE, 3000);
-          }
-        };
-      }
-    };
-
-    setupSSE();
-
-    return () => {
-      if (eventSourceRef.current) eventSourceRef.current.close();
-      clearTimeout(reconnectTimer);
-    };
-  }, [session, otherUser.id, isOpen]);
-
-  // Scroll automático y persistencia de posición
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    const savedPosition = localStorage.getItem('chatScrollPosition');
-    
-    if (container && savedPosition) {
-      container.scrollTop = parseInt(savedPosition);
-    }
-
-    return () => {
-      if (container) {
-        localStorage.setItem('chatScrollPosition', container.scrollTop.toString());
-      }
-    };
-  }, []);
-
+  // Manejar scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Cargar datos iniciales
-  useEffect(() => {
-    if (session && isOpen) {
-      checkMutualFollow();
-      fetchMessages();
-    }
-  }, [session, otherUser.id, isOpen, checkMutualFollow, fetchMessages]);
-
-  // Enviar mensaje
+  // Enviar mensaje con actualización optimista
   const handleSend = async () => {
     if (!session || !newMessage.trim() || !isMutualFollow || isSending) return;
 
@@ -173,25 +133,23 @@ export function ChatWindow({
     setNewMessage("");
 
     try {
-      const res = await fetch("/api/messages", {
+      const response = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          receiverId: otherUser.id, 
-          content: newMessage 
-        }),
+        body: JSON.stringify({ receiverId: otherUser.id, content: newMessage }),
       });
 
-      if (!res.ok) throw new Error("Error enviando mensaje");
+      if (!response.ok) throw new Error("Error enviando mensaje");
+      const realMessage = await response.json();
       
-      const realMessage = await res.json();
-      setMessages(prev => 
-        prev.map(msg => msg.id === tempId ? realMessage : msg)
-      );
+      setMessages(prev => prev.map(msg => msg.id === tempId ? realMessage : msg));
 
-    } catch  {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(realMessage));
+      }
+    } catch (error) {
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
-      alert("Error al enviar el mensaje");
+      console.error("Error al enviar mensaje:", error);
     } finally {
       setIsSending(false);
     }

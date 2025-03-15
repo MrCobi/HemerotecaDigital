@@ -1,3 +1,4 @@
+// next-config.ts
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -7,15 +8,29 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "**",
         pathname: "/**",
-        
-      }, 
+      },
       {
-        protocol: "http", // Permite imágenes desde dominios HTTP
-        hostname: "*", // Permite cualquier dominio
-        pathname: "/**", // Permite cualquier ruta en esos dominios
+        protocol: "http",
+        hostname: "*",
+        pathname: "/**",
       },
     ],
   },
+  webpack: (config) => {
+    config.resolve.fallback = { 
+      ...config.resolve.fallback,
+      net: false,
+      tls: false,
+      dns: false,
+      fs: false
+    };
+    return config;
+  },
+  env: {
+    WS_SERVER_URL: process.env.NODE_ENV === 'production' 
+      ? 'wss://88.17.253.233:3000' 
+      : 'ws://192.168.1.97:3000'
+  }
 };
 
 export default nextConfig;
