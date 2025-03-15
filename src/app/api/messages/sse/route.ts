@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
             } else {
               interval = Math.min(interval * 1.5, 5000);
             }
-          } catch (error) {
+          } catch {
             interval = 2000;
           } finally {
             if (isActive) setTimeout(checkMessages, interval);
