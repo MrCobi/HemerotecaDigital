@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/src/app/components/ui/avatar";
 import { Input } from "@/src/app/components/ui/input";
 import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 import { CldImage } from "next-cloudinary";
+import Image from "next/image";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 
 interface User {
@@ -62,7 +63,7 @@ export default function MessagesPage() {
   const processConvResponse = useCallback(async (convRes: Response): Promise<Conversation[]> => {
     if (!convRes.ok) throw new Error("Error al cargar conversaciones");
     const data = await convRes.json();
-    
+
     return data.conversations.map((conv: {
       id: string;
       receiver: User;
@@ -103,8 +104,8 @@ export default function MessagesPage() {
       ...newConvs,
       ...existing.filter(ec => !existingIds.has(ec.id))
     ];
-    
-    return merged.sort((a, b) => 
+
+    return merged.sort((a, b) =>
       new Date(b.lastMessage?.createdAt || b.createdAt).getTime() -
       new Date(a.lastMessage?.createdAt || a.createdAt).getTime()
     );
@@ -124,18 +125,18 @@ export default function MessagesPage() {
   useEffect(() => {
     if (status === "authenticated") {
       let isMounted = true;
-      
+
       const loadData = async () => {
         try {
           const [convRes, mutualRes] = await Promise.all([
             fetch(`/api/messages/conversations?page=1&limit=${CONVERSATIONS_PER_PAGE}`),
             fetch("/api/relationships/mutual")
           ]);
-          
+
           if (isMounted) {
             const conversations = await processConvResponse(convRes);
             const mutuals = await processMutualResponse(mutualRes);
-            
+
             setConversations(prev => mergeAndSort(prev, conversations));
             setMutualFollowers(mutuals);
           }
@@ -145,7 +146,7 @@ export default function MessagesPage() {
           if (isMounted) setLoading(false);
         }
       };
-      
+
       loadData();
       return () => { isMounted = false; };
     }
@@ -183,19 +184,19 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (!session?.user?.id) return;
-  
+
     const eventSource = new EventSource('/api/messages/global-sse');
-    
+
     eventSource.onmessage = (event) => {
       try {
         const { conversationId, message } = JSON.parse(event.data);
-        
+
         setConversations(prev => prev.map(conv => {
           if (conv.id === conversationId) {
             return {
               ...conv,
               lastMessage: message,
-              unreadCount: (conv.unreadCount || 0) + 
+              unreadCount: (conv.unreadCount || 0) +
                 (message.receiverId === session?.user?.id && !message.read ? 1 : 0),
               updatedAt: new Date().toISOString()
             };
@@ -206,7 +207,7 @@ export default function MessagesPage() {
         console.error("Error procesando evento SSE:", error);
       }
     };
-  
+
     return () => eventSource.close();
   }, [session?.user?.id]);
 
@@ -222,8 +223,8 @@ export default function MessagesPage() {
     if (status === "authenticated") {
       const conversationIdParam = searchParams.get("conversationWith");
       if (conversationIdParam) {
-        const targetConv = conversations.find(conv => 
-          conv.senderId === conversationIdParam || 
+        const targetConv = conversations.find(conv =>
+          conv.senderId === conversationIdParam ||
           conv.receiverId === conversationIdParam
         );
         if (targetConv) {
@@ -339,18 +340,50 @@ export default function MessagesPage() {
                     onClick={() => handleConversationSelect(conversation.id)}
                   >
                     <Avatar className="h-14 w-14 border-2 border-blue-200 dark:border-blue-800 group-hover:border-blue-500">
-                      {currentOtherUser?.image ? (
+                      {currentOtherUser?.image && currentOtherUser.image.includes("cloudinary") ? (
                         <CldImage
                           src={currentOtherUser.image}
                           alt={currentOtherUser?.username || "Usuario"}
                           width={56}
                           height={56}
+                          crop="fill"
+                          gravity="face"
                           className="rounded-full object-cover"
+                          priority
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
+                      ) : currentOtherUser?.image &&
+                        !currentOtherUser.image.startsWith("/") &&
+                        !currentOtherUser.image.startsWith("http") ? (
+                        <CldImage
+                          src={currentOtherUser.image}
+                          alt={currentOtherUser?.username || "Usuario"}
+                          width={56}
+                          height={56}
+                          crop="fill"
+                          gravity="face"
+                          className="rounded-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
                         />
                       ) : (
-                        <AvatarFallback className="bg-blue-100 dark:bg-blue-800 text-lg font-medium">
-                          {currentOtherUser?.username?.[0]?.toUpperCase() || "U"}
-                        </AvatarFallback>
+                        <Image
+                          src={currentOtherUser?.image || "/images/AvatarPredeterminado.webp"}
+                          alt={currentOtherUser?.username || "Usuario"}
+                          width={56}
+                          height={56}
+                          className="rounded-full object-cover"
+                          priority
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
                       )}
                     </Avatar>
 
@@ -361,9 +394,7 @@ export default function MessagesPage() {
                         </h3>
                         {conversation.lastMessage && (
                           <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                            {new Date(
-                              conversation.lastMessage.createdAt
-                            ).toLocaleTimeString([], {
+                            {new Date(conversation.lastMessage.createdAt).toLocaleTimeString([], {
                               hour: "2-digit",
                               minute: "2-digit",
                             })}
@@ -398,18 +429,50 @@ export default function MessagesPage() {
                     onClick={() => startNewConversation(user.id)}
                   >
                     <Avatar className="h-14 w-14 border-2 border-blue-200 dark:border-blue-800">
-                      {user?.image ? (
+                      {user?.image && user.image.includes("cloudinary") ? (
                         <CldImage
                           src={user.image}
                           alt={user?.username || "Usuario"}
                           width={56}
                           height={56}
+                          crop="fill"
+                          gravity="face"
                           className="rounded-full object-cover"
+                          priority
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
+                      ) : user?.image &&
+                        !user.image.startsWith("/") &&
+                        !user.image.startsWith("http") ? (
+                        <CldImage
+                          src={user.image}
+                          alt={user?.username || "Usuario"}
+                          width={56}
+                          height={56}
+                          crop="fill"
+                          gravity="face"
+                          className="rounded-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
                         />
                       ) : (
-                        <AvatarFallback className="bg-blue-100 dark:bg-blue-800 text-lg font-medium">
-                          {user?.username?.[0]?.toUpperCase() || "U"}
-                        </AvatarFallback>
+                        <Image
+                          src={user?.image || "/images/AvatarPredeterminado.webp"}
+                          alt={user?.username || "Usuario"}
+                          width={56}
+                          height={56}
+                          className="rounded-full object-cover"
+                          priority
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
                       )}
                     </Avatar>
                     <div className="flex-1 min-w-0">
@@ -433,7 +496,7 @@ export default function MessagesPage() {
           <ChatWindow
             otherUser={otherUser}
             currentUserId={session?.user?.id || ""}
-            onMessageSent={() => setConversations(prev => [...prev])}
+            onMessageSent={() => setConversations((prev) => [...prev])}
             isOpen={true}
             onClose={handleBackToList}
             isMobile={mobileView}

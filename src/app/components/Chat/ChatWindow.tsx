@@ -6,7 +6,14 @@ import { Input } from "../ui/input";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 import { CldImage } from "next-cloudinary";
-import { Send, UserCheck, Clock, MessageCircle, ChevronLeft } from "lucide-react";
+import Image from "next/image";
+import {
+  Send,
+  UserCheck,
+  Clock,
+  MessageCircle,
+  ChevronLeft,
+} from "lucide-react";
 
 interface User {
   id: string;
@@ -53,15 +60,20 @@ export function ChatWindow({
     if (!session || !isOpen || !otherUser.id) return;
 
     const connectWebSocket = () => {
-      const ws = new WebSocket(`${process.env.NEXT_PUBLIC_WS_URL}?userId=${currentUserId}&token=${session?.user?.accessToken}`);
-      
+      const ws = new WebSocket(
+        `${process.env.NEXT_PUBLIC_WS_URL}?userId=${currentUserId}&token=${session?.user?.accessToken}`
+      );
+
       let batchTimeout: NodeJS.Timeout;
-    
+
       ws.onopen = () => {
         wsRef.current = ws;
         // Enviar mensajes en buffer cada 50ms
         batchTimeout = setInterval(() => {
-          if (messageBuffer.current.length > 0 && ws.readyState === WebSocket.OPEN) {
+          if (
+            messageBuffer.current.length > 0 &&
+            ws.readyState === WebSocket.OPEN
+          ) {
             const batch = messageBuffer.current.splice(0, 50); // Enviar lotes de 50 mensajes
             ws.send(JSON.stringify(batch));
           }
@@ -72,15 +84,19 @@ export function ChatWindow({
         try {
           const data = JSON.parse(event.data);
           if (Array.isArray(data)) {
-            setMessages(prev => [
+            setMessages((prev) => [
               ...prev,
-              ...data.filter((msg: Message) => !prev.some(m => m.id === msg.id))
+              ...data.filter(
+                (msg: Message) => !prev.some((m) => m.id === msg.id)
+              ),
             ]);
           } else {
-            setMessages(prev => prev.some(m => m.id === data.id) ? prev : [...prev, data]);
+            setMessages((prev) =>
+              prev.some((m) => m.id === data.id) ? prev : [...prev, data]
+            );
           }
         } catch (error) {
-          console.error('Error procesando mensaje:', error);
+          console.error("Error procesando mensaje:", error);
         }
       };
 
@@ -90,7 +106,7 @@ export function ChatWindow({
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error("WebSocket error:", error);
         ws.close();
       };
 
@@ -109,19 +125,25 @@ export function ChatWindow({
     try {
       const [messagesRes, followRes] = await Promise.all([
         fetch(`/api/messages?userId=${otherUser.id}&cache=${Date.now()}`),
-        fetch(`/api/relationships/check?targetUserId=${otherUser.id}`)
+        fetch(`/api/relationships/check?targetUserId=${otherUser.id}`),
       ]);
-      
+
       const [messagesData, followData] = await Promise.all([
         messagesRes.json(),
-        followRes.json()
+        followRes.json(),
       ]);
-      
+
       setMessages(messagesData);
       setIsMutualFollow(followData.isMutualFollow);
 
-      if (messagesData.some((msg: Message) => !msg.read && msg.receiverId === currentUserId)) {
-        await fetch(`/api/messages/read?senderId=${otherUser.id}`, { method: "POST" });
+      if (
+        messagesData.some(
+          (msg: Message) => !msg.read && msg.receiverId === currentUserId
+        )
+      ) {
+        await fetch(`/api/messages/read?senderId=${otherUser.id}`, {
+          method: "POST",
+        });
         unreadContext.updateUnreadCount();
       }
     } catch (error) {
@@ -137,7 +159,9 @@ export function ChatWindow({
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (container) {
-      const isNearBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 100;
+      const isNearBottom =
+        container.scrollHeight - container.clientHeight <=
+        container.scrollTop + 100;
       if (isNearBottom) {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }
@@ -159,7 +183,7 @@ export function ChatWindow({
     };
 
     setIsSending(true);
-    setMessages(prev => [...prev, tempMessage]);
+    setMessages((prev) => [...prev, tempMessage]);
     setNewMessage("");
     messageBuffer.current.push(tempMessage);
 
@@ -172,10 +196,12 @@ export function ChatWindow({
 
       if (!response.ok) throw new Error("Error enviando mensaje");
       const realMessage = await response.json();
-      
-      setMessages(prev => prev.map(msg => msg.id === tempId ? realMessage : msg));
+
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === tempId ? realMessage : msg))
+      );
     } catch (error) {
-      setMessages(prev => prev.filter(msg => msg.id !== tempId));
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
       console.error("Error al enviar mensaje:", error);
     } finally {
       setIsSending(false);
@@ -195,14 +221,14 @@ export function ChatWindow({
 
   // Formateo de fecha memoizado
   const formatDateHeader = useCallback((dateStr: string) => {
-    const date = new Date(dateStr.split('/').reverse().join('-'));
+    const date = new Date(dateStr.split("/").reverse().join("-"));
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
 
     if (date.toDateString() === today.toDateString()) return "Hoy";
     if (date.toDateString() === yesterday.toDateString()) return "Ayer";
-    
+
     return date.toLocaleDateString("es-ES", {
       weekday: "long",
       day: "numeric",
@@ -228,18 +254,53 @@ export function ChatWindow({
           </Button>
         )}
         <Avatar className="h-10 w-10 ring-2 ring-blue-200/50 dark:ring-blue-700/50">
-          {otherUser?.image ? (
+          {otherUser?.image && otherUser.image.includes("cloudinary") ? (
+            // Si la imagen es URL completa de Cloudinary
             <CldImage
               src={otherUser.image}
-              alt={otherUser?.username || "Usuario"}
+              alt={otherUser?.username || "Avatar"}
               width={40}
               height={40}
-              className="rounded-full"
+              crop="fill"
+              gravity="face"
+              className="object-cover rounded-full"
+              priority
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = "/images/AvatarPredeterminado.webp";
+              }}
+            />
+          ) : otherUser?.image &&
+            !otherUser.image.startsWith("/") &&
+            !otherUser.image.startsWith("http") ? (
+            // Si la imagen es un public_id de Cloudinary
+            <CldImage
+              src={otherUser.image}
+              alt={otherUser?.username || "Avatar"}
+              width={40}
+              height={40}
+              crop="fill"
+              gravity="face"
+              className="object-cover rounded-full"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = "/images/AvatarPredeterminado.webp";
+              }}
             />
           ) : (
-            <AvatarFallback className="bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300">
-              {otherUser?.username?.[0] || "U"}
-            </AvatarFallback>
+            // Para imágenes locales o fallback
+            <Image
+              src={otherUser?.image || "/images/AvatarPredeterminado.webp"}
+              alt={otherUser?.username || "Avatar"}
+              width={40}
+              height={40}
+              className="object-cover rounded-full"
+              priority
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = "/images/AvatarPredeterminado.webp";
+              }}
+            />
           )}
         </Avatar>
         <div className="ml-3">
@@ -256,10 +317,7 @@ export function ChatWindow({
       </div>
 
       {/* Mensajes */}
-      <div 
-        className="flex-1 overflow-y-auto"
-        ref={messagesContainerRef}
-      >
+      <div className="flex-1 overflow-y-auto" ref={messagesContainerRef}>
         <div className="max-w-3xl mx-auto px-4 pb-4 h-[calc(100vh-180px)]">
           {Object.entries(groupMessagesByDate()).map(([date, msgs]) => (
             <div key={date}>
@@ -273,7 +331,11 @@ export function ChatWindow({
                 {msgs.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${message.senderId === currentUserId ? "justify-end" : "justify-start"}`}
+                    className={`flex ${
+                      message.senderId === currentUserId
+                        ? "justify-end"
+                        : "justify-start"
+                    }`}
                   >
                     <div
                       className={`p-3 rounded-lg max-w-[80%] ${
