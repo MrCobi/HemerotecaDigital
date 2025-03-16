@@ -1,19 +1,18 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 
-// ============ Validación inicial ============
-if (typeof window !== "undefined") {
-  throw new Error("Prisma solo puede usarse en el servidor");
+// ============ Validación mejorada ============
+declare const EdgeRuntime: string | undefined;
+
+if (typeof window !== "undefined" || typeof EdgeRuntime !== "undefined") {
+  throw new Error("Prisma solo puede usarse en entornos Node.js tradicionales");
 }
 
 // ============ Tipos y Configs ============
-type EnhancedPrismaClient = PrismaClient<{
-  log: Array<Prisma.LogLevel | Prisma.LogDefinition>;
-}> & {
+type EnhancedPrismaClient = PrismaClient & {
   $on(event: 'query', callback: (e: Prisma.QueryEvent) => void): void;
 };
 
 declare global {
-   // eslint-disable-next-line no-var -- Global declaration for prismaGlobal must use var
   var prismaGlobal: EnhancedPrismaClient | undefined;
 }
 
@@ -28,17 +27,11 @@ const createPrismaClient = (): EnhancedPrismaClient => {
     logOptions.push({ level: 'info', emit: 'event' });
   }
 
-  const dbUrl = new URL(process.env.DATABASE_URL!);
-  dbUrl.searchParams.set("connection_limit", 
-    process.env.NODE_ENV === "production" ? "20" : "5"
-  );
-  dbUrl.searchParams.set("pool_timeout", "10");
-
   const client = new PrismaClient({
     log: logOptions,
     datasources: {
       db: {
-        url: dbUrl.toString()
+        url: process.env.DATABASE_URL
       }
     }
   }) as EnhancedPrismaClient;
@@ -57,22 +50,6 @@ const prisma: EnhancedPrismaClient = globalThis.prismaGlobal || createPrismaClie
 
 if (process.env.NODE_ENV !== 'production') {
   globalThis.prismaGlobal = prisma;
-}
-
-// ============ Manejo de cierre ============
-const gracefulShutdown = async () => {
-  try {
-    await prisma.$disconnect();
-    console.log('Prisma connection closed');
-  } catch (error) {
-    console.error('Error closing Prisma:', error);
-  }
-};
-
-if (process.env.NODE_ENV === 'production') {
-  process.on('beforeExit', gracefulShutdown);
-  process.on('SIGTERM', gracefulShutdown);
-  process.on('uncaughtException', gracefulShutdown);
 }
 
 export default prisma;

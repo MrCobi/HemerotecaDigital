@@ -34,7 +34,7 @@ export async function GET(req: Request) {
     }
 
     // Validar campo de ordenación
-    const validSortFields = ["publishedAt", "name", "createdAt"];
+    const validSortFields = ["createdAt", "name", "updatedAt"];
     const orderBy: Record<string, string> = {};
     
     if (validSortFields.includes(sortBy)) {

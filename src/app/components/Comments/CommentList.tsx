@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef, memo, useCallback } from "react";
-import { CldImage } from 'next-cloudinary';
+import { CldImage } from "next-cloudinary";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
+import Image from "next/image";
 import { es } from "date-fns/locale";
 import { useSession } from "next-auth/react";
 import type { Session } from "next-auth";
@@ -61,7 +62,8 @@ const DeleteConfirmationDialog = ({
           ¿Eliminar comentario?
         </h3>
         <p className="text-gray-600 dark:text-gray-300 mb-6">
-          Esta acción no se puede deshacer. ¿Estás seguro de que quieres eliminar permanentemente este comentario?
+          Esta acción no se puede deshacer. ¿Estás seguro de que quieres
+          eliminar permanentemente este comentario?
         </p>
         <div className="flex justify-end gap-3">
           <button
@@ -133,15 +135,57 @@ const CommentItem = memo(
             <div className="flex items-start gap-3 md:gap-4 flex-1">
               <div className="relative flex-shrink-0">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-indigo-600/20 rounded-full animate-pulse-slow"></div>
-                <CldImage
-                  src={comment.user.image || "default_avatar"}
-                  alt={comment.user.username}
-                  width={40}
-                  height={40}
-                  crop="fill"
-                  gravity="face"
-                  className="rounded-full border-2 border-gray-100 dark:border-gray-700 object-cover z-10 relative"
-                />
+                {comment.user.image &&
+                comment.user.image.includes("cloudinary") ? (
+                  // Si la imagen es una URL completa de Cloudinary
+                  <CldImage
+                    src={comment.user.image}
+                    alt={comment.user.username}
+                    width={40}
+                    height={40}
+                    crop="fill"
+                    gravity="face"
+                    className="rounded-full border-2 border-gray-100 dark:border-gray-700 object-cover z-10 relative"
+                    priority
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/images/AvatarPredeterminado.webp";
+                    }}
+                  />
+                ) : comment.user.image &&
+                  !comment.user.image.startsWith("/") &&
+                  !comment.user.image.startsWith("http") ? (
+                  // Si la imagen es un public_id de Cloudinary (sin 'https://' ni '/')
+                  <CldImage
+                    src={comment.user.image}
+                    alt={comment.user.username}
+                    width={40}
+                    height={40}
+                    crop="fill"
+                    gravity="face"
+                    className="rounded-full border-2 border-gray-100 dark:border-gray-700 object-cover z-10 relative"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/images/AvatarPredeterminado.webp";
+                    }}
+                  />
+                ) : (
+                  // Para imágenes locales o si no se tiene imagen, usar next/image
+                  <Image
+                    src={
+                      comment.user.image || "/images/AvatarPredeterminado.webp"
+                    }
+                    alt={comment.user.username}
+                    width={40}
+                    height={40}
+                    className="rounded-full border-2 border-gray-100 dark:border-gray-700 object-cover z-10 relative"
+                    priority
+                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/images/AvatarPredeterminado.webp";
+                    }}
+                  />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -402,12 +446,12 @@ export default function CommentList({
 
   useEffect(() => {
     const controller = new AbortController();
-    
+
     // Agregar un pequeño retraso para evitar múltiples solicitudes rápidas que se cancelan
     const timer = setTimeout(() => {
       fetchComments(controller.signal);
     }, 50);
-    
+
     return () => {
       clearTimeout(timer);
       controller.abort();
@@ -423,9 +467,12 @@ export default function CommentList({
 
   const confirmDelete = async () => {
     try {
-      const response = await fetch(API_ROUTES.comments.delete(deleteState.commentId), {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        API_ROUTES.comments.delete(deleteState.commentId),
+        {
+          method: "DELETE",
+        }
+      );
       if (!response.ok) throw new Error("Error al eliminar");
       await fetchComments();
     } catch (error) {
