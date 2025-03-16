@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Source } from "@/src/interface/source";
 import SourcesPage from "@/src/app/components/SourceList";
 import { Button } from "@/src/app/components/ui/button";
-import { Star, ExternalLink, Heart } from "lucide-react";
+import { ExternalLink, Heart } from "lucide-react";
 import Link from "next/link";
 import { API_ROUTES } from "@/src/config/api-routes";
 

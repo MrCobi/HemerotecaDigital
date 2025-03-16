@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
 import {
@@ -30,7 +30,6 @@ import {
 import { useRouter } from "next/navigation";
 import { Source } from "@/src/interface/source";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
 import { debounce } from "lodash";
 
 const languages = [
@@ -100,13 +99,21 @@ export default function SourcesPage({
     }
   }, [session?.user?.id]);
 
-  const debouncedSearch = useCallback(
-    debounce((term: string) => {
-      onSearch(term);
-      onPageChange(1);
-    }, 300),
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((term: string) => {
+        onSearch(term);
+        onPageChange(1);
+      }, 300),
     [onSearch, onPageChange]
   );
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
 
   const toggleFavorite = async (sourceId: string) => {
     if (!session?.user?.id) {

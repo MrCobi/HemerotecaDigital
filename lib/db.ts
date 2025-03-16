@@ -12,7 +12,9 @@ type EnhancedPrismaClient = PrismaClient & {
   $on(event: 'query', callback: (e: Prisma.QueryEvent) => void): void;
 };
 
+
 declare global {
+  // eslint-disable-next-line no-var
   var prismaGlobal: EnhancedPrismaClient | undefined;
 }
 

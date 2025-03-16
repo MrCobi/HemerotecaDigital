@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ChatWindow } from "@/src/app/components/Chat/ChatWindow";
 import { MessageCircle, Search } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/src/app/components/ui/avatar";
+import { Avatar } from "@/src/app/components/ui/avatar";
 import { Input } from "@/src/app/components/ui/input";
 import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 import { CldImage } from "next-cloudinary";

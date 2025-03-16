@@ -25,7 +25,7 @@ export default function Page() {
 
         const response = await fetch(`/api/sources?${params}`);
         const data = await response.json();
-        
+
         setSources(data.sources);
         setTotalSources(data.pagination.total);
       } catch (error) {
@@ -63,6 +63,7 @@ export default function Page() {
       totalSources={totalSources}
       currentPage={currentPage}
       sourcesPerPage={sourcesPerPage}
+      selectedLanguage={selectedLanguage}
       onPageChange={handlePageChange}
       onSearch={handleSearch}
       onLanguageChange={handleLanguageChange}

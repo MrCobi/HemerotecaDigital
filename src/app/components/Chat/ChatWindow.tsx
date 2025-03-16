@@ -3,7 +3,7 @@ import { useState, useEffect, useContext, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Avatar, AvatarFallback } from "../ui/avatar";
+import { Avatar } from "../ui/avatar";
 import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 import { CldImage } from "next-cloudinary";
 import Image from "next/image";
