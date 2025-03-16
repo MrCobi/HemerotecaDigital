@@ -14,17 +14,20 @@ export default function FavoritesPage() {
   const [favoriteSources, setFavoriteSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Estados para filtrar y paginar
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const sourcesPerPage = 6;
+
   const loadFavorites = useCallback(async () => {
     if (session?.user?.id) {
       try {
         setLoading(true);
-        
-        // Actualizado con API_ROUTES
         const favoritesResponse = await fetch(API_ROUTES.favorites.list);
         const favoritesData = await favoritesResponse.json();
         const favoriteIds = favoritesData.favoriteIds;
   
-        // Actualizado con API_ROUTES - corregido para usar la URL correcta
         const detailsResponse = await fetch("/api/sources/details", {
           method: "POST",
           headers: {
@@ -45,11 +48,11 @@ export default function FavoritesPage() {
         setLoading(false);
       }
     }
-  }, [session?.user?.id]); // Dependencia necesaria
+  }, [session?.user?.id]);
 
   useEffect(() => {
     loadFavorites();
-  }, [session, loadFavorites]); // Dependencia actualizada
+  }, [session, loadFavorites]);
 
   const handleFavoriteUpdate = (sourceId: string) => {
     setFavoriteSources((prev) =>
@@ -57,7 +60,23 @@ export default function FavoritesPage() {
     );
   };
 
-  
+  // Filtrado en memoria de los favoritos según búsqueda e idioma
+  const filteredSources = favoriteSources.filter((source) => {
+    const matchesSearch =
+      searchTerm === "" ||
+      source.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesLanguage =
+      selectedLanguage === "all" || source.language === selectedLanguage;
+    return matchesSearch && matchesLanguage;
+  });
+
+  // Paginación en memoria
+  const totalSources = filteredSources.length;
+  const paginatedSources = filteredSources.slice(
+    (currentPage - 1) * sourcesPerPage,
+    currentPage * sourcesPerPage
+  );
+
   return (
     <div className="min-h-screen ">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -79,26 +98,21 @@ export default function FavoritesPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto"></div>
           <p className="mt-4 text-blue-600">Cargando favoritos...</p>
         </div>
-      ) : favoriteSources.length === 0 ? (
-        <div className="text-center py-12 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-          <Star className="h-16 w-16 mx-auto text-blue-400 mb-4" />
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            No tienes periódicos favoritos
-          </p>
-          <Link href="/sources">
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white transition-transform hover:scale-105">
-              Explorar periódicos
-            </Button>
-          </Link>
-        </div>
       ) : (
         <div>
           <SourcesPage
-            sources={favoriteSources}
+            sources={paginatedSources}
+            totalSources={totalSources}
+            currentPage={currentPage}
+            sourcesPerPage={sourcesPerPage}
+            selectedLanguage={selectedLanguage}
             showFilters={true}
             showPagination={true}
             isFavoritePage={true}
             onFavoriteUpdate={handleFavoriteUpdate}
+            onPageChange={setCurrentPage}
+            onSearch={setSearchTerm}
+            onLanguageChange={setSelectedLanguage}
           />
         </div>
       )}

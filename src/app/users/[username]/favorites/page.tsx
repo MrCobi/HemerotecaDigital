@@ -1,4 +1,3 @@
-// src/app/users/[username]/favorites/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -32,14 +31,18 @@ export default function UserFavoritesPage() {
   const [error, setError] = useState<string | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
 
+  // Estados para filtrar y paginar
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const sourcesPerPage = 6;
+
   const loadUserData = useCallback(async () => {
     try {
       const userResponse = await fetch(API_ROUTES.users.byUsername(username));
-      
       if (!userResponse.ok) {
         throw new Error("Usuario no encontrado");
       }
-      
       const userData: UserData = await userResponse.json();
       setUserData(userData);
       return userData.id;
@@ -54,14 +57,11 @@ export default function UserFavoritesPage() {
     try {
       setLoading(true);
       setError(null);
-      
       const favoritesResponse = await fetch(API_ROUTES.favorites.user(userId, 1, 50));
-      
       if (!favoritesResponse.ok) {
         const errorData: { error?: string } = await favoritesResponse.json();
         throw new Error(errorData.error || "Error al obtener favoritos");
       }
-      
       const favoritesData: { favorites: Favorite[] } = await favoritesResponse.json();
       const sources = favoritesData.favorites.map((fav: Favorite) => fav.source);
       setFavoriteSources(sources || []);
@@ -80,9 +80,30 @@ export default function UserFavoritesPage() {
         await loadFavorites(userId);
       }
     };
-    
     fetchData();
   }, [loadUserData, loadFavorites]);
+
+  // Filtrado en memoria de los favoritos según búsqueda e idioma
+  const filteredSources = favoriteSources.filter((source) => {
+    const matchesSearch =
+      searchTerm === "" ||
+      source.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesLanguage =
+      selectedLanguage === "all" || source.language === selectedLanguage;
+    return matchesSearch && matchesLanguage;
+  });
+
+  const totalSources = filteredSources.length;
+  const paginatedSources = filteredSources.slice(
+    (currentPage - 1) * sourcesPerPage,
+    currentPage * sourcesPerPage
+  );
+
+  const handleFavoriteUpdate = (sourceId: string) => {
+    setFavoriteSources((prev) =>
+      prev.filter((source) => source.id !== sourceId)
+    );
+  };
 
   if (error) {
     return (
@@ -107,6 +128,7 @@ export default function UserFavoritesPage() {
   
   return (
     <div className="min-h-screen">
+      {/* Header con la información del usuario */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
@@ -154,14 +176,20 @@ export default function UserFavoritesPage() {
           </Link>
         </div>
       ) : (
-        <div>
-          <SourcesPage
-            sources={favoriteSources}
-            showFilters={true}
-            showPagination={true}
-            isFavoritePage={false}
-          />
-        </div>
+        <SourcesPage
+          sources={paginatedSources}
+          totalSources={totalSources}
+          currentPage={currentPage}
+          sourcesPerPage={sourcesPerPage}
+          selectedLanguage={selectedLanguage}
+          showFilters={true}
+          showPagination={true}
+          isFavoritePage={true}
+          onFavoriteUpdate={handleFavoriteUpdate}
+          onPageChange={setCurrentPage}
+          onSearch={setSearchTerm}
+          onLanguageChange={setSelectedLanguage}
+        />
       )}
     </div>
   );
