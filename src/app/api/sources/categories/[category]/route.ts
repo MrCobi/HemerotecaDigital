@@ -1,3 +1,4 @@
+// src/app/api/sources/categories/[category]/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 

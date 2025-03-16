@@ -31,6 +31,7 @@ import { useRouter } from "next/navigation";
 import { Source } from "@/src/interface/source";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { debounce } from "lodash";
 
 const languages = [
   { code: "es", name: "Español", flag: "🇪🇸" },
@@ -49,6 +50,7 @@ interface SourcesListProps {
   totalSources: number;
   currentPage: number;
   sourcesPerPage: number;
+  selectedLanguage: string;
   showFilters?: boolean;
   showPagination?: boolean;
   isFavoritePage?: boolean;
@@ -63,6 +65,7 @@ export default function SourcesPage({
   totalSources,
   currentPage,
   sourcesPerPage,
+  selectedLanguage,
   showFilters = true,
   showPagination = true,
   isFavoritePage = false,
@@ -73,7 +76,6 @@ export default function SourcesPage({
 }: SourcesListProps) {
   const router = useRouter();
   const { data: session } = useSession();
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -97,6 +99,14 @@ export default function SourcesPage({
       }
     }
   }, [session?.user?.id]);
+
+  const debouncedSearch = useCallback(
+    debounce((term: string) => {
+      onSearch(term);
+      onPageChange(1);
+    }, 300),
+    [onSearch, onPageChange]
+  );
 
   const toggleFavorite = async (sourceId: string) => {
     if (!session?.user?.id) {
@@ -144,12 +154,10 @@ export default function SourcesPage({
 
   const handleSearch = (term: string) => {
     setSearchTerm(term);
-    onSearch(term);
-    onPageChange(1);
+    debouncedSearch(term);
   };
 
   const handleLanguageChange = (language: string) => {
-    setSelectedLanguage(language);
     onLanguageChange(language);
     onPageChange(1);
   };

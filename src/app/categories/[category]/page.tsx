@@ -1,4 +1,3 @@
-// src/app/categories/[category]/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -8,32 +7,45 @@ import { Source } from "@/src/interface/source";
 import SourcesPage from "@/src/app/components/SourceList";
 import { Button } from "@/src/app/components/ui/button";
 import Link from "next/link";
-import { API_ROUTES } from "@/src/config/api-routes";
 
 export default function CategoryPage() {
   const { category } = useParams();
   const [sources, setSources] = useState<Source[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalSources, setTotalSources] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("all");
+  const sourcesPerPage = 6;
 
   const fetchSources = useCallback(async () => {
     try {
-      setIsLoading(true);
       if (!category) throw new Error("Categoría no especificada");
 
       const categoryName = Array.isArray(category) ? category[0] : category;
-      // Línea actualizada usando API_ROUTES
-      const response = await fetch(API_ROUTES.sources.byCategory(categoryName));
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: sourcesPerPage.toString(),
+        category: decodeURIComponent(categoryName),
+        ...(searchTerm && { search: searchTerm }),
+        ...(selectedLanguage !== "all" && { language: selectedLanguage })
+      });
 
+      // Se realiza la consulta sin reiniciar el estado de carga,
+      // de modo que después de la carga inicial los filtros siguen siendo visibles.
+      const response = await fetch(`/api/sources?${params}`);
       if (!response.ok) throw new Error("Error al cargar las fuentes");
 
-      setSources(await response.json());
+      const data = await response.json();
+      setSources(data.sources);
+      setTotalSources(data.pagination.total);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
     } finally {
       setIsLoading(false);
     }
-  }, [category]);
+  }, [category, currentPage, searchTerm, selectedLanguage]);
 
   useEffect(() => {
     fetchSources();
@@ -77,6 +89,7 @@ export default function CategoryPage() {
 
   return (
     <div className="min-h-screen">
+      {/* Cabecera de la categoría */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
@@ -91,29 +104,22 @@ export default function CategoryPage() {
           </Link>
         </div>
       </div>
-
-      {sources.length === 0 ? (
-        <div className="text-center py-12 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-blue-100 dark:border-gray-700">
-          <Tag className="h-16 w-16 mx-auto text-blue-400 mb-4" />
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            No se encontraron fuentes en esta categoría
-          </p>
-          <Link href="/sources">
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              Explorar todas las fuentes
-            </Button>
-          </Link>
-        </div>
-      ) : (
-        <div>
-          <SourcesPage
-            sources={sources}
-            showFilters={true}
-            showPagination={true}
-            isFavoritePage={false}
-          />
-        </div>
-      )}
+      {/* Siempre se muestran los filtros, la paginación y el grid de fuentes,
+          incluso si sources es un arreglo vacío. Así, el usuario puede modificar
+          el término de búsqueda o cambiar el idioma sin tener que recargar la página. */}
+      <SourcesPage
+        sources={sources}
+        totalSources={totalSources}
+        currentPage={currentPage}
+        sourcesPerPage={sourcesPerPage}
+        selectedLanguage={selectedLanguage}
+        onPageChange={setCurrentPage}
+        onSearch={setSearchTerm}
+        onLanguageChange={setSelectedLanguage}
+        showFilters={true}
+        showPagination={true}
+        isFavoritePage={false}
+      />
     </div>
   );
 }
