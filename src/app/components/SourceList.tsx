@@ -46,18 +46,30 @@ const languages = [
 
 interface SourcesListProps {
   sources: Source[];
+  totalSources: number;
+  currentPage: number;
+  sourcesPerPage: number;
   showFilters?: boolean;
   showPagination?: boolean;
   isFavoritePage?: boolean;
   onFavoriteUpdate?: (sourceId: string) => void;
+  onPageChange: (page: number) => void;
+  onSearch: (term: string) => void;
+  onLanguageChange: (language: string) => void;
 }
 
 export default function SourcesPage({
   sources,
+  totalSources,
+  currentPage,
+  sourcesPerPage,
   showFilters = true,
   showPagination = true,
   isFavoritePage = false,
   onFavoriteUpdate,
+  onPageChange,
+  onSearch,
+  onLanguageChange,
 }: SourcesListProps) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -65,31 +77,13 @@ export default function SourcesPage({
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [currentPage, setCurrentPage] = useState(1);
-  const sourcesPerPage = 6;
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
-  const filteredSources = sources.filter((source) => {
-    const matchesLanguage =
-      selectedLanguage === "all" || source.language === selectedLanguage;
-    const matchesSearch = source.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    return matchesLanguage && matchesSearch;
-  });
+  const totalPages = Math.ceil(totalSources / sourcesPerPage);
 
-  const totalPages = Math.ceil(filteredSources.length / sourcesPerPage);
-  const indexOfLastSource = currentPage * sourcesPerPage;
-  const indexOfFirstSource = indexOfLastSource - sourcesPerPage;
-  const currentSources = filteredSources.slice(
-    indexOfFirstSource,
-    indexOfLastSource
-  );
-
-  // Modifica la declaración de loadFavorites
   const loadFavorites = useCallback(async () => {
     if (session?.user?.id) {
       try {
@@ -102,7 +96,7 @@ export default function SourcesPage({
         console.error("Error cargando favoritos:", error);
       }
     }
-  }, [session?.user?.id]); // Dependencias necesarias
+  }, [session?.user?.id]);
 
   const toggleFavorite = async (sourceId: string) => {
     if (!session?.user?.id) {
@@ -148,10 +142,21 @@ export default function SourcesPage({
     loadFavorites();
   }, [loadFavorites]);
 
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    onSearch(term);
+    onPageChange(1);
+  };
+
+  const handleLanguageChange = (language: string) => {
+    setSelectedLanguage(language);
+    onLanguageChange(language);
+    onPageChange(1);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-600/5 to-indigo-600/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        {/* Header condicional */}
         {!isFavoritePage && (
           <div
             className={`text-center mb-16 transition-all duration-1000 ${
@@ -161,18 +166,16 @@ export default function SourcesPage({
             }`}
           >
             <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
-              {isFavoritePage ? "Mis Favoritos" : "Fuentes de Noticias"}
+              Fuentes de Noticias
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              {isFavoritePage
-                ? "Tu colección personal de periódicos favoritos"
-                : "Explora nuestra colección de periódicos y medios de comunicación de todo el mundo"}
+              Explora nuestra colección de periódicos y medios de comunicación
+              de todo el mundo
             </p>
             <div className="h-1 w-20 bg-blue-600 mx-auto mt-6"></div>
           </div>
         )}
 
-        {/* Filtros condicionales */}
         {showFilters && (
           <div
             className={`mb-12 transition-all duration-1000 delay-200 ${
@@ -185,9 +188,7 @@ export default function SourcesPage({
               <CardHeader>
                 <CardTitle className="text-blue-900">Filtrar Fuentes</CardTitle>
                 <CardDescription>
-                  {isFavoritePage
-                    ? "Filtra tus favoritos"
-                    : "Encuentra las fuentes que más te interesan"}
+                  Encuentra las fuentes que más te interesan
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -195,10 +196,7 @@ export default function SourcesPage({
                   <div className="flex-1">
                     <Select
                       value={selectedLanguage}
-                      onValueChange={(value) => {
-                        setSelectedLanguage(value);
-                        setCurrentPage(1);
-                      }}
+                      onValueChange={handleLanguageChange}
                     >
                       <SelectTrigger className="w-full">
                         <Globe2 className="w-4 h-4 mr-2" />
@@ -224,10 +222,7 @@ export default function SourcesPage({
                         type="text"
                         placeholder="Buscar por nombre..."
                         value={searchTerm}
-                        onChange={(e) => {
-                          setSearchTerm(e.target.value);
-                          setCurrentPage(1);
-                        }}
+                        onChange={(e) => handleSearch(e.target.value)}
                         className="pl-10"
                       />
                     </div>
@@ -238,9 +233,8 @@ export default function SourcesPage({
           </div>
         )}
 
-        {/* Grid de fuentes */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {currentSources.map((source, index) => (
+          {sources.map((source, index) => (
             <div
               key={source.id}
               className={`transform transition-all duration-500 ${
@@ -308,14 +302,13 @@ export default function SourcesPage({
           ))}
         </div>
 
-        {/* Paginación condicional */}
-        {showPagination && filteredSources.length > sourcesPerPage && (
+        {showPagination && totalSources > sourcesPerPage && (
           <div className="mt-12 flex flex-col items-center space-y-4">
             <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setCurrentPage(1)}
+                onClick={() => onPageChange(1)}
                 disabled={currentPage === 1}
                 className="w-10 h-10 p-0"
               >
@@ -324,7 +317,7 @@ export default function SourcesPage({
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
                 className="w-10 h-10 p-0"
               >
@@ -348,7 +341,7 @@ export default function SourcesPage({
                     <Button
                       key={pageNum}
                       variant={currentPage === pageNum ? "default" : "outline"}
-                      onClick={() => setCurrentPage(pageNum)}
+                      onClick={() => onPageChange(pageNum)}
                       className={`w-10 h-10 p-0 ${
                         currentPage === pageNum
                           ? "bg-blue-600 text-white hover:bg-blue-700"
@@ -365,7 +358,7 @@ export default function SourcesPage({
                 variant="outline"
                 size="icon"
                 onClick={() =>
-                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  onPageChange(Math.min(totalPages, currentPage + 1))
                 }
                 disabled={currentPage === totalPages}
                 className="w-10 h-10 p-0"
@@ -375,7 +368,7 @@ export default function SourcesPage({
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setCurrentPage(totalPages)}
+                onClick={() => onPageChange(totalPages)}
                 disabled={currentPage === totalPages}
                 className="w-10 h-10 p-0"
               >
@@ -384,34 +377,23 @@ export default function SourcesPage({
             </div>
 
             <p className="text-sm text-gray-600">
-              Mostrando {indexOfFirstSource + 1} -{" "}
-              {Math.min(indexOfLastSource, filteredSources.length)} de{" "}
-              {filteredSources.length} fuentes
+              Mostrando {(currentPage - 1) * sourcesPerPage + 1} -{" "}
+              {Math.min(currentPage * sourcesPerPage, totalSources)} de{" "}
+              {totalSources} fuentes
             </p>
           </div>
         )}
 
-        {/* Estado vacío */}
-        {filteredSources.length === 0 && (
+        {sources.length === 0 && (
           <div className="text-center py-16 bg-white/50 backdrop-blur-sm rounded-xl border border-blue-100">
             <Search className="w-16 h-16 mx-auto text-blue-300 mb-4" />
             <h3 className="text-2xl font-bold text-blue-900 mb-2">
-              {isFavoritePage
-                ? "No hay favoritos"
-                : "No se encontraron resultados"}
+              No se encontraron resultados
             </h3>
             <p className="text-blue-600">
-              {isFavoritePage
-                ? "Agrega periódicos a tus favoritos para verlos aquí"
-                : "Intenta con otros términos de búsqueda o cambia el filtro de idioma"}
+              Intenta con otros términos de búsqueda o cambia el filtro de
+              idioma
             </p>
-            {isFavoritePage && (
-              <Link href="/sources" className="mt-4 inline-block">
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                  Explorar periódicos
-                </Button>
-              </Link>
-            )}
           </div>
         )}
       </div>

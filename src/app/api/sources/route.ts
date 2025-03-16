@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { Source, Rating } from "@/src/interface/source";
 
-// GET para obtener una lista de fuentes con filtros y paginación
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -13,6 +12,7 @@ export async function GET(req: Request) {
     const limit = Math.min(Math.max(Number(searchParams.get("limit") || 10), 1), 50);
     const search = searchParams.get("search") || "";
     const category = searchParams.get("category");
+    const language = searchParams.get("language");
     const sortBy = searchParams.get("sortBy") || "publishedAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
@@ -20,6 +20,7 @@ export async function GET(req: Request) {
     const where: {
       OR?: { name?: { contains: string }; description?: { contains: string } }[];
       category?: string;
+      language?: string;
     } = {};
     
     if (search) {
@@ -31,6 +32,10 @@ export async function GET(req: Request) {
     
     if (category) {
       where.category = category;
+    }
+
+    if (language) {
+      where.language = language;
     }
 
     // Validar campo de ordenación
@@ -91,7 +96,6 @@ export async function GET(req: Request) {
   }
 }
 
-// POST para obtener detalles de fuentes específicas por IDs (migrado desde sources/details)
 export async function POST(request: Request) {
   try {
     const { sourceIds } = await request.json();
@@ -103,7 +107,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Obtener los detalles de las fuentes
     const sources = await prisma.source.findMany({
       where: {
         id: {
@@ -112,7 +115,6 @@ export async function POST(request: Request) {
       }
     });
 
-    // Para cada fuente, calcular el rating promedio
     const sourcesWithRatings = await Promise.all(
       sources.map(async (source: Source) => {
         const ratings = await prisma.rating.findMany({
