@@ -1,100 +1,211 @@
 import { NextRequest } from 'next/server';
-import prisma from '@/lib/db';
 import { auth } from "@/auth";
+import prisma from '@/lib/db';
+import { NextResponse } from "next/server";
+
+// Map to track active connections with their controllers
+const activeConnections = new Map<string, {
+  controller: ReadableStreamDefaultController;
+  lastActivity: number;
+  lastPollTime: number;
+  userId: string;
+}>();
+
+// Map to track when we last saw a message for a user
+const lastSeenMessageTime = new Map<string, Date>();
+
+// Clean up inactive connections every minute
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, connection] of activeConnections.entries()) {
+    if (now - connection.lastActivity > 10 * 60 * 1000) { // 10 minutes
+      console.log(`Closing inactive global SSE connection: ${id}`);
+      try {
+        connection.controller.close();
+      } catch (error) {
+        console.error(`Error closing connection ${id}:`, error);
+      }
+      activeConnections.delete(id);
+    }
+  }
+}, 60 * 1000);
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
-
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    const connectionId = `${userId}-${Date.now()}`;
+    
+    console.log(`Global SSE connection from ${userId} (${connectionId})`);
+    
+    // Set initial last seen time if not set
+    if (!lastSeenMessageTime.has(userId)) {
+      lastSeenMessageTime.set(userId, new Date(Date.now() - 1000)); // Start 1 second ago
+    }
+    
     const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-        let lastCheck = new Date();
-        let interval = 5000; // Intervalo inicial de 5 segundos
-        let isActive = true;
-
+      start: (controller) => {
+        // Close existing connection for this user if it exists
+        for (const [id, connection] of activeConnections.entries()) {
+          if (connection.userId === userId) {
+            console.log(`Closing previous connection for user ${userId}`);
+            try {
+              connection.controller.close();
+            } catch (err) {
+              console.error(`Error closing previous connection:`, err);
+            }
+            activeConnections.delete(id);
+            break;
+          }
+        }
+        
+        // Register new connection
+        activeConnections.set(connectionId, {
+          controller,
+          lastActivity: Date.now(),
+          lastPollTime: Date.now(),
+          userId
+        });
+        
+        // Send initial connected message
+        controller.enqueue(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+        
+        // Set up polling function with dynamic interval
+        let pollingInterval = 1000; // Start with 1 second
+        const MAX_POLLING_INTERVAL = 2000; // Max 2 seconds between polls
+        
         const pollMessages = async () => {
-          if (!isActive) return;
-
           try {
-            const messages = await prisma.directMessage.findMany({
-              where: {
-                OR: [
-                  { receiverId: session.user.id },
-                  { senderId: session.user.id }
-                ],
-                createdAt: { gt: lastCheck }
-              },
-              orderBy: { createdAt: 'asc' },
-              select: {
-                id: true,
-                content: true,
-                senderId: true,
-                receiverId: true,
-                read: true,
-                createdAt: true,
-                sender: { select: { id: true, username: true, image: true } },
-                receiver: { select: { id: true, username: true, image: true } }
-              }
-            });
-
-            if (messages.length > 0) {
-              lastCheck = new Date();
-              interval = 5000; // Resetear a 5s si hay novedades
-              messages.forEach(msg => {
-                const conversationId = [msg.senderId, msg.receiverId]
-                  .sort()
-                  .join('-');
+            if (!activeConnections.has(connectionId)) return;
+            
+            const connection = activeConnections.get(connectionId)!;
+            connection.lastPollTime = Date.now();
+            
+            // Get last seen time for this user
+            const lastSeen = lastSeenMessageTime.get(userId) || new Date(0);
+            
+            // Find new messages using raw query to avoid model issues
+            const newMessages = await prisma.$queryRaw`
+              SELECT 
+                dm.id,
+                dm.content,
+                dm.sender_id as "senderId",
+                dm.receiver_id as "receiverId",
+                dm.read,
+                dm.created_at as "createdAt",
+                CONCAT(LEAST(dm.sender_id, dm.receiver_id), '-', GREATEST(dm.sender_id, dm.receiver_id)) as "conversationId"
+              FROM direct_messages dm
+              WHERE 
+                (dm.sender_id = ${userId} OR dm.receiver_id = ${userId})
+                AND dm.created_at > ${lastSeen}
+              ORDER BY dm.created_at DESC
+              LIMIT 20
+            `;
+            
+            // Update activity timestamp
+            connection.lastActivity = Date.now();
+            
+            // Process new messages
+            if (Array.isArray(newMessages) && newMessages.length > 0) {
+              console.log(`Found ${newMessages.length} new messages for ${userId}`);
+              
+              // Reset polling interval to minimum when messages are found
+              pollingInterval = 1000;
+              
+              // Map to track latest message per conversation
+              const latestMessageByConversation = new Map();
+              
+              // Group messages by conversation
+              for (const message of newMessages) {
+                // Track the latest message for each conversation
+                if (!latestMessageByConversation.has(message.conversationId) || 
+                    new Date(message.createdAt) > new Date(latestMessageByConversation.get(message.conversationId).createdAt)) {
+                  latestMessageByConversation.set(message.conversationId, message);
+                }
                 
-                const eventData = {
+                // Track the latest overall message timestamp
+                const messageTime = new Date(message.createdAt);
+                if (!lastSeenMessageTime.has(userId) || messageTime > lastSeenMessageTime.get(userId)!) {
+                  lastSeenMessageTime.set(userId, messageTime);
+                }
+              }
+              
+              // Send a notification for each conversation with a new message
+              for (const [conversationId, message] of latestMessageByConversation.entries()) {
+                // Format the message for SSE
+                const messageData = {
                   conversationId,
                   message: {
-                    ...msg,
-                    createdAt: msg.createdAt.toISOString()
+                    id: message.id,
+                    content: message.content,
+                    createdAt: new Date(message.createdAt).toISOString(),
+                    senderId: message.senderId,
+                    receiverId: message.receiverId,
+                    read: message.read
                   }
                 };
                 
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(eventData)}\n\n`));
-              });
+                // Send message to client
+                try {
+                  controller.enqueue(`data: ${JSON.stringify(messageData)}\n\n`);
+                } catch (error) {
+                  console.error(`Error sending message to client ${connectionId}:`, error);
+                }
+              }
             } else {
-              interval = Math.min(interval * 2, 30000); // Aumentar gradualmente hasta 30s
+              // Gradually increase polling interval when no messages are found
+              pollingInterval = Math.min(pollingInterval * 1.2, MAX_POLLING_INTERVAL);
             }
+            
+            // Send heartbeat every 30 seconds to keep connection alive
+            const timeSinceLastActivity = Date.now() - connection.lastActivity;
+            if (timeSinceLastActivity > 30000) {
+              try {
+                controller.enqueue(`: heartbeat\n\n`);
+                connection.lastActivity = Date.now();
+              } catch (error) {
+                console.error(`Error sending heartbeat to ${connectionId}:`, error);
+                activeConnections.delete(connectionId);
+                return;
+              }
+            }
+            
+            // Schedule next poll with dynamic interval
+            setTimeout(pollMessages, pollingInterval);
           } catch (error) {
-            console.error('Polling error:', error);
-            interval = 30000; // Reset a 30s en errores
-          } finally {
-            if (isActive) {
-              setTimeout(pollMessages, interval);
+            console.error(`Polling error for ${userId}:`, error);
+            
+            // Try to recover
+            if (activeConnections.has(connectionId)) {
+              setTimeout(pollMessages, 2000); // Retry after 2 seconds on error
             }
           }
         };
-
-        const abortHandler = () => {
-          isActive = false;
-          controller.close();
-        };
-
-        request.signal.addEventListener('abort', abortHandler);
-        await pollMessages();
-
-        return () => {
-          request.signal.removeEventListener('abort', abortHandler);
-          isActive = false;
-        };
+        
+        // Start polling
+        pollMessages();
+      },
+      
+      cancel: () => {
+        console.log(`Global SSE connection closed: ${connectionId}`);
+        activeConnections.delete(connectionId);
       }
     });
-
+    
     return new Response(stream, {
       headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive'
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no", // For Nginx
       }
     });
-
   } catch (error) {
-    console.error('SSE Error:', error);
-    return new Response('Internal Server Error', { status: 500 });
+    console.error("Global SSE error:", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

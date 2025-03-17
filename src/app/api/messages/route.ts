@@ -9,8 +9,25 @@ export async function POST(request: Request) {
   if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
 
   try {
-    const { receiverId, content } = await request.json();
+    const { receiverId, content, priority } = await request.json();
     
+    // Fast-path: broadcast message before database write for immediate delivery
+    const tempMessage = {
+      id: `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      content,
+      senderId: session.user.id,
+      receiverId,
+      read: false,
+      createdAt: new Date().toISOString(),
+      isTemp: true // Mark as temporary until database confirmation
+    };
+    
+    // Immediately notify through SSE (high priority)
+    console.log('Fast-path: Broadcasting temp message through SSE:', tempMessage);
+    messageEvents.sendMessage(receiverId, tempMessage);
+    messageEvents.sendMessage(session.user.id, tempMessage);
+    
+    // Then perform the database write
     const message = await prisma.directMessage.create({
       data: {
         content,
@@ -30,11 +47,12 @@ export async function POST(request: Request) {
       senderId: session.user.id,
       receiverId,
       read: message.read,
-      createdAt: message.createdAt.toISOString()
+      createdAt: message.createdAt.toISOString(),
+      tempId: tempMessage.id // Include the temp ID for client-side reconciliation
     };
     
-    // Notificar a través de SSE al remitente y al destinatario
-    console.log('Broadcasting message through SSE:', optimizedMessage);
+    // Send the real message with database ID for clients to update
+    console.log('Broadcasting confirmed message through SSE:', optimizedMessage);
     messageEvents.sendMessage(receiverId, optimizedMessage);
     messageEvents.sendMessage(session.user.id, optimizedMessage);
     

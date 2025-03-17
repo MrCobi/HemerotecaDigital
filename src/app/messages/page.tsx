@@ -185,27 +185,75 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const eventSource = new EventSource('/api/messages/global-sse');
+    const eventSource = new EventSource(`/api/messages/global-sse?t=${Date.now()}`);
+    
+    let lastMessageTimestamp = Date.now();
+
+    eventSource.onopen = () => {
+      console.log('Global SSE connected successfully');
+    };
 
     eventSource.onmessage = (event) => {
       try {
-        const { conversationId, message } = JSON.parse(event.data);
+        if (event.data.startsWith(':')) return;
+        
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'connected') {
+          console.log('Connected to global SSE');
+          return;
+        }
+        
+        const { conversationId, message } = data;
+        console.log('Received global update:', message);
+        
+        const messageTime = new Date(message.createdAt).getTime();
+        if (messageTime <= lastMessageTimestamp) {
+          console.log('Ignoring older message');
+          return;
+        }
+        
+        lastMessageTimestamp = messageTime;
 
-        setConversations(prev => prev.map(conv => {
-          if (conv.id === conversationId) {
-            return {
-              ...conv,
-              lastMessage: message,
-              unreadCount: (conv.unreadCount || 0) +
-                (message.receiverId === session?.user?.id && !message.read ? 1 : 0),
-              updatedAt: new Date().toISOString()
-            };
+        setConversations(prev => {
+          const updatedConvs = prev.map(conv => {
+            if (conv.id === conversationId) {
+              return {
+                ...conv,
+                lastMessage: message,
+                unreadCount: (conv.unreadCount || 0) +
+                  (message.receiverId === session?.user?.id && !message.read ? 1 : 0),
+                updatedAt: new Date().toISOString()
+              };
+            }
+            return conv;
+          });
+          
+          const foundConv = updatedConvs.some(c => c.id === conversationId);
+          if (!foundConv && (message.senderId === session?.user?.id || message.receiverId === session?.user?.id)) {
+            fetch(`/api/messages/conversations/${conversationId}`)
+              .then(res => res.json())
+              .then(newConv => {
+                setConversations(current => [newConv, ...current]);
+              })
+              .catch(err => console.error('Error fetching new conversation:', err));
           }
-          return conv;
-        }));
+          
+          return updatedConvs;
+        });
       } catch (error) {
         console.error("Error procesando evento SSE:", error);
       }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("Global SSE error:", error);
+      eventSource.close();
+      setTimeout(() => {
+        if (session?.user?.id) {
+          const newEventSource = new EventSource(`/api/messages/global-sse?t=${Date.now()}`);
+        }
+      }, 500);
     };
 
     return () => eventSource.close();

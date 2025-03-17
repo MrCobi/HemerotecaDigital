@@ -67,7 +67,8 @@ export function ChatWindow({
     console.log('Connecting to SSE endpoint...');
     
     try {
-      const eventSource = new EventSource('/api/messages/sse-messages');
+      // Usar un parámetro con timestamp para evitar caché y forzar una nueva conexión
+      const eventSource = new EventSource(`/api/messages/sse-messages?t=${Date.now()}&userId=${currentUserId}`);
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
@@ -88,16 +89,34 @@ export function ChatWindow({
             (message.senderId === currentUserId && message.receiverId === otherUser.id)
           ) {
             console.log('Adding/updating message in state');
-            setMessages((prev) =>
-              prev.some((m) => m.id === message.id)
-                ? prev.map((m) => (m.id === message.id ? message : m))
-                : [...prev, message]
-            );
+            
+            // Actualización inmediata usando React 18 flushSync para garantizar actualización síncrona
+            setMessages((prev) => {
+              // Check if the message already exists
+              const exists = prev.some((m) => m.id === message.id);
+              
+              if (exists) {
+                // Update existing message
+                return prev.map((m) => (m.id === message.id ? message : m));
+              } else {
+                // Add new message, ensuring no duplicates
+                return [...prev, message];
+              }
+            });
+
+            // Trigger immediate scroll to bottom
+            setTimeout(() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+            }, 50);
 
             // Marcar como leído si somos el receptor
             if (message.receiverId === currentUserId && !message.read) {
               fetch(`/api/messages/read?senderId=${otherUser.id}`, {
                 method: "POST",
+                headers: {
+                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  "Pragma": "no-cache"
+                }
               }).then(() => {
                 unreadContext.updateUnreadCount();
               });
@@ -113,14 +132,14 @@ export function ChatWindow({
         // Cerrar y reconectar en error
         eventSource.close();
         eventSourceRef.current = null;
-        // Intentar reconectar después de un breve retraso
+        // Intentar reconectar inmediatamente en caso de error
         setTimeout(() => {
           if (isOpen && session) {
             console.log('Reconnecting to SSE after error...');
-            const newEventSource = new EventSource('/api/messages/sse-messages');
+            const newEventSource = new EventSource(`/api/messages/sse-messages?t=${Date.now()}&userId=${currentUserId}`);
             eventSourceRef.current = newEventSource;
           }
-        }, 2000);
+        }, 500); // Reducir tiempo de reconexión a 500ms
       };
 
       return () => {
@@ -186,7 +205,7 @@ export function ChatWindow({
     if (!session || !newMessage.trim() || !isMutualFollow || isSending) return;
 
     const trimmedMessage = newMessage.trim();
-    const tempId = `temp-${Date.now()}`;
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const tempMessage = {
       id: tempId,
       content: trimmedMessage,
@@ -201,31 +220,60 @@ export function ChatWindow({
     setNewMessage("");
 
     try {
-      const response = await fetch("/api/messages", {
+      const res = await fetch("/api/messages", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          // Añadir un timestamp para evitar caché
           "Cache-Control": "no-cache, no-store, must-revalidate",
-          "Pragma": "no-cache",
-          "Expires": "0" 
+          "Pragma": "no-cache"
         },
         body: JSON.stringify({
           receiverId: otherUser.id,
           content: trimmedMessage,
-          timestamp: Date.now() // Añadir timestamp para prevenir cacheo
+          priority: "high" // Añadir prioridad alta para procesamiento más rápido
         }),
       });
 
-      if (!response.ok) throw new Error("Error enviando mensaje");
+      if (!res.ok) {
+        throw new Error("Error sending message");
+      }
+
+      const data = await res.json();
       
-      const realMessage = await response.json();
+      // Actualizar mensaje después de enviar
       setMessages((prev) =>
-        prev.map((msg) => (msg.id === tempId ? realMessage : msg))
+        prev.map((msg) =>
+          msg.id === tempId
+            ? {
+                ...data,
+                sender: {
+                  id: currentUserId,
+                  username: session?.user?.username || null,
+                  image: session?.user?.image || null,
+                },
+                receiver: {
+                  id: otherUser.id,
+                  username: otherUser.username || null,
+                  image: otherUser.image || null,
+                },
+              }
+            : msg
+        )
       );
+
+      // Scroll to bottom immediately
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+      
     } catch (error) {
       console.error("Error:", error);
-      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+      // Mostrar error al usuario
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === tempId
+            ? { ...msg, error: true, content: trimmedMessage + " (Error al enviar)" }
+            : msg
+        )
+      );
     } finally {
       setIsSending(false);
     }
@@ -342,52 +390,61 @@ export function ChatWindow({
       {/* Mensajes */}
       <div className="flex-1 overflow-y-auto" ref={messagesContainerRef}>
         <div className="max-w-3xl mx-auto px-4 pb-4 h-[calc(100vh-180px)]">
-          {Object.entries(groupMessagesByDate()).map(([date, msgs]) => (
-            <div key={date}>
-              <div className="sticky top-2 z-20 mb-4">
-                <div className="inline-flex px-4 py-1 text-xs font-medium bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700">
-                  {formatDateHeader(date)}
+          {Object.entries(groupMessagesByDate()).map(([date, msgs]) => {
+            // Generate a unique key for the date group
+            const dateKey = `date-${date}`;
+            
+            return (
+              <div key={dateKey}>
+                <div className="sticky top-2 z-20 mb-4">
+                  <div className="inline-flex px-4 py-1 text-xs font-medium bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700">
+                    {formatDateHeader(date)}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {msgs.map((message, index) => {
+                    // Ensure unique key using id and index
+                    const messageKey = `${message.id || 'msg'}-${index}-${date}`;
+                    const isMyMessage = message.senderId === currentUserId;
+
+                    return (
+                      <div
+                        key={messageKey}
+                        className={`flex ${
+                          isMyMessage ? "justify-end" : "justify-start"
+                        }`}
+                      >
+                        <div
+                          className={`p-3 rounded-lg max-w-[80%] ${
+                            isMyMessage
+                              ? "bg-blue-500 text-white ml-auto rounded-br-none"
+                              : "bg-gray-100 dark:bg-gray-700 mr-auto rounded-bl-none"
+                          }`}
+                        >
+                          <p className="text-sm break-words">{message.content}</p>
+                          <div className="flex items-center justify-end gap-1 mt-2">
+                            <span className="text-xs opacity-75">
+                              {new Date(message.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                            {message.senderId === currentUserId &&
+                              (message.read ? (
+                                <UserCheck className="w-3 h-3" />
+                              ) : (
+                                <Clock className="w-3 h-3" />
+                              ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-
-              <div className="space-y-2">
-                {msgs.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${
-                      message.senderId === currentUserId
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
-                    <div
-                      className={`p-3 rounded-lg max-w-[80%] ${
-                        message.senderId === currentUserId
-                          ? "bg-blue-500 text-white ml-auto rounded-br-none"
-                          : "bg-gray-100 dark:bg-gray-700 mr-auto rounded-bl-none"
-                      }`}
-                    >
-                      <p className="text-sm break-words">{message.content}</p>
-                      <div className="flex items-center justify-end gap-1 mt-2">
-                        <span className="text-xs opacity-75">
-                          {new Date(message.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                        {message.senderId === currentUserId &&
-                          (message.read ? (
-                            <UserCheck className="w-3 h-3" />
-                          ) : (
-                            <Clock className="w-3 h-3" />
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
       </div>
