@@ -9,26 +9,74 @@ export async function POST(request: Request) {
   if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
 
   try {
-    const { receiverId, content, priority } = await request.json();
+    const { receiverId, content, priority, tempId } = await request.json();
     
-    // Fast-path: broadcast message before database write for immediate delivery
+    // Validar contenido del mensaje
+    if (!content || content.trim() === '') {
+      return new Response(JSON.stringify({ error: 'Contenido del mensaje no puede estar vacío' }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Validar ID del receptor
+    if (!receiverId) {
+      return new Response(JSON.stringify({ error: 'ID del receptor es requerido' }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Generar ID temporal único si no se proporciona
+    const messageId = tempId || `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Ultra-fast path: Enviar mensaje a ambos clientes inmediatamente, antes de guardar en DB
+    console.log(`ULTRA-FAST PATH: Broadcasting temporary message to sender ${session.user.id} and receiver ${receiverId}`);
+    
+    // Mensaje temporal con estructura completa para mostrar en UI inmediatamente
     const tempMessage = {
-      id: `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      id: messageId,
       content,
       senderId: session.user.id,
       receiverId,
       read: false,
       createdAt: new Date().toISOString(),
-      isTemp: true // Mark as temporary until database confirmation
+      isTemp: true,
+      priority: priority || 'normal',
+      tempId: messageId, // Incluir el ID temporal para reconciliación posterior
+      sender: {
+        id: session.user.id,
+        username: session.user.username || null,
+        image: session.user.image || null
+      },
+      receiver: {
+        id: receiverId
+        // El receptor se completará en el cliente si es necesario
+      }
     };
     
-    // Immediately notify through SSE (high priority)
-    console.log('Fast-path: Broadcasting temp message through SSE:', tempMessage);
-    messageEvents.sendMessage(receiverId, tempMessage);
-    messageEvents.sendMessage(session.user.id, tempMessage);
+    // SOLO USAR SSE SI ESTA ACTIVADO, DE LO CONTRARIO USAMOS SOCKET.IO 
+    let senderConnected = false;
+    let receiverConnected = false;
     
-    // Then perform the database write
-    const message = await prisma.directMessage.create({
+    try {
+      // Verificar si los clientes están conectados y emitir mensaje temporal
+      senderConnected = messageEvents.isUserConnected(session.user.id);
+      receiverConnected = messageEvents.isUserConnected(receiverId);
+      
+      // Registrar el estado de conexión para diagnóstico
+      console.log(`Sender ${session.user.id} connected via SSE: ${senderConnected}`);
+      console.log(`Receiver ${receiverId} connected via SSE: ${receiverConnected}`);
+      
+      // Emitir mensaje temporal inmediatamente si están conectados por SSE
+      if (senderConnected) messageEvents.sendMessage(session.user.id, tempMessage);
+      if (receiverConnected) messageEvents.sendMessage(receiverId, tempMessage);
+    } catch (sseError) {
+      console.warn('SSE not available or error occurred, relying on Socket.io:', sseError);
+    }
+    
+    // Crear promesa para el proceso de base de datos
+    const dbPromise = prisma.directMessage.create({
       data: {
         content,
         senderId: session.user.id,
@@ -36,39 +84,144 @@ export async function POST(request: Request) {
       },
       select: {
         id: true,
-        createdAt: true,
-        read: true
+        content: true,
+        createdAt: true, 
+        read: true,
+        senderId: true,
+        receiverId: true
       }
     });
     
-    const optimizedMessage = {
-      id: message.id,
-      content,
-      senderId: session.user.id,
-      receiverId,
-      read: message.read,
-      createdAt: message.createdAt.toISOString(),
-      tempId: tempMessage.id // Include the temp ID for client-side reconciliation
-    };
+    // Para mensajes de alta prioridad, no esperamos a la base de datos
+    if (priority === 'high') {
+      // Iniciar escritura en DB pero no esperar
+      dbPromise.then(message => {
+        // Cuando finalice, enviar mensaje con ID real para reconciliación
+        const finalMessage = {
+          ...message,
+          createdAt: message.createdAt.toISOString(),
+          tempId: messageId, // Para reconciliación con el mensaje temporal
+          priority: 'high',
+          sender: {
+            id: session.user.id,
+            username: session.user.username || null,
+            image: session.user.image || null
+          },
+          receiver: {
+            id: receiverId
+          }
+        };
+        
+        // Registrar éxito para diagnóstico
+        console.log(`DB save success for high priority message. Real ID: ${message.id}, replacing temp: ${messageId}`);
+        
+        // Emitir el mensaje final con ID real (para actualizar referencias)
+        try {
+          if (senderConnected) messageEvents.sendMessage(session.user.id, finalMessage);
+          if (receiverConnected) messageEvents.sendMessage(receiverId, finalMessage);
+        } catch (sseError) {
+          console.warn('SSE notification failed for final message, relying on Socket.io:', sseError);
+        }
+      }).catch(error => {
+        console.error('Error al guardar mensaje en base de datos:', error);
+        // Notificar al cliente del error
+        const errorMessage = {
+          id: messageId,
+          tempId: messageId,
+          error: true,
+          errorType: 'db_save_failed',
+          message: 'Error al guardar mensaje'
+        };
+        try {
+          if (senderConnected) messageEvents.sendMessage(session.user.id, errorMessage);
+        } catch (sseError) {
+          console.warn('SSE error notification failed, relying on Socket.io for error delivery:', sseError);
+        }
+      });
+      
+      // Responder inmediatamente con un mensaje temporal
+      return new Response(JSON.stringify({
+        ...tempMessage,
+        status: 'pending', // Indicar que está pendiente de confirmación en DB
+      }), { 
+        status: 202, // Accepted
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        }
+      });
+    }
     
-    // Send the real message with database ID for clients to update
-    console.log('Broadcasting confirmed message through SSE:', optimizedMessage);
-    messageEvents.sendMessage(receiverId, optimizedMessage);
-    messageEvents.sendMessage(session.user.id, optimizedMessage);
-    
-    return new Response(JSON.stringify(optimizedMessage), { 
-      status: 201,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
+    // Para mensajes de prioridad normal, esperar a la confirmación de la DB
+    try {
+      const message = await dbPromise;
+      
+      // Mensaje definitivo con el ID real de la base de datos
+      const finalMessage = {
+        ...message,
+        createdAt: message.createdAt.toISOString(),
+        tempId: messageId, // Incluir el ID temporal para que el cliente pueda reemplazar el mensaje temporal
+        sender: {
+          id: session.user.id,
+          username: session.user.username || null,
+          image: session.user.image || null
+        },
+        receiver: {
+          id: receiverId
+        }
+      };
+      
+      // Emitir el mensaje final con ID real de DB (para sustituir al temporal en la UI)
+      console.log(`Broadcasting final message with ID ${message.id} (replaces temp ${messageId})`);
+      try {
+        if (senderConnected) messageEvents.sendMessage(session.user.id, finalMessage);
+        if (receiverConnected) messageEvents.sendMessage(receiverId, finalMessage);
+      } catch (sseError) {
+        console.warn('SSE notification failed for final message, relying on Socket.io for delivery:', sseError);
       }
-    });
-    
+      
+      // Responder con el mensaje completo
+      return new Response(JSON.stringify(finalMessage), { 
+        status: 201,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+    } catch (dbError) {
+      console.error("Error saving message to database:", dbError);
+      
+      // Notificar al cliente del error
+      const errorMessage = {
+        id: messageId,
+        tempId: messageId,
+        error: true,
+        errorType: 'db_save_failed',
+        message: 'Error al guardar mensaje en la base de datos'
+      };
+      try {
+        if (senderConnected) messageEvents.sendMessage(session.user.id, errorMessage);
+      } catch (sseError) {
+        console.warn('SSE error notification failed, relying on Socket.io for error delivery:', sseError);
+      }
+      
+      return new Response(JSON.stringify({
+        error: 'Database Error',
+        message: 'Error saving message to database',
+        tempId: messageId
+      }), { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
   } catch (error) {
     console.error("Error sending message:", error);
-    return new Response('Internal Server Error', { 
+    return new Response(JSON.stringify({
+      error: 'Internal Server Error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

@@ -116,10 +116,7 @@ export async function GET() {
     const sortedConversations = Array.from(uniqueConversationsMap.values())
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-    return NextResponse.json({
-      conversations: sortedConversations,
-      total: sortedConversations.length
-    });
+    return NextResponse.json(sortedConversations);
 
   } catch (error) {
     console.error("Error al obtener conversaciones:", error);

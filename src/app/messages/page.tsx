@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState, useContext, useCallback } from "react";
+import { useEffect, useState, useContext, useCallback, useMemo } from "react";
+import { flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ChatWindow } from "@/src/app/components/Chat/ChatWindow";
@@ -10,6 +11,7 @@ import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext"
 import { CldImage } from "next-cloudinary";
 import Image from "next/image";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
+import useSocket, { MessageType } from "@/src/hooks/useSocket";
 
 interface User {
   id: string;
@@ -17,25 +19,36 @@ interface User {
   image: string | null;
 }
 
-interface Message {
+export interface Message {
   id: string;
   content: string;
   senderId: string;
   receiverId: string;
-  read: boolean;
   createdAt: string;
+  read: boolean;
+  tempId?: string;
 }
 
-interface Conversation {
+export interface Conversation {
   id: string;
-  senderId: string;
-  receiverId: string;
-  createdAt: string;
-  sender: User;
-  receiver: User;
-  lastMessage?: Message;
+  otherUser: User;
+  lastMessage: Message | null;
+  createdAt?: string;
+  updatedAt: string;
+  senderId?: string;
+  receiverId?: string;
+  sender?: {
+    id: string;
+    username: string | null;
+    image: string | null;
+  };
+  receiver?: {
+    id: string;
+    username: string | null;
+    image: string | null;
+  };
   unreadCount?: number;
-  updatedAt?: string;
+  lastInteraction?: Date;
 }
 
 interface CombinedItem {
@@ -61,32 +74,69 @@ export default function MessagesPage() {
   const CONVERSATIONS_PER_PAGE = 15;
 
   const processConvResponse = useCallback(async (convRes: Response): Promise<Conversation[]> => {
-    if (!convRes.ok) throw new Error("Error al cargar conversaciones");
-    const data = await convRes.json();
+    if (!convRes.ok) {
+      console.error(`Error response from conversations API: ${convRes.status}`);
+      throw new Error("Error al cargar conversaciones");
+    }
+    
+    try {
+      const data = await convRes.json();
+      
+      // Verificar si la respuesta es un array (formato nuevo) o un objeto (formato antiguo)
+      let conversations: any[] = [];
+      
+      if (Array.isArray(data)) {
+        conversations = data;
+      } else if (data && typeof data === 'object' && Array.isArray(data.conversations)) {
+        conversations = data.conversations;
+      } else {
+        console.warn('Formato de respuesta inesperado:', data);
+        return []; // Devolver array vacío en caso de formato desconocido
+      }
+      
+      console.log(`Loaded ${conversations.length} conversations`);
 
-    return data.conversations.map((conv: {
-      id: string;
-      receiver: User;
-      lastMessage?: Message;
-      unreadCount: number;
-      createdAt: string;
-    }) => ({
-      id: conv.id,
-      senderId: session?.user?.id || '',
-      receiverId: conv.receiver.id,
-      createdAt: conv.createdAt,
-      sender: {
-        id: session?.user?.id || '',
-        username: session?.user?.username || null,
-        image: session?.user?.image || null,
-      },
-      receiver: conv.receiver,
-      lastMessage: conv.lastMessage ? {
-        ...conv.lastMessage,
-        createdAt: new Date(conv.lastMessage.createdAt),
-      } : null,
-      unreadCount: conv.unreadCount,
-    }));
+      return conversations
+        .filter(conv => {
+          // Validar que cada conversación tenga los campos necesarios
+          const isValid = conv && typeof conv === 'object' && conv.id && conv.receiver;
+          if (!isValid) {
+            console.warn('Conversación inválida encontrada:', conv);
+          }
+          return isValid;
+        })
+        .map((conv: {
+          id: string;
+          receiver: User;
+          lastMessage?: Message;
+          unreadCount: number;
+          createdAt: string;
+          updatedAt: string;
+        }) => ({
+          id: conv.id,
+          otherUser: conv.receiver,
+          lastMessage: conv.lastMessage ? {
+            ...conv.lastMessage,
+            createdAt: typeof conv.lastMessage.createdAt === 'string' ? 
+              new Date(conv.lastMessage.createdAt).toISOString() : 
+              conv.lastMessage.createdAt,
+          } : null,
+          createdAt: conv.createdAt,
+          updatedAt: conv.updatedAt || new Date().toISOString(),
+          senderId: session?.user?.id || '',
+          receiverId: conv.receiver.id,
+          sender: {
+            id: session?.user?.id || '',
+            username: session?.user?.username || null,
+            image: session?.user?.image || null,
+          },
+          receiver: conv.receiver,
+          unreadCount: conv.unreadCount,
+        }));
+    } catch (error) {
+      console.error('Error parsing conversation response:', error);
+      return [];
+    }
   }, [session?.user?.id, session?.user?.username, session?.user?.image]);
 
   const processMutualResponse = useCallback(async (mutualRes: Response): Promise<User[]> => {
@@ -106,8 +156,8 @@ export default function MessagesPage() {
     ];
 
     return merged.sort((a, b) =>
-      new Date(b.lastMessage?.createdAt || b.createdAt).getTime() -
-      new Date(a.lastMessage?.createdAt || a.createdAt).getTime()
+      new Date(b.updatedAt || Date.now().toString()).getTime() -
+      new Date(a.updatedAt || Date.now().toString()).getTime()
     );
   }, []);
 
@@ -154,110 +204,206 @@ export default function MessagesPage() {
 
   useEffect(() => {
     const combineLists = () => {
-      const currentUserId = session?.user?.id;
+      if (!Array.isArray(conversations)) {
+        console.error("Conversations is not an array", conversations);
+        setCombinedList([]);
+        return;
+      }
+      
+      // Debug output
+      console.log(`Combining lists: ${conversations.length} conversations and ${mutualFollowers.length} mutual followers`);
+      
+      // Filter out invalid conversations
+      const validConversations = conversations.filter(
+        conv => conv && typeof conv === 'object' && conv.otherUser && conv.otherUser.id
+      );
+      
+      // Safely create a set of existing user IDs
       const existingUserIds = new Set(
-        conversations.flatMap(c => [c.senderId, c.receiverId])
+        validConversations
+          .filter(c => c?.otherUser?.id) // Make sure otherUser.id exists
+          .map(c => c.otherUser.id)
       );
 
-      const newCombined = [
-        ...conversations.map(c => ({
-          id: c.id,
+      // Debug which users we're filtering out
+      console.log('Existing user IDs in conversations:', Array.from(existingUserIds));
+
+      // Filter out undefined users
+      const validMutualFollowers = Array.isArray(mutualFollowers) ? 
+        mutualFollowers.filter(user => user && typeof user === 'object' && user.id) : 
+        [];
+
+      // Create combined list with conversations first
+      const newCombined: CombinedItem[] = [
+        ...validConversations.map(conv => ({
+          id: conv.id,
           isConversation: true,
-          data: c,
-          lastInteraction: new Date(c.lastMessage?.createdAt || c.createdAt),
+          data: conv,
+          lastInteraction: new Date(conv.lastMessage?.createdAt || conv.createdAt || Date.now())
         })),
-        ...mutualFollowers
-          .filter(user => user.id !== currentUserId && !existingUserIds.has(user.id))
+        // Then add mutual followers who don't already have a conversation
+        ...validMutualFollowers
+          .filter(user => !existingUserIds.has(user.id))
           .map(user => ({
-            id: `mutual-${user.id}`,
+            id: user.id,
             isConversation: false,
             data: user,
-            lastInteraction: new Date(0),
-          })),
-      ].sort((a, b) => b.lastInteraction.getTime() - a.lastInteraction.getTime());
-
-      setCombinedList(newCombined);
+            lastInteraction: new Date(0) // Put these at the end
+          }))
+      ];
+      
+      // Sort combined list by last interaction date
+      const sortedCombined = [...newCombined].sort(
+        (a, b) => (b.lastInteraction?.getTime() || 0) - (a.lastInteraction?.getTime() || 0)
+      );
+      
+      console.log(`Final combined list has ${sortedCombined.length} items`);
+      setCombinedList(sortedCombined);
     };
-
+    
     combineLists();
   }, [conversations, mutualFollowers, session?.user?.id]);
 
+  // Auto-refresh conversations list periodically to ensure it stays updated
   useEffect(() => {
     if (!session?.user?.id) return;
-
-    const eventSource = new EventSource(`/api/messages/global-sse?t=${Date.now()}`);
     
-    let lastMessageTimestamp = Date.now();
-
-    eventSource.onopen = () => {
-      console.log('Global SSE connected successfully');
-    };
-
-    eventSource.onmessage = (event) => {
+    const fetchConversations = async () => {
       try {
-        if (event.data.startsWith(':')) return;
-        
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'connected') {
-          console.log('Connected to global SSE');
-          return;
-        }
-        
-        const { conversationId, message } = data;
-        console.log('Received global update:', message);
-        
-        const messageTime = new Date(message.createdAt).getTime();
-        if (messageTime <= lastMessageTimestamp) {
-          console.log('Ignoring older message');
-          return;
-        }
-        
-        lastMessageTimestamp = messageTime;
-
-        setConversations(prev => {
-          const updatedConvs = prev.map(conv => {
-            if (conv.id === conversationId) {
-              return {
-                ...conv,
-                lastMessage: message,
-                unreadCount: (conv.unreadCount || 0) +
-                  (message.receiverId === session?.user?.id && !message.read ? 1 : 0),
-                updatedAt: new Date().toISOString()
-              };
-            }
-            return conv;
-          });
+        const res = await fetch('/api/messages/conversations');
+        if (res.ok) {
+          const data = await res.json();
+          console.log(`Refreshed ${data.length} conversations`);
           
-          const foundConv = updatedConvs.some(c => c.id === conversationId);
-          if (!foundConv && (message.senderId === session?.user?.id || message.receiverId === session?.user?.id)) {
-            fetch(`/api/messages/conversations/${conversationId}`)
-              .then(res => res.json())
-              .then(newConv => {
-                setConversations(current => [newConv, ...current]);
-              })
-              .catch(err => console.error('Error fetching new conversation:', err));
+          // Only update if we have conversations and they're different
+          if (Array.isArray(data) && data.length > 0) {
+            setConversations(prev => {
+              // Check if the conversations are different
+              if (JSON.stringify(data) !== JSON.stringify(prev)) {
+                return data;
+              }
+              return prev;
+            });
           }
-          
-          return updatedConvs;
-        });
+        }
       } catch (error) {
-        console.error("Error procesando evento SSE:", error);
+        console.error('Error refreshing conversations:', error);
       }
     };
-
-    eventSource.onerror = (error) => {
-      console.error("Global SSE error:", error);
-      eventSource.close();
-      setTimeout(() => {
-        if (session?.user?.id) {
-          const newEventSource = new EventSource(`/api/messages/global-sse?t=${Date.now()}`);
-        }
-      }, 500);
-    };
-
-    return () => eventSource.close();
+    
+    // Fetch immediately
+    fetchConversations();
+    
+    // Then set up interval for periodic refresh
+    const intervalId = setInterval(fetchConversations, 30000); // Every 30 seconds
+    
+    return () => clearInterval(intervalId);
   }, [session?.user?.id]);
+
+  // Función para cargar conversaciones optimizada con caché
+  const fetchLatestConversations = useCallback(async () => {
+    if (status !== "authenticated") return;
+    
+    try {
+      const url = `/api/messages/conversations?page=1&limit=${CONVERSATIONS_PER_PAGE}&t=${Date.now()}`;
+      console.log(`Fetching latest conversations from ${url}`);
+      
+      const convRes = await fetch(url);
+      const conversations = await processConvResponse(convRes);
+      
+      // Usar flushSync para actualizar inmediatamente
+      flushSync(() => {
+        setConversations((prev) => {
+          // Detectar si hay cambios para evitar rerenders innecesarios
+          if (conversations.length === 0 && prev.length === 0) return prev;
+          
+          return mergeAndSort(prev, conversations);
+        });
+      });
+      
+      // Actualización del estado de carga
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+      setLoading(false);
+    }
+  }, [status, processConvResponse, mergeAndSort, CONVERSATIONS_PER_PAGE]);
+
+  // Estado para seguimiento de la conexión de Socket.io
+  const [socketStatus, setSocketStatus] = useState<'connecting' | 'connected' | 'error' | 'disconnected'>('disconnected');
+
+  // Conexión a Socket.io para mensajes globales
+  const {
+    connected,
+    error: socketError,
+    onlineUsers
+  } = useSocket({
+    userId: session?.user?.id || '',
+    username: session?.user?.name || session?.user?.username || 'Usuario',
+    onNewMessage: (message: MessageType) => {
+      if (!message.conversationId) return;
+      
+      // Actualizar conversaciones usando updater function
+      setConversations(prev => {
+        // Performance optimization: utilizar Map para búsqueda rápida
+        const conversationMap = new Map(prev.map(c => [c.id, c]));
+        
+        // Si la conversación ya existe, actualizar
+        if (message.conversationId && conversationMap.has(message.conversationId)) {
+          // Clone existing conversations
+          const currentConv = conversationMap.get(message.conversationId);
+          
+          // Actualizar lastMessage solo si el mensaje es más reciente
+          if (
+            !currentConv?.lastMessage ||
+            new Date(message.createdAt as string) > new Date(currentConv.lastMessage.createdAt)
+          ) {
+            // Actualizar la conversación existente
+            conversationMap.set(message.conversationId, {
+              ...currentConv!,
+              lastMessage: {
+                id: message.id || '',
+                content: message.content,
+                senderId: message.senderId,
+                receiverId: message.receiverId || '',
+                createdAt: typeof message.createdAt === 'string' ? message.createdAt : message.createdAt.toISOString(),
+                read: message.read || false,
+                tempId: message.tempId
+              },
+              updatedAt: typeof message.createdAt === 'string' ? message.createdAt : message.createdAt.toISOString(),
+              unreadCount: message.senderId !== session?.user?.id 
+                ? (currentConv!.unreadCount || 0) + 1 
+                : currentConv!.unreadCount || 0
+            });
+          }
+          
+          // Convertir el Map de nuevo a array y ordenar por updatedAt
+          return Array.from(conversationMap.values())
+            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        }
+        
+        // Si es una nueva conversación, la añadiremos cuando se recargue la lista
+        return prev;
+      });
+
+      // Actualizar contador de mensajes no leídos
+      if (message.senderId !== session?.user?.id) {
+        _updateUnreadCount();
+      }
+    },
+    onConnect: () => {
+      console.log('Socket.io conectado exitosamente');
+      setSocketStatus('connected');
+    },
+    onDisconnect: () => {
+      console.log('Socket.io desconectado');
+      setSocketStatus('disconnected');
+    },
+    onError: (error: any) => {
+      console.error('Error de conexión Socket.io:', error);
+      setSocketStatus('error');
+    }
+  });
 
   useEffect(() => {
     const handleResize = () => setMobileView(window.innerWidth < 768);
@@ -271,9 +417,10 @@ export default function MessagesPage() {
     if (status === "authenticated") {
       const conversationIdParam = searchParams.get("conversationWith");
       if (conversationIdParam) {
+        // Add null checks to prevent accessing properties of undefined
         const targetConv = conversations.find(conv =>
-          conv.senderId === conversationIdParam ||
-          conv.receiverId === conversationIdParam
+          (conv?.otherUser?.id === conversationIdParam) ||
+          (conv?.senderId === conversationIdParam)
         );
         if (targetConv) {
           setSelectedConversation(targetConv.id);
@@ -282,39 +429,106 @@ export default function MessagesPage() {
     }
   }, [status, router, searchParams, conversations]);
 
+  const filteredCombinedList = useMemo(() => {
+    return combinedList.filter((item) => {
+      // Mantener logs para depuración
+      if (item.isConversation) {
+        const conv = item.data as Conversation;
+        const username = conv.otherUser?.username?.toLowerCase() || "";
+        const searchTerm = generalSearchTerm.toLowerCase();
+        return searchTerm.trim() === "" || username.includes(searchTerm);
+      } else {
+        const user = item.data as User;
+        const username = user.username?.toLowerCase() || "";
+        const searchTerm = generalSearchTerm.toLowerCase();
+        return searchTerm.trim() === "" || username.includes(searchTerm);
+      }
+    });
+  }, [combinedList, generalSearchTerm]);
+
+  useEffect(() => {
+    console.log(`Filtered combinedList has ${filteredCombinedList.length} items (search: "${generalSearchTerm}")`);
+  }, [filteredCombinedList.length, generalSearchTerm]);
+
   const startNewConversation = async (userId: string) => {
     try {
-      setMutualFollowers(prev => prev.filter(user => user.id !== userId));
+      if (!userId || !session?.user?.id) {
+        console.error("Missing user ID or session");
+        return;
+      }
+      
+      setMutualFollowers(prev => prev.filter(user => user?.id !== userId));
       const res = await fetch("/api/messages/conversations/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
 
-      if (!res.ok) throw new Error("Error al crear conversación");
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error("Error creating conversation:", errorData);
+        throw new Error("Error al crear conversación");
+      }
+      
       const { conversation: newConversation } = await res.json();
+      
+      // Verify that we received a valid conversation object
+      if (!newConversation || typeof newConversation !== 'object' || !newConversation.id) {
+        console.error("Received invalid conversation object", newConversation);
+        return;
+      }
 
-      setConversations(prev => [
-        { ...newConversation, lastMessage: null, unreadCount: 0 },
-        ...prev,
-      ]);
+      console.log("New conversation created:", newConversation);
 
+      // Add the new conversation to the top of the list
+      setConversations(prev => {
+        // Check if conversation already exists to avoid duplicates
+        const existingConvIndex = prev.findIndex(c => 
+          c.id === newConversation.id || 
+          (c.otherUser?.id === newConversation.otherUser?.id)
+        );
+        
+        if (existingConvIndex >= 0) {
+          // Just update the existing conversation
+          const updatedConversations = [...prev];
+          updatedConversations[existingConvIndex] = {
+            ...newConversation,
+            lastMessage: newConversation.lastMessage || null,
+            unreadCount: 0
+          };
+          return updatedConversations;
+        } else {
+          // Add as a new conversation
+          return [
+            { 
+              ...newConversation, 
+              lastMessage: newConversation.lastMessage || null, 
+              unreadCount: 0 
+            },
+            ...prev,
+          ];
+        }
+      });
+
+      // Update the URL and selected conversation
       router.push(`/messages?conversationWith=${userId}`);
       setSelectedConversation(newConversation.id);
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error creating conversation:", error);
     }
   };
 
   const handleConversationSelect = (conversationId: string) => {
-    const conversation = conversations.find((c) => c.id === conversationId);
+    const conversation = conversations.find((c) => c?.id === conversationId);
     if (conversation) {
       const otherUserId =
         conversation.senderId === session?.user?.id
           ? conversation.receiverId
           : conversation.senderId;
-      router.push(`/messages?conversationWith=${otherUserId}`);
-      setSelectedConversation(conversationId);
+      if (otherUserId) {
+        router.push(`/messages?conversationWith=${otherUserId}`);
+        setSelectedConversation(conversationId);
+      }
     }
   };
 
@@ -331,31 +545,43 @@ export default function MessagesPage() {
     );
   }
 
-  const filteredCombinedList = combinedList.filter((item) => {
-    const searchLower = generalSearchTerm.toLowerCase();
-    if (item.isConversation) {
-      const conv = item.data as Conversation;
-      const otherUser =
-        conv.senderId === session?.user?.id ? conv.receiver : conv.sender;
-      return otherUser?.username?.toLowerCase().includes(searchLower);
-    }
-    const user = item.data as User;
-    return user?.username?.toLowerCase().includes(searchLower);
-  });
-
   const selectedConversationData = conversations.find(
     (conv) => conv.id === selectedConversation
   );
   const otherUser = selectedConversationData
-    ? selectedConversationData.senderId === session?.user?.id
-      ? selectedConversationData.receiver
-      : selectedConversationData.sender
+    ? selectedConversationData.otherUser
     : null;
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       {(!mobileView || !selectedConversation) && (
         <div className="w-full md:w-96 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <h1 className="text-xl font-semibold">Mensajes</h1>
+            
+            {/* Indicador de estado de conexión */}
+            <div className="flex items-center text-xs">
+              {socketStatus === 'connected' ? (
+                <span className="text-green-500 flex items-center" title="Conexión establecida">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                  Conectado
+                </span>
+              ) : socketStatus === 'connecting' ? (
+                <span className="text-amber-500 flex items-center" title="Estableciendo conexión...">
+                  <span className="w-2 h-2 bg-amber-500 rounded-full mr-1 animate-pulse"></span>
+                  Conectando...
+                </span>
+              ) : (
+                <span className="text-red-500 flex items-center cursor-pointer" 
+                      title="Error de conexión. Haz clic para reconectar"
+                      onClick={() => window.location.reload()}>
+                  <span className="w-2 h-2 bg-red-500 rounded-full mr-1"></span>
+                  Reconectar
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -369,172 +595,170 @@ export default function MessagesPage() {
           </div>
 
           <div className="overflow-y-auto h-[calc(100vh-160px)] px-2 pb-4">
-            {filteredCombinedList.map((item) => {
-              if (item.isConversation) {
-                const conversation = item.data as Conversation;
-                const currentOtherUser =
-                  conversation.senderId === session?.user?.id
-                    ? conversation.receiver
-                    : conversation.sender;
-
-                return (
-                  <div
-                    key={`conv-${conversation.id}`}
-                    className={`group flex items-center p-3 gap-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer rounded-xl m-2 ${
-                      selectedConversation === conversation.id
-                        ? "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 shadow-sm"
-                        : ""
-                    }`}
-                    onClick={() => handleConversationSelect(conversation.id)}
-                  >
-                    <Avatar className="h-14 w-14 border-2 border-blue-200 dark:border-blue-800 group-hover:border-blue-500">
-                      {currentOtherUser?.image && currentOtherUser.image.includes("cloudinary") ? (
-                        <CldImage
-                          src={currentOtherUser.image}
-                          alt={currentOtherUser?.username || "Usuario"}
-                          width={56}
-                          height={56}
-                          crop="fill"
-                          gravity="face"
-                          className="rounded-full object-cover"
-                          priority
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = "/images/AvatarPredeterminado.webp";
-                          }}
-                        />
-                      ) : currentOtherUser?.image &&
-                        !currentOtherUser.image.startsWith("/") &&
-                        !currentOtherUser.image.startsWith("http") ? (
-                        <CldImage
-                          src={currentOtherUser.image}
-                          alt={currentOtherUser?.username || "Usuario"}
-                          width={56}
-                          height={56}
-                          crop="fill"
-                          gravity="face"
-                          className="rounded-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = "/images/AvatarPredeterminado.webp";
-                          }}
-                        />
-                      ) : (
-                        <Image
-                          src={currentOtherUser?.image || "/images/AvatarPredeterminado.webp"}
-                          alt={currentOtherUser?.username || "Usuario"}
-                          width={56}
-                          height={56}
-                          className="rounded-full object-cover"
-                          priority
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = "/images/AvatarPredeterminado.webp";
-                          }}
-                        />
-                      )}
-                    </Avatar>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center mb-1 gap-2">
-                        <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate">
-                          {currentOtherUser?.username || "Usuario desconocido"}
-                        </h3>
-                        {conversation.lastMessage && (
-                          <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                            {new Date(conversation.lastMessage.createdAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex justify-between items-center">
-                        {conversation.lastMessage ? (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                            {conversation.lastMessage.content}
-                          </p>
+            {loading ? (
+              <div className="flex justify-center items-center h-32">
+                <LoadingSpinner />
+              </div>
+            ) : filteredCombinedList.length === 0 ? (
+              <div className="text-center py-10 text-gray-500 dark:text-gray-400">
+                <MessageCircle className="h-12 w-12 mx-auto text-blue-500 dark:text-blue-400 mb-4" />
+                <p>No hay conversaciones disponibles</p>
+                <p className="text-sm mt-2">
+                  {generalSearchTerm ? (
+                    <>
+                      No se encontraron resultados para "{generalSearchTerm}"
+                      <button
+                        className="ml-2 text-blue-500 hover:underline"
+                        onClick={() => setGeneralSearchTerm("")}
+                      >
+                        Mostrar todos
+                      </button>
+                    </>
+                  ) : (
+                    "Sigue a otros usuarios para poder empezar a chatear"
+                  )}
+                </p>
+              </div>
+            ) : (
+              filteredCombinedList.map((item) => {
+                if (item.isConversation) {
+                  const conversation = item.data as Conversation;
+                  if (!conversation?.otherUser) {
+                    console.error('Conversation missing otherUser:', conversation);
+                    return null;
+                  }
+                  
+                  const currentOtherUser = conversation.otherUser;
+                  return (
+                    <div
+                      key={`conv-${conversation.id}`}
+                      className={`group flex items-center p-3 gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer rounded-xl m-2 ${
+                        selectedConversation === conversation.id
+                          ? "bg-blue-50 dark:bg-blue-900/20 shadow-sm"
+                          : ""}`}
+                      onClick={() => handleConversationSelect(conversation.id)}
+                    >
+                      <Avatar className="h-14 w-14 border-2 border-blue-200 dark:border-blue-800 group-hover:border-blue-500">
+                        {currentOtherUser?.image && currentOtherUser.image.includes("cloudinary") ? (
+                          <CldImage
+                            src={currentOtherUser.image}
+                            alt={currentOtherUser?.username || "Usuario"}
+                            width={56}
+                            height={56}
+                            crop="fill"
+                            gravity="face"
+                            className="rounded-full object-cover"
+                            priority
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = "/images/AvatarPredeterminado.webp";
+                            }}
+                          />
+                        ) : currentOtherUser?.image &&
+                          !currentOtherUser.image.startsWith("/") &&
+                          !currentOtherUser.image.startsWith("http") ? (
+                          <CldImage
+                            src={currentOtherUser.image}
+                            alt={currentOtherUser?.username || "Usuario"}
+                            width={56}
+                            height={56}
+                            crop="fill"
+                            gravity="face"
+                            className="rounded-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = "/images/AvatarPredeterminado.webp";
+                            }}
+                          />
                         ) : (
-                          <p className="text-sm text-blue-500 italic">
-                            Nuevo chat
+                          <Image
+                            src={currentOtherUser?.image || "/images/AvatarPredeterminado.webp"}
+                            alt={currentOtherUser?.username || "Usuario"}
+                            width={56}
+                            height={56}
+                            className="rounded-full object-cover"
+                            priority
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = "/images/AvatarPredeterminado.webp";
+                            }}
+                          />
+                        )}
+                      </Avatar>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-center mb-1 gap-2">
+                          <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate">
+                            {currentOtherUser?.username || "Usuario desconocido"}
+                          </h3>
+                          {conversation.lastMessage && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                              {new Date(conversation.lastMessage.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                            {conversation.lastMessage
+                              ? conversation.lastMessage.content
+                              : "Comienza una conversación..."}
                           </p>
-                        )}
-                        {(conversation.unreadCount ?? 0) > 0 && (
-                          <span className="bg-red-500 text-white rounded-full px-2 py-1 text-xs min-w-[24px] flex justify-center items-center">
-                            {conversation.unreadCount}
-                          </span>
-                        )}
+                          {(conversation.unreadCount ?? 0) > 0 && (
+                            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs text-white">
+                              {conversation.unreadCount}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              } else {
-                const user = item.data as User;
-                return (
-                  <div
-                    key={`mutual-${user.id}`}
-                    className="group flex items-center p-3 gap-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer rounded-xl m-2"
-                    onClick={() => startNewConversation(user.id)}
-                  >
-                    <Avatar className="h-14 w-14 border-2 border-blue-200 dark:border-blue-800">
-                      {user?.image && user.image.includes("cloudinary") ? (
-                        <CldImage
-                          src={user.image}
-                          alt={user?.username || "Usuario"}
-                          width={56}
-                          height={56}
-                          crop="fill"
-                          gravity="face"
-                          className="rounded-full object-cover"
-                          priority
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = "/images/AvatarPredeterminado.webp";
-                          }}
-                        />
-                      ) : user?.image &&
-                        !user.image.startsWith("/") &&
-                        !user.image.startsWith("http") ? (
-                        <CldImage
-                          src={user.image}
-                          alt={user?.username || "Usuario"}
-                          width={56}
-                          height={56}
-                          crop="fill"
-                          gravity="face"
-                          className="rounded-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = "/images/AvatarPredeterminado.webp";
-                          }}
-                        />
-                      ) : (
-                        <Image
-                          src={user?.image || "/images/AvatarPredeterminado.webp"}
-                          alt={user?.username || "Usuario"}
-                          width={56}
-                          height={56}
-                          className="rounded-full object-cover"
-                          priority
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = "/images/AvatarPredeterminado.webp";
-                          }}
-                        />
-                      )}
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-800 dark:text-gray-200">
-                        {user.username || "Usuario sin nombre"}
-                      </h3>
-                      <p className="text-sm text-blue-500 italic">
-                        Nuevo chat disponible
-                      </p>
+                  );
+                } else {
+                  const user = item.data as User;
+                  return (
+                    <div
+                      key={`user-${user.id}`}
+                      className="group flex items-center gap-3 p-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer rounded-xl m-2"
+                      onClick={() => startNewConversation(user.id)}
+                    >
+                      <Avatar className="h-14 w-14 border-2 border-gray-200 dark:border-gray-700 group-hover:border-green-500">
+                        {/* Avatar rendering... */}
+                        {user?.image ? (
+                          <Image
+                            src={user.image}
+                            alt={user?.username || "Usuario"}
+                            width={56}
+                            height={56}
+                            className="rounded-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = "/images/AvatarPredeterminado.webp";
+                            }}
+                          />
+                        ) : (
+                          <div className="h-full w-full bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center text-xl font-semibold text-gray-600 dark:text-gray-300">
+                            {user?.username?.[0] || "U"}
+                          </div>
+                        )}
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-center gap-2">
+                          <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate">
+                            {user?.username || "Usuario desconocido"}
+                          </h3>
+                        </div>
+                        <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          Iniciar conversación
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                );
-              }
-            })}
+                  );
+                }
+              })
+            )}
           </div>
         </div>
       )}
@@ -543,11 +767,10 @@ export default function MessagesPage() {
         {selectedConversation && otherUser ? (
           <ChatWindow
             otherUser={otherUser}
-            currentUserId={session?.user?.id || ""}
-            onMessageSent={() => setConversations((prev) => [...prev])}
+            initialMessages={[]} // Se cargarán mediante WebSocket
+            conversationId={selectedConversation}
             isOpen={true}
             onClose={handleBackToList}
-            isMobile={mobileView}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800">
