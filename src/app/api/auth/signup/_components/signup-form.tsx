@@ -113,7 +113,6 @@ export default function SignupForm() {
     });
   }, []);
 
-
   const onSubmit = useCallback(async (values: z.infer<typeof ExtendedSignUpSchema>) => {
     setError(null);
     setUploadProgress(0);
@@ -142,7 +141,13 @@ export default function SignupForm() {
           } else {
             await update(); // Actualiza la sesión
             router.refresh(); // Fuerza recarga de datos del lado del cliente
-            router.push("/home");
+            
+            // Redirect based on whether email verification is required
+            if (response.requiresVerification) {
+              router.push("/auth/verification-pending");
+            } else {
+              router.push("/home");
+            }
           }
         } catch (err) {
           setError(err instanceof Error ? err.message : "Error en el registro");

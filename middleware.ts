@@ -25,7 +25,12 @@ const publicRoutes = new Set([
   "/api/auth/signup",      // Página de registro en la ruta actual
   "/acceso-denegado",      // Página de acceso denegado
   "/api/auth/(.*)",        // Rutas de autenticación (callbacks, etc.)
-  "/api/public/(.*)"       // APIs públicas
+  "/api/public/(.*)",      // APIs públicas
+  "/auth/verify-email",    // Página de verificación de correo
+  "/auth/verify-success",  // Página de éxito de verificación
+  "/auth/verify-error",    // Página de error de verificación
+  "/auth/verification-pending",  // Página de verificación pendiente
+  "/auth/resend-verification"    // Página para reenviar verificación
 ]);
 
 const adminRoutes = new Set([

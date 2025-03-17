@@ -26,10 +26,67 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Contraseña", type: "password" }
+        password: { label: "Contraseña", type: "password" },
+        autoVerified: { label: "Auto Verified", type: "text" }
       },
       authorize: async (credentials) => {
         try {
+          // Verificar si es un inicio de sesión automático después de la verificación
+          if (credentials?.autoVerified === "true" && credentials?.email) {
+            const email = credentials.email as string;
+            console.log("Auto-verification login attempt for:", email);
+            
+            // Buscar el usuario por email sin validar contraseña
+            const verifiedUser = await prisma.user.findUnique({
+              where: { email: email.toLowerCase() },
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                bio: true,
+                role: true,
+                username: true,
+                image: true,
+                createdAt: true,
+                emailVerified: true,
+                favoriteSources: { select: { sourceId: true } }
+              }
+            });
+            
+            // Verificar que el usuario existe y tiene email verificado
+            if (verifiedUser && verifiedUser.emailVerified) {
+              console.log("Auto-verification login successful");
+              
+              // Generar accessToken
+              const accessToken = jwt.sign(
+                { 
+                  userId: verifiedUser.id,
+                  role: verifiedUser.role,
+                  username: verifiedUser.username
+                },
+                process.env.AUTH_SECRET!,
+                { expiresIn: '1h' }
+              );
+              
+              return {
+                id: verifiedUser.id,
+                email: verifiedUser.email,
+                name: verifiedUser.name,
+                role: verifiedUser.role,
+                username: verifiedUser.username,
+                image: verifiedUser.image,
+                createdAt: verifiedUser.createdAt,
+                emailVerified: verifiedUser.emailVerified,
+                favoriteSourceIds: verifiedUser.favoriteSources.map(fs => fs.sourceId),
+                accessToken
+              };
+            } else {
+              console.error("Auto-verification login failed: user not found or not verified");
+              return null;
+            }
+          }
+          
+          // Flujo de inicio de sesión normal
           const parsed = loginSchema.safeParse(credentials);
           if (!parsed.success) throw new Error("Datos inválidos");
 

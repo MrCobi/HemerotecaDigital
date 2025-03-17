@@ -1,5 +1,4 @@
 import React from 'react';
-import { Button } from '@/src/app/components/ui/button';
 import Link from 'next/link';
 
 export default function VerificationErrorPage() {
@@ -31,13 +30,17 @@ export default function VerificationErrorPage() {
           </p>
           
           <div className="flex flex-col w-full space-y-3 mt-4">
-            <Button asChild className="w-full">
-              <Link href="/auth/resend-verification">Reenviar enlace de verificación</Link>
-            </Button>
+            <Link href="/auth/resend-verification">
+              <button className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Reenviar enlace de verificación
+              </button>
+            </Link>
             
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/login">Volver al inicio de sesión</Link>
-            </Button>
+            <Link href="/login">
+              <button className="w-full py-2 px-4 border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 font-medium rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Volver al inicio de sesión
+              </button>
+            </Link>
           </div>
         </div>
       </div>
