@@ -493,7 +493,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       console.log(`${historicalMessages.length} mensajes históricos cargados`);
       
       // Convertir los mensajes al formato adecuado y ordenarlos por fecha
-      const formattedMessages = historicalMessages.map((msg: any) => ({
+      const formattedMessages = historicalMessages.map((msg: {
+        id: string;
+        content: string;
+        senderId: string;
+        receiverId: string;
+        createdAt: string;
+        read?: boolean;
+      }) => ({
         id: msg.id,
         content: msg.content,
         senderId: msg.senderId,
@@ -552,6 +559,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   // Limpiar estados al cerrar la ventana de chat
   const handleClose = () => {
+    // Prevenir cierres inesperados cuando estamos enviando mensajes
+    if (isSending) {
+      console.log('Evitando cierre mientras se envía un mensaje');
+      return;
+    }
+    
     setIsSending(false);
     setPeerIsTyping(false);
     setShowEmojiPicker(false);
@@ -561,7 +574,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      // Solo permitir cerrar si es un evento real del usuario
+      // Si la ventana está abierta y se está intentando cerrar, llamar a handleClose
+      if (isOpen && !open) {
+        handleClose();
+      }
+    }}>
       <DialogContent className="sm:max-w-md md:max-w-2xl max-h-[90vh] p-0 gap-0 overflow-hidden">
         <DialogHeader className="border-b dark:border-gray-700 p-4 py-2">
           <div className="flex justify-between items-center">

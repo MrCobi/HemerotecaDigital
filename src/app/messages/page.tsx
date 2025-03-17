@@ -270,19 +270,40 @@ export default function MessagesPage() {
     
     const fetchConversations = async () => {
       try {
-        const res = await fetch('/api/messages/conversations');
+        const res = await fetch(`/api/messages/conversations?t=${Date.now()}`);
         if (res.ok) {
-          const data = await res.json();
-          console.log(`Refreshed ${data.length} conversations`);
+          const newConversations = await processConvResponse(res);
           
-          // Only update if we have conversations and they're different
-          if (Array.isArray(data) && data.length > 0) {
+          // Solo actualizar si tenemos conversaciones válidas
+          if (Array.isArray(newConversations) && newConversations.length > 0) {
             setConversations(prev => {
-              // Check if the conversations are different
-              if (JSON.stringify(data) !== JSON.stringify(prev)) {
-                return data;
-              }
-              return prev;
+              // Combinar y preservar las conversaciones existentes
+              const existingMap = new Map(prev.map(c => [c.id, c]));
+              
+              // Actualizar conversaciones existentes con nueva información
+              newConversations.forEach(conv => {
+                if (existingMap.has(conv.id)) {
+                  // Preservar mensajes no leídos si no cambiaron
+                  const existing = existingMap.get(conv.id)!;
+                  existingMap.set(conv.id, {
+                    ...conv,
+                    // Mantener count más alto para evitar que se pierdan mensajes no leídos
+                    unreadCount: Math.max(conv.unreadCount || 0, existing.unreadCount || 0)
+                  });
+                } else {
+                  // Agregar nueva conversación
+                  existingMap.set(conv.id, conv);
+                }
+              });
+              
+              // Convertir mapa a array y ordenar por última actualización
+              const result = Array.from(existingMap.values()).sort((a, b) => 
+                new Date(b.updatedAt || Date.now()).getTime() - 
+                new Date(a.updatedAt || Date.now()).getTime()
+              );
+              
+              console.log(`Actualizadas ${result.length} conversaciones (${newConversations.length} recibidas)`);
+              return result;
             });
           }
         }
@@ -294,40 +315,11 @@ export default function MessagesPage() {
     // Fetch immediately
     fetchConversations();
     
-    // Then set up interval for periodic refresh
-    const intervalId = setInterval(fetchConversations, 30000); // Every 30 seconds
+    // Then set up interval for periodic refresh - más frecuente
+    const intervalId = setInterval(fetchConversations, 15000); // Cada 15 segundos
     
     return () => clearInterval(intervalId);
-  }, [session?.user?.id]);
-
-  // Función para cargar conversaciones optimizada con caché
-  const fetchLatestConversations = useCallback(async () => {
-    if (status !== "authenticated") return;
-    
-    try {
-      const url = `/api/messages/conversations?page=1&limit=${CONVERSATIONS_PER_PAGE}&t=${Date.now()}`;
-      console.log(`Fetching latest conversations from ${url}`);
-      
-      const convRes = await fetch(url);
-      const conversations = await processConvResponse(convRes);
-      
-      // Usar flushSync para actualizar inmediatamente
-      flushSync(() => {
-        setConversations((prev) => {
-          // Detectar si hay cambios para evitar rerenders innecesarios
-          if (conversations.length === 0 && prev.length === 0) return prev;
-          
-          return mergeAndSort(prev, conversations);
-        });
-      });
-      
-      // Actualización del estado de carga
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching conversations:", error);
-      setLoading(false);
-    }
-  }, [status, processConvResponse, mergeAndSort, CONVERSATIONS_PER_PAGE]);
+  }, [session?.user?.id, processConvResponse]);
 
   // Estado para seguimiento de la conexión de Socket.io
   const [socketStatus, setSocketStatus] = useState<'connecting' | 'connected' | 'error' | 'disconnected'>('disconnected');
@@ -341,17 +333,28 @@ export default function MessagesPage() {
     userId: session?.user?.id || '',
     username: session?.user?.name || session?.user?.username || 'Usuario',
     onNewMessage: (message: MessageType) => {
-      if (!message.conversationId) return;
+      if (!message.senderId || !message.content) return;
+      
+      // Siempre actualizar el contador de mensajes no leídos cuando recibimos un mensaje nuevo
+      if (message.senderId !== session?.user?.id) {
+        _updateUnreadCount();
+      }
       
       // Actualizar conversaciones usando updater function
       setConversations(prev => {
         // Performance optimization: utilizar Map para búsqueda rápida
         const conversationMap = new Map(prev.map(c => [c.id, c]));
         
-        // Si la conversación ya existe, actualizar
-        if (message.conversationId && conversationMap.has(message.conversationId)) {
-          // Clone existing conversations
-          const currentConv = conversationMap.get(message.conversationId);
+        // Determinar a qué conversación pertenece este mensaje
+        const conversationId = message.conversationId || 
+          prev.find(c => 
+            (c.senderId === message.senderId && c.receiverId === message.receiverId) || 
+            (c.senderId === message.receiverId && c.receiverId === message.senderId)
+          )?.id;
+        
+        if (conversationId && conversationMap.has(conversationId)) {
+          // Actualizar conversación existente
+          const currentConv = conversationMap.get(conversationId);
           
           // Actualizar lastMessage solo si el mensaje es más reciente
           if (
@@ -359,7 +362,7 @@ export default function MessagesPage() {
             new Date(message.createdAt as string) > new Date(currentConv.lastMessage.createdAt)
           ) {
             // Actualizar la conversación existente
-            conversationMap.set(message.conversationId, {
+            conversationMap.set(conversationId, {
               ...currentConv!,
               lastMessage: {
                 id: message.id || '',

@@ -25,9 +25,18 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
     if (status !== "authenticated" || !session?.user) return;
 
     try {
-      const res = await fetch('/api/messages/unread/count');
+      // Agregar parámetro de tiempo para evitar caché
+      const res = await fetch(`/api/messages/unread/count?t=${Date.now()}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      
       if (res.ok) {
         const data = await res.json();
+        console.log(`Contador de mensajes no leídos actualizado: ${data.count}`);
         setUnreadCount(data.count);
       }
     } catch (error) {
@@ -40,8 +49,8 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
     if (status === "authenticated" && session?.user) {
       updateUnreadCount();
       
-      // Configurar un intervalo para actualizar periódicamente
-      const interval = setInterval(updateUnreadCount, 30000); // cada 30 segundos
+      // Configurar un intervalo para actualizar más frecuentemente
+      const interval = setInterval(updateUnreadCount, 15000); // cada 15 segundos
       
       return () => clearInterval(interval);
     }
