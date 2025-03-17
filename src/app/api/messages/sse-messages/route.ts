@@ -8,7 +8,7 @@ const messageQueues = new Map<string, any[]>();
 // Store connected clients
 const connectedClients = new Map<string, Set<{
   id: string;
-  controller: ReadableStreamController<Uint8Array>;
+  writer: WritableStreamDefaultWriter<Uint8Array>;
 }>>();
 
 // Send messages to user
@@ -26,9 +26,13 @@ export const messageEvents = {
     const userClients = connectedClients.get(targetUserId);
     if (userClients) {
       const encoder = new TextEncoder();
+      const data = encoder.encode(`data: ${JSON.stringify(message)}\n\n`);
+      
       for (const client of userClients) {
         try {
-          client.controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`));
+          client.writer.write(data).catch(err => {
+            console.error(`Failed to write to client ${client.id}:`, err);
+          });
         } catch (err) {
           console.error(`Failed to send message to client ${client.id}:`, err);
         }
@@ -61,8 +65,7 @@ export async function GET(req: NextRequest) {
       connectedClients.set(userId, new Set());
     }
     
-    const controller = writer as unknown as ReadableStreamController<Uint8Array>;
-    const clientConnection = { id: clientId, controller };
+    const clientConnection = { id: clientId, writer };
     connectedClients.get(userId)!.add(clientConnection);
     
     // Send any queued messages
