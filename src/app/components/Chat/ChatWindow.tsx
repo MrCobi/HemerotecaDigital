@@ -64,6 +64,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   
+  // Estado para controlar la carga de mensajes
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  
   // Socket.io integration
   const {
     connected,
@@ -457,6 +462,78 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     });
   };
 
+  // Cargar mensajes históricos cuando se abre la conversación
+  useEffect(() => {
+    if (isOpen && otherUser?.id && currentUserId && !messagesLoaded) {
+      loadHistoricalMessages();
+    }
+  }, [isOpen, otherUser?.id, currentUserId, messagesLoaded]);
+  
+  // Función para cargar mensajes históricos de la conversación
+  const loadHistoricalMessages = async () => {
+    if (!otherUser?.id || !currentUserId || isLoadingMessages || messagesLoaded) return;
+    
+    setIsLoadingMessages(true);
+    console.log(`Cargando mensajes históricos de la conversación entre ${currentUserId} y ${otherUser.id}`);
+    
+    try {
+      const response = await fetch(`/api/messages?userId=${otherUser.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error al cargar mensajes: ${response.status}`);
+      }
+      
+      const historicalMessages = await response.json();
+      console.log(`${historicalMessages.length} mensajes históricos cargados`);
+      
+      // Convertir los mensajes al formato adecuado y ordenarlos por fecha
+      const formattedMessages = historicalMessages.map((msg: any) => ({
+        id: msg.id,
+        content: msg.content,
+        senderId: msg.senderId,
+        receiverId: msg.receiverId,
+        createdAt: msg.createdAt,
+        status: msg.read ? 'read' : 'delivered'
+      }));
+      
+      // Usar una función de estado para asegurar que no perdemos mensajes recientes
+      setMessages(prevMessages => {
+        // Crear un mapa de los mensajes actuales por ID para evitar duplicados
+        const existingMsgMap = new Map(prevMessages.map(msg => [
+          msg.id || msg.tempId, 
+          msg
+        ]));
+        
+        // Añadir mensajes históricos si no existen en la lista actual
+        formattedMessages.forEach(msg => {
+          if (!existingMsgMap.has(msg.id)) {
+            existingMsgMap.set(msg.id, msg);
+          }
+        });
+        
+        // Convertir el mapa de vuelta a array y ordenar por fecha
+        const mergedMessages = Array.from(existingMsgMap.values());
+        return mergedMessages.sort((a, b) => {
+          const timeA = new Date(a.createdAt).getTime();
+          const timeB = new Date(b.createdAt).getTime();
+          return timeA - timeB;
+        });
+      });
+      
+      setMessagesLoaded(true);
+    } catch (error) {
+      console.error('Error al cargar mensajes históricos:', error);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
   // Debug: Mostrar el avance del tiempo cada segundo
   useEffect(() => {
     const interval = setInterval(() => {
@@ -473,8 +550,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     return () => clearInterval(interval);
   }, [otherUser?.id, currentUserId, messages.length, connected]);
 
+  // Limpiar estados al cerrar la ventana de chat
+  const handleClose = () => {
+    setIsSending(false);
+    setPeerIsTyping(false);
+    setShowEmojiPicker(false);
+    setNewMessage('');
+    setMessagesLoaded(false); // Resetear el estado de carga de mensajes
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={() => onClose()}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md md:max-w-2xl max-h-[90vh] p-0 gap-0 overflow-hidden">
         <DialogHeader className="border-b dark:border-gray-700 p-4 py-2">
           <div className="flex justify-between items-center">
@@ -517,7 +604,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
             {!isMobile && (
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 <X className="h-5 w-5 text-gray-500" />
