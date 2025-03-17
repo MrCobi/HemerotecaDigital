@@ -8,6 +8,9 @@ import { AuthError } from "next-auth";
 import prisma from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
+import { isProduction } from "@/lib/environment";
+import jwt from "jsonwebtoken";
+import { sendEmailVerification } from "@/lib/mail";
 
 // auth-action.tsx
 export const loginAction = async (values: z.infer<typeof loginSchema>) => {
@@ -65,6 +68,10 @@ export const registerAction = async (values: z.infer<typeof SignUpSchema>) => {
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
+    // En producción, creamos una cuenta no verificada
+    // En desarrollo, creamos una cuenta ya verificada para facilitar pruebas
+    const emailVerified = isProduction() ? null : new Date();
+
     const newUser = await prisma.user.create({
       data: {
         name: data.name,
@@ -72,6 +79,7 @@ export const registerAction = async (values: z.infer<typeof SignUpSchema>) => {
         email: data.email,
         password: hashedPassword,
         image: data.image || "/images/AvatarPredeterminado.webp",
+        emailVerified, // Null en producción, fecha actual en desarrollo
       },
       select: {
         id: true,
@@ -83,13 +91,46 @@ export const registerAction = async (values: z.infer<typeof SignUpSchema>) => {
       },
     });
 
-    await signIn("credentials", {
-      email: data.email,
-      password: data.password,
-      redirect: false,
-    });
+    // En producción, enviar correo de verificación
+    if (isProduction()) {
+      try {
+        // Generar token JWT para verificación de correo
+        const verificationToken = jwt.sign(
+          { userId: newUser.id, email: newUser.email },
+          process.env.AUTH_SECRET!,
+          { expiresIn: "24h" }
+        );
 
-    return { success: true };
+        // Enviar correo de verificación
+        await sendEmailVerification(newUser.email, verificationToken);
+        
+        return { 
+          success: true, 
+          requiresVerification: true,
+          message: "Se ha enviado un correo de verificación a tu dirección de email. Por favor, verifica tu cuenta para continuar."
+        };
+      } catch (emailError) {
+        console.error("Error al enviar email de verificación:", emailError);
+        // Continuar aunque falle el envío del correo, para no bloquear el registro
+      }
+    }
+
+    // En desarrollo, iniciar sesión automáticamente
+    if (!isProduction()) {
+      await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
+    }
+
+    return { 
+      success: true,
+      requiresVerification: isProduction(),
+      message: isProduction() 
+        ? "Se ha enviado un correo de verificación a tu dirección de email. Por favor, verifica tu cuenta para continuar."
+        : "Registro exitoso. ¡Bienvenido!"
+    };
   } catch (error) {
     // Manejo adicional de errores de Prisma
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -102,6 +143,7 @@ export const registerAction = async (values: z.infer<typeof SignUpSchema>) => {
       return { error: error.cause?.err?.message };
     }
 
+    console.error("Error en registro:", error);
     return { error: "Error interno del servidor" };
   }
 };

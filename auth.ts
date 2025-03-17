@@ -6,7 +6,8 @@ import type { Role } from "@prisma/client";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { loginSchema } from "@/lib/zod";
-import jwt from "jsonwebtoken"; // Añadir esta importación
+import jwt from "jsonwebtoken";
+import { isProduction } from "@/lib/environment";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma) as any,
@@ -44,6 +45,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               password: true,
               image: true,
               createdAt: true,
+              emailVerified: true,
               favoriteSources: { select: { sourceId: true } }
             }
           });
@@ -52,6 +54,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
           const isValid = await bcrypt.compare(parsed.data.password, user.password);
           if (!isValid) return null;
+
+          // Verificar si el correo está verificado en producción
+          if (isProduction() && !user.emailVerified) {
+            throw new Error("email_not_verified");
+          }
 
           // Generar accessToken
           const accessToken = jwt.sign(
@@ -72,10 +79,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             username: user.username,
             image: user.image,
             createdAt: user.createdAt,
+            emailVerified: user.emailVerified,
             favoriteSourceIds: user.favoriteSources.map(fs => fs.sourceId),
             accessToken // Añadir el token aquí
           };
         } catch (error) {
+          if (error instanceof Error && error.message === 'email_not_verified') {
+            throw new Error("email_not_verified");
+          }
           return null;
         }
       }
@@ -91,6 +102,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.email = user.email;
         token.image = user.image;
         token.createdAt = user.createdAt;
+        token.emailVerified = (user as any).emailVerified;
         token.favoriteSourceIds = (user as any).favoriteSourceIds;
         token.accessToken = (user as any).accessToken; // Añadir esta línea
       }
@@ -108,6 +120,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: token.email as string | null,
           image: token.image as string | null,
           createdAt: token.createdAt as Date,
+          emailVerified: token.emailVerified as Date | null,
           favoriteSourceIds: token.favoriteSourceIds as string[] | undefined
         },
         accessToken: token.accessToken as string // Añadir esta línea

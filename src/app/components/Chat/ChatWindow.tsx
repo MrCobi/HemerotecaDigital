@@ -14,8 +14,6 @@ import {
   MessageCircle,
   ChevronLeft,
 } from "lucide-react";
-import { inflateSync } from "zlib";
-import { Buffer } from 'buffer';
 
 interface User {
   id: string;

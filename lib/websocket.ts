@@ -91,7 +91,7 @@ wss.on('connection', async (ws: WebSocket, req: Request) => {
           // Intenta descomprimir primero
           const decompressed = inflateSync(data).toString();
           message = JSON.parse(decompressed);
-        } catch (error) {
+        } catch {
           // Si falla, intenta parsear directamente
           message = JSON.parse(data.toString());
         }
@@ -126,7 +126,7 @@ wss.on('connection', async (ws: WebSocket, req: Request) => {
   }
 });
 
-const validateToken = async (token: string | null): Promise<string | null> => {
+const _validateToken = async (token: string | null): Promise<string | null> => {
   if (!token) return null;
   
   try {

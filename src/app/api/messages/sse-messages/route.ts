@@ -1,9 +1,9 @@
 // src/app/api/messages/sse-messages/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { auth } from "@/auth";
 
 // Message queue for each user
-const messageQueues = new Map<string, any[]>();
+const messageQueues = new Map<string, Array<Record<string, unknown>>>();
 
 // Store connected clients
 const connectedClients = new Map<string, Set<{
@@ -13,7 +13,7 @@ const connectedClients = new Map<string, Set<{
 
 // Send messages to user
 export const messageEvents = {
-  sendMessage: (targetUserId: string, message: any) => {
+  sendMessage: (targetUserId: string, message: Record<string, unknown>) => {
     console.log(`Sending message to user ${targetUserId}:`, message);
     
     // Store message in queue
