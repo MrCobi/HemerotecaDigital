@@ -33,13 +33,18 @@ const BATCH_INTERVAL = 25;
 const HEARTBEAT_INTERVAL = 10000;
 const PING_TIMEOUT = 3000;
 
-// Función processMessage faltante
 const processMessage = (message: Message) => {
-  // Implementar lógica de procesamiento de mensajes aquí
-  console.log('Mensaje recibido:', message);
+  const receivers = [message.receiverId, message.senderId];
+  
+  receivers.forEach(id => {
+    if (!messageQueues.has(id)) messageQueues.set(id, []);
+    messageQueues.get(id)?.push({
+      ...message,
+      _timestamp: Date.now()
+    });
+  });
 };
 
-// Procesamiento de lotes
 setInterval(() => {
   messageQueues.forEach((queue, userId) => {
     if (queue.length > 0) {
@@ -58,11 +63,10 @@ setInterval(() => {
 wss.on('connection', async (ws: WebSocket, req: Request) => {
   try {
     const url = new URL(req.url || '', `ws://${req.headers.host}`);
-    const token = url.searchParams.get('token');
-    const userId = await validateToken(token);
-
+    const userId = url.searchParams.get('userId');
+    
     if (!userId) {
-      ws.close(4001, 'Autenticación fallida');
+      ws.close(4001, 'Missing userId');
       return;
     }
 
@@ -82,8 +86,19 @@ wss.on('connection', async (ws: WebSocket, req: Request) => {
 
     ws.on('message', (data: Buffer) => {
       try {
-        const message = JSON.parse(inflateSync(data).toString());
-        processMessage(message);
+        let message;
+        try {
+          // Intenta descomprimir primero
+          const decompressed = inflateSync(data).toString();
+          message = JSON.parse(decompressed);
+        } catch (error) {
+          // Si falla, intenta parsear directamente
+          message = JSON.parse(data.toString());
+        }
+        
+        if (message) {
+          processMessage(message);
+        }
       } catch (error) {
         console.error('Error procesando mensaje:', error);
       }
@@ -91,11 +106,13 @@ wss.on('connection', async (ws: WebSocket, req: Request) => {
 
     if (!connections.has(userId)) connections.set(userId, []);
     connections.get(userId)?.push(ws);
+    console.log(`Usuario ${userId} conectado. Total de conexiones: ${connections.size}`);
 
     ws.on('close', () => {
       clearInterval(heartbeat);
       clearTimeout(timeout);
       connections.set(userId, connections.get(userId)?.filter(conn => conn !== ws) || []);
+      console.log(`Usuario ${userId} desconectado`);
     });
 
     ws.on('error', (error) => {
@@ -113,7 +130,7 @@ const validateToken = async (token: string | null): Promise<string | null> => {
   if (!token) return null;
   
   try {
-    const decoded = jwt.verify(token, process.env.AUTH_SECRET!) as { userId: string };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || process.env.AUTH_SECRET!) as { userId: string };
     return decoded.userId;
   } catch (error) {
     console.error('Token inválido:', error);
@@ -125,11 +142,17 @@ export const broadcastMessage = (receiverId: string, message: Message) => {
   const receivers = [receiverId, message.senderId];
   
   receivers.forEach(id => {
-    if (!messageQueues.has(id)) messageQueues.set(id, []);
-    messageQueues.get(id)?.push({
-      ...message,
-      _timestamp: Date.now()
-    });
+    const userConnections = connections.get(id);
+    if (userConnections) {
+      const messageData = JSON.stringify(message);
+      const compressed = deflateSync(messageData);
+      
+      userConnections.forEach(ws => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(compressed);
+        }
+      });
+    }
   });
 };
 

@@ -14,6 +14,8 @@ import {
   MessageCircle,
   ChevronLeft,
 } from "lucide-react";
+import { inflateSync } from "zlib";
+import { Buffer } from 'buffer';
 
 interface User {
   id: string;
@@ -52,73 +54,86 @@ export function ChatWindow({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const unreadContext = useContext(UnreadMessagesContext);
-  const wsRef = useRef<WebSocket | null>(null);
-  const messageBuffer = useRef<Message[]>([]);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Configurar WebSocket optimizado
+  // Configurar Server-Sent Events (SSE)
   useEffect(() => {
-    if (!session || !isOpen || !otherUser.id) return;
+    if (!session || !isOpen) return;
 
-    const connectWebSocket = () => {
-      const ws = new WebSocket(
-        `${process.env.NEXT_PUBLIC_WS_URL}?userId=${currentUserId}&token=${session?.user?.accessToken}`
-      );
+    // Cerrar conexión anterior si existe
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
 
-      let batchTimeout: NodeJS.Timeout;
+    console.log('Connecting to SSE endpoint...');
+    
+    try {
+      const eventSource = new EventSource('/api/messages/sse-messages');
+      eventSourceRef.current = eventSource;
 
-      ws.onopen = () => {
-        wsRef.current = ws;
-        // Enviar mensajes en buffer cada 50ms
-        batchTimeout = setInterval(() => {
-          if (
-            messageBuffer.current.length > 0 &&
-            ws.readyState === WebSocket.OPEN
-          ) {
-            const batch = messageBuffer.current.splice(0, 50); // Enviar lotes de 50 mensajes
-            ws.send(JSON.stringify(batch));
-          }
-        }, 50);
+      eventSource.onopen = () => {
+        console.log('SSE connected successfully');
       };
 
-      ws.onmessage = (event) => {
+      eventSource.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
-          if (Array.isArray(data)) {
-            setMessages((prev) => [
-              ...prev,
-              ...data.filter(
-                (msg: Message) => !prev.some((m) => m.id === msg.id)
-              ),
-            ]);
-          } else {
+          const message = JSON.parse(event.data);
+          console.log('Received SSE message:', message);
+          
+          // Si es un mensaje de tipo 'connected', ignorarlo
+          if (message.type === 'connected') return;
+          
+          // Solo procesar mensajes relacionados con la conversación actual
+          if (
+            (message.senderId === otherUser.id && message.receiverId === currentUserId) || 
+            (message.senderId === currentUserId && message.receiverId === otherUser.id)
+          ) {
+            console.log('Adding/updating message in state');
             setMessages((prev) =>
-              prev.some((m) => m.id === data.id) ? prev : [...prev, data]
+              prev.some((m) => m.id === message.id)
+                ? prev.map((m) => (m.id === message.id ? message : m))
+                : [...prev, message]
             );
+
+            // Marcar como leído si somos el receptor
+            if (message.receiverId === currentUserId && !message.read) {
+              fetch(`/api/messages/read?senderId=${otherUser.id}`, {
+                method: "POST",
+              }).then(() => {
+                unreadContext.updateUnreadCount();
+              });
+            }
           }
         } catch (error) {
-          console.error("Error procesando mensaje:", error);
+          console.error("Error procesando mensaje SSE:", error);
         }
       };
 
-      ws.onclose = () => {
-        clearInterval(batchTimeout);
-        setTimeout(connectWebSocket, 300);
+      eventSource.onerror = (error) => {
+        console.error("SSE error:", error);
+        // Cerrar y reconectar en error
+        eventSource.close();
+        eventSourceRef.current = null;
+        // Intentar reconectar después de un breve retraso
+        setTimeout(() => {
+          if (isOpen && session) {
+            console.log('Reconnecting to SSE after error...');
+            const newEventSource = new EventSource('/api/messages/sse-messages');
+            eventSourceRef.current = newEventSource;
+          }
+        }, 2000);
       };
 
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        ws.close();
+      return () => {
+        console.log('Closing SSE connection');
+        eventSource.close();
+        eventSourceRef.current = null;
       };
-
-      return ws;
-    };
-
-    const ws = connectWebSocket();
-    return () => {
-      ws.close();
-      if (wsRef.current) wsRef.current = null;
-    };
-  }, [session, isOpen, currentUserId, otherUser.id]);
+    } catch (error) {
+      console.error('Error creating SSE connection:', error);
+    }
+  }, [session, isOpen, currentUserId, otherUser.id, unreadContext]);
 
   // Cargar mensajes iniciales optimizado
   const initializeChat = useCallback(async () => {
@@ -168,14 +183,15 @@ export function ChatWindow({
     }
   }, [messages]);
 
-  // Envío optimizado con buffer local
+  // Envío optimizado de mensajes
   const handleSend = async () => {
     if (!session || !newMessage.trim() || !isMutualFollow || isSending) return;
 
+    const trimmedMessage = newMessage.trim();
     const tempId = `temp-${Date.now()}`;
-    const tempMessage: Message = {
+    const tempMessage = {
       id: tempId,
-      content: newMessage,
+      content: trimmedMessage,
       senderId: currentUserId,
       receiverId: otherUser.id,
       createdAt: new Date().toISOString(),
@@ -185,24 +201,33 @@ export function ChatWindow({
     setIsSending(true);
     setMessages((prev) => [...prev, tempMessage]);
     setNewMessage("");
-    messageBuffer.current.push(tempMessage);
 
     try {
       const response = await fetch("/api/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receiverId: otherUser.id, content: newMessage }),
+        headers: { 
+          "Content-Type": "application/json",
+          // Añadir un timestamp para evitar caché
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0" 
+        },
+        body: JSON.stringify({
+          receiverId: otherUser.id,
+          content: trimmedMessage,
+          timestamp: Date.now() // Añadir timestamp para prevenir cacheo
+        }),
       });
 
       if (!response.ok) throw new Error("Error enviando mensaje");
+      
       const realMessage = await response.json();
-
       setMessages((prev) =>
         prev.map((msg) => (msg.id === tempId ? realMessage : msg))
       );
     } catch (error) {
+      console.error("Error:", error);
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-      console.error("Error al enviar mensaje:", error);
     } finally {
       setIsSending(false);
     }

@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
-import { broadcastMessage } from "@/lib/websocket";
+import { messageEvents } from "./sse-messages/route";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -33,11 +33,19 @@ export async function POST(request: Request) {
       createdAt: message.createdAt.toISOString()
     };
     
-    await broadcastMessage(receiverId, optimizedMessage);
+    // Notificar a través de SSE al remitente y al destinatario
+    console.log('Broadcasting message through SSE:', optimizedMessage);
+    messageEvents.sendMessage(receiverId, optimizedMessage);
+    messageEvents.sendMessage(session.user.id, optimizedMessage);
     
     return new Response(JSON.stringify(optimizedMessage), { 
       status: 201,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
     
   } catch (error) {
@@ -98,7 +106,13 @@ export async function GET(req: Request) {
       }
     }));
 
-    return NextResponse.json(optimizedMessages);
+    return NextResponse.json(optimizedMessages, { 
+      headers: { 
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
     
   } catch (error) {
     console.error("Error fetching messages:", error);
