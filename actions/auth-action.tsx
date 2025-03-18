@@ -7,7 +7,7 @@ import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
 import prisma from "@/lib/db";
 import bcrypt from "bcryptjs";
-import { Prisma } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { isProduction } from "@/lib/environment";
 import jwt from "jsonwebtoken";
 import { sendEmailVerification } from "@/lib/mail";

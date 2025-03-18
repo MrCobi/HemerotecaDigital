@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { PrismaClient } from "@prisma/client";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -19,8 +20,11 @@ export async function GET(req: Request) {
     page = isNaN(page) || page < 1 ? 1 : page;
     limit = isNaN(limit) || limit < 1 || limit > 100 ? 10 : limit;
 
+    // Asegurar que prisma está correctamente tipado
+    const prismaTyped = prisma as PrismaClient;
+
     // Obtener los IDs de los usuarios seguidos con información de showActivity
-    const following = await prisma.follow.findMany({
+    const following = await prismaTyped.follow.findMany({
       where: { followerId: session.user.id },
       include: {
         following: {
@@ -38,12 +42,12 @@ export async function GET(req: Request) {
       .map(f => f.followingId);
 
     // Obtener total de actividades solo de usuarios con actividad pública
-    const total = await prisma.activityHistory.count({
+    const total = await prismaTyped.activityHistory.count({
       where: { userId: { in: followingIds } },
     });
 
     // Obtener actividades paginadas solo de usuarios con actividad pública
-    const activities = await prisma.activityHistory.findMany({
+    const activities = await prismaTyped.activityHistory.findMany({
       where: { userId: { in: followingIds } },
       include: {
         user: {

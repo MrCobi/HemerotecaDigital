@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { auth } from "@/auth";
+import { PrismaClient } from "@prisma/client";
 
 export async function GET(req: Request) {
   try {
@@ -22,8 +23,10 @@ export async function GET(req: Request) {
       ]
     } : {};
 
+    const prismaTyped = prisma as PrismaClient;
+    
     const [users, total] = await Promise.all([
-      prisma.user.findMany({
+      prismaTyped.user.findMany({
         where,
         select: {
           id: true,
@@ -37,7 +40,7 @@ export async function GET(req: Request) {
         take: limit,
         orderBy: { createdAt: "desc" }
       }),
-      prisma.user.count({ where })
+      prismaTyped.user.count({ where })
     ]);
 
     return NextResponse.json({

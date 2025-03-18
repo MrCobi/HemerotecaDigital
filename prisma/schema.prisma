@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  previewFeatures = ["middlewares"]
 }
 
 datasource db {
@@ -9,32 +8,32 @@ datasource db {
 }
 
 model User {
-  id              String            @id @default(cuid())
-  name            String?
-  username        String?           @unique
-  password        String
-  email           String            @unique
-  emailVerified   DateTime?         @map("email_verified")
-  image           String?
-  role            Role              @default(user)
-  createdAt       DateTime          @default(now()) @map("created_at")
-  updatedAt       DateTime          @updatedAt @map("updated_at")
-  bio             String?
-  showActivity    Boolean           @default(true) @map("show_activity")
-  showFavorites   Boolean           @default(true) @map("show_favorites")
-  accounts        Account[]
-  activityHistory ActivityHistory[]
-  comments        Comment[]
-  favoriteSources FavoriteSource[]
-  followers       Follow[]          @relation("follower")
-  following       Follow[]          @relation("following")
-  ratings         Rating[]
-  sentMessages    DirectMessage[]   @relation("SentMessages")
-  receivedMessages DirectMessage[]  @relation("ReceivedMessages")
+  id                  String               @id @default(cuid())
+  name                String?
+  username            String?              @unique
+  password            String
+  email               String               @unique
+  emailVerified       DateTime?            @map("email_verified")
+  image               String?
+  role                Role                 @default(user)
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  bio                 String?
+  showActivity        Boolean              @default(true) @map("show_activity")
+  showFavorites       Boolean              @default(true) @map("show_favorites")
+  accounts            Account[]
+  activityHistory     ActivityHistory[]
+  comments            Comment[]
+  favoriteSources     FavoriteSource[]
+  followers           Follow[]             @relation("follower")
+  following           Follow[]             @relation("following")
+  ratings             Rating[]
+  sentMessages        DirectMessage[]      @relation("SentMessages")
+  receivedMessages    DirectMessage[]      @relation("ReceivedMessages")
+  passwordResetTokens PasswordResetToken[]
 
-@@index([emailVerified]) // Si haces queries de usuarios verificados
-@@map("users")
-  
+  @@index([emailVerified]) // Si haces queries de usuarios verificados
+  @@map("users")
 }
 
 model Account {
@@ -67,6 +66,18 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "password_reset_token_user_id_fkey")
+  @@map("password_reset_tokens")
 }
 
 model Source {
@@ -176,10 +187,10 @@ model DirectMessage {
   sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 
-  @@map("direct_messages") // Nombre real de la tabla en MySQL
   @@index([senderId, receiverId])
   @@index([createdAt])
   @@index([senderId, receiverId, createdAt], map: "sender_receiver_created_idx")
+  @@map("direct_messages") // Nombre real de la tabla en MySQL
 }
 
 enum Role {

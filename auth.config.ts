@@ -5,6 +5,7 @@ import Credentials from "next-auth/providers/credentials";
 import { loginSchema } from "./lib/zod";
 import prisma from "./lib/db";
 import { Role } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
 
 export const authOptions: NextAuthConfig = {
   providers: [
@@ -19,7 +20,10 @@ export const authOptions: NextAuthConfig = {
           const parsed = loginSchema.safeParse(credentials);
           if (!parsed.success) throw new Error("Datos inválidos");
 
-          const user = await prisma.user.findUnique({
+          // Aseguramos el tipo para prisma
+          const prismaTyped = prisma as PrismaClient;
+          
+          const user = await prismaTyped.user.findUnique({
             where: { email: parsed.data.email.toLowerCase() },
             select: {
               id: true,
@@ -52,7 +56,7 @@ export const authOptions: NextAuthConfig = {
           };
 
         } catch (error) {
-          console.error("Error en autenticación:", error);
+          console.error("Auth error:", error);
           throw error;
         }
       }
@@ -65,6 +69,19 @@ export const authOptions: NextAuthConfig = {
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60 // 30 días
+  },
+  // Configurar hosts confiables para desarrollo
+  trustHost: process.env.NODE_ENV === 'development',
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === "development" ? "next-auth.session-token" : "__Secure-next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV !== "development"
+      }
+    }
   },
   callbacks: {
     async jwt({ token, user }) {

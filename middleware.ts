@@ -14,7 +14,9 @@ const { auth: middleware } = NextAuth({
   // Aumentar seguridad
   jwt: {
     maxAge: 30 * 60, // 30 minutos
-  }
+  },
+  // Confiar en hosts de desarrollo
+  trustHost: process.env.NODE_ENV === 'development'
 });
 
 // Definición de rutas

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { PrismaClient } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
@@ -31,8 +32,11 @@ export async function GET(
       );
     }
 
+    // Asegurar que prisma está correctamente tipado antes de usar $queryRaw
+    const prismaTyped = prisma as PrismaClient;
+    
     // Consulta SQL usando activity_history
-    const query = await prisma.$queryRaw<ActivityResult[]>`
+    const query = await prismaTyped.$queryRaw<ActivityResult[]>`
       WITH limited_activities AS (
         SELECT * FROM activity_history
         WHERE user_id = ${userId}

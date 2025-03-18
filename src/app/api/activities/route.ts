@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { PrismaClient } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
@@ -17,9 +18,12 @@ export async function GET(req: Request) {
     const limit = Math.min(Math.max(Number(searchParams.get("limit") || 10), 1), 100);
     const skip = (page - 1) * limit;
 
-    // Obtener actividades recientes globales (se puede filtrar más adelante)
+    // Asegurar que prisma estu00e1 correctamente tipado
+    const prismaTyped = prisma as PrismaClient;
+
+    // Obtener actividades recientes globales (se puede filtrar mu00e1s adelante)
     const [activities, total] = await Promise.all([
-      prisma.activityHistory.findMany({
+      prismaTyped.activityHistory.findMany({
         take: limit,
         skip: skip,
         orderBy: { createdAt: "desc" },
@@ -34,7 +38,7 @@ export async function GET(req: Request) {
           },
         },
       }),
-      prisma.activityHistory.count()
+      prismaTyped.activityHistory.count()
     ]);
 
     return NextResponse.json({

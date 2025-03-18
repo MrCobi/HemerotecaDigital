@@ -1,10 +1,12 @@
 // src/app/api/categories/route.ts
 import prisma from "@/lib/db";
 import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
 
 export async function GET() {
   try {
-    const categories = await prisma.source.findMany({
+    const prismaTyped = prisma as PrismaClient;
+    const categories = await prismaTyped.source.findMany({
       select: { category: true },
       distinct: ["category"],
       where: {
