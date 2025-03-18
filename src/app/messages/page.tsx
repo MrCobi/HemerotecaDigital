@@ -1,17 +1,16 @@
 "use client";
-import { useEffect, useState, useContext, useCallback, useMemo } from "react";
-import { flushSync } from "react-dom";
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from 'next-auth/react';
 import { ChatWindow } from "@/src/app/components/Chat/ChatWindow";
 import { MessageCircle, Search } from "lucide-react";
 import { Avatar } from "@/src/app/components/ui/avatar";
-import { Input } from "@/src/app/components/ui/input";
-import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
-import { CldImage } from "next-cloudinary";
+import { Input } from '@/src/app/components/ui/input';
 import Image from "next/image";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 import useSocket, { MessageType } from "@/src/hooks/useSocket";
+import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
+import { CldImage } from "next-cloudinary";
 
 interface User {
   id: string;
@@ -58,10 +57,25 @@ interface CombinedItem {
   lastInteraction?: Date;
 }
 
+interface _ApiResponse<T> {
+  data: T;
+  error?: string;
+}
+
+interface _SearchResult {
+  id: string;
+  username: string;
+  name?: string;
+  image?: string;
+  following?: boolean;
+}
+
 export default function MessagesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
+  const unreadMessagesContext = React.useContext(UnreadMessagesContext);
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [mutualFollowers, setMutualFollowers] = useState<User[]>([]);
   const [combinedList, setCombinedList] = useState<CombinedItem[]>([]);
@@ -69,7 +83,6 @@ export default function MessagesPage() {
   const [generalSearchTerm, setGeneralSearchTerm] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState(false);
-  const { updateUnreadCount: _updateUnreadCount } = useContext(UnreadMessagesContext);
 
   const CONVERSATIONS_PER_PAGE = 15;
 
@@ -83,7 +96,27 @@ export default function MessagesPage() {
       const data = await convRes.json();
       
       // Verificar si la respuesta es un array (formato nuevo) o un objeto (formato antiguo)
-      let conversations: any[] = [];
+      interface Conversation {
+        id: string;
+        receiver: {
+          id: string;
+          username: string | null;
+          image: string | null;
+        };
+        lastMessage?: {
+          id: string;
+          content: string;
+          senderId: string;
+          receiverId: string;
+          createdAt: string;
+          read: boolean;
+        };
+        unreadCount: number;
+        createdAt: string;
+        updatedAt: string;
+      }
+      
+      let conversations: Conversation[] = [];
       
       if (Array.isArray(data)) {
         conversations = data;
@@ -296,11 +329,9 @@ export default function MessagesPage() {
                 }
               });
               
-              // Convertir mapa a array y ordenar por última actualización
-              const result = Array.from(existingMap.values()).sort((a, b) => 
-                new Date(b.updatedAt || Date.now()).getTime() - 
-                new Date(a.updatedAt || Date.now()).getTime()
-              );
+              // Convertir el Map de nuevo a array y ordenar por updatedAt
+              const result = Array.from(existingMap.values())
+                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
               
               console.log(`Actualizadas ${result.length} conversaciones (${newConversations.length} recibidas)`);
               return result;
@@ -326,9 +357,11 @@ export default function MessagesPage() {
 
   // Conexión a Socket.io para mensajes globales
   const {
-    connected,
-    error: socketError,
-    onlineUsers
+    connected: _connected,
+    error: _socketError,
+    onlineUsers: _onlineUsers,
+    sendMessage: _sendMessage,
+    markMessageAsRead: _markMessageAsRead
   } = useSocket({
     userId: session?.user?.id || '',
     username: session?.user?.name || session?.user?.username || 'Usuario',
@@ -337,7 +370,7 @@ export default function MessagesPage() {
       
       // Siempre actualizar el contador de mensajes no leídos cuando recibimos un mensaje nuevo
       if (message.senderId !== session?.user?.id) {
-        _updateUnreadCount();
+        unreadMessagesContext?.updateUnreadCount();
       }
       
       // Actualizar conversaciones usando updater function
@@ -391,7 +424,7 @@ export default function MessagesPage() {
 
       // Actualizar contador de mensajes no leídos
       if (message.senderId !== session?.user?.id) {
-        _updateUnreadCount();
+        unreadMessagesContext?.updateUnreadCount();
       }
     },
     onConnect: () => {
@@ -402,7 +435,7 @@ export default function MessagesPage() {
       console.log('Socket.io desconectado');
       setSocketStatus('disconnected');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error de conexión Socket.io:', error);
       setSocketStatus('error');
     }
@@ -609,7 +642,7 @@ export default function MessagesPage() {
                 <p className="text-sm mt-2">
                   {generalSearchTerm ? (
                     <>
-                      No se encontraron resultados para "{generalSearchTerm}"
+                      No se encontraron resultados para &quot;{generalSearchTerm}&quot;
                       <button
                         className="ml-2 text-blue-500 hover:underline"
                         onClick={() => setGeneralSearchTerm("")}
@@ -773,7 +806,7 @@ export default function MessagesPage() {
             initialMessages={[]} // Se cargarán mediante WebSocket
             conversationId={selectedConversation}
             isOpen={true}
-            onClose={handleBackToList}
+           onClose={handleBackToList}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800">

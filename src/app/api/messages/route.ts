@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
-import { messageEvents } from "./sse-messages/route";
+import { messageEvents } from "./sse-messages/message-event-manager";
 
 export async function POST(request: Request) {
   const session = await auth();

@@ -1,21 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/app/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { ArrowLeft, Send, X } from 'lucide-react';
+import { Send, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-// Importar format como any para resolver problemas de tipado
-import { format as dateFormat } from 'date-fns';
-import { es } from 'date-fns/locale';
-import Image from 'next/image';
+import { format } from 'date-fns';
 import { flushSync } from 'react-dom';
 import useSocket, { MessageType } from '@/src/hooks/useSocket';
 
-// Crear una versión tipada correctamente de format
-const format: any = dateFormat;
 
 type User = {
   id: string;
@@ -33,6 +27,7 @@ type Message = {
   createdAt: Date | string;
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error';
   conversationId?: string;
+  read?: boolean;
 };
 
 interface ChatWindowProps {
@@ -42,6 +37,8 @@ interface ChatWindowProps {
   initialMessages?: Message[];
   conversationId?: string;
 }
+
+type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'error';
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
   isOpen,
@@ -67,7 +64,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   // Estado para controlar la carga de mensajes
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [_showEmojiPicker, _setShowEmojiPicker] = useState(false);
   
   // Socket.io integration
   const {
@@ -110,8 +107,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         setPeerIsTyping(status.isTyping);
       }
     },
-    onMessageStatus: (status) => {
-      updateMessageStatus(status.messageId, status.status);
+    onMessageStatus: (status: { messageId: string; status: string }) => {
+      console.log(`Actualizando estado del mensaje ${status.messageId} a ${status.status}`);
+      updateMessageStatus(status.messageId, status.status as MessageStatus);
     },
     onMessageRead: (data) => {
       // Actualizar mensaje como leído
@@ -225,11 +223,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   // Actualizar estado de un mensaje
-  const updateMessageStatus = (messageId: string, status: string) => {
+  const updateMessageStatus = (messageId: string, status: MessageStatus) => {
     setMessages(prev => 
       prev.map(msg => 
         (msg.id === messageId || msg.tempId === messageId) 
-          ? { ...msg, status: status as any } 
+          ? { ...msg, status } 
           : msg
       )
     );
@@ -400,9 +398,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const renderGroupedMessages = () => {
     return Object.entries(groupedMessages).map(([dateKey, messages]) => {
       const date = new Date(dateKey);
-      // Usar un objeto options separado y parseado como tipo any para evitar el error
-      const options = { locale: es } as any;
-      const formattedDate = format(date, "EEEE, d 'de' MMMM", options);
+      const day = format(date, 'd');
+      const month = format(date, 'MMMM');
+      const weekday = format(date, 'EEEE');
+      const formattedDate = `${weekday}, ${day} de ${month}`;
       
       return (
         <div key={dateKey} className="flex flex-col space-y-4 mb-4">
@@ -462,15 +461,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     });
   };
 
-  // Cargar mensajes históricos cuando se abre la conversación
-  useEffect(() => {
-    if (isOpen && otherUser?.id && currentUserId && !messagesLoaded) {
-      loadHistoricalMessages();
-    }
-  }, [isOpen, otherUser?.id, currentUserId, messagesLoaded]);
-  
   // Función para cargar mensajes históricos de la conversación
-  const loadHistoricalMessages = async () => {
+  const loadHistoricalMessages = useCallback(async () => {
     if (!otherUser?.id || !currentUserId || isLoadingMessages || messagesLoaded) return;
     
     setIsLoadingMessages(true);
@@ -481,33 +473,52 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
-        }
+        },
       });
       
       if (!response.ok) {
-        throw new Error(`Error al cargar mensajes: ${response.status}`);
+        throw new Error('No se pudieron cargar los mensajes históricos');
       }
       
-      const historicalMessages = await response.json();
-      console.log(`${historicalMessages.length} mensajes históricos cargados`);
+      const data = await response.json();
       
-      // Convertir los mensajes al formato adecuado y ordenarlos por fecha
-      const formattedMessages = historicalMessages.map((msg: {
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        console.log('No hay mensajes históricos para esta conversación');
+        setMessagesLoaded(true);
+        return;
+      }
+      
+      console.log(`${data.length} mensajes históricos cargados`);
+      
+      interface HistoricalMessage {
         id: string;
         content: string;
         senderId: string;
         receiverId: string;
         createdAt: string;
         read?: boolean;
-      }) => ({
-        id: msg.id,
-        content: msg.content,
-        senderId: msg.senderId,
-        receiverId: msg.receiverId,
-        createdAt: msg.createdAt,
-        status: msg.read ? 'read' : 'delivered'
-      }));
+      }
+      
+      // Define explicit type for message parameter in map function
+      const formattedMessages = data
+        .filter((message): message is HistoricalMessage => Boolean(message))
+        .map((message: HistoricalMessage): { 
+          id: string; 
+          content: string; 
+          senderId: string; 
+          receiverId: string; 
+          createdAt: string; 
+          status: MessageStatus;
+        } => {
+          return {
+            id: message.id,
+            content: message.content,
+            senderId: message.senderId,
+            receiverId: message.receiverId,
+            createdAt: message.createdAt,
+            status: (message.read ? 'read' : 'delivered') as MessageStatus
+          };
+        });
       
       // Usar una función de estado para asegurar que no perdemos mensajes recientes
       setMessages(prevMessages => {
@@ -518,29 +529,41 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         ]));
         
         // Añadir mensajes históricos si no existen en la lista actual
-        formattedMessages.forEach(msg => {
+        formattedMessages.forEach((msg) => {
           if (!existingMsgMap.has(msg.id)) {
-            existingMsgMap.set(msg.id, msg);
+            // Convert the status string to MessageStatus type
+            const messageWithCorrectStatus: Message = {
+              ...msg,
+              status: msg.status as MessageStatus
+            };
+            existingMsgMap.set(msg.id, messageWithCorrectStatus);
           }
         });
         
         // Convertir el mapa de vuelta a array y ordenar por fecha
         const mergedMessages = Array.from(existingMsgMap.values());
         return mergedMessages.sort((a, b) => {
-          const timeA = new Date(a.createdAt).getTime();
-          const timeB = new Date(b.createdAt).getTime();
-          return timeA - timeB;
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         });
       });
       
       setMessagesLoaded(true);
+      console.log('Mensajes históricos cargados correctamente');
+      
     } catch (error) {
       console.error('Error al cargar mensajes históricos:', error);
     } finally {
       setIsLoadingMessages(false);
     }
-  };
+  }, [otherUser?.id, currentUserId, isLoadingMessages, messagesLoaded]);
 
+  // Cargar mensajes históricos cuando se abre la conversación
+  useEffect(() => {
+    if (isOpen && otherUser?.id && currentUserId && !messagesLoaded) {
+      loadHistoricalMessages();
+    }
+  }, [isOpen, otherUser?.id, currentUserId, messagesLoaded, loadHistoricalMessages]);
+  
   // Debug: Mostrar el avance del tiempo cada segundo
   useEffect(() => {
     const interval = setInterval(() => {
@@ -567,11 +590,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     
     setIsSending(false);
     setPeerIsTyping(false);
-    setShowEmojiPicker(false);
     setNewMessage('');
     setMessagesLoaded(false); // Resetear el estado de carga de mensajes
     onClose();
   };
+
+  useEffect(() => {
+    loadHistoricalMessages();
+  }, [loadHistoricalMessages]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {

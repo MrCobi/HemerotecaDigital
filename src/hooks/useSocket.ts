@@ -38,7 +38,7 @@ interface UseSocketOptions {
   onMessageRead?: (data: { messageId: string; conversationId: string }) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
-  onError?: (error: any) => void;
+  onError?: (error: Error | unknown) => void;
 }
 
 export default function useSocket(options: UseSocketOptions) {
@@ -56,7 +56,7 @@ export default function useSocket(options: UseSocketOptions) {
   } = options;
   
   const [connected, setConnected] = useState(false);
-  const [error, setError] = useState<any>(null);
+  const [error, setError] = useState<Error | unknown>(null);
   const [onlineUsers, setOnlineUsers] = useState<UserType[]>([]);
   
   const socketRef = useRef<Socket | null>(null);
@@ -98,10 +98,10 @@ export default function useSocket(options: UseSocketOptions) {
       if (onConnect) onConnect();
     });
     
-    socket.on('connect_error', (err) => {
-      console.error('Error de conexión Socket.io:', err);
+    socket.on('connect_error', (error) => {
+      console.error('Error de conexión Socket.io:', error);
       setConnected(false);
-      setError(err);
+      setError(error);
       
       // Intentar reconectar con WebSocket solamente
       try {
@@ -121,7 +121,7 @@ export default function useSocket(options: UseSocketOptions) {
         console.error('Error al cambiar transporte:', e);
       }
       
-      if (onError) onError(err);
+      if (onError) onError(error);
     });
     
     socket.on('disconnect', (reason) => {
@@ -148,7 +148,7 @@ export default function useSocket(options: UseSocketOptions) {
           const fecha = new Date(message.createdAt);
           if (isNaN(fecha.getTime())) throw new Error('Fecha inválida');
           message.createdAt = fecha.toISOString(); // Normalizar formato
-        } catch (err) {
+        } catch {
           console.warn(`Fecha inválida en mensaje: ${message.createdAt}, reemplazando con fecha actual`);
           message.createdAt = new Date().toISOString();
         }
@@ -225,6 +225,27 @@ export default function useSocket(options: UseSocketOptions) {
       // Puedes manejar la confirmación de lectura si es necesario
     });
     
+    // Handle socket errors
+    socket.on('error', (error) => {
+      console.error('Socket.io error:', error);
+      setError(error);
+      if (onError) onError(error);
+    });
+
+    // Handle socket disconnect
+    socket.on('disconnect', () => {
+      console.log('Socket.io disconnected');
+      setConnected(false);
+      if (onDisconnect) onDisconnect();
+    });
+
+    // Handle connection error (this is different from regular errors)
+    socket.on('connect_error', (error) => {
+      console.error('Socket.io connection error:', error);
+      setError(error);
+      if (onError) onError(error);
+    });
+    
     // Conectar si no está conectado
     if (!socket.connected) {
       socket.connect();
@@ -242,6 +263,7 @@ export default function useSocket(options: UseSocketOptions) {
       socket.off('typing_status');
       socket.off('message_read');
       socket.off('message_read_confirmed');
+      socket.off('error');
     };
   }, [userId, username, onNewMessage, onUserOnline, onTypingStatus, onMessageStatus, onMessageRead, onConnect, onDisconnect, onError]);
   

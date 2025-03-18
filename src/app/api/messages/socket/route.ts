@@ -1,7 +1,6 @@
 // src/app/api/messages/socket/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { messageEvents } from "../sse-messages/route";
 
 // Clave de autorización para peticiones desde el servidor de socket
 const SOCKET_API_KEY = 'Socket-Internal-Auth-00123';
