@@ -22,7 +22,6 @@ const { auth: middleware } = NextAuth({
 // Definición de rutas
 const publicRoutes = new Set([
   "/",                     // Página principal
-  "/login",                // Página de login configurada en NextAuth
   "/api/auth/signin",      // Página de inicio de sesión en la ruta actual
   "/api/auth/signup",      // Página de registro en la ruta actual
   "/acceso-denegado",      // Página de acceso denegado
@@ -32,7 +31,11 @@ const publicRoutes = new Set([
   "/auth/verify-success",  // Página de éxito de verificación
   "/auth/verify-error",    // Página de error de verificación
   "/auth/verification-pending",  // Página de verificación pendiente
-  "/auth/resend-verification"    // Página para reenviar verificación
+  "/auth/resend-verification",    // Página para reenviar verificación
+  "/auth/reset-password",  // Página de restablecimiento de contraseña
+  "/auth/reset-password/(.*)",  // Subrutas de restablecimiento de contraseña
+  "/api/articles",         // API pública de artículos
+  "/api/categories"       // API pública de categorías
 ]);
 
 const adminRoutes = new Set([
@@ -41,9 +44,15 @@ const adminRoutes = new Set([
 ]);
 
 const authRoutes = new Set([
-  "/login", 
   "/api/auth/signin", 
   "/api/auth/signup"
+]);
+
+// Rutas que no requieren verificación de email pero sí autenticación
+const unverifiedAllowedRoutes = new Set([
+  "/auth/verification-pending",
+  "/auth/resend-verification",
+  "/api/auth/resend-verification"
 ]);
 
 export default middleware(async (req) => {
@@ -51,6 +60,7 @@ export default middleware(async (req) => {
   const pathname = nextUrl.pathname;
   const isLoggedIn = !!auth?.user;
   const isAdmin = auth?.user?.role === "admin";
+  const isEmailVerified = !!auth?.user?.emailVerified;
 
   // Forzar verificación de cookie de sesión en cada solicitud
   // Bypass de caché para rutas protegidas
@@ -85,6 +95,24 @@ export default middleware(async (req) => {
         }
       );
     }
+    
+    // Verificar si el correo electrónico está verificado para APIs protegidas
+    if (!isEmailVerified && !unverifiedAllowedRoutes.has(pathname) && 
+        !Array.from(unverifiedAllowedRoutes).some(route => new RegExp(`^${route}$`).test(pathname))) {
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          message: "Cuenta no verificada. Por favor, verifique su correo electrónico."
+        }),
+        { 
+          status: 403,
+          headers: { 
+            'content-type': 'application/json',
+            'cache-control': 'no-store, max-age=0' 
+          }
+        }
+      );
+    }
   }
 
   // 3. Redirigir usuarios no autenticados a páginas normales
@@ -98,7 +126,14 @@ export default middleware(async (req) => {
     return NextResponse.redirect(signInUrl);
   }
 
-  // 4. Verificar rutas de administrador
+  // 4. Verificar si el correo electrónico está verificado
+  if (!isEmailVerified && !unverifiedAllowedRoutes.has(pathname) && 
+      !Array.from(unverifiedAllowedRoutes).some(route => new RegExp(`^${route}$`).test(pathname))) {
+    console.log("Usuario no verificado intentando acceder a:", pathname);
+    return NextResponse.redirect(new URL("/auth/verification-pending", nextUrl));
+  }
+
+  // 5. Verificar rutas de administrador
   if (Array.from(adminRoutes).some(route => new RegExp(route).test(pathname))) {
     if (!isAdmin) {
       return NextResponse.redirect(new URL("/acceso-denegado", nextUrl));
@@ -108,7 +143,7 @@ export default middleware(async (req) => {
     });
   }
 
-  // 5. Redirigir usuarios autenticados que visiten rutas de auth
+  // 6. Redirigir usuarios autenticados que visiten rutas de auth
   if (authRoutes.has(pathname)) {
     return NextResponse.redirect(new URL("/home", nextUrl));
   }

@@ -84,7 +84,7 @@ export function FollowButton({
   if (!session) {
     return (
       <Button asChild variant="ghost" className="gap-2">
-        <Link href="/login">
+        <Link href="/api/auth/signin">
           <UserPlus className="h-4 w-4" />
           Seguir
         </Link>

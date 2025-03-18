@@ -14,7 +14,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   secret: process.env.AUTH_SECRET, // Asegúrate de tener esto en tu .env
   pages: {
-    signIn: "/login",
+    signIn: "/api/auth/signin",
     error: "/auth/error"
   },
   session: {

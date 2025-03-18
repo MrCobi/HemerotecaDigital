@@ -59,7 +59,7 @@ export default function ResendVerificationPage() {
                 Por favor, revisa tu bandeja de entrada y sigue las instrucciones.
               </p>
               <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded mt-2">
-                <Link href="/login" className="text-white no-underline">Volver al inicio de sesión</Link>
+                <Link href="/api/auth/signin" className="text-white no-underline">Volver al inicio de sesión</Link>
               </button>
             </div>
           ) : (
@@ -97,7 +97,7 @@ export default function ResendVerificationPage() {
           )}
         </div>
         <div className="border-t p-4 text-center">
-          <Link href="/login" className="text-blue-600 hover:text-blue-800 font-medium">
+          <Link href="/api/auth/signin" className="text-blue-600 hover:text-blue-800 font-medium">
             Volver al inicio de sesión
           </Link>
         </div>

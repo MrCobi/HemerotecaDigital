@@ -231,7 +231,7 @@ export default function DashboardPage() {
   }
 
   if (status === "unauthenticated") {
-    router.push("/login");
+    router.push("/api/auth/signin");
     return null;
   }
 

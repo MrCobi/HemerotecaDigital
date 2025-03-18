@@ -58,7 +58,7 @@ export default function AuthErrorPage() {
             )}
             
             <Link 
-              href="/login"
+              href="/api/auth/signin"
               className="w-full bg-transparent hover:bg-gray-100 text-gray-700 font-medium py-2 px-4 border border-gray-300 rounded text-center transition duration-150"
             >
               Volver al inicio de sesión

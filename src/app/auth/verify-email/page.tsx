@@ -135,7 +135,7 @@ export default function VerifyEmailPage() {
                   Reenviar verificación
                 </button>
               </Link>
-              <Link href="/login">
+              <Link href="/api/auth/signin">
                 <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded">
                   Volver al inicio de sesión
                 </button>

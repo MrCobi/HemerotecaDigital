@@ -6,7 +6,7 @@ import { CustomUser } from "@/src/interface/user";
 export default async function UsersPage() {
   const session = await auth();
 
-  if (!session) redirect("/login");
+  if (!session) redirect("/api/auth/signin");
   if (session.user.role !== "admin") redirect("/acceso-denegado");
 
   // Fetch desde API Route

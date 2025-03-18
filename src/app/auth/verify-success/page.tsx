@@ -30,7 +30,7 @@ export default function VerificationSuccessPage() {
             Ahora puedes acceder a todas las funcionalidades de la plataforma.
           </p>
           
-          <Link href="/login" className="w-full mt-6">
+          <Link href="/api/auth/signin" className="w-full mt-6">
             <button className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
               Iniciar sesión
             </button>

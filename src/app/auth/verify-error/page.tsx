@@ -36,7 +36,7 @@ export default function VerificationErrorPage() {
               </button>
             </Link>
             
-            <Link href="/login">
+            <Link href="/api/auth/signin">
               <button className="w-full py-2 px-4 border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 font-medium rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                 Volver al inicio de sesión
               </button>

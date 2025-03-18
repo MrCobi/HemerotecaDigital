@@ -125,7 +125,7 @@ const ResetPasswordPage = () => {
       
       // Redireccionar al inicio de sesión después de 3 segundos
       setTimeout(() => {
-        router.push("/login");
+        router.push("/api/auth/signin");
       }, 3000);
     } catch (error) {
       console.error("Error al restablecer la contraseña:", error);
@@ -178,7 +178,7 @@ const ResetPasswordPage = () => {
             <h2 className="text-xl font-semibold mb-2">¡Contraseña restablecida!</h2>
             <p className="text-muted-foreground mb-4">Tu contraseña ha sido actualizada correctamente.</p>
             <Button asChild>
-              <Link href="/login">Iniciar sesión</Link>
+              <Link href="/api/auth/signin">Iniciar sesión</Link>
             </Button>
           </div>
         );
@@ -258,7 +258,7 @@ const ResetPasswordPage = () => {
         {status !== VerificationStatus.VALID && status !== VerificationStatus.LOADING && (
           <CardFooter className="flex justify-center">
             <Button variant="link" asChild>
-              <Link href="/login">Volver al inicio de sesión</Link>
+              <Link href="/api/auth/signin">Volver al inicio de sesión</Link>
             </Button>
           </CardFooter>
         )}
