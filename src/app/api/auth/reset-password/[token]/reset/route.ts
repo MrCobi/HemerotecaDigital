@@ -23,9 +23,9 @@ export async function POST(
       );
     }
 
-    if (!password || typeof password !== "string" || password.length < 8) {
+    if (!password || typeof password !== "string" || password.length < 6) {
       return NextResponse.json(
-        { message: "Contraseña no válida" },
+        { message: "Contraseña no válida. Debe tener al menos 6 caracteres." },
         { status: 400 }
       );
     }
