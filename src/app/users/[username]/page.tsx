@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import Image from "next/image";
@@ -24,6 +24,7 @@ import { Button } from "@/src/app/components/ui/button";
 import { FollowButton } from "@/src/app/components/FollowButton";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { CldImage } from 'next-cloudinary';
+import Loading from "@/src/app/components/Loading";
 
 type Activity = {
   id: string;
@@ -52,7 +53,8 @@ interface UserStats {
 
 export default function UserProfilePage() {
   const { username } = useParams();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [userData, setUserData] = useState<{
     user: User & { stats: UserStats };
   } | null>(null);
@@ -66,6 +68,21 @@ export default function UserProfilePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const [isFollowing, setIsFollowing] = useState(false);
+
+  // Verificación de autenticación
+  useEffect(() => {
+    // Si no está autenticado, redirigir a la página de inicio de sesión
+    if (status === "unauthenticated") {
+      router.push("/api/auth/signin");
+      return;
+    }
+
+    // Verificar que el correo electrónico esté verificado
+    if (status === "authenticated" && !session?.user?.emailVerified) {
+      router.push("/auth/verification-pending");
+      return;
+    }
+  }, [status, session, router]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -107,6 +124,15 @@ export default function UserProfilePage() {
     };
     loadProfile();
   }, [username, session?.user?.id]);
+
+  // Mostrar pantalla de carga mientras se verifica la sesión
+  if (status === "loading") {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loading />
+      </div>
+    );
+  }
 
   if (loading) return <LoadingSpinner />;
 

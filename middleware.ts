@@ -1,164 +1,78 @@
-// middleware.ts
-import { NextResponse } from 'next/server';
-import NextAuth from "next-auth";
-import authConfig from "./auth.config";
+import { NextResponse, NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
-// Usar configuración de NextAuth con verificación estricta de token
-const { auth: middleware } = NextAuth({
-  ...authConfig,
-  // Asegurar que se verifique el token correctamente
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 60, // 30 minutos
-  },
-  // Aumentar seguridad
-  jwt: {
-    maxAge: 30 * 60, // 30 minutos
-  },
-  // Confiar en hosts de desarrollo
-  trustHost: process.env.NODE_ENV === 'development'
-});
-
-// Definición de rutas
-const publicRoutes = new Set([
-  "/",                     // Página principal
-  "/api/auth/signin",      // Página de inicio de sesión en la ruta actual
-  "/api/auth/signup",      // Página de registro en la ruta actual
-  "/acceso-denegado",      // Página de acceso denegado
-  "/api/auth/(.*)",        // Rutas de autenticación (callbacks, etc.)
-  "/api/public/(.*)",      // APIs públicas
-  "/auth/verify-email",    // Página de verificación de correo
-  "/auth/verify-success",  // Página de éxito de verificación
-  "/auth/verify-error",    // Página de error de verificación
-  "/auth/verification-pending",  // Página de verificación pendiente
-  "/auth/resend-verification",    // Página para reenviar verificación
-  "/auth/reset-password",  // Página de restablecimiento de contraseña
-  "/auth/reset-password/(.*)",  // Subrutas de restablecimiento de contraseña
-  "/api/articles",         // API pública de artículos
-  "/api/categories"       // API pública de categorías
-]);
-
-const adminRoutes = new Set([
-  "/admin(.*)",            // Todas las subrutas de admin
-  "/api/admin(.*)"         // APIs de administración
-]);
-
-const authRoutes = new Set([
-  "/api/auth/signin", 
-  "/api/auth/signup"
-]);
-
-// Rutas que no requieren verificación de email pero sí autenticación
-const unverifiedAllowedRoutes = new Set([
-  "/auth/verification-pending",
-  "/auth/resend-verification",
-  "/api/auth/resend-verification"
-]);
-
-export default middleware(async (req) => {
-  const { nextUrl, auth } = req;
-  const pathname = nextUrl.pathname;
-  const isLoggedIn = !!auth?.user;
-  const isAdmin = auth?.user?.role === "admin";
-  const isEmailVerified = !!auth?.user?.emailVerified;
-
-  // Forzar verificación de cookie de sesión en cada solicitud
-  // Bypass de caché para rutas protegidas
-  const headers = new Headers(req.headers);
-  headers.set('x-middleware-cache', 'no-cache');
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
   
-  // 1. Verificar rutas públicas
-  if (publicRoutes.has(pathname) || Array.from(publicRoutes).some(route => new RegExp(`^${route}$`).test(pathname))) {
-    // Si el usuario está autenticado y accede a la página de presentación (/), redirigir a /home
-    if (isLoggedIn && pathname === "/") {
-      return NextResponse.redirect(new URL("/home", nextUrl));
-    }
-    return NextResponse.next({
-      headers: headers
-    });
+  // Lista explícita de rutas públicas que siempre están permitidas
+  const publicPaths = [
+    '/',
+    '/api/auth/signin',
+    '/api/auth/signup',
+    '/api/auth/callback',
+    '/acceso-denegado',
+    '/auth/verify-email',
+    '/auth/verify-success',
+    '/auth/verify-error',
+    '/auth/verification-pending',
+    '/auth/resend-verification',
+    '/auth/reset-password',
+  ];
+  
+  // Lista de patrones que deberían ser públicos
+  const publicPatterns = [
+    /^\/api\/auth\/.*/,         // Rutas API de autenticación
+    /^\/api\/public\/.*/,       // APIs públicas
+    /^\/auth\/reset-password\/.*/,  // Reset de contraseña
+    /^\/_next\/.*/,             // Archivos Next.js
+    /^\/(favicon\.ico|robots\.txt|sitemap\.xml)$/,  // Archivos estáticos comunes
+  ];
+  
+  // Comprueba si la ruta actual es pública
+  const isPublicPath = publicPaths.includes(pathname) || 
+                       publicPatterns.some(pattern => pattern.test(pathname));
+  
+  if (isPublicPath) {
+    return NextResponse.next();
   }
-
-  // 2. Manejar rutas API - Bloquear todas excepto las públicas ya verificadas anteriormente
-  if (pathname.startsWith('/api/')) {
-    if (!isLoggedIn) {
-      return new NextResponse(
-        JSON.stringify({
-          success: false,
-          message: "No autenticado. Debe iniciar sesión para acceder a esta API."
-        }),
-        { 
-          status: 401,
-          headers: { 
-            'content-type': 'application/json',
-            'cache-control': 'no-store, max-age=0' 
-          }
-        }
-      );
-    }
-    
-    // Verificar si el correo electrónico está verificado para APIs protegidas
-    if (!isEmailVerified && !unverifiedAllowedRoutes.has(pathname) && 
-        !Array.from(unverifiedAllowedRoutes).some(route => new RegExp(`^${route}$`).test(pathname))) {
-      return new NextResponse(
-        JSON.stringify({
-          success: false,
-          message: "Cuenta no verificada. Por favor, verifique su correo electrónico."
-        }),
-        { 
-          status: 403,
-          headers: { 
-            'content-type': 'application/json',
-            'cache-control': 'no-store, max-age=0' 
-          }
-        }
-      );
-    }
-  }
-
-  // 3. Redirigir usuarios no autenticados a páginas normales
-  if (!isLoggedIn) {
-    // Para depuración
-    console.log("Usuario no autenticado intentando acceder a:", pathname);
-    
-    // Guardamos la URL a la que intentaba acceder para redirigir después de iniciar sesión
-    const signInUrl = new URL("/api/auth/signin", nextUrl);
-    signInUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(signInUrl);
-  }
-
-  // 4. Verificar si el correo electrónico está verificado
-  if (!isEmailVerified && !unverifiedAllowedRoutes.has(pathname) && 
-      !Array.from(unverifiedAllowedRoutes).some(route => new RegExp(`^${route}$`).test(pathname))) {
-    console.log("Usuario no verificado intentando acceder a:", pathname);
-    return NextResponse.redirect(new URL("/auth/verification-pending", nextUrl));
-  }
-
-  // 5. Verificar rutas de administrador
-  if (Array.from(adminRoutes).some(route => new RegExp(route).test(pathname))) {
-    if (!isAdmin) {
-      return NextResponse.redirect(new URL("/acceso-denegado", nextUrl));
-    }
-    return NextResponse.next({
-      headers: headers
-    });
-  }
-
-  // 6. Redirigir usuarios autenticados que visiten rutas de auth
-  if (authRoutes.has(pathname)) {
-    return NextResponse.redirect(new URL("/home", nextUrl));
-  }
-
-  // Permitir acceso a otras rutas protegidas
-  return NextResponse.next({
-    headers: headers
+  
+  // Para rutas no públicas, verificar el token
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET
   });
-});
+  
+  // Si no hay token, redirigir a inicio de sesión
+  if (!token) {
+    const url = new URL('/api/auth/signin', request.url);
+    url.searchParams.set('callbackUrl', encodeURI(request.url));
+    return NextResponse.redirect(url);
+  }
+  
+  // Verificar si el email está verificado para rutas que lo requieran
+  const isEmailVerified = token.emailVerified ? true : false;
+  const unverifiedAllowedPaths = [
+    '/auth/verification-pending',
+    '/auth/resend-verification',
+    '/api/auth/resend-verification'
+  ];
+  
+  if (!isEmailVerified && !unverifiedAllowedPaths.includes(pathname)) {
+    return NextResponse.redirect(new URL('/auth/verification-pending', request.url));
+  }
+  
+  // Verificar acceso a áreas admin
+  const isAdmin = token.role === "admin";
+  if (pathname.startsWith('/admin') && !isAdmin) {
+    return NextResponse.redirect(new URL('/acceso-denegado', request.url));
+  }
+  
+  return NextResponse.next();
+}
 
 export const config = {
+  // Este matcher capturará todas las rutas, excepto los archivos estáticos y recursos de Next.js
   matcher: [
-    // Excluir archivos estáticos y rutas de Next.js
-    "/((?!.*\\..*|_next).*)",
-    // Incluir explícitamente todas las rutas API
-    "/api/:path*"
-  ],
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ]
 };

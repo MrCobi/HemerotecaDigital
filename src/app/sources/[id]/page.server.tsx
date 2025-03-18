@@ -2,10 +2,25 @@
 import { Source } from "@/src/interface/source";
 import { Article } from "@/src/interface/article";
 import SourcePageClient from "./SourcePageClient";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
 export default async function SourcePage(
   context: { params: Promise<{ id: string }> }
 ) {
+  // Verificación de autenticación
+  const session = await auth();
+  
+  // Verificar si el usuario está autenticado
+  if (!session || !session.user) {
+    redirect("/api/auth/signin");
+  }
+  
+  // Verificar si el correo está verificado
+  if (!session.user.emailVerified) {
+    redirect("/auth/verification-pending");
+  }
+
   // Espera a resolver la promesa para obtener el id
   const { id: sourceId } = await context.params;
 

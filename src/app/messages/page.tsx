@@ -206,6 +206,18 @@ export default function MessagesPage() {
   }, [conversations]);
 
   useEffect(() => {
+    // Verificar autenticación y redireccionar si es necesario
+    if (status === "unauthenticated") {
+      router.push("/api/auth/signin");
+      return;
+    }
+
+    // Verificar que el correo electrónico esté verificado
+    if (status === "authenticated" && !session?.user?.emailVerified) {
+      router.push("/auth/verification-pending");
+      return;
+    }
+
     if (status === "authenticated") {
       let isMounted = true;
 
@@ -233,7 +245,7 @@ export default function MessagesPage() {
       loadData();
       return () => { isMounted = false; };
     }
-  }, [status, processConvResponse, processMutualResponse, mergeAndSort]);
+  }, [status, processConvResponse, processMutualResponse, mergeAndSort, router, session]);
 
   useEffect(() => {
     const combineLists = () => {

@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Source } from "@/src/interface/source";
 import SourcesPage from "@/src/app/components/SourceList";
 import { Button } from "@/src/app/components/ui/button";
 import { Star, ExternalLink, Heart, User } from "lucide-react";
 import Link from "next/link";
 import { API_ROUTES } from "@/src/config/api-routes";
+import Loading from "@/src/app/components/Loading";
 
 interface Favorite {
   id: string;
@@ -25,6 +27,8 @@ interface UserData {
 export default function UserFavoritesPage() {
   const params = useParams();
   const username = params.username as string;
+  const { data: session, status } = useSession();
+  const router = useRouter();
   
   const [favoriteSources, setFavoriteSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +40,21 @@ export default function UserFavoritesPage() {
   const [selectedLanguage, setSelectedLanguage] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const sourcesPerPage = 6;
+
+  // Verificación de autenticación
+  useEffect(() => {
+    // Si no está autenticado, redirigir a la página de inicio de sesión
+    if (status === "unauthenticated") {
+      router.push("/api/auth/signin");
+      return;
+    }
+
+    // Verificar que el correo electrónico esté verificado
+    if (status === "authenticated" && !session?.user?.emailVerified) {
+      router.push("/auth/verification-pending");
+      return;
+    }
+  }, [status, session, router]);
 
   const loadUserData = useCallback(async () => {
     try {
@@ -74,14 +93,16 @@ export default function UserFavoritesPage() {
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      const userId = await loadUserData();
-      if (userId) {
-        await loadFavorites(userId);
-      }
-    };
-    fetchData();
-  }, [loadUserData, loadFavorites]);
+    if (session) {
+      const fetchData = async () => {
+        const userId = await loadUserData();
+        if (userId) {
+          await loadFavorites(userId);
+        }
+      };
+      fetchData();
+    }
+  }, [loadUserData, loadFavorites, session]);
 
   // Filtrado en memoria de los favoritos según búsqueda e idioma
   const filteredSources = favoriteSources.filter((source) => {
@@ -104,6 +125,15 @@ export default function UserFavoritesPage() {
       prev.filter((source) => source.id !== sourceId)
     );
   };
+
+  // Mostrar pantalla de carga mientras se verifica la sesión
+  if (status === "loading") {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loading />
+      </div>
+    );
+  }
 
   if (error) {
     return (

@@ -8,7 +8,8 @@ import Loading from "../components/Loading";
 import NoArticlesError from "@/src/app/components/Article/NoArticlesError";
 import ArticleForm from "@/src/app/components/Article/ArticleForm";
 import Pagination from "@/src/app/components/Article/Pagination";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 const defaultSearchParams = {
   sources: "",
@@ -19,6 +20,8 @@ const defaultSearchParams = {
 };
 
 const Page = () => {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,10 +30,25 @@ const Page = () => {
   const [searchParams, setSearchParams] = useState(defaultSearchParams);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const router = useSearchParams();
-  const urlQuery = router.get("q");
+  const searchParamsHook = useSearchParams();
+  const urlQuery = searchParamsHook.get("q");
   const searchPerformed = useRef(false);
   const queryProcessed = useRef(false);
+
+  // Verificación de autenticación
+  useEffect(() => {
+    // Si no está autenticado, redirigir a la página de inicio de sesión
+    if (status === "unauthenticated") {
+      router.push("/api/auth/signin");
+      return;
+    }
+
+    // Verificar que el correo electrónico esté verificado
+    if (status === "authenticated" && !session?.user?.emailVerified) {
+      router.push("/auth/verification-pending");
+      return;
+    }
+  }, [status, session, router]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -172,6 +190,15 @@ const Page = () => {
     `/images/ArticuloError/ArticuloError${
       Math.floor(Math.random() * 3) + 1
     }.jpg`;
+
+  // Mostrar pantalla de carga mientras se verifica la sesión
+  if (status === "loading") {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loading />
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100">

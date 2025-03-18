@@ -8,9 +8,12 @@ import { Button } from "@/src/app/components/ui/button";
 import { ExternalLink, Heart } from "lucide-react";
 import Link from "next/link";
 import { API_ROUTES } from "@/src/config/api-routes";
+import { useRouter } from "next/navigation";
+import Loading from "@/src/app/components/Loading";
 
 export default function FavoritesPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [favoriteSources, setFavoriteSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,6 +22,21 @@ export default function FavoritesPage() {
   const [selectedLanguage, setSelectedLanguage] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const sourcesPerPage = 6;
+
+  // Verificación de autenticación
+  useEffect(() => {
+    // Si no está autenticado, redirigir a la página de inicio de sesión
+    if (status === "unauthenticated") {
+      router.push("/api/auth/signin");
+      return;
+    }
+
+    // Verificar que el correo electrónico esté verificado
+    if (status === "authenticated" && !session?.user?.emailVerified) {
+      router.push("/auth/verification-pending");
+      return;
+    }
+  }, [status, session, router]);
 
   const loadFavorites = useCallback(async () => {
     if (session?.user?.id) {
@@ -76,6 +94,15 @@ export default function FavoritesPage() {
     (currentPage - 1) * sourcesPerPage,
     currentPage * sourcesPerPage
   );
+
+  // Mostrar pantalla de carga mientras se verifica la sesión
+  if (status === "loading") {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loading />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen ">

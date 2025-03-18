@@ -3,8 +3,12 @@
 import { Source } from "@/src/interface/source";
 import SourcesPage from "@/src/app/components/SourceList";
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function Page() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [sources, setSources] = useState<Source[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -14,6 +18,18 @@ export default function Page() {
   const sourcesPerPage = 6;
 
   useEffect(() => {
+    // Verificar autenticación
+    if (status === "unauthenticated") {
+      router.push("/api/auth/signin");
+      return;
+    }
+
+    // Verificar que el correo electrónico está verificado
+    if (status === "authenticated" && !session?.user?.emailVerified) {
+      router.push("/auth/verification-pending");
+      return;
+    }
+
     const fetchData = async () => {
       try {
         const params = new URLSearchParams({
@@ -34,8 +50,11 @@ export default function Page() {
         setIsLoading(false);
       }
     };
-    fetchData();
-  }, [currentPage, searchTerm, selectedLanguage]);
+
+    if (status === "authenticated") {
+      fetchData();
+    }
+  }, [currentPage, searchTerm, selectedLanguage, status, session, router]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -49,7 +68,8 @@ export default function Page() {
     setSelectedLanguage(language);
   };
 
-  if (isLoading) {
+  // Mostrar loading mientras se verifica la sesión
+  if (status === "loading" || isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>

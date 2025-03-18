@@ -11,6 +11,8 @@ import { motion } from "framer-motion";
 import { Search, Users } from "lucide-react";
 import { Button } from "@/src/app/components/ui/button";
 import { API_ROUTES } from "@/src/config/api-routes";
+import { useRouter } from "next/navigation";
+import Loading from "@/src/app/components/Loading";
 
 type Stats = {
   followers?: number;
@@ -26,7 +28,8 @@ type User = {
 };
 
 export default function ExplorePage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,6 +41,21 @@ export default function ExplorePage() {
     Record<string, boolean>
   >({});
   const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  // Verificación de autenticación
+  useEffect(() => {
+    // Si no está autenticado, redirigir a la página de inicio de sesión
+    if (status === "unauthenticated") {
+      router.push("/api/auth/signin");
+      return;
+    }
+
+    // Verificar que el correo electrónico esté verificado
+    if (status === "authenticated" && !session?.user?.emailVerified) {
+      router.push("/auth/verification-pending");
+      return;
+    }
+  }, [status, session, router]);
 
   // Debounce search input
   useEffect(() => {
@@ -137,6 +155,15 @@ export default function ExplorePage() {
     currentPage * itemsPerPage
   );
   const totalPages = Math.ceil(users.length / itemsPerPage);
+
+  // Mostrar pantalla de carga mientras se verifica la sesión
+  if (status === "loading") {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loading />
+      </div>
+    );
+  }
 
   if (error) {
     return (
