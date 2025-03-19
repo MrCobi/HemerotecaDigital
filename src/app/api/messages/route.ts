@@ -232,11 +232,72 @@ export const GET = withAuth(async (request: Request, { userId }: { userId: strin
   const limit = parseInt(url.searchParams.get('limit') || '50');
   const before = url.searchParams.get('before');
   
+  // Si no hay parámetro "with", devolvemos todas las conversaciones del usuario
   if (!conversationWith) {
-    return new Response(JSON.stringify({ error: 'Se requiere el parámetro "with"' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    try {
+      // Obtener las últimas conversaciones del usuario
+      const conversations = await prisma.directMessage.findMany({
+        where: {
+          OR: [
+            { senderId: userId },
+            { receiverId: userId }
+          ]
+        },
+        orderBy: { createdAt: 'desc' },
+        distinct: ['senderId', 'receiverId'],
+        take: limit,
+        include: {
+          sender: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              username: true
+            }
+          },
+          receiver: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              username: true
+            }
+          }
+        }
+      });
+
+      // Agrupar mensajes por conversación
+      const conversationMap = new Map();
+      
+      for (const message of conversations) {
+        const otherUserId = message.senderId === userId ? message.receiverId : message.senderId;
+        
+        if (!conversationMap.has(otherUserId)) {
+          conversationMap.set(otherUserId, {
+            userId: otherUserId,
+            lastMessage: {
+              ...message,
+              createdAt: message.createdAt.toISOString()
+            },
+            userInfo: message.senderId === userId ? message.receiver : message.sender
+          });
+        }
+      }
+      
+      return new Response(JSON.stringify(Array.from(conversationMap.values())), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (error) {
+      console.error("Error obteniendo conversaciones:", error);
+      return new Response(JSON.stringify({ 
+        error: 'Error al obtener conversaciones',
+        details: error instanceof Error ? error.message : String(error)
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
   }
   
   try {

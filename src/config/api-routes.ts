@@ -89,7 +89,8 @@ export const API_ROUTES = {
   },
   messages: {
     send: "/api/messages",
-    get: (userId: string) => `/api/messages?userId=${userId}`,
+    get: (otherUserId: string) => `/api/messages?with=${otherUserId}`,
+    list: "/api/messages",  // Para obtener todas las conversaciones
     conversations: "/api/messages/conversations",
     createConversation: "/api/messages/conversations/create",
     read: "/api/messages/read",

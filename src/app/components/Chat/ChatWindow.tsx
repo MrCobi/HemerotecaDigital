@@ -477,6 +477,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       });
       
       if (!response.ok) {
+        console.error(`Error al cargar mensajes: ${response.status} ${response.statusText}`);
         throw new Error('No se pudieron cargar los mensajes históricos');
       }
       
