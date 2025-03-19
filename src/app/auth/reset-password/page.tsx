@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { AlertCircle, CheckCircle, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 // Esquema de validación para el formulario
 const resetPasswordSchema = z.object({
@@ -75,7 +76,7 @@ const ResetPasswordPage = () => {
 
       try {
         // Verificar el token con el servidor
-        const response = await fetch(`/api/auth/reset-password/${token}/verify`);
+        const response = await fetch(API_ROUTES.auth.resetPasswordVerify(token));
         const data = await response.json();
 
         if (!response.ok) {
@@ -105,7 +106,7 @@ const ResetPasswordPage = () => {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/auth/reset-password/${token}/reset`, {
+      const response = await fetch(API_ROUTES.auth.resetPasswordReset(token), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -1,6 +1,7 @@
 import prisma from "@/lib/db";
 import { NextResponse } from "next/server";
 import { Article } from "@/src/interface/article";
+import { withAuth } from "../../../lib/auth-utils";
 
 type NewsApiTrend = Article & {
   localSourceId: string | null;
@@ -63,7 +64,7 @@ async function fetchWithRetry(url: string, retries = 3, delay = 1000) {
   throw new Error(`Failed after ${retries} retries`);
 }
 
-export async function GET() {
+export const GET = withAuth(async () => {
   try {
     // 1. Fuentes más favoritadas
     const topFavorites = await prisma.favoriteSource.groupBy({
@@ -156,4 +157,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});

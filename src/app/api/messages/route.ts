@@ -1,13 +1,10 @@
 // src/app/api/messages/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { messageEvents } from "./sse-messages/message-event-manager";
+import { withAuth } from "../../../lib/auth-utils";
 
-export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
-
+export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: any }) => {
   try {
     const { receiverId, content, priority, tempId } = await request.json();
     
@@ -31,13 +28,13 @@ export async function POST(request: Request) {
     const messageId = tempId || `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     
     // Ultra-fast path: Enviar mensaje a ambos clientes inmediatamente, antes de guardar en DB
-    console.log(`ULTRA-FAST PATH: Broadcasting temporary message to sender ${session.user.id} and receiver ${receiverId}`);
+    console.log(`ULTRA-FAST PATH: Broadcasting temporary message to sender ${userId} and receiver ${receiverId}`);
     
     // Mensaje temporal con estructura completa para mostrar en UI inmediatamente
     const tempMessage = {
       id: messageId,
       content,
-      senderId: session.user.id,
+      senderId: userId,
       receiverId,
       read: false,
       createdAt: new Date().toISOString(),
@@ -45,9 +42,9 @@ export async function POST(request: Request) {
       priority: priority || 'normal',
       tempId: messageId, // Incluir el ID temporal para reconciliación posterior
       sender: {
-        id: session.user.id,
-        username: session.user.username || null,
-        image: session.user.image || null
+        id: userId,
+        username: user.username || null,
+        image: user.image || null
       },
       receiver: {
         id: receiverId
@@ -61,15 +58,15 @@ export async function POST(request: Request) {
     
     try {
       // Verificar si los clientes están conectados y emitir mensaje temporal
-      senderConnected = messageEvents.isUserConnected(session.user.id);
+      senderConnected = messageEvents.isUserConnected(userId);
       receiverConnected = messageEvents.isUserConnected(receiverId);
       
       // Registrar el estado de conexión para diagnóstico
-      console.log(`Sender ${session.user.id} connected via SSE: ${senderConnected}`);
+      console.log(`Sender ${userId} connected via SSE: ${senderConnected}`);
       console.log(`Receiver ${receiverId} connected via SSE: ${receiverConnected}`);
       
       // Emitir mensaje temporal inmediatamente si están conectados por SSE
-      if (senderConnected) messageEvents.sendMessage(session.user.id, tempMessage);
+      if (senderConnected) messageEvents.sendMessage(userId, tempMessage);
       if (receiverConnected) messageEvents.sendMessage(receiverId, tempMessage);
     } catch (sseError) {
       console.warn('SSE not available or error occurred, relying on Socket.io:', sseError);
@@ -79,7 +76,7 @@ export async function POST(request: Request) {
     const dbPromise = prisma.directMessage.create({
       data: {
         content,
-        senderId: session.user.id,
+        senderId: userId,
         receiverId,
       },
       select: {
@@ -103,9 +100,9 @@ export async function POST(request: Request) {
           tempId: messageId, // Para reconciliación con el mensaje temporal
           priority: 'high',
           sender: {
-            id: session.user.id,
-            username: session.user.username || null,
-            image: session.user.image || null
+            id: userId,
+            username: user.username || null,
+            image: user.image || null
           },
           receiver: {
             id: receiverId
@@ -117,7 +114,7 @@ export async function POST(request: Request) {
         
         // Emitir el mensaje final con ID real (para actualizar referencias)
         try {
-          if (senderConnected) messageEvents.sendMessage(session.user.id, finalMessage);
+          if (senderConnected) messageEvents.sendMessage(userId, finalMessage);
           if (receiverConnected) messageEvents.sendMessage(receiverId, finalMessage);
         } catch (sseError) {
           console.warn('SSE notification failed for final message, relying on Socket.io:', sseError);
@@ -133,7 +130,7 @@ export async function POST(request: Request) {
           message: 'Error al guardar mensaje'
         };
         try {
-          if (senderConnected) messageEvents.sendMessage(session.user.id, errorMessage);
+          if (senderConnected) messageEvents.sendMessage(userId, errorMessage);
         } catch (sseError) {
           console.warn('SSE error notification failed, relying on Socket.io for error delivery:', sseError);
         }
@@ -162,9 +159,9 @@ export async function POST(request: Request) {
         createdAt: message.createdAt.toISOString(),
         tempId: messageId, // Incluir el ID temporal para que el cliente pueda reemplazar el mensaje temporal
         sender: {
-          id: session.user.id,
-          username: session.user.username || null,
-          image: session.user.image || null
+          id: userId,
+          username: user.username || null,
+          image: user.image || null
         },
         receiver: {
           id: receiverId
@@ -174,7 +171,7 @@ export async function POST(request: Request) {
       // Emitir el mensaje final con ID real de DB (para sustituir al temporal en la UI)
       console.log(`Broadcasting final message with ID ${message.id} (replaces temp ${messageId})`);
       try {
-        if (senderConnected) messageEvents.sendMessage(session.user.id, finalMessage);
+        if (senderConnected) messageEvents.sendMessage(userId, finalMessage);
         if (receiverConnected) messageEvents.sendMessage(receiverId, finalMessage);
       } catch (sseError) {
         console.warn('SSE notification failed for final message, relying on Socket.io for delivery:', sseError);
@@ -201,15 +198,16 @@ export async function POST(request: Request) {
         errorType: 'db_save_failed',
         message: 'Error al guardar mensaje en la base de datos'
       };
+      
       try {
-        if (senderConnected) messageEvents.sendMessage(session.user.id, errorMessage);
+        if (senderConnected) messageEvents.sendMessage(userId, errorMessage);
       } catch (sseError) {
-        console.warn('SSE error notification failed, relying on Socket.io for error delivery:', sseError);
+        console.warn('SSE error notification failed:', sseError);
       }
       
       return new Response(JSON.stringify({
-        error: 'Database Error',
-        message: 'Error saving message to database',
+        error: 'Error al guardar mensaje en la base de datos',
+        errorType: 'db_save_failed',
         tempId: messageId
       }), { 
         status: 500,
@@ -217,79 +215,99 @@ export async function POST(request: Request) {
       });
     }
   } catch (error) {
-    console.error("Error sending message:", error);
+    console.error("Unexpected error in message sending:", error);
     return new Response(JSON.stringify({
-      error: 'Internal Server Error',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Error inesperado al enviar mensaje',
+      details: error instanceof Error ? error.message : String(error)
     }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
   }
-}
+});
 
-export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export const GET = withAuth(async (request: Request, { userId }: { userId: string }) => {
+  const url = new URL(request.url);
+  const conversationWith = url.searchParams.get('with');
+  const limit = parseInt(url.searchParams.get('limit') || '50');
+  const before = url.searchParams.get('before');
+  
+  if (!conversationWith) {
+    return new Response(JSON.stringify({ error: 'Se requiere el parámetro "with"' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
-
+  
   try {
-    const { searchParams } = new URL(req.url);
-    const otherUserId = searchParams.get('userId');
+    // Construir condiciones de búsqueda
+    const whereCondition: any = {
+      OR: [
+        { senderId: userId, receiverId: conversationWith },
+        { senderId: conversationWith, receiverId: userId }
+      ]
+    };
     
-    if (!otherUserId) {
-      return NextResponse.json({ error: 'User ID required' }, { status: 400 });
+    // Añadir condición de paginación si se proporciona 'before'
+    if (before) {
+      whereCondition.createdAt = { lt: new Date(before) };
     }
-
+    
+    // Buscar mensajes
     const messages = await prisma.directMessage.findMany({
-      where: {
-        OR: [
-          { senderId: session.user.id, receiverId: otherUserId },
-          { senderId: otherUserId, receiverId: session.user.id }
-        ]
-      },
-      orderBy: { createdAt: 'asc' },
-      select: {
-        id: true,
-        content: true,
-        senderId: true,
-        receiverId: true,
-        read: true,
-        createdAt: true,
-        sender: { select: { id: true, username: true, image: true } },
-        receiver: { select: { id: true, username: true, image: true } }
-      }
-    });
-
-    const optimizedMessages = messages.map(message => ({
-      ...message,
-      createdAt: message.createdAt.toISOString(),
-      sender: {
-        ...message.sender,
-        username: message.sender.username || null,
-        image: message.sender.image || null
-      },
-      receiver: {
-        ...message.receiver,
-        username: message.receiver.username || null,
-        image: message.receiver.image || null
-      }
-    }));
-
-    return NextResponse.json(optimizedMessages, { 
-      headers: { 
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
+      where: whereCondition,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            username: true
+          }
+        },
+        receiver: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            username: true
+          }
+        }
       }
     });
     
+    // Marcar como leídos los mensajes recibidos
+    if (messages.some(msg => msg.senderId === conversationWith && !msg.read)) {
+      await prisma.directMessage.updateMany({
+        where: {
+          senderId: conversationWith,
+          receiverId: userId,
+          read: false
+        },
+        data: { read: true }
+      });
+    }
+    
+    // Serializar las fechas para JSON
+    const serializedMessages = messages.map(msg => ({
+      ...msg,
+      createdAt: msg.createdAt.toISOString()
+    }));
+    
+    return new Response(JSON.stringify(serializedMessages), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (error) {
     console.error("Error fetching messages:", error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
+    return new Response(JSON.stringify({
+      error: 'Error al obtener mensajes',
+      details: error instanceof Error ? error.message : String(error)
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
-}
+});

@@ -1,18 +1,9 @@
 // src/app/api/comments/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { withAuth } from "../../../lib/auth-utils";
 
-export async function POST(request: Request) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      { message: "Debes iniciar sesión" },
-      { status: 401 }
-    );
-  }
-
+export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: any }) => {
   try {
     const { content, sourceId } = await request.json();
     const trimmedContent = content?.trim() || "";
@@ -47,7 +38,7 @@ export async function POST(request: Request) {
       const newComment = await tx.comment.create({
         data: {
           content: trimmedContent,
-          userId: session.user.id,
+          userId: userId,
           sourceId,
         },
         include: {
@@ -62,20 +53,19 @@ export async function POST(request: Request) {
       });
 
       // 3. Registrar en historial de actividades
-      // Falta el campo userName
       await tx.activityHistory.create({
         data: {
-          userId: session.user.id,
+          userId: userId,
           type: "comment",
           sourceName: sourceExists.name,
-          userName: session.user.name, // Agregar esta línea
+          userName: user.name || "",
           createdAt: new Date(),
         },
       });
 
       // 4. Limitar a 20 actividades
       const activities = await tx.activityHistory.findMany({
-        where: { userId: session.user.id },
+        where: { userId: userId },
         orderBy: { createdAt: "desc" },
       });
 
@@ -106,4 +96,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
+});

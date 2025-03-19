@@ -2,6 +2,16 @@
 const http = require('http');
 const { Server } = require('socket.io');
 const fetch = require('node-fetch');
+const path = require('path');
+const fs = require('fs');
+
+// Definir las rutas API para uso del servidor socket
+const API_BASE_URL = 'http://localhost:3000';
+const API_ROUTES = {
+  messages: {
+    socket: `${API_BASE_URL}/api/messages/socket`
+  }
+};
 
 // Configuración de puerto y URL del socket
 const SOCKET_PORT = process.env.SOCKET_PORT || 3001;
@@ -116,7 +126,7 @@ io.on('connection', (socket) => {
       // IMPORTANTE: Guardar el mensaje en la base de datos
       try {
         // Hacer una petición a la API para guardar el mensaje
-        const response = await fetch('http://localhost:3000/api/messages/socket', {
+        const response = await fetch(API_ROUTES.messages.socket, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

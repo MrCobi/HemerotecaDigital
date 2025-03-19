@@ -151,6 +151,7 @@ const useCounter = (end: number, duration: number = 2000) => {
 
 const TrendsSection = () => {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [trends, setTrends] = useState<Trends>({
     api: [],
     favorites: [],
@@ -159,6 +160,12 @@ const TrendsSection = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("api");
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/api/auth/signin");
+    }
+  }, [status, router]);
 
   const handleTrendClick = (trend: Trend, type: string) => {
     if (type === "favorite" || type === "comment") {
@@ -171,48 +178,50 @@ const TrendsSection = () => {
   };
 
   useEffect(() => {
-    const fetchTrends = async () => {
-      try {
-        const response = await fetch(API_ROUTES.trends.list); // Usando la ruta centralizada
-        const { data } = await response.json();
-  
-        setTrends({
-          api: data.trends.slice(0, 8),
-          favorites: data.favorites
-            .map(
-              (item: {
-                _count: { sourceId: number };
-                sourceName: string;
-                sourceId: string;
-              }) => ({
-                sourceId: item.sourceId,
-                sourceName: item.sourceName,
-                count: item._count.sourceId,
-              })
-            )
-            .slice(0, 8),
-          comments: data.comments
-            .map(
-              (item: {
-                _count: { sourceId: number };
-                sourceName: string;
-                sourceId: string;
-              }) => ({
-                sourceId: item.sourceId,
-                sourceName: item.sourceName,
-                count: item._count.sourceId,
-              })
-            )
-            .slice(0, 8),
-        });
-      } catch (error) {
-        console.error("Error fetching trends:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchTrends();
-  }, []);
+    if (status === "authenticated") {
+      const fetchTrends = async () => {
+        try {
+          const response = await fetch(API_ROUTES.trends.popular); // Usando la ruta centralizada
+          const { data } = await response.json();
+    
+          setTrends({
+            api: data.trends.slice(0, 8),
+            favorites: data.favorites
+              .map(
+                (item: {
+                  _count: { sourceId: number };
+                  sourceName: string;
+                  sourceId: string;
+                }) => ({
+                  sourceId: item.sourceId,
+                  sourceName: item.sourceName,
+                  count: item._count.sourceId,
+                })
+              )
+              .slice(0, 8),
+            comments: data.comments
+              .map(
+                (item: {
+                  _count: { sourceId: number };
+                  sourceName: string;
+                  sourceId: string;
+                }) => ({
+                  sourceId: item.sourceId,
+                  sourceName: item.sourceName,
+                  count: item._count.sourceId,
+                })
+              )
+              .slice(0, 8),
+          });
+        } catch (error) {
+          console.error("Error fetching trends:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchTrends();
+    }
+  }, [status]);
 
   if (isLoading) {
     return (

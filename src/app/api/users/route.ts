@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { auth } from "@/auth";
-import { PrismaClient } from "@prisma/client";
+import { withAuth } from "../../../lib/auth-utils";
 
-export async function GET(req: Request) {
+// Esta ruta es solo para administradores
+export const GET = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }) => {
   try {
-    const session = await auth();
-    if (!session?.user || session.user.role !== "admin") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    // Verificar si el usuario es admin
+    if (user.role !== "admin") {
+      return NextResponse.json({ error: "Acceso denegado: se requieren permisos de administrador" }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -22,11 +22,9 @@ export async function GET(req: Request) {
         { username: { contains: search, mode: "insensitive" } }
       ]
     } : {};
-
-    const prismaTyped = prisma as PrismaClient;
     
     const [users, total] = await Promise.all([
-      prismaTyped.user.findMany({
+      prisma.user.findMany({
         where,
         select: {
           id: true,
@@ -40,7 +38,7 @@ export async function GET(req: Request) {
         take: limit,
         orderBy: { createdAt: "desc" }
       }),
-      prismaTyped.user.count({ where })
+      prisma.user.count({ where })
     ]);
 
     return NextResponse.json({
@@ -59,4 +57,4 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
-}
+});

@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { PrismaClient } from "@prisma/client";
+import { withAuth } from "../../../../lib/auth-utils";
 
-export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export const GET = withAuth(async (req: Request, { userId }: { userId: string }) => {
   try {
     const { searchParams } = new URL(req.url);
     
@@ -25,7 +20,7 @@ export async function GET(req: Request) {
 
     // Obtener los IDs de los usuarios seguidos con información de showActivity
     const following = await prismaTyped.follow.findMany({
-      where: { followerId: session.user.id },
+      where: { followerId: userId },
       include: {
         following: {
           select: {
@@ -79,4 +74,4 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
-}
+});

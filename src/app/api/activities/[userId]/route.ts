@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { PrismaClient } from "@prisma/client";
+import { withAuth } from "../../../../lib/auth-utils";
 
 export const dynamic = 'force-dynamic';
 
@@ -12,10 +13,11 @@ interface ActivityResult {
   total: number | bigint;
 }
 
-export async function GET(
+export const GET = withAuth(async (
   request: Request,
+  { userId: currentUserId }: { userId: string },
   context: { params: Promise<{ userId: string }> }
-) {
+) => {
   try {
     const { userId } = await context.params;
 
@@ -77,4 +79,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});

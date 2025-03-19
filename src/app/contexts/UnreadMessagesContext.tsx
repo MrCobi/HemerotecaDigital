@@ -2,6 +2,7 @@
 
 import React, { createContext, useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 // Definir la interfaz del contexto
 export interface UnreadMessagesContextType {
@@ -26,7 +27,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
 
     try {
       // Agregar parámetro de tiempo para evitar caché
-      const res = await fetch(`/api/messages/unread/count?t=${Date.now()}`, {
+      const res = await fetch(`${API_ROUTES.messages.unreadCount}?t=${Date.now()}`, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',

@@ -6,7 +6,6 @@ export async function middleware(request: NextRequest) {
   
   // Lista explícita de rutas públicas que siempre están permitidas
   const publicPaths = [
-    '/',
     '/api/auth/signin',
     '/api/auth/signup',
     '/api/auth/callback',
@@ -22,10 +21,9 @@ export async function middleware(request: NextRequest) {
   // Lista de patrones que deberían ser públicos
   const publicPatterns = [
     /^\/api\/auth\/.*/,         // Rutas API de autenticación
-    /^\/api\/public\/.*/,       // APIs públicas
-    /^\/auth\/reset-password\/.*/,  // Reset de contraseña
     /^\/_next\/.*/,             // Archivos Next.js
     /^\/(favicon\.ico|robots\.txt|sitemap\.xml)$/,  // Archivos estáticos comunes
+    /^\/auth\/reset-password\/.*/,  // Reset de contraseña
   ];
   
   // Comprueba si la ruta actual es pública

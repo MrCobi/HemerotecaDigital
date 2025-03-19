@@ -278,7 +278,7 @@ export default function UserProfilePage() {
                           onClick={async () => {
                             // Verificar si hay seguimiento mutuo
                             try {
-                              const res = await fetch(`/api/relationships/check?targetUserId=${user.id}`);
+                              const res = await fetch(API_ROUTES.relationships.checkFollowing(user.id));
                               const data = await res.json();
                               
                               if (data.isMutualFollow) {
@@ -286,17 +286,24 @@ export default function UserProfilePage() {
                                 window.location.href = "/messages";
                               } else {
                                 // Mostrar una alerta si no hay seguimiento mutuo
-                                alert("Para enviar mensajes, ambos usuarios deben seguirse mutuamente.");
+                                alert("Esta acción requiere que ambos usuarios se sigan mutuamente.");
                               }
                             } catch (error) {
-                              console.error("Error:", error);
-                              alert("Hubo un error al intentar iniciar la conversación.");
+                              console.error("Error al verificar relación:", error);
+                              alert("Ha ocurrido un error al verificar la relación entre usuarios.");
                             }
                           }}
-                          variant="outline"
-                          className="bg-blue-600 hover:bg-blue-700 text-white border-0"
+                          className="w-full flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-500 to-teal-400 text-white rounded-lg shadow hover:from-blue-600 hover:to-teal-500 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all"
                         >
-                          <MessageSquare className="mr-2 h-4 w-4" />
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5 mr-2"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V7a2 2 0 012-2h7z" />
+                            <path d="M12 8v2m0 4h.01M5 6a1 1 0 00-1 1v2a1 1 0 110 2H9v-2H6a1 1 0 00-1-1z" />
+                          </svg>
                           Enviar mensaje
                         </Button>
                       )}

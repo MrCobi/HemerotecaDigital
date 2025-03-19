@@ -5,6 +5,7 @@ import SourcesPage from "@/src/app/components/SourceList";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 export default function Page() {
   const { data: session, status } = useSession();
@@ -32,14 +33,12 @@ export default function Page() {
 
     const fetchData = async () => {
       try {
-        const params = new URLSearchParams({
-          page: currentPage.toString(),
-          limit: sourcesPerPage.toString(),
-          ...(searchTerm && { search: searchTerm }),
-          ...(selectedLanguage !== "all" && { language: selectedLanguage })
-        });
-
-        const response = await fetch(`/api/sources?${params}`);
+        const response = await fetch(API_ROUTES.sources.list(
+          currentPage,
+          sourcesPerPage,
+          selectedLanguage !== "all" ? selectedLanguage : undefined,
+          searchTerm || undefined
+        ));
         const data = await response.json();
 
         setSources(data.sources);

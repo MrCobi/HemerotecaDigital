@@ -1,5 +1,6 @@
 // lib/api.ts
 import { Article } from "@/src/interface/article";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 export type PrivacySettings = {
   showFavorites: boolean;
@@ -8,7 +9,7 @@ export type PrivacySettings = {
 
 export async function updatePrivacySettings(settings: PrivacySettings) {
   try {
-    const response = await fetch('/api/user/privacy', {
+    const response = await fetch(API_ROUTES.users.privacy, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(settings),
@@ -28,7 +29,7 @@ export async function updatePrivacySettings(settings: PrivacySettings) {
 
 export async function getUserPrivacySettings(): Promise<PrivacySettings> {
   try {
-    const response = await fetch('/api/user/privacy', {
+    const response = await fetch(API_ROUTES.users.privacy, {
       next: { tags: ['privacy-settings'] }
     });
     
@@ -60,45 +61,34 @@ export async function fetchArticulosDestacados(): Promise<Article[]> {
   }
 
   try {
-    const apiUrl = new URL("https://newsapi.org/v2/everything");
-    apiUrl.searchParams.set("q", encodeURIComponent("news"));
-    apiUrl.searchParams.set("language", "es");
-    apiUrl.searchParams.set("sortBy", "publishedAt");
-    apiUrl.searchParams.set("pageSize", "21");
-    apiUrl.searchParams.set("apiKey", process.env.NEXT_PUBLIC_NEWS_API_KEY!);
-
-    const response = await fetch(apiUrl.toString());
+    // Importante: Para evitar problemas con la API, usamos fetch al endpoint propio
+    // en lugar de llamar directamente a NewsAPI
+    const response = await fetch(API_ROUTES.articles.featured);
     
     if (!response.ok) {
       throw new Error(`Error: ${response.status}`);
     }
 
     const data = await response.json();
+    const articles = data.articles || [];
     
-    const articles = data.articles.map((article: Article) => ({
-      source: article.source?.name || "NewsAPI",
-      author: article.author || "Anónimo",
-      title: article.title,
-      description: article.description,
-      url: article.url,
-      urlToImage: article.urlToImage,
-      publishedAt: article.publishedAt,
-      content: article.content,
-    }));
-
     // Guardar en caché
     sessionStorage.setItem(
       CACHE_KEY,
       JSON.stringify({
         data: articles,
-        timestamp: now
+        timestamp: now,
       })
     );
 
     return articles;
-
   } catch (error) {
-    console.error("Error fetching destacados:", error);
-    return [];
+    console.error("Error obteniendo artículos destacados:", error);
+    // En caso de error, intentar usar datos en caché si existen, aunque estén vencidos
+    if (cachedData) {
+      const { data } = JSON.parse(cachedData);
+      return data;
+    }
+    return []; // Devolver array vacío si no hay datos
   }
 }

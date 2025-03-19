@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Source } from "@/src/interface/source";
 import { Button } from "@/src/app/components/ui/button";
 import { Card } from "@/src/app/components/ui/card";
+import { API_ROUTES } from "@/src/config/api-routes";
 import {
   LogOut,
   ChevronRight,
@@ -74,11 +75,11 @@ export default function DashboardPage() {
     const loadFavorites = async () => {
       if (session?.user?.id) {
         try {
-          const favoritesResponse = await fetch("/api/favorites/list");
+          const favoritesResponse = await fetch(API_ROUTES.favorites.list);
           const favoritesData = await favoritesResponse.json();
           const favoriteIds = favoritesData.favoriteIds;
 
-          const detailsResponse = await fetch("/api/sources/details", {
+          const detailsResponse = await fetch(API_ROUTES.sources.details, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -105,7 +106,7 @@ export default function DashboardPage() {
       if (session?.user?.id) {
         try {
           const response = await fetch(
-            `/api/comments/user/count/${session.user.id}`
+            API_ROUTES.comments.userCount(session.user.id)
           );
           const data = await response.json();
           setCommentCount(data.count);
@@ -150,7 +151,7 @@ export default function DashboardPage() {
       if (session?.user?.id) {
         try {
           const response = await fetch(
-            `/api/activities/${session.user.id}?page=${currentPage}&limit=${itemsPerPage}`
+            API_ROUTES.activities.user(session.user.id, currentPage, itemsPerPage)
           );
           const data = await response.json();
 
@@ -174,7 +175,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (session?.user?.id) {
       // Obtener el número de seguidores
-      fetch(`/api/users/${session.user.id}/followers?limit=1`)
+      fetch(API_ROUTES.relationships.followers(session.user.id, 1, 1))
         .then((response) => response.json())
         .then((data) => {
           // En tu endpoint de followers, el count se devuelve en data.meta.total
@@ -185,7 +186,7 @@ export default function DashboardPage() {
         );
 
       // Obtener el número de seguidos
-      fetch(`/api/users/${session.user.id}/following?limit=1`)
+      fetch(API_ROUTES.relationships.following(session.user.id, 1, 1))
         .then((response) => response.json())
         .then((data) => {
           // En el endpoint de following, el count se devuelve en data.total

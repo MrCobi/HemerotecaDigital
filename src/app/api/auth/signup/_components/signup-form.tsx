@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 const ExtendedSignUpSchema = SignUpSchema.extend({
   confirmPassword: z.string()
@@ -108,7 +109,7 @@ export default function SignupForm() {
         }
       };
 
-      xhr.open("POST", "/api/upload");
+      xhr.open("POST", API_ROUTES.auth.registerUpload);
       xhr.send(formData);
     });
   }, []);

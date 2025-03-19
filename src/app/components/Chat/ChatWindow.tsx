@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { flushSync } from 'react-dom';
 import useSocket, { MessageType } from '@/src/hooks/useSocket';
-
+import { API_ROUTES } from '@/src/config/api-routes';
 
 type User = {
   id: string;
@@ -305,7 +305,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       
       // RESPALDO: También enviar el mensaje a la API REST para garantizar persistencia
       try {
-        const response = await fetch('/api/messages', {
+        const response = await fetch(API_ROUTES.messages.send, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -469,7 +469,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     console.log(`Cargando mensajes históricos de la conversación entre ${currentUserId} y ${otherUser.id}`);
     
     try {
-      const response = await fetch(`/api/messages?userId=${otherUser.id}`, {
+      const response = await fetch(API_ROUTES.messages.get(otherUser.id), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

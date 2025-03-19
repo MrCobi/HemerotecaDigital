@@ -16,6 +16,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 // Esquema de validación para el email
 const forgotPasswordSchema = z.object({
@@ -25,7 +26,7 @@ const forgotPasswordSchema = z.object({
 // Acción para solicitar reseteo de contraseña (a implementar en actions/auth-action.ts)
 const requestPasswordReset = async (email: string): Promise<{ success: boolean; error?: string }> => {
   try {
-    const res = await fetch('/api/auth/reset-password', {
+    const res = await fetch(API_ROUTES.auth.resetPassword, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

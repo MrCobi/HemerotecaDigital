@@ -1,23 +1,12 @@
 // src/app/api/users/suggestions/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { auth } from "@/auth";
+import { withAuth } from "../../../../lib/auth-utils";
 
-export async function GET(req: Request) {
-  const session = await auth();
+export const GET = withAuth(async (req: Request, { userId }: { userId: string }) => {
   try {
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
-    const userId = session.user.id;
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("query")?.toLowerCase() || "";
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "ID de usuario requerido" },
-        { status: 400 }
-      );
-    }
 
     const users = await prisma.user.findMany({
       where: {
@@ -52,4 +41,4 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
-}
+});

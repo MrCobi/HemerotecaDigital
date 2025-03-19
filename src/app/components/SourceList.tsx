@@ -31,6 +31,7 @@ import { useRouter } from "next/navigation";
 import { Source } from "@/src/interface/source";
 import { useSession } from "next-auth/react";
 import { debounce } from "lodash";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 const languages = [
   { code: "es", name: "Español", flag: "🇪🇸" },
@@ -53,6 +54,7 @@ interface SourcesListProps {
   showFilters?: boolean;
   showPagination?: boolean;
   isFavoritePage?: boolean;
+  isLoading?: boolean;
   onFavoriteUpdate?: (sourceId: string) => void;
   onPageChange: (page: number) => void;
   onSearch: (term: string) => void;
@@ -68,6 +70,7 @@ export default function SourcesPage({
   showFilters = true,
   showPagination = true,
   isFavoritePage = false,
+  isLoading = false,
   onFavoriteUpdate,
   onPageChange,
   onSearch,
@@ -88,7 +91,7 @@ export default function SourcesPage({
   const loadFavorites = useCallback(async () => {
     if (session?.user?.id) {
       try {
-        const response = await fetch("/api/favorites/list");
+        const response = await fetch(API_ROUTES.favorites.list);
         if (response.ok) {
           const data = await response.json();
           setFavorites(new Set(data.favoriteIds));
@@ -127,7 +130,7 @@ export default function SourcesPage({
 
     try {
       if (favorites.has(sourceId)) {
-        await fetch("/api/favorites/remove", {
+        await fetch(API_ROUTES.favorites.removeByPost, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sourceId }),
@@ -138,7 +141,7 @@ export default function SourcesPage({
           return newFav;
         });
       } else {
-        await fetch("/api/favorites/add", {
+        await fetch(API_ROUTES.favorites.add, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sourceId }),
@@ -146,7 +149,7 @@ export default function SourcesPage({
         setFavorites((prev) => new Set(prev).add(sourceId));
       }
     } catch (error) {
-      console.error("Error al actualizar favoritos:", error);
+      console.error("Error al cambiar favorito:", error);
     }
   };
 
@@ -248,74 +251,92 @@ export default function SourcesPage({
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {sources.map((source, index) => (
-            <div
-              key={source.id}
-              className={`transform transition-all duration-500 ${
-                isLoaded
-                  ? "opacity-100 translate-y-0"
-                  : "opacity-0 translate-y-10"
-              }`}
-              style={{ transitionDelay: `${index * 100}ms` }}
-            >
-              <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-blue-100 group hover:scale-[1.02]">
-                <div className="relative h-48">
-                  <div
-                    className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
-                    style={{
-                      backgroundImage: `url(${source.imageUrl})`,
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  <div className="absolute top-4 right-4 bg-white/90 px-3 py-1 rounded-full text-sm font-medium text-gray-800 flex items-center shadow-lg">
-                    {languages.find((l) => l.code === source.language)?.flag}{" "}
-                    <span className="ml-2">
-                      {languages.find((l) => l.code === source.language)?.name}
-                    </span>
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 opacity-60 pointer-events-none">
+            {Array.from({ length: sources.length > 0 ? sources.length : 6 }).map((_, idx) => (
+              <div key={`skeleton-${idx}`} className="relative h-48 rounded-lg bg-gray-200 dark:bg-gray-800 animate-pulse">
+                <div className="h-full flex flex-col p-6">
+                  <div className="h-6 w-3/4 bg-gray-300 dark:bg-gray-700 rounded mb-4"></div>
+                  <div className="h-4 w-full bg-gray-300 dark:bg-gray-700 rounded mb-2"></div>
+                  <div className="h-4 w-2/3 bg-gray-300 dark:bg-gray-700 rounded mb-6"></div>
+                  <div className="mt-auto flex justify-between items-center">
+                    <div className="h-8 w-28 bg-gray-300 dark:bg-gray-700 rounded"></div>
+                    <div className="h-6 w-20 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-4 left-4 text-red-400 hover:text-red-500 bg-white/90 backdrop-blur-sm hover:bg-white/100 shadow-md hover:shadow-lg"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(source.id);
-                    }}
-                  >
-                    <Heart
-                      className={`w-6 h-6 ${
-                        favorites.has(source.id)
-                          ? "fill-current stroke-red-600"
-                          : "stroke-current stroke-2"
-                      }`}
-                    />
-                  </Button>
                 </div>
-                <CardHeader>
-                  <CardTitle className="text-blue-900">{source.name}</CardTitle>
-                  <CardDescription>{source.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center">
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {sources.map((source, index) => (
+              <div
+                key={source.id}
+                className={`transform transition-all duration-500 ${
+                  isLoaded
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 translate-y-10"
+                }`}
+                style={{ transitionDelay: `${index * 100}ms` }}
+              >
+                <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-blue-100 group hover:scale-[1.02]">
+                  <div className="relative h-48">
+                    <div
+                      className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
+                      style={{
+                        backgroundImage: `url(${source.imageUrl})`,
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute top-4 right-4 bg-white/90 px-3 py-1 rounded-full text-sm font-medium text-gray-800 flex items-center shadow-lg">
+                      {languages.find((l) => l.code === source.language)?.flag}{" "}
+                      <span className="ml-2">
+                        {languages.find((l) => l.code === source.language)?.name}
+                      </span>
+                    </div>
                     <Button
-                      variant="default"
-                      size="sm"
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => navigateToSource(source.id)}
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-4 left-4 text-red-400 hover:text-red-500 bg-white/90 backdrop-blur-sm hover:bg-white/100 shadow-md hover:shadow-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(source.id);
+                      }}
                     >
-                      <Info className="w-4 h-4 mr-2" />
-                      Ver detalles
+                      <Heart
+                        className={`w-6 h-6 ${
+                          favorites.has(source.id)
+                            ? "fill-current stroke-red-600"
+                            : "stroke-current stroke-2"
+                        }`}
+                      />
                     </Button>
-                    <span className="text-sm text-blue-600 font-medium px-3 py-1 bg-blue-50 rounded-full">
-                      {source.category}
-                    </span>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          ))}
-        </div>
+                  <CardHeader>
+                    <CardTitle className="text-blue-900">{source.name}</CardTitle>
+                    <CardDescription>{source.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex justify-between items-center">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => navigateToSource(source.id)}
+                      >
+                        <Info className="w-4 h-4 mr-2" />
+                        Ver detalles
+                      </Button>
+                      <span className="text-sm text-blue-600 font-medium px-3 py-1 bg-blue-50 rounded-full">
+                        {source.category}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ))}
+          </div>
+        )}
 
         {showPagination && totalSources > sourcesPerPage && (
           <div className="mt-12 flex flex-col items-center space-y-4">
@@ -399,7 +420,7 @@ export default function SourcesPage({
           </div>
         )}
 
-        {sources.length === 0 && (
+        {sources.length === 0 && !isLoading && (
           <div className="text-center py-16 bg-white/50 backdrop-blur-sm rounded-xl border border-blue-100">
             <Search className="w-16 h-16 mx-auto text-blue-300 mb-4" />
             <h3 className="text-2xl font-bold text-blue-900 mb-2">

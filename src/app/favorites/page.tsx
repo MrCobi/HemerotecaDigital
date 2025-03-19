@@ -46,7 +46,7 @@ export default function FavoritesPage() {
         const favoritesData = await favoritesResponse.json();
         const favoriteIds = favoritesData.favoriteIds;
   
-        const detailsResponse = await fetch("/api/sources/details", {
+        const detailsResponse = await fetch(API_ROUTES.sources.details, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

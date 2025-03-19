@@ -1,17 +1,11 @@
 // src/app/api/favorites/list/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { withAuth } from "../../../../lib/auth-utils";
 
 // Este endpoint es transitorio hasta que todas las referencias
 // del frontend hayan sido actualizadas a la nueva estructura API
-export async function GET(request: Request) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
-  }
-
+export const GET = withAuth(async (request: Request, { userId }: { userId: string }) => {
   try {
     const { searchParams } = new URL(request.url);
     const page = Math.max(Number(searchParams.get("page") || 1), 1);
@@ -21,7 +15,7 @@ export async function GET(request: Request) {
     const [favorites, total] = await Promise.all([
       prisma.favoriteSource.findMany({
         where: { 
-          userId: session.user.id 
+          userId: userId
         },
         include: {
           source: true
@@ -32,7 +26,7 @@ export async function GET(request: Request) {
       }),
       prisma.favoriteSource.count({
         where: { 
-          userId: session.user.id 
+          userId: userId
         }
       })
     ]);
@@ -65,4 +59,4 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
-}
+});

@@ -1,32 +1,71 @@
 import { NextResponse } from "next/server";
+import prisma from "@/lib/db";
+import { withAuth } from "../../../../lib/auth-utils";
+import { NextRequest } from "next/server";
 
 // Esta es una ruta de compatibilidad transitoria
 // que redirige las solicitudes a la API actualizada en /api/favorites
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (req: NextRequest, { userId }: { userId: string }) => {
   try {
-    // Extraer los datos del cuerpo de la solicitud
+    // Extraer el sourceId del cuerpo de la solicitud
     const body = await req.json();
+    const { sourceId } = body;
 
-    // Reenviar la solicitud al endpoint principal de favoritos
-    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/favorites`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Pasar la cookie de autenticación
-        "Cookie": req.headers.get("cookie") || "",
-      },
-      body: JSON.stringify(body),
+    if (!sourceId) {
+      return NextResponse.json(
+        { error: "Se requiere sourceId" },
+        { status: 400 }
+      );
+    }
+
+    // Verificar si la fuente existe
+    const source = await prisma.source.findUnique({
+      where: { id: sourceId },
     });
 
-    // Devolver la respuesta tal cual la recibimos
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
-  } catch (error) {
-    console.error("Error en la compatibilidad transitoria de añadir favorito:", error);
+    if (!source) {
+      return NextResponse.json(
+        { error: "La fuente especificada no existe" },
+        { status: 404 }
+      );
+    }
+
+    // Verificar si ya está en favoritos
+    const existingFavorite = await prisma.favoriteSource.findFirst({
+      where: {
+        userId,
+        sourceId,
+      },
+    });
+
+    if (existingFavorite) {
+      return NextResponse.json(
+        { message: "Esta fuente ya está en tus favoritos" },
+        { status: 200 }
+      );
+    }
+
+    // Añadir a favoritos
+    const favorite = await prisma.favoriteSource.create({
+      data: {
+        userId,
+        sourceId,
+      },
+    });
+
     return NextResponse.json(
-      { error: "Error al procesar la solicitud para añadir favorito" },
+      { 
+        message: "Fuente añadida a favoritos con éxito",
+        success: true
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Error al añadir favorito:", error);
+    return NextResponse.json(
+      { error: "Error al añadir favorito" },
       { status: 500 }
     );
   }
-}
+});

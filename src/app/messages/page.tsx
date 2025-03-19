@@ -11,6 +11,7 @@ import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 import useSocket, { MessageType } from "@/src/hooks/useSocket";
 import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 import { CldImage } from "next-cloudinary";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 interface User {
   id: string;
@@ -224,8 +225,8 @@ export default function MessagesPage() {
       const loadData = async () => {
         try {
           const [convRes, mutualRes] = await Promise.all([
-            fetch(`/api/messages/conversations?page=1&limit=${CONVERSATIONS_PER_PAGE}`),
-            fetch("/api/relationships/mutual")
+            fetch(`${API_ROUTES.messages.conversations}?page=1&limit=${CONVERSATIONS_PER_PAGE}`),
+            fetch(API_ROUTES.relationships.mutual)
           ]);
 
           if (isMounted) {
@@ -315,7 +316,7 @@ export default function MessagesPage() {
     
     const fetchConversations = async () => {
       try {
-        const res = await fetch(`/api/messages/conversations?t=${Date.now()}`);
+        const res = await fetch(`${API_ROUTES.messages.conversations}?t=${Date.now()}`);
         if (res.ok) {
           const newConversations = await processConvResponse(res);
           
@@ -506,7 +507,7 @@ export default function MessagesPage() {
       }
       
       setMutualFollowers(prev => prev.filter(user => user?.id !== userId));
-      const res = await fetch("/api/messages/conversations/create", {
+      const res = await fetch(`${API_ROUTES.messages.conversations}/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),

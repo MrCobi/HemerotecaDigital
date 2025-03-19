@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Source } from "@/src/interface/source";
 import { Article } from "@/src/interface/article";
 import { SourceImage } from "./SourceImage.client";
-import { StarRating } from "@/src/app/components/StarRating.client";
+import StarRating from "@/src/app/components/StarRating.client";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import CommentForm from "@/src/app/components/Comments/CommentForm";
@@ -90,27 +90,32 @@ export default function SourcePageClient({
     }
   };
 
-  const loadArticles = async (order: typeof sortBy) => {
-    const cacheKey = `articles_${source.id}_${order}`;
-    const cachedArticles = sessionStorage.getItem(cacheKey);
-  
-    if (cachedArticles) {
-      setArticles(JSON.parse(cachedArticles));
-    } else {
+  const loadArticles = async (order: typeof sortBy = sortBy) => {
+    const cacheKey = `source_${source.id}_articles_${order}`;
+    const cachedData = sessionStorage.getItem(cacheKey);
+
+    if (cachedData) {
       try {
-        const response = await fetch(
-          `/api/sources/${source.id}/articles?sortBy=${order}&language=${source.language}`
-        );
-        
-        if (!response.ok) throw new Error("Error fetching articles");
-        
-        const fetchedArticles = await response.json();
-        setArticles(fetchedArticles);
-        sessionStorage.setItem(cacheKey, JSON.stringify(fetchedArticles));
+        setArticles(JSON.parse(cachedData));
+        return;
       } catch (error) {
-        console.error("Error fetching articles:", error);
-        setArticles([]);
+        console.error("Error parsing cached articles:", error);
       }
+    }
+
+    try {
+      const response = await fetch(
+        `${window.location.origin}${API_ROUTES.sources.articles(source.id, order, source.language)}`
+      );
+      
+      if (!response.ok) throw new Error("Error fetching articles");
+      
+      const fetchedArticles = await response.json();
+      setArticles(fetchedArticles);
+      sessionStorage.setItem(cacheKey, JSON.stringify(fetchedArticles));
+    } catch (error) {
+      console.error("Error fetching articles:", error);
+      setArticles([]);
     }
   };
 

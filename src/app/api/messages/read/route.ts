@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { withAuth } from "../../../../lib/auth-utils";
 
 // POST para marcar mensajes como leídos
-export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-  
+export const POST = withAuth(async (req: Request, { userId }: { userId: string }) => {
   // Obtener el ID del remitente de los mensajes que queremos marcar como leídos
   const { searchParams } = new URL(req.url);
   const senderId = searchParams.get("senderId");
@@ -22,7 +17,7 @@ export async function POST(req: Request) {
     const result = await prisma.directMessage.updateMany({
       where: {
         senderId: senderId,
-        receiverId: session.user.id,
+        receiverId: userId,
         read: false
       },
       data: {
@@ -41,4 +36,4 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-}
+});

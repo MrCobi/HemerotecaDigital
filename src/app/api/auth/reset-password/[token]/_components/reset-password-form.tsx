@@ -15,6 +15,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 // Esquema de validación para el cambio de contraseña
 const resetPasswordSchema = z.object({
@@ -35,7 +36,7 @@ const resetPasswordSchema = z.object({
 // Acción para cambiar la contraseña
 const resetPassword = async (token: string, password: string): Promise<{ success: boolean; error?: string }> => {
   try {
-    const response = await fetch(`/api/auth/reset-password/${token}/reset`, {
+    const response = await fetch(API_ROUTES.auth.resetPasswordReset(token), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -58,7 +59,7 @@ const resetPassword = async (token: string, password: string): Promise<{ success
 // Verificar si el token es válido
 const verifyToken = async (token: string): Promise<{ valid: boolean; userId?: string; error?: string }> => {
   try {
-    const response = await fetch(`/api/auth/reset-password/${token}/verify`, {
+    const response = await fetch(API_ROUTES.auth.resetPasswordVerify(token), {
       method: 'GET',
     });
 

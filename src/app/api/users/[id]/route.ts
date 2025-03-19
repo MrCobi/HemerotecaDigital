@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
-import { auth } from "@/auth";
+import { withAuth } from "../../../../lib/auth-utils";
 
 // GET para obtener detalles de un usuario específico
 export async function GET(req: Request, context: { params: Promise<{ id?: string }> }) {
@@ -43,18 +43,13 @@ export async function GET(req: Request, context: { params: Promise<{ id?: string
 }
 
 // PUT para actualizar un usuario existente
-export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
+export const PUT = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }, context: { params: Promise<{ id: string }> }) => {
   try {
-    const session = await auth();
     const { id } = await context.params;
     
     // Verificar si el usuario está autorizado (es administrador o es el mismo usuario)
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-    
-    const isAdmin = session.user.role === "admin";
-    const isSelf = session.user.id === id;
+    const isAdmin = user.role === "admin";
+    const isSelf = userId === id;
     
     if (!isAdmin && !isSelf) {
       return NextResponse.json({ error: "No tienes permiso para editar este usuario" }, { status: 403 });
@@ -140,21 +135,16 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       { status: 500 }
     );
   }
-}
+});
 
 // DELETE para eliminar un usuario
-export async function DELETE(req: Request, context: { params: Promise<{ id: string }> }) {
+export const DELETE = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }, context: { params: Promise<{ id: string }> }) => {
   try {
-    const session = await auth();
     const { id } = await context.params;
     
     // Verificar si el usuario está autorizado (es administrador o es el mismo usuario)
-    if (!session?.user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-    
-    const isAdmin = session.user.role === "admin";
-    const isSelf = session.user.id === id;
+    const isAdmin = user.role === "admin";
+    const isSelf = userId === id;
     
     if (!isAdmin && !isSelf) {
       return NextResponse.json({ error: "No tienes permiso para eliminar este usuario" }, { status: 403 });
@@ -178,4 +168,4 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
     console.error("Error al eliminar usuario:", error);
     return NextResponse.json({ error: "Error al eliminar usuario" }, { status: 500 });
   }
-}
+});

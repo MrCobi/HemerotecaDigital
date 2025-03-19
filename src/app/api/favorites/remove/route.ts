@@ -1,9 +1,20 @@
 import { NextResponse } from "next/server";
+import prisma from "@/lib/db";
+import { withAuth } from "../../../../lib/auth-utils";
+import { NextRequest } from "next/server";
 
-// Esta es una ruta de compatibilidad transitoria
-// que redirige las solicitudes a la API actualizada en /api/favorites
+// Implementación del método DELETE (para compatibilidad con REST)
+export const DELETE = withAuth(async (req: NextRequest, { userId }: { userId: string }) => {
+  return await removeFavorite(req, userId);
+});
 
-export async function DELETE(req: Request) {
+// Implementación del método POST (para clientes que prefieren usar POST)
+export const POST = withAuth(async (req: NextRequest, { userId }: { userId: string }) => {
+  return await removeFavorite(req, userId);
+});
+
+// Función auxiliar que maneja la lógica común entre DELETE y POST
+async function removeFavorite(req: NextRequest, userId: string) {
   try {
     let sourceId;
     
@@ -24,58 +35,29 @@ export async function DELETE(req: Request) {
       );
     }
 
-    // Reenviar la solicitud al endpoint principal de favoritos
-    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/favorites?sourceId=${sourceId}`, {
-      method: "DELETE",
-      headers: {
-        // Pasar la cookie de autenticación
-        "Cookie": req.headers.get("cookie") || "",
+    // Eliminar el favorito de la base de datos
+    const result = await prisma.favoriteSource.deleteMany({
+      where: {
+        userId,
+        sourceId,
       },
     });
 
-    // Devolver la respuesta tal cual la recibimos
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
-  } catch (error) {
-    console.error("Error en la compatibilidad transitoria de eliminar favorito:", error);
-    return NextResponse.json(
-      { error: "Error al procesar la solicitud para eliminar favorito" },
-      { status: 500 }
-    );
-  }
-}
-
-// Añadimos el método POST para mayor compatibilidad
-export async function POST(req: Request) {
-  try {
-    // Extraer los datos del cuerpo de la solicitud
-    const body = await req.json();
-    const sourceId = body.sourceId;
-
-    if (!sourceId) {
+    if (result.count === 0) {
       return NextResponse.json(
-        { error: "sourceId es requerido" },
-        { status: 400 }
+        { message: "No se encontró el favorito o ya fue eliminado" },
+        { status: 404 }
       );
     }
 
-    // Reenviar la solicitud al endpoint principal de favoritos
-    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/favorites?sourceId=${sourceId}`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        // Pasar la cookie de autenticación
-        "Cookie": req.headers.get("cookie") || "",
-      },
-    });
-
-    // Devolver la respuesta tal cual la recibimos
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
-  } catch (error) {
-    console.error("Error en la compatibilidad transitoria de eliminar favorito (POST):", error);
     return NextResponse.json(
-      { error: "Error al procesar la solicitud para eliminar favorito" },
+      { message: "Favorito eliminado con éxito", success: true },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error al eliminar favorito:", error);
+    return NextResponse.json(
+      { error: "Error al eliminar favorito" },
       { status: 500 }
     );
   }

@@ -1,16 +1,10 @@
 // src/app/api/sources/ratings/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { withAuth } from "../../../../lib/auth-utils";
 
 // Manejar solicitudes GET
-export async function GET(request: Request) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
-  }
-
+export const GET = withAuth(async (request: Request, { userId, user }: { userId: string, user: any }) => {
   const { searchParams } = new URL(request.url);
   const sourceId = searchParams.get("sourceId");
 
@@ -26,7 +20,7 @@ export async function GET(request: Request) {
     const rating = await prisma.rating.findUnique({
       where: {
         userId_sourceId: {
-          userId: session.user.id,
+          userId: userId,
           sourceId,
         },
       },
@@ -43,17 +37,10 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
-}
-// Manejar solicitudes POST (ya existente)
+});
+
 // Método POST modificado
-export async function POST(request: Request) {
-  const session = await auth();
-  console.log("session", session);
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
-  }
-
+export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: any }) => {
   const { sourceId, value } = await request.json();
 
   if (!sourceId || value < 1 || value > 5) {
@@ -77,25 +64,25 @@ export async function POST(request: Request) {
 
       // 2. Crear/Actualizar rating
       const rating = await tx.rating.upsert({
-        where: { userId_sourceId: { userId: session.user.id, sourceId } },
+        where: { userId_sourceId: { userId: userId, sourceId } },
         update: { value },
-        create: { userId: session.user.id, sourceId, value }
+        create: { userId: userId, sourceId, value }
       });
 
       // 3. Registrar en historial
       await tx.activityHistory.create({
         data: {
-          userId: session.user.id,
+          userId: userId,
           type: value === 0 ? "rating_removed" : "rating_added",
           sourceName: source.name,
-          userName: session.user.name, // Incluir el nombre del usuario
+          userName: user.name || "", // Incluir el nombre del usuario
           createdAt: new Date(),
         }
       });
 
       // 4. Limitar a 20 actividades
       const activities = await tx.activityHistory.findMany({
-        where: { userId: session.user.id },
+        where: { userId: userId },
         orderBy: { createdAt: "desc" }
       });
 
@@ -118,16 +105,10 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
+});
 
 // Método DELETE modificado
-export async function DELETE(req: Request) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
-  }
-
+export const DELETE = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }) => {
   const { searchParams } = new URL(req.url);
   const sourceId = searchParams.get("sourceId");
 
@@ -142,7 +123,7 @@ export async function DELETE(req: Request) {
     const _result = await prisma.$transaction(async (tx) => {
       // 1. Obtener rating y fuente
       const rating = await tx.rating.findUnique({
-        where: { userId_sourceId: { userId: session.user.id, sourceId } },
+        where: { userId_sourceId: { userId: userId, sourceId } },
         include: { source: true }
       });
 
@@ -152,23 +133,23 @@ export async function DELETE(req: Request) {
 
       // 2. Eliminar rating
       await tx.rating.delete({
-        where: { userId_sourceId: { userId: session.user.id, sourceId } }
+        where: { userId_sourceId: { userId: userId, sourceId } }
       });
 
       // 3. Registrar en historial
       await tx.activityHistory.create({
         data: {
-          userId: session.user.id,
+          userId: userId,
           type: "rating_removed",
           sourceName: rating.source.name,
-          userName: session.user.name, // Incluir el nombre del usuario
+          userName: user.name || "", // Incluir el nombre del usuario
           createdAt: new Date(),
         }
       });
 
       // 4. Limitar a 20 actividades
       const activities = await tx.activityHistory.findMany({
-        where: { userId: session.user.id },
+        where: { userId: userId },
         orderBy: { createdAt: "desc" }
       });
 
@@ -192,5 +173,4 @@ export async function DELETE(req: Request) {
       { status: 500 }
     );
   }
-}
-
+});

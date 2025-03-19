@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/src/app/components/ui/button";
 import { Textarea } from "@/src/app/components/ui/textarea";
 import { MessageSquare, AlertCircle } from "lucide-react";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 const MAX_LENGTH = 500;
 
@@ -47,7 +48,7 @@ export default function CommentForm({
     setError(null);
 
     try {
-      const response = await fetch("/api/comments", {
+      const response = await fetch(API_ROUTES.comments.create, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, sourceId }),

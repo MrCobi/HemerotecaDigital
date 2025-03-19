@@ -1,19 +1,14 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { withAuth } from "../../../../../lib/auth-utils";
 
 // GET para obtener el número de mensajes no leídos
-export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
+export const GET = withAuth(async (_request: Request, { userId }: { userId: string }) => {
   try {
     // Contar todos los mensajes no leídos donde el usuario actual es el receptor
     const count = await prisma.directMessage.count({
       where: {
-        receiverId: session.user.id,
+        receiverId: userId,
         read: false
       }
     });
@@ -26,4 +21,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});

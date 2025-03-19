@@ -4,6 +4,7 @@ import { Article } from "@/src/interface/article";
 import SourcePageClient from "./SourcePageClient";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 export default async function SourcePage(
   context: { params: Promise<{ id: string }> }
@@ -40,7 +41,7 @@ export default async function SourcePage(
   try {
     // Obtener fuente desde el endpoint de la API
     const sourceResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/api/sources/${sourceId}`
+      new URL(API_ROUTES.sources.get(sourceId), process.env.NEXTAUTH_URL).toString()
     );
 
     if (sourceResponse.ok) {
@@ -50,7 +51,7 @@ export default async function SourcePage(
     // Obtener artículos desde el endpoint de la API
     if (source) {
       const articlesResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/sources/${sourceId}/articles?sortBy=popularity&language=${source.language}`
+        new URL(`${API_ROUTES.sources.articles(sourceId)}?sortBy=popularity&language=${source.language}`, process.env.NEXTAUTH_URL).toString()
       );
 
       if (articlesResponse.ok) {

@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { withAuth } from "../../../lib/auth-utils";
 
 // POST para seguir a un usuario
-export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
+export const POST = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }) => {
   try {
     const { followingId } = await req.json();
 
@@ -16,7 +13,7 @@ export async function POST(req: Request) {
     }
 
     // Verificar que no intenta seguirse a sí mismo
-    if (followingId === session.user.id) {
+    if (followingId === userId) {
       return NextResponse.json({ error: "No puedes seguirte a ti mismo" }, { status: 400 });
     }
 
@@ -24,7 +21,7 @@ export async function POST(req: Request) {
     const existingFollow = await prisma.follow.findUnique({
       where: {
         followerId_followingId: {
-          followerId: session.user.id,
+          followerId: userId,
           followingId: followingId
         }
       }
@@ -47,7 +44,7 @@ export async function POST(req: Request) {
     // Crear el follow
     const _newFollow = await prisma.follow.create({
       data: {
-        followerId: session.user.id,
+        followerId: userId,
         followingId: followingId
       },
       include: {
@@ -65,17 +62,17 @@ export async function POST(req: Request) {
     // Registrar la actividad de "follow"
     await prisma.activityHistory.create({
       data: {
-        userId: session.user.id,
+        userId: userId,
         type: "follow",
         sourceName: null,
-        userName: followingUser.username || followingUser.name,
+        userName: followingUser.username || followingUser.name || "",
         createdAt: new Date()
       }
     });
 
     // Revalidar caché
-    revalidateTag(`user-${session.user.id}-following`);
-    revalidateTag(`user-${session.user.id}-activity`);
+    revalidateTag(`user-${userId}-following`);
+    revalidateTag(`user-${userId}-activity`);
 
     return NextResponse.json({
       success: true,
@@ -91,13 +88,10 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-}
+});
 
 // DELETE para dejar de seguir a un usuario
-export async function DELETE(req: Request) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
+export const DELETE = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }) => {
   try {
     const { searchParams } = new URL(req.url);
     const targetUserId = searchParams.get("targetUserId");
@@ -127,7 +121,7 @@ export async function DELETE(req: Request) {
     const followExists = await prisma.follow.findUnique({
       where: {
         followerId_followingId: {
-          followerId: session.user.id,
+          followerId: userId,
           followingId: targetUserId
         }
       }
@@ -144,7 +138,7 @@ export async function DELETE(req: Request) {
     await prisma.follow.delete({
       where: {
         followerId_followingId: {
-          followerId: session.user.id,
+          followerId: userId,
           followingId: targetUserId
         }
       }
@@ -155,7 +149,7 @@ export async function DELETE(req: Request) {
       where: {
         followerId_followingId: {
           followerId: targetUserId,
-          followingId: session.user.id
+          followingId: userId
         }
       }
     });
@@ -167,12 +161,12 @@ export async function DELETE(req: Request) {
         where: {
           OR: [
             {
-              senderId: session.user.id,
+              senderId: userId,
               receiverId: targetUserId
             },
             {
               senderId: targetUserId,
-              receiverId: session.user.id
+              receiverId: userId
             }
           ]
         }
@@ -182,17 +176,17 @@ export async function DELETE(req: Request) {
     // Registrar la actividad de "unfollow"
     await prisma.activityHistory.create({
       data: {
-        userId: session.user.id,
+        userId: userId,
         type: "unfollow",
         sourceName: null,
-        userName: userExists.username || userExists.name,
+        userName: userExists.username || userExists.name || "",
         createdAt: new Date()
       }
     });
 
     // Revalidar caché
-    revalidateTag(`user-${session.user.id}-following`);
-    revalidateTag(`user-${session.user.id}-activity`);
+    revalidateTag(`user-${userId}-following`);
+    revalidateTag(`user-${userId}-activity`);
 
     return NextResponse.json({
       success: true,
@@ -203,13 +197,9 @@ export async function DELETE(req: Request) {
     });
   } catch (error) {
     console.error("Error al dejar de seguir usuario:", error);
-    const errorMessage = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json(
-      {
-        error: "Error al procesar la solicitud",
-        details: errorMessage
-      },
+      { error: "Error al procesar la solicitud" },
       { status: 500 }
     );
   }
-}
+});

@@ -2,8 +2,9 @@
 import prisma from "@/lib/db";
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { withAuth } from "../../../lib/auth-utils";
 
-export async function GET() {
+export const GET = withAuth(async () => {
   try {
     const prismaTyped = prisma as PrismaClient;
     const categories = await prismaTyped.source.findMany({
@@ -30,4 +31,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});

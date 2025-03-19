@@ -1,22 +1,16 @@
 // src/app/api/favorites/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { revalidateTag } from "next/cache";
+import { withAuth } from "../../../lib/auth-utils";
 
 // GET para obtener todos los favoritos del usuario
-export async function GET() {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
-  }
-
+export const GET = withAuth(async (request: Request, { userId }: { userId: string }) => {
   try {
     // Obtener todos los favoritos del usuario actual
     const favorites = await prisma.favoriteSource.findMany({
       where: {
-        userId: session.user.id,
+        userId: userId,
       },
       select: {
         sourceId: true,
@@ -37,16 +31,10 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});
 
 // POST para añadir un favorito
-export async function POST(request: Request) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
-  }
-
+export const POST = withAuth(async (request: Request, { userId }: { userId: string }) => {
   try {
     const { sourceId } = await request.json();
 
@@ -68,7 +56,7 @@ export async function POST(request: Request) {
     const existingFavorite = await prisma.favoriteSource.findUnique({
       where: {
         userId_sourceId: {
-          userId: session.user.id,
+          userId: userId,
           sourceId: sourceId
         }
       }
@@ -83,25 +71,25 @@ export async function POST(request: Request) {
       // Crear favorito
       prisma.favoriteSource.create({
         data: {
-          userId: session.user.id,
+          userId: userId,
           sourceId: sourceId,
         },
       }),
       // Registrar actividad
       prisma.activityHistory.create({
         data: {
-          userId: session.user.id,
+          userId: userId,
           type: "favorite",
           sourceName: sourceExists.name,
-          userName: session.user.name,
+          userName: (await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || '',
           createdAt: new Date(),
         },
       }),
     ]);
 
     // Revalidar cache
-    revalidateTag(`user-${session.user.id}-favorites`);
-    revalidateTag(`user-${session.user.id}-activity`);
+    revalidateTag(`user-${userId}-favorites`);
+    revalidateTag(`user-${userId}-activity`);
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {
@@ -111,19 +99,12 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
+});
 
 // DELETE para eliminar un favorito
-export async function DELETE(request: Request) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
-  }
-
+export const DELETE = withAuth(async (request: Request, { userId }: { userId: string }) => {
   try {
-    const { searchParams } = new URL(request.url);
-    const sourceId = searchParams.get("sourceId");
+    const { sourceId } = await request.json();
 
     if (!sourceId) {
       return NextResponse.json({ error: "ID de fuente no proporcionado" }, { status: 400 });
@@ -133,7 +114,7 @@ export async function DELETE(request: Request) {
     const favorite = await prisma.favoriteSource.findUnique({
       where: {
         userId_sourceId: {
-          userId: session.user.id,
+          userId: userId,
           sourceId: sourceId
         }
       },
@@ -157,7 +138,7 @@ export async function DELETE(request: Request) {
       prisma.favoriteSource.delete({
         where: {
           userId_sourceId: {
-            userId: session.user.id,
+            userId: userId,
             sourceId
           }
         }
@@ -165,18 +146,18 @@ export async function DELETE(request: Request) {
       // Registrar actividad de eliminación
       prisma.activityHistory.create({
         data: {
-          userId: session.user.id,
+          userId: userId,
           type: "favorite_removed",
           sourceName: favorite.source.name,
-          userName: session.user.name,
+          userName: (await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || '',
           createdAt: new Date()
         },
       })
     ]);
 
     // Revalidar cache
-    revalidateTag(`user-${session.user.id}-favorites`);
-    revalidateTag(`user-${session.user.id}-activity`);
+    revalidateTag(`user-${userId}-favorites`);
+    revalidateTag(`user-${userId}-activity`);
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -186,4 +167,4 @@ export async function DELETE(request: Request) {
       { status: 500 }
     );
   }
-}
+});

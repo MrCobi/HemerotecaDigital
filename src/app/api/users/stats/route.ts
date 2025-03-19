@@ -1,17 +1,10 @@
 // app/api/user/stats/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { withAuth } from "../../../../lib/auth-utils";
 
-export async function GET() {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  
+export const GET = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }) => {
     try {
-      const userId = session.user.id;
-  
       const [favorites, comments, ratings, activities] = await Promise.all([
         prisma.favoriteSource.count({ where: { userId } }),
         prisma.comment.count({ where: { userId } }),
@@ -20,16 +13,26 @@ export async function GET() {
       ]);
   
       // Manejo seguro del createdAt
-      if (!session.user.createdAt) {
+      if (!user.createdAt) {
         return NextResponse.json(
           { error: "Fecha de creación no disponible" }, 
           { status: 400 }
         );
       }
 
-      // Conversión explícita a string y validación
-      const creationDateString = session.user.createdAt as unknown as string;
-      const creationDate = new Date(creationDateString);
+      // Conversión explícita a Date
+      let creationDate: Date;
+      
+      if (typeof user.createdAt === 'string') {
+        creationDate = new Date(user.createdAt);
+      } else if (user.createdAt instanceof Date) {
+        creationDate = user.createdAt;
+      } else {
+        return NextResponse.json(
+          { error: "Formato de fecha de creación inválido" }, 
+          { status: 400 }
+        );
+      }
       
       if (isNaN(creationDate.getTime())) {
         return NextResponse.json(
@@ -62,4 +65,4 @@ export async function GET() {
         { status: 500 }
       );
     }
-}
+});

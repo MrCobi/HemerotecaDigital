@@ -1,15 +1,9 @@
 // src/app/api/users/follow-status/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { withAuth } from "../../../../lib/auth-utils";
 
-export async function GET(request: Request) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
-  }
-
+export const GET = withAuth(async (request: Request, { userId }: { userId: string }) => {
   try {
     const { searchParams } = new URL(request.url);
     const idsParam = searchParams.get("ids");
@@ -23,7 +17,7 @@ export async function GET(request: Request) {
     // Buscar todas las relaciones de seguimiento donde el usuario actual sigue a alguno de los IDs proporcionados
     const follows = await prisma.follow.findMany({
       where: {
-        followerId: session.user.id,
+        followerId: userId,
         followingId: {
           in: userIds
         }
@@ -54,4 +48,4 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
-}
+});

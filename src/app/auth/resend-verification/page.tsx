@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { API_ROUTES } from "@/src/config/api-routes";
 
 export default function ResendVerificationPage() {
   const [email, setEmail] = useState('');
@@ -16,7 +17,7 @@ export default function ResendVerificationPage() {
     setErrorMessage('');
 
     try {
-      const response = await fetch('/api/auth/resend-verification', {
+      const response = await fetch(API_ROUTES.auth.resendVerification, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })

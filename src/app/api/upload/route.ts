@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { withAuth } from "../../../lib/auth-utils";
 
 // Configurar Cloudinary
 cloudinary.config({
@@ -8,7 +9,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (req: NextRequest, { userId }: { userId: string }) => {
   try {
     const data = await req.formData();
     const file: File | null = data.get('file') as unknown as File;
@@ -33,9 +34,9 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Generar un identificador único para el archivo
+    // Generar un identificador único para el archivo con el ID del usuario
     const timestamp = Date.now();
-    const uniqueId = `user_uploads/user_${timestamp}`;
+    const uniqueId = `user_uploads/user_${userId}_${timestamp}`;
 
     // Crear una promesa para la carga a Cloudinary
     const cloudinaryUpload = new Promise<string>((resolve, reject) => {
@@ -74,4 +75,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

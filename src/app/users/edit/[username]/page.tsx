@@ -107,7 +107,7 @@ export default function EditUserPage() {
         const blob = await (await fetch(imageUrl)).blob();
         imageFormData.append('file', blob);
         
-        const uploadResponse = await fetch('/api/upload', {
+        const uploadResponse = await fetch(API_ROUTES.upload, {
           method: 'POST',
           body: imageFormData,
         });

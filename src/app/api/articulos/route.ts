@@ -1,8 +1,9 @@
 // src/app/api/articulos/route.ts
 import { NextResponse } from 'next/server';
 import { GETHeadLines } from './NewsEverything';
+import { withAuth } from '../../../lib/auth-utils';
 
-export async function GET(request: Request) {
+export const GET = withAuth(async (request: Request) => {
   const { searchParams } = new URL(request.url);
   
   try {
@@ -27,4 +28,4 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
-}
+});

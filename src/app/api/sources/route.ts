@@ -2,7 +2,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { Source, Rating } from "@/src/interface/source";
+import { withAuth } from "../../../lib/auth-utils";
 
+// El método GET es público para que cualquiera pueda ver las fuentes
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -96,7 +98,8 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(request: Request) {
+// El método POST requiere autenticación para obtener detalles específicos de fuentes
+export const POST = withAuth(async (request: Request) => {
   try {
     const { sourceIds } = await request.json();
 
@@ -141,4 +144,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
+});

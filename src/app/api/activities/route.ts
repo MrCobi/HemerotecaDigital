@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { PrismaClient } from "@prisma/client";
+import { withAuth } from "../../../lib/auth-utils";
 
 export const dynamic = 'force-dynamic';
 
 // Endpoint para obtener actividades globales o filtradas
-export async function GET(req: Request) {
+export const GET = withAuth(async (req: Request) => {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(req.url);
     const page = Math.max(Number(searchParams.get("page") || 1), 1);
     const limit = Math.min(Math.max(Number(searchParams.get("limit") || 10), 1), 100);
@@ -62,4 +57,4 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
-}
+});

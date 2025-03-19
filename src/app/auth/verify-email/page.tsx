@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { API_ROUTES } from "@/src/config/api-routes";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function VerifyEmailPage() {
     const verifyEmail = async () => {
       try {
         console.log("Calling API with token");
-        const response = await fetch(`/api/auth/verify-email?token=${encodeURIComponent(token)}`);
+        const response = await fetch(`${API_ROUTES.auth.verifyEmail}?token=${encodeURIComponent(token)}`);
         console.log("API response status:", response.status);
         
         const data = await response.json().catch(() => ({ error: "Error desconocido" }));

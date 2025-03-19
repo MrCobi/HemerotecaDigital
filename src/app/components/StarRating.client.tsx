@@ -3,27 +3,28 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Star } from "lucide-react";
+import { API_ROUTES } from "@/src/config/api-routes";
 
-export function StarRating({ sourceId }: { sourceId: string }) {
+export default function StarRating({ sourceId }: { sourceId: string }) {
   const { data: session } = useSession();
   const [userRating, setUserRating] = useState(0);
   const [averageRating, setAverageRating] = useState(0);
+  const [totalRatings, setTotalRatings] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hoverRating, setHoverRating] = useState(0);
-  const [totalRatings, setTotalRatings] = useState(0);
   const [showTooltip, setShowTooltip] = useState(false);
 
   useEffect(() => {
     const fetchRatings = async () => {
       try {
         if (session?.user?.id) {
-          const userRes = await fetch(`/api/sources/ratings?sourceId=${sourceId}&t=${Date.now()}`);
+          const userRes = await fetch(API_ROUTES.sources.ratings.get(sourceId) + `&t=${Date.now()}`);
           if (!userRes.ok) throw new Error("Error al obtener la valoración del usuario");
           const userData = await userRes.json();
           setUserRating(userData.rating || 0);
         }
 
-        const avgRes = await fetch(`/api/sources/ratings/average?sourceId=${sourceId}&t=${Date.now()}`);
+        const avgRes = await fetch(API_ROUTES.sources.ratings.average(sourceId) + `&t=${Date.now()}`);
         if (!avgRes.ok) throw new Error("Error al obtener la media de valoraciones");
         const avgData = await avgRes.json();
         setAverageRating(avgData.average);
@@ -41,7 +42,7 @@ export function StarRating({ sourceId }: { sourceId: string }) {
 
     try {
       setLoading(true);
-      const response = await fetch("/api/sources/ratings", {
+      const response = await fetch(API_ROUTES.sources.ratings.add, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sourceId, value }),
@@ -51,7 +52,7 @@ export function StarRating({ sourceId }: { sourceId: string }) {
 
       setUserRating(value);
       
-      const avgRes = await fetch(`/api/sources/ratings/average?sourceId=${sourceId}&t=${Date.now()}`);
+      const avgRes = await fetch(API_ROUTES.sources.ratings.average(sourceId) + `&t=${Date.now()}`);
       if (!avgRes.ok) throw new Error("Error al obtener la media actualizada");
       const avgData = await avgRes.json();
       setAverageRating(avgData.average);
@@ -68,7 +69,7 @@ export function StarRating({ sourceId }: { sourceId: string }) {
 
     try {
       setLoading(true);
-      const response = await fetch(`/api/sources/ratings?sourceId=${sourceId}`, {
+      const response = await fetch(API_ROUTES.sources.ratings.delete(sourceId), {
         method: "DELETE",
       });
 
@@ -76,7 +77,7 @@ export function StarRating({ sourceId }: { sourceId: string }) {
 
       setUserRating(0);
       
-      const avgRes = await fetch(`/api/sources/ratings/average?sourceId=${sourceId}&t=${Date.now()}`);
+      const avgRes = await fetch(API_ROUTES.sources.ratings.average(sourceId) + `&t=${Date.now()}`);
       if (!avgRes.ok) throw new Error("Error al obtener la media actualizada");
       const avgData = await avgRes.json();
       setAverageRating(avgData.average);
