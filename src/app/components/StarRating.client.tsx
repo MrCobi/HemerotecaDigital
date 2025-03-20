@@ -51,7 +51,7 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
       if (!response.ok) throw new Error("Error al guardar la valoración");
 
       setUserRating(value);
-      
+
       const avgRes = await fetch(API_ROUTES.sources.ratings.average(sourceId) + `&t=${Date.now()}`);
       if (!avgRes.ok) throw new Error("Error al obtener la media actualizada");
       const avgData = await avgRes.json();
@@ -76,7 +76,7 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
       if (!response.ok) throw new Error("Error al eliminar la valoración");
 
       setUserRating(0);
-      
+
       const avgRes = await fetch(API_ROUTES.sources.ratings.average(sourceId) + `&t=${Date.now()}`);
       if (!avgRes.ok) throw new Error("Error al obtener la media actualizada");
       const avgData = await avgRes.json();
@@ -103,18 +103,16 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
               onMouseEnter={() => interactive && setHoverRating(value)}
               onMouseLeave={() => interactive && setHoverRating(0)}
               disabled={!session || loading || !interactive}
-              className={`relative transition-all duration-200 ${
-                interactive ? 'cursor-pointer hover:scale-110' : ''
-              } ${loading ? 'opacity-50' : ''}`}
+              className={`relative transition-all duration-200 ${interactive ? 'cursor-pointer hover:scale-110' : ''
+                } ${loading ? 'opacity-50' : ''}`}
             >
               <Star
-                className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-200 ${
-                  filled
+                className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-200 ${filled
                     ? 'fill-yellow-400 stroke-yellow-400'
                     : halfFilled
-                    ? 'fill-yellow-400/50 stroke-yellow-400'
-                    : 'fill-transparent stroke-gray-300'
-                }`}
+                      ? 'fill-yellow-400/50 stroke-yellow-400'
+                      : 'fill-transparent stroke-gray-300'
+                  }`}
               />
             </button>
           );
@@ -146,7 +144,7 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
               {averageRating ? averageRating.toFixed(1) : "0.0"}
             </span>
           </div>
-          <div 
+          <div
             className="relative"
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}

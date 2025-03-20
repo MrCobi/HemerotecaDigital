@@ -269,8 +269,8 @@ export default function SourcePageClient({
           >
             <Heart
               className={`w-6 h-6 ${favorites.has(source.id)
-                  ? "fill-current text-red-600" // Corazón lleno cuando está en favoritos
-                  : "stroke-current text-gray-400 dark:text-gray-300" // Corazón vacío cuando no está en favoritos
+                ? "fill-current text-red-600" // Corazón lleno cuando está en favoritos
+                : "stroke-current text-gray-400 dark:text-gray-300" // Corazón vacío cuando no está en favoritos
                 }`}
             />
           </motion.button>
@@ -402,8 +402,8 @@ export default function SourcePageClient({
                 <span
                   onClick={rotateSort}
                   className={`text-blue-600 dark:text-blue-400 cursor-pointer inline-block transition-all duration-300 ${isAnimating
-                      ? "opacity-0 transform -translate-y-4"
-                      : "opacity-100"
+                    ? "opacity-0 transform -translate-y-4"
+                    : "opacity-100"
                     }`}
                 >
                   {sortLabels[sortBy]}
@@ -421,24 +421,24 @@ export default function SourcePageClient({
               <div className="flex gap-1">
                 <span
                   className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-all ${sortBy === "relevancy"
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-500 dark:text-gray-400"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 dark:text-gray-400"
                     }`}
                 >
                   Relevancia
                 </span>
                 <span
                   className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-all ${sortBy === "popularity"
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-500 dark:text-gray-400"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 dark:text-gray-400"
                     }`}
                 >
                   Popularidad
                 </span>
                 <span
                   className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-all ${sortBy === "publishedAt"
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-500 dark:text-gray-400"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 dark:text-gray-400"
                     }`}
                 >
                   Fecha
