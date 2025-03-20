@@ -2,14 +2,34 @@
 import { useSession, signOut } from "next-auth/react";
 import React from "react";
 import Link from "next/link";
-import { Menu } from "@mui/material";
-import styled from "styled-components";
+import { Menu, MenuItem } from "@mui/material";
 import { CldImage } from 'next-cloudinary';
 import Image from 'next/image';
+import { motion } from "framer-motion";
+import { useAnimationSettings } from '@/src/app/hooks/useAnimationSettings';
+import { useRouter } from 'next/navigation';
 
 const AuthButton = () => {
   const { data: session } = useSession();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  
+  // Obtener preferencias de animación
+  const animationsEnabled = useAnimationSettings();
+  
+  // Para navegación
+  const router = useRouter();
+  
+  // Definir variantes de animación
+  const buttonVariants = {
+    initial: { opacity: 0.9, scale: 0.98 },
+    hover: animationsEnabled ? { opacity: 1, scale: 1.02 } : {},
+    tap: animationsEnabled ? { scale: 0.98 } : {}
+  };
+  
+  const arrowVariants = {
+    initial: { rotate: 0 },
+    open: animationsEnabled ? { rotate: 180 } : { rotate: 0 }
+  };
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -39,13 +59,16 @@ const AuthButton = () => {
   if (session) {
     const isAdmin = session.user?.role === "admin";
     return (
-      <div style={{ position: "relative" }}>
-        <button
+      <div className="relative">
+        <motion.button
           onClick={handleMenu}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white shadow-sm transition-colors duration-200"
+          initial={buttonVariants.initial}
+          whileHover={buttonVariants.hover}
+          whileTap={buttonVariants.tap}
         >
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full overflow-hidden">
+            <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white/20">
               {session.user.image && (session.user.image.includes('cloudinary') || 
               (!session.user.image.startsWith('/') && !session.user.image.startsWith('http'))) ? (
                 <CldImage
@@ -83,11 +106,15 @@ const AuthButton = () => {
                 {session.user?.email || ""}
               </span>
             </div>
-            <svg
+            <motion.svg
               className="w-4 h-4 text-gray-200 ml-2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              variants={arrowVariants}
+              initial="initial"
+              animate={anchorEl ? "open" : "initial"}
+              transition={{ duration: animationsEnabled ? 0.2 : 0 }}
             >
               <path
                 strokeLinecap="round"
@@ -95,341 +122,253 @@ const AuthButton = () => {
                 strokeWidth={2}
                 d="M19 9l-7 7-7-7"
               />
-            </svg>
+            </motion.svg>
           </div>
-        </button>
+        </motion.button>
 
         <Menu
-          className="custom-menu"
+          id="menu-appbar"
           anchorEl={anchorEl}
+          anchorOrigin={{
+            vertical: "bottom",
+            horizontal: "right",
+          }}
+          keepMounted
+          transformOrigin={{
+            vertical: "top",
+            horizontal: "right",
+          }}
           open={Boolean(anchorEl)}
           onClose={handleClose}
           PaperProps={{
-            style: {
-              backgroundColor: "rgb(18, 35, 82)", // Color de fondo del menú
-              padding: "0", // Elimina el padding predeterminado
-              borderRadius: "5px", // Ajusta el borde redondeado
-              boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.2)", // Sombra personalizada
-            },
+            className: "bg-white dark:bg-gray-800 shadow-lg rounded-lg mt-1 border border-gray-200 dark:border-gray-700"
+          }}
+          classes={{
+            list: "py-1",
           }}
         >
-          <StyledWrapper>
-            <div className="input">
-              <Link href="/api/auth/dashboard" passHref legacyBehavior>
-                <button className="value" onClick={handleClose}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg">
+            <div className="menu-container py-1">
+              <Link href="/profile" passHref>
+                <motion.div
+                  className="px-4 py-3 flex items-center gap-3 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                  onClick={() => {
+                    handleClose();
+                    router.push("/profile");
+                  }}
+                  whileHover={animationsEnabled ? { x: 5 } : {}}
+                  whileTap={animationsEnabled ? { scale: 0.98 } : {}}
+                >
                   <svg
-                    viewBox="0 0 16 16"
+                    className="w-5 h-5 text-blue-500 dark:text-blue-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg"
-                    data-name="Layer 2"
                   >
                     <path
-                      fill="#7D8590"
-                      d="m1.5 13v1a.5.5 0 0 0 .3379.4731 18.9718 18.9718 0 0 0 6.1621 1.0269 18.9629 18.9629 0 0 0 6.1621-1.0269.5.5 0 0 0 .3379-.4731v-1a6.5083 6.5083 0 0 0 -4.461-6.1676 3.5 3.5 0 1 0 -4.078 0 6.5083 6.5083 0 0 0 -4.461 6.1676zm4-9a2.5 2.5 0 1 1 2.5 2.5 2.5026 2.5026 0 0 1 -2.5-2.5zm2.5 3.5a5.5066 5.5066 0 0 1 5.5 5.5v.6392a18.08 18.08 0 0 1 -11 0v-.6392a5.5066 5.5066 0 0 1 5.5-5.5z"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.5"
+                      d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  Perfil Público
-                </button>
+                  <span className="font-medium">Mi Perfil</span>
+                </motion.div>
               </Link>
-              <Link href="/settings" passHref legacyBehavior>
-                <button className="value" onClick={handleClose}>
+              <Link href="/api/auth/dashboard" passHref>
+                <motion.div
+                  className="px-4 py-3 flex items-center gap-3 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                  onClick={handleClose}
+                  whileHover={animationsEnabled ? { x: 5 } : {}}
+                  whileTap={animationsEnabled ? { scale: 0.98 } : {}}
+                >
                   <svg
+                    className="w-5 h-5 text-blue-500 dark:text-blue-400"
+                    viewBox="0 0 16 16"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="currentColor"
+                  >
+                    <path d="m1.5 13v1a.5.5 0 0 0 .3379.4731 18.9718 18.9718 0 0 0 6.1621 1.0269 18.9629 18.9629 0 0 0 6.1621-1.0269.5.5 0 0 0 .3379-.4731v-1a6.5083 6.5083 0 0 0 -4.461-6.1676 3.5 3.5 0 1 0 -4.078 0 6.5083 6.5083 0 0 0 -4.461 6.1676zm4-9a2.5 2.5 0 1 1 2.5 2.5 2.5026 2.5026 0 0 1 -2.5-2.5zm2.5 3.5a5.5066 5.5066 0 0 1 5.5 5.5v.6392a18.08 18.08 0 0 1 -11 0v-.6392a5.5066 5.5066 0 0 1 5.5-5.5z" />
+                  </svg>
+                  <span className="font-medium">Perfil Público</span>
+                </motion.div>
+              </Link>
+              <Link href="/settings" passHref>
+                <motion.div
+                  className="px-4 py-3 flex items-center gap-3 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                  onClick={handleClose}
+                  whileHover={animationsEnabled ? { x: 5 } : {}}
+                  whileTap={animationsEnabled ? { scale: 0.98 } : {}}
+                >
+                  <svg
+                    className="w-5 h-5 text-blue-500 dark:text-blue-400"
                     viewBox="0 0 24 24"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
-                    stroke="#ffffff"
+                    stroke="currentColor"
                   >
-                    <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-                    <g
-                      id="SVGRepo_tracerCarrier"
+                    <path
+                      d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z"
+                      strokeWidth="1.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                    ></g>
-                    <g id="SVGRepo_iconCarrier">
-                      <path
-                        d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z"
-                        stroke="#ffffff"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M19.6224 10.3954L18.5247 7.7448L20 6L18 4L16.2647 5.48295L13.5578 4.36974L12.9353 2H10.981L10.3491 4.40113L7.70441 5.51596L6 4L4 6L5.45337 7.78885L4.3725 10.4463L2 11V13L4.40111 13.6555L5.51575 16.2997L4 18L6 20L7.79116 18.5403L10.397 19.6123L11 22H13L13.6045 19.6132L16.2551 18.5155L18 20L20 18L18.5159 16.2494L19.6139 13.598L22 13V11L19.6224 10.3954Z"
-                        stroke="#ffffff"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </g>
+                    />
+                    <path
+                      d="M19.6224 10.3954L18.5247 7.7448L20 6L18 4L16.2647 5.48295L13.5578 4.36974L12.9353 2H10.981L10.3491 4.40113L7.70441 5.51596L6 4L4 6L5.45337 7.78885L4.3725 10.4463L2 11V13L4.40111 13.6555L5.51575 16.2997L4 18L6 20L7.79116 18.5403L10.397 19.6123L11 22H13L13.6045 19.6132L16.2551 18.5155L18 20L20 18L18.5159 16.2494L19.6139 13.598L22 13V11L19.6224 10.3954Z"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
-                  Configuración
-                </button>
+                  <span className="font-medium">Configuración</span>
+                </motion.div>
               </Link>
-              <Link href="/appearance" passHref legacyBehavior>
-                <button className="value" onClick={handleClose}>
+              <Link href="/appearance" passHref>
+                <motion.div
+                  className="px-4 py-3 flex items-center gap-3 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                  onClick={handleClose}
+                  whileHover={animationsEnabled ? { x: 5 } : {}}
+                  whileTap={animationsEnabled ? { scale: 0.98 } : {}}
+                >
                   <svg 
-                    width="18" 
-                    height="18" 
+                    className="w-5 h-5 text-blue-500 dark:text-blue-400"
                     viewBox="0 0 24 24" 
                     fill="none" 
                     xmlns="http://www.w3.org/2000/svg"
+                    stroke="currentColor"
                   >
                     <path 
                       d="M12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16Z" 
-                      stroke="#ffffff" 
                       strokeWidth="1.5" 
                       strokeLinecap="round" 
                       strokeLinejoin="round"
                     />
                     <path 
                       d="M12 2V4" 
-                      stroke="#ffffff" 
                       strokeWidth="1.5" 
                       strokeLinecap="round" 
                       strokeLinejoin="round"
                     />
                     <path 
                       d="M12 20V22" 
-                      stroke="#ffffff" 
                       strokeWidth="1.5" 
                       strokeLinecap="round" 
                       strokeLinejoin="round"
                     />
                     <path 
                       d="M4.93 4.93L6.34 6.34" 
-                      stroke="#ffffff" 
                       strokeWidth="1.5" 
                       strokeLinecap="round" 
                       strokeLinejoin="round"
                     />
                     <path 
                       d="M17.66 17.66L19.07 19.07" 
-                      stroke="#ffffff" 
                       strokeWidth="1.5" 
                       strokeLinecap="round" 
                       strokeLinejoin="round"
                     />
                     <path 
                       d="M2 12H4" 
-                      stroke="#ffffff" 
                       strokeWidth="1.5" 
                       strokeLinecap="round" 
                       strokeLinejoin="round"
                     />
                     <path 
                       d="M20 12H22" 
-                      stroke="#ffffff" 
                       strokeWidth="1.5" 
                       strokeLinecap="round" 
                       strokeLinejoin="round"
                     />
                     <path 
                       d="M6.34 17.66L4.93 19.07" 
-                      stroke="#ffffff" 
                       strokeWidth="1.5" 
                       strokeLinecap="round" 
                       strokeLinejoin="round"
                     />
                     <path 
                       d="M19.07 4.93L17.66 6.34" 
-                      stroke="#ffffff" 
                       strokeWidth="1.5" 
                       strokeLinecap="round" 
                       strokeLinejoin="round"
                     />
                   </svg>
-                  Apariencia
-                </button>
+                  <span className="font-medium">Apariencia</span>
+                </motion.div>
               </Link>
+
+              <div className="my-1 border-t border-gray-200 dark:border-gray-700"></div>
               {isAdmin && (
-                <Link href="/admin/users" passHref legacyBehavior>
-                  <button className="value" onClick={handleClose}>
+                <Link href="/admin/users" passHref>
+                  <motion.div
+                    className="px-4 py-3 flex items-center gap-3 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                    onClick={handleClose}
+                    whileHover={animationsEnabled ? { x: 5 } : {}}
+                    whileTap={animationsEnabled ? { scale: 0.98 } : {}}
+                  >
                     <svg
+                      className="w-5 h-5 text-blue-500 dark:text-blue-400"
+                      fill="currentColor"
                       viewBox="0 0 24 24"
-                      fill="none"
                       xmlns="http://www.w3.org/2000/svg"
-                      stroke="#ffffff"
                     >
-                      <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-                      <g
-                        id="SVGRepo_tracerCarrier"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      ></g>
-                      <g id="SVGRepo_iconCarrier">
-                        {" "}
-                        <path
-                          d="M16 9L20 5V16H4V5L6 7M8 9L12 5L14 7M4 19H20"
-                          stroke="#ffffff"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        ></path>{" "}
-                      </g>
+                      <path d="M12 14c3.31 0 6-2.69 6-6s-2.69-6-6-6-6 2.69-6 6 2.69 6 6 6zm0-10c2.21 0 4 1.79 4 4s-1.79 4-4 4-4-1.79-4-4 1.79-4 4-4zm0 12c-4.42 0-8 1.79-8 4v2h16v-2c0-2.21-3.58-4-8-4zm-6 4c.47-.72 2.78-2 6-2s5.53 1.28 6 2H6z" />
                     </svg>
-                    Administración
-                  </button>
+                    <span className="font-medium">Administrador</span>
+                  </motion.div>
                 </Link>
               )}
-
-              <button className="value" onClick={handleSignOut}>
+              <motion.div
+                className="px-4 py-3 flex items-center gap-3 text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                onClick={handleSignOut}
+                whileHover={animationsEnabled ? { x: 5 } : {}}
+                whileTap={animationsEnabled ? { scale: 0.98 } : {}}
+              >
                 <svg
-                  fill="#ffffff"
-                  version="1.1"
-                  id="Capa_1"
+                  className="w-5 h-5 text-red-500 dark:text-red-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                   xmlns="http://www.w3.org/2000/svg"
-                  xmlnsXlink="http://www.w3.org/1999/xlink"
-                  viewBox="0 0 492.5 492.5"
-                  xmlSpace="preserve"
-                  stroke="#ffffff"
                 >
-                  <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-                  <g
-                    id="SVGRepo_tracerCarrier"
+                  <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                  ></g>
-                  <g id="SVGRepo_iconCarrier">
-                    {" "}
-                    <g>
-                      {" "}
-                      <path d="M184.646,0v21.72H99.704v433.358h31.403V53.123h53.539V492.5l208.15-37.422v-61.235V37.5L184.646,0z M222.938,263.129 c-6.997,0-12.67-7.381-12.67-16.486c0-9.104,5.673-16.485,12.67-16.485s12.67,7.381,12.67,16.485 C235.608,255.748,229.935,263.129,222.938,263.129z"></path>{" "}
-                    </g>{" "}
-                  </g>
+                    strokeWidth="1.5"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
                 </svg>
-                Cerrar Sesión
-              </button>
+                <span className="font-medium">Cerrar sesión</span>
+              </motion.div>
             </div>
-          </StyledWrapper>
+          </div>
         </Menu>
       </div>
     );
   }
 
   return (
-    <div className="contenedor-botones">
-      <StyledWrapper>
-        <Link href="/api/auth/signin" passHref legacyBehavior>
-          <button className="boton-elegante">Iniciar Sesión</button>
-        </Link>
-        <Link href="/api/auth/signup" passHref legacyBehavior>
-          <button className="boton-elegante">Registrarse</button>
-        </Link>
-      </StyledWrapper>
+    <div className="flex gap-3">
+      <Link href="/api/auth/signin" passHref>
+        <motion.button 
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-700 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-colors"
+          whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+          whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+        >
+          Iniciar Sesión
+        </motion.button>
+      </Link>
+      <Link href="/api/auth/signup" passHref>
+        <motion.button 
+          className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800 border border-blue-600 dark:border-blue-500 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-colors"
+          whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+          whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+        >
+          Registrarse
+        </motion.button>
+      </Link>
     </div>
   );
 };
-
-const StyledWrapper = styled.div`
-  .menu-appbar {
-    background-color: #3b82f6;
-  }
-
-  .input {
-    display: flex;
-    flex-direction: column;
-    width: 200px;
-    background-color: rgb(18, 35, 82);
-    justify-content: center;
-    border-radius: 5px;
-  }
-
-  .value {
-    background-color: transparent;
-    border: none;
-    padding: 10px;
-    color: white;
-    display: flex;
-    position: relative;
-    gap: 5px;
-    cursor: pointer;
-    border-radius: 4px;
-  }
-
-  .value:not(:active):hover,
-  .value:focus {
-    background-color: rgb(22, 48, 89);
-  }
-
-  .value:focus,
-  .value:active {
-    background-color: #1e40af;
-    outline: none;
-  }
-
-  .value::before {
-    content: "";
-    position: absolute;
-    top: 5px;
-    left: -10px;
-    width: 5px;
-    height: 80%;
-    background-color: #3b82f6;
-    border-radius: 5px;
-    opacity: 0;
-  }
-
-  .value:focus::before,
-  .value:active::before {
-    opacity: 1;
-  }
-
-  .value svg {
-    width: 15px;
-  }
-
-  .input:hover > :not(.value:hover) {
-    transition: 300ms;
-    filter: blur(1px);
-    transform: scale(0.95, 0.95);
-  }
-
-  .contenedor-botones {
-    display: flex;
-    text-align: center;
-    white-space: nowrap;
-  }
-
-  .boton-elegante {
-    display: inline-block;
-    padding: 10px 20px;
-    border: 2px solid #3b82f6;
-    background-color: #1e3a8a;
-    color: #ffffff;
-    font-size: 1rem;
-    cursor: pointer;
-    border-radius: 20px;
-    transition: all 0.4s ease;
-    outline: none;
-    position: relative;
-    overflow: hidden;
-    font-weight: bold;
-    margin: 5px;
-  }
-
-  .boton-elegante::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(
-      circle,
-      rgba(255, 255, 255, 0.25) 0%,
-      rgba(255, 255, 255, 0) 70%
-    );
-    transform: scale(0);
-    transition: transform 0.5s ease;
-  }
-
-  .boton-elegante:hover::after {
-    transform: scale(4);
-  }
-
-  .boton-elegante:hover {
-    border-color: #2563eb;
-    background: #1e40af;
-  }
-`;
 
 export default AuthButton;

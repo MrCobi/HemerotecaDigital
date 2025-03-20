@@ -5,6 +5,7 @@ import { SessionProvider } from "next-auth/react";
 import ClientLayout from "./ClientLayout";
 import { ToastProvider, ToastViewport } from "@/src/app/components/ui/toast";
 import { ThemeProvider } from "./components/ThemeProvider";
+import AppearanceLoader from "./components/AppearanceLoader";
 
 export default function RootLayout({
   children,
@@ -20,6 +21,8 @@ export default function RootLayout({
           <SessionProvider>
             {/* Proveedor de tema */}
             <ThemeProvider>
+              {/* Cargador de configuraciones de apariencia */}
+              <AppearanceLoader />
               {/* Layout principal del cliente */}
               <ClientLayout>
                 {children}

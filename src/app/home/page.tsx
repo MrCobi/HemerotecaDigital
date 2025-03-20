@@ -21,6 +21,8 @@ import {
   Minus,
   Plus,
   User2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
@@ -39,6 +41,7 @@ import { Article } from "@/src/interface/article";
 import { fetchArticulosDestacados } from "@/lib/api";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { CldImage } from 'next-cloudinary';
+import { useAnimationSettings, useConditionalAnimation, useConditionalTransition } from "../hooks/useAnimationSettings";
 
 interface Activity {
   id: string;
@@ -563,10 +566,29 @@ export default function HomePage() {
     useState(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalActivities, setTotalActivities] = useState<number>(0);
+  
+  // Variables que se necesitan mantener
   const itemsPerPage = 5;
   const [categories, setCategories] = useState<string[]>([]);
   const [featuredArticles, setFeaturedArticles] = useState<Article[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  
+  // Obtener configuración de animaciones para aplicar a los componentes de framer-motion
+  const animationsEnabled = useAnimationSettings();
+  
+  // Variantes para animaciones condicionales
+  const fadeInVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+  
+  const noAnimationVariants = {
+    hidden: { opacity: 1, y: 0 },
+    visible: { opacity: 1, y: 0 }
+  };
+  
+  const animationVariants = useConditionalAnimation(fadeInVariants, noAnimationVariants);
+  const animationTransition = useConditionalTransition(0.5);
 
   const horizontalScroll = useHorizontalScroll();
 
@@ -727,7 +749,7 @@ export default function HomePage() {
       <div className="flex h-screen items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-900">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-white mx-auto" />
-          <p className="mt-4 text-blue-100 font-medium">
+          <p className="text-blue-100 font-medium">
             Cargando tu experiencia personalizada...
           </p>
         </div>
@@ -745,15 +767,14 @@ export default function HomePage() {
           {decorativeElements.map((element, index) => (
             <div
               key={index}
-              className="absolute rounded-full opacity-50 animate-pulse"
+              className="absolute rounded-full opacity-50"
               style={{
                 left: element.left,
                 top: element.top,
                 width: element.width,
                 height: element.height,
                 backgroundColor: "rgba(255, 255, 255, 0.1)",
-                borderRadius: "50%",
-                animation: `pulse ${element.duration} infinite`,
+                borderRadius: "50%"
               }}
             />
           ))}
@@ -763,9 +784,9 @@ export default function HomePage() {
 
         <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 flex flex-col justify-center">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            initial={animationVariants.hidden}
+            animate={animationVariants.visible}
+            transition={animationTransition}
             className="max-w-3xl"
           >
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white dark:text-white mb-4 sm:mb-6 leading-tight">
@@ -839,12 +860,9 @@ export default function HomePage() {
       <section id="stats-section" className="py-12 sm:py-16 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{
-              opacity: isVisible.stats ? 1 : 0,
-              y: isVisible.stats ? 0 : 20,
-            }}
-            transition={{ duration: 0.5 }}
+            initial={animationVariants.hidden}
+            animate={animationVariants.visible}
+            transition={animationTransition}
             className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6"
           >
             {[
@@ -910,12 +928,9 @@ export default function HomePage() {
           </div>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{
-              opacity: isVisible.featured ? 1 : 0,
-              y: isVisible.featured ? 0 : 20,
-            }}
-            transition={{ duration: 0.5 }}
+            initial={animationVariants.hidden}
+            animate={animationVariants.visible}
+            transition={animationTransition}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
             {featuredArticles.map((article) => (
@@ -1041,162 +1056,81 @@ export default function HomePage() {
           </div>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{
-              opacity: isVisible.collections ? 1 : 0,
-              y: isVisible.collections ? 0 : 20,
-            }}
-            transition={{ duration: 0.5 }}
+            initial={animationVariants.hidden}
+            animate={animationVariants.visible}
+            transition={animationTransition}
             className="relative"
           >
             <div
               ref={horizontalScroll.scrollRef}
-              className={`flex overflow-x-auto pb-6 scrollbar-hide snap-x snap-mandatory gap-4 select-none ${
-                horizontalScroll.isDragging ? "cursor-grabbing" : "cursor-grab"
-              }`}
-              style={{
-                scrollBehavior: "auto",
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-                WebkitOverflowScrolling: "touch", // Para scroll más suave en iOS
-              }}
+              className="flex gap-4 overflow-x-auto scrollbar-thin scrollbar-thumb-blue-500 scrollbar-track-transparent pb-6 snap-x snap-mandatory"
               onMouseDown={horizontalScroll.onMouseDown}
               onMouseUp={horizontalScroll.onMouseUp}
-              onMouseLeave={horizontalScroll.onMouseUp}
               onMouseMove={horizontalScroll.onMouseMove}
-              onTouchStart={horizontalScroll.onTouchStart}
-              onTouchMove={horizontalScroll.onTouchMove}
-              onTouchEnd={horizontalScroll.onTouchEnd}
             >
-              {categories.map((category, i) => {
-                // Traducción de categorías (inglés a español)
-                const categoryTranslations: Record<string, string> = {
-                  general: "General",
-                  business: "Bussiness",
-                  politics: "Política",
-                  economy: "Economía",
-                  science: "Ciencia",
-                  culture: "Cultura",
-                  society: "Sociedad",
-                  sports: "Deportes",
-                  technology: "Tecnología",
-                  education: "Educación",
-                  entertainment: "Entretenimiento",
-                  health: "Salud",
-                  environment: "Medio Ambiente",
-                };
-
-                const displayName =
-                  categoryTranslations[category.toLowerCase()] || category;
-
-                // Generar un color basado en el nombre de la categoría
-                const colors = [
-                  "from-blue-500 to-blue-700",
-                  "from-green-500 to-green-700",
-                  "from-red-500 to-red-700",
-                  "from-yellow-500 to-yellow-700",
-                  "from-purple-500 to-purple-700",
-                  "from-pink-500 to-pink-700",
-                  "from-indigo-500 to-indigo-700",
-                  "from-teal-500 to-teal-700",
-                ];
-                const bgColor = colors[i % colors.length];
-
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{
-                      opacity: isVisible.collections ? 1 : 0,
-                      scale: isVisible.collections ? 1 : 0.9,
-                    }}
-                    whileHover={{
-                      scale: 1.05,
-                      boxShadow:
-                        "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-                      transition: { duration: 0.3, ease: "easeOut" },
-                    }}
-                    transition={{
-                      duration: 0.5,
-                      delay: i * 0.1,
-                      ease: "easeOut",
-                    }}
-                    className="snap-start flex-shrink-0 relative"
-                    style={{ width: "280px" }}
-                  >
+              {categories.map((category, i) => (
+                <motion.div
+                  key={i}
+                  initial={animationVariants.hidden}
+                  animate={animationVariants.visible}
+                  transition={animationTransition}
+                  className="snap-start flex-shrink-0 relative"
+                  style={{ width: "280px" }}
+                >
+                  <div className="group relative rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-40 w-full">
                     <div
-                      className={`h-48 rounded-xl overflow-hidden relative bg-gradient-to-br ${bgColor} shadow-lg transform transition-all duration-300`}
-                    >
-                      <div className="absolute inset-0 opacity-20 pointer-events-none">
-                        <Image
-                          src="https://img.freepik.com/foto-gratis/textura-pared-cemento-viejo_1149-1280.jpg"
-                          alt={displayName}
-                          width={280}
-                          height={160}
-                          className="h-full w-full object-cover mix-blend-overlay select-none"
-                          draggable="false"
-                          unoptimized
-                        />
-                      </div>
-                      <div className="absolute inset-0 flex flex-col justify-between p-4 select-none">
-                        <h3 className="text-xl font-bold text-white drop-shadow-md">
-                          {displayName}
-                        </h3>
-                        <Button
-                          onClick={() =>
-                            router.push(
-                              `/categories/${encodeURIComponent(
-                                category.toLowerCase()
-                              )}`
-                            )
-                          }
-                          className="bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white self-start mt-auto transition-all duration-300 hover:scale-105"
+                      className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-110"
+                      style={{
+                        backgroundImage: `url(https://source.unsplash.com/random/300x200?${encodeURIComponent(
+                          category
+                        )})`,
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-5">
+                      <h3 className="text-xl font-bold text-white">
+                        {category}
+                      </h3>
+                      <div className="flex items-center mt-2 text-sm text-blue-50">
+                        <Link
+                          href={`/Articulos?category=${encodeURIComponent(
+                            category
+                          )}`}
+                          className="flex items-center text-blue-100 hover:text-white transition-colors"
                         >
-                          Explorar <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
+                          Explorar{" "}
+                          <ArrowRight className="ml-1 w-4 h-4 inline-block text-white" />
+                        </Link>
                       </div>
                     </div>
-                  </motion.div>
-                );
-              })}
+                  </div>
+                </motion.div>
+              ))}
             </div>
 
-            <div className="flex justify-center mt-6 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (horizontalScroll.scrollRef.current) {
-                    const scrollAmount =
-                      horizontalScroll.scrollRef.current.clientWidth * 0.75;
-                    horizontalScroll.scrollRef.current.scrollBy({
-                      left: -scrollAmount,
-                      behavior: "smooth",
-                    });
-                  }
-                }}
-                className="rounded-full w-10 h-10 p-0 flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 transition-all duration-300"
-              >
-                <ArrowRight className="h-4 w-4 rotate-180" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (horizontalScroll.scrollRef.current) {
-                    const scrollAmount =
-                      horizontalScroll.scrollRef.current.clientWidth * 0.75;
-                    horizontalScroll.scrollRef.current.scrollBy({
-                      left: scrollAmount,
-                      behavior: "smooth",
-                    });
-                  }
-                }}
-                className="rounded-full w-10 h-10 p-0 flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 transition-all duration-300"
-              >
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
+            {/* Botones de navegación */}
+            <button
+              onClick={() => {
+                if (horizontalScroll.scrollRef.current) {
+                  horizontalScroll.scrollRef.current.scrollLeft -= 350;
+                }
+              }}
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 rounded-full p-2 shadow-lg z-10 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
+              style={{ marginLeft: "-15px" }}
+            >
+              <ChevronLeft className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </button>
+            <button
+              onClick={() => {
+                if (horizontalScroll.scrollRef.current) {
+                  horizontalScroll.scrollRef.current.scrollLeft += 350;
+                }
+              }}
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 rounded-full p-2 shadow-lg z-10 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
+              style={{ marginRight: "-15px" }}
+            >
+              <ChevronRight className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </button>
           </motion.div>
         </div>
       </section>
@@ -1205,12 +1139,9 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{
-                opacity: isVisible.recent ? 1 : 0,
-                x: isVisible.recent ? 0 : -20,
-              }}
-              transition={{ duration: 0.5 }}
+              initial={animationVariants.hidden}
+              animate={animationVariants.visible}
+              transition={animationTransition}
               className="lg:col-span-2"
             >
               <Card className="border-blue-100 dark:border-blue-900/30 h-full">
@@ -1407,12 +1338,9 @@ export default function HomePage() {
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{
-                opacity: isVisible.recent ? 1 : 0,
-                x: isVisible.recent ? 0 : 20,
-              }}
-              transition={{ duration: 0.5 }}
+              initial={animationVariants.hidden}
+              animate={animationVariants.visible}
+              transition={animationTransition}
             >
               <TrendsSection />
             </motion.div>

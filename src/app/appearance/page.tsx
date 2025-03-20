@@ -8,25 +8,74 @@ import { useTheme } from "../components/ThemeProvider";
 // Tipos para el tema
 type Theme = "light" | "dark" | "system";
 
+// Tipos para opciones avanzadas
+type FontSize = "small" | "medium" | "large";
+type FontFamily = "sans" | "serif" | "mono";
+type ContentDensity = "compact" | "comfortable";
+
 export default function AppearancePage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  
+  // Estados para las configuraciones avanzadas
+  const [fontSize, setFontSize] = useState<FontSize>("medium");
+  const [fontFamily, setFontFamily] = useState<FontFamily>("sans");
+  const [contentDensity, setContentDensity] = useState<ContentDensity>("comfortable");
+  const [enableAnimations, setEnableAnimations] = useState(true);
 
   // Aseguramos que el componente está montado para evitar problemas de hidratación
   useEffect(() => {
     setMounted(true);
+    
+    // Cargar preferencias guardadas
+    if (typeof window !== "undefined") {
+      const savedFontSize = localStorage.getItem("hemopress-font-size") as FontSize | null;
+      const savedFontFamily = localStorage.getItem("hemopress-font-family") as FontFamily | null;
+      const savedContentDensity = localStorage.getItem("hemopress-content-density") as ContentDensity | null;
+      const savedEnableAnimations = localStorage.getItem("hemopress-animations");
+      
+      if (savedFontSize) setFontSize(savedFontSize);
+      if (savedFontFamily) setFontFamily(savedFontFamily);
+      if (savedContentDensity) setContentDensity(savedContentDensity);
+      if (savedEnableAnimations !== null) setEnableAnimations(savedEnableAnimations === "true");
+    }
   }, []);
+
+  // Handlers para cambiar configuraciones
+  const handleFontSizeChange = (size: FontSize) => {
+    setFontSize(size);
+    localStorage.setItem("hemopress-font-size", size);
+    document.documentElement.setAttribute("data-font-size", size);
+  };
+
+  const handleFontFamilyChange = (family: FontFamily) => {
+    setFontFamily(family);
+    localStorage.setItem("hemopress-font-family", family);
+    document.documentElement.setAttribute("data-font-family", family);
+  };
+
+  const handleContentDensityChange = (density: ContentDensity) => {
+    setContentDensity(density);
+    localStorage.setItem("hemopress-content-density", density);
+    document.documentElement.setAttribute("data-content-density", density);
+  };
+
+  const handleAnimationsChange = (enabled: boolean) => {
+    setEnableAnimations(enabled);
+    localStorage.setItem("hemopress-animations", String(enabled));
+    document.documentElement.setAttribute("data-animations", String(enabled));
+  };
 
   // No renderizar nada hasta que el componente esté montado para evitar problemas de hidratación
   if (!mounted) return null;
 
   return (
     <div className="container mx-auto py-8 px-4">
-      <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg transition-colors duration-300">
-        <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Configuración de Apariencia</h1>
+      <div className="max-w-2xl mx-auto bg-card dark:bg-card p-6 rounded-lg shadow-lg dark:shadow-slate-800 transition-colors duration-300">
+        <h1 className="text-2xl font-bold mb-6 text-card-foreground">Configuración Avanzada de Apariencia</h1>
         
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Modo del tema</h2>
+          <h2 className="text-xl font-semibold mb-4 text-card-foreground">Modo del tema</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <ThemeCard 
@@ -75,8 +124,165 @@ export default function AppearancePage() {
           </div>
         </div>
 
-        <div className="flex justify-center mt-10">
-          <Link href="/settings" className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white font-medium py-2 px-4 rounded transition-colors">
+        {/* Personalización de texto */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-card-foreground">Personalización de texto</h2>
+          <div className="bg-muted p-4 rounded-lg">
+            <div className="mb-4">
+              <label className="block text-muted-foreground text-sm font-medium mb-2">Tamaño de fuente</label>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={() => handleFontSizeChange("small")}
+                  className={`p-3 rounded-md flex flex-col items-center justify-center ${
+                    fontSize === "small" 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-muted-foreground/10 text-muted-foreground hover:bg-muted-foreground/20"
+                  }`}
+                >
+                  <span className="text-sm mb-1">A</span>
+                  <span className="text-xs">Pequeño</span>
+                </button>
+                <button
+                  onClick={() => handleFontSizeChange("medium")}
+                  className={`p-3 rounded-md flex flex-col items-center justify-center ${
+                    fontSize === "medium" 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-muted-foreground/10 text-muted-foreground hover:bg-muted-foreground/20"
+                  }`}
+                >
+                  <span className="text-base mb-1">A</span>
+                  <span className="text-xs">Mediano</span>
+                </button>
+                <button
+                  onClick={() => handleFontSizeChange("large")}
+                  className={`p-3 rounded-md flex flex-col items-center justify-center ${
+                    fontSize === "large" 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-muted-foreground/10 text-muted-foreground hover:bg-muted-foreground/20"
+                  }`}
+                >
+                  <span className="text-lg mb-1">A</span>
+                  <span className="text-xs">Grande</span>
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-muted-foreground text-sm font-medium mb-2">Familia de fuente</label>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={() => handleFontFamilyChange("sans")}
+                  className={`p-3 rounded-md flex flex-col items-center justify-center ${
+                    fontFamily === "sans" 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-muted-foreground/10 text-muted-foreground hover:bg-muted-foreground/20"
+                  }`}
+                >
+                  <span className="font-sans text-base mb-1">Aa</span>
+                  <span className="text-xs">Sans-serif</span>
+                </button>
+                <button
+                  onClick={() => handleFontFamilyChange("serif")}
+                  className={`p-3 rounded-md flex flex-col items-center justify-center ${
+                    fontFamily === "serif" 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-muted-foreground/10 text-muted-foreground hover:bg-muted-foreground/20"
+                  }`}
+                >
+                  <span className="font-serif text-base mb-1">Aa</span>
+                  <span className="text-xs">Serif</span>
+                </button>
+                <button
+                  onClick={() => handleFontFamilyChange("mono")}
+                  className={`p-3 rounded-md flex flex-col items-center justify-center ${
+                    fontFamily === "mono" 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-muted-foreground/10 text-muted-foreground hover:bg-muted-foreground/20"
+                  }`}
+                >
+                  <span className="font-mono text-base mb-1">Aa</span>
+                  <span className="text-xs">Mono</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Densidad de contenido */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-card-foreground">Densidad de contenido</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              onClick={() => handleContentDensityChange("compact")}
+              className={`p-4 rounded-lg border transition-all ${
+                contentDensity === "compact"
+                  ? "border-2 border-primary bg-primary/10"
+                  : "border-border bg-muted/50 hover:bg-muted"
+              }`}
+            >
+              <h3 className="font-medium mb-2 text-card-foreground">Compacto</h3>
+              <div className="h-16 bg-background rounded-md flex flex-col justify-center items-center">
+                <div className="w-3/4 h-2 bg-muted-foreground/30 rounded mb-1"></div>
+                <div className="w-3/4 h-2 bg-muted-foreground/30 rounded mb-1"></div>
+                <div className="w-3/4 h-2 bg-muted-foreground/30 rounded"></div>
+              </div>
+              <p className="text-sm mt-2 text-muted-foreground">Muestra más contenido en la pantalla con menos espacio entre elementos.</p>
+            </button>
+            <button
+              onClick={() => handleContentDensityChange("comfortable")}
+              className={`p-4 rounded-lg border transition-all ${
+                contentDensity === "comfortable"
+                  ? "border-2 border-primary bg-primary/10"
+                  : "border-border bg-muted/50 hover:bg-muted"
+              }`}
+            >
+              <h3 className="font-medium mb-2 text-card-foreground">Cómodo</h3>
+              <div className="h-24 bg-background rounded-md flex flex-col justify-center items-center">
+                <div className="w-3/4 h-2 bg-muted-foreground/30 rounded mb-3"></div>
+                <div className="w-3/4 h-2 bg-muted-foreground/30 rounded mb-3"></div>
+                <div className="w-3/4 h-2 bg-muted-foreground/30 rounded"></div>
+              </div>
+              <p className="text-sm mt-2 text-muted-foreground">Experiencia de lectura más relajada con más espacio entre elementos.</p>
+            </button>
+          </div>
+        </div>
+
+        {/* Animaciones */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-card-foreground">Animaciones</h2>
+          <div className="bg-muted p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <label className="text-muted-foreground">Activar animaciones</label>
+              <div className="relative inline-flex">
+                <button 
+                  onClick={() => handleAnimationsChange(!enableAnimations)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                    enableAnimations ? 'bg-primary' : 'bg-muted-foreground/30'
+                  }`}
+                  role="switch"
+                  aria-checked={enableAnimations}
+                >
+                  <span 
+                    className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${
+                      enableAnimations ? 'translate-x-5' : 'translate-x-0'
+                    }`} 
+                  />
+                </button>
+              </div>
+            </div>
+            <p className="text-sm mt-2 text-muted-foreground">
+              {enableAnimations 
+                ? "Las animaciones ayudan a proporcionar contexto visual y hacen que la interfaz sea más intuitiva." 
+                : "Las animaciones están desactivadas para mejorar el rendimiento y reducir distracciones."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex justify-between mt-10 pt-4 border-t border-border">
+          <Link href="/settings" className="text-muted-foreground hover:text-foreground transition-colors flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+              <path d="m12 19-7-7 7-7"></path>
+              <path d="M19 12H5"></path>
+            </svg>
             Volver a Configuración
           </Link>
         </div>
@@ -99,41 +305,41 @@ function ThemeCard({ title, description, isActive, onClick, icon }: ThemeCardPro
     <StyledThemeCard 
       className={`p-4 rounded-lg cursor-pointer transition-all ${
         isActive 
-          ? 'border-2 border-blue-500 bg-blue-50 dark:bg-blue-900/40' 
-          : 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+          ? 'border-2 border-primary bg-primary/10 dark:bg-primary/20' 
+          : 'border border-border bg-card dark:bg-card'
       }`}
       onClick={onClick}
     >
       <div className="flex items-start mb-3">
-        <div className={`mr-3 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}>
+        <div className={`mr-3 ${isActive ? 'text-primary dark:text-primary' : 'text-muted-foreground'}`}>
           {icon}
         </div>
         <div className="flex-1">
-          <h3 className={`font-medium ${isActive ? 'text-blue-700 dark:text-blue-300' : 'text-gray-800 dark:text-gray-200'}`}>
+          <h3 className={`font-medium ${isActive ? 'text-primary dark:text-primary' : 'text-card-foreground'}`}>
             {title}
           </h3>
         </div>
         {isActive && (
-          <div className="text-blue-500 dark:text-blue-400">
+          <div className="text-primary">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M5 12L10 17L20 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
         )}
       </div>
-      <p className="text-sm text-gray-600 dark:text-gray-300 ml-9">{description}</p>
+      <p className="text-sm text-muted-foreground ml-9">{description}</p>
       
       {title === "Tema claro" && (
-        <div className="mt-4 ml-9 p-3 bg-gray-100 dark:bg-gray-700 rounded">
-          <div className="h-2 w-16 bg-gray-300 dark:bg-gray-500 rounded mb-2"></div>
-          <div className="h-2 w-10 bg-gray-300 dark:bg-gray-500 rounded"></div>
+        <div className="mt-4 ml-9 p-3 bg-background rounded">
+          <div className="h-2 w-16 bg-border rounded mb-2"></div>
+          <div className="h-2 w-10 bg-border rounded"></div>
         </div>
       )}
       
       {title === "Tema oscuro" && (
-        <div className="mt-4 ml-9 p-3 bg-gray-800 dark:bg-gray-900 rounded">
-          <div className="h-2 w-16 bg-gray-600 dark:bg-gray-700 rounded mb-2"></div>
-          <div className="h-2 w-10 bg-gray-600 dark:bg-gray-700 rounded"></div>
+        <div className="mt-4 ml-9 p-3 bg-muted rounded">
+          <div className="h-2 w-16 bg-muted-foreground/40 rounded mb-2"></div>
+          <div className="h-2 w-10 bg-muted-foreground/40 rounded"></div>
         </div>
       )}
     </StyledThemeCard>

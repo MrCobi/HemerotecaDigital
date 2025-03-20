@@ -116,15 +116,14 @@ export default function HomePage() {
           {decorativeElements.map((element, i) => (
             <div
               key={i}
-              className="absolute animate-pulse hidden sm:block"
+              className="absolute hidden sm:block"
               style={{
                 left: element.left,
                 top: element.top,
                 width: element.width,
                 height: element.height,
                 backgroundColor: "rgba(255, 255, 255, 0.1)",
-                borderRadius: "50%",
-                animation: `pulse ${element.duration} infinite`,
+                borderRadius: "50%"
               }}
             />
           ))}

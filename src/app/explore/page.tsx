@@ -13,6 +13,7 @@ import { Button } from "@/src/app/components/ui/button";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { useRouter } from "next/navigation";
 import Loading from "@/src/app/components/Loading";
+import { useAnimationSettings, useConditionalAnimation, useConditionalTransition } from "../hooks/useAnimationSettings";
 
 type Stats = {
   followers?: number;
@@ -41,6 +42,24 @@ export default function ExplorePage() {
     Record<string, boolean>
   >({});
   const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  // Obtener el estado de las animaciones
+  const animationsEnabled = useAnimationSettings();
+  
+  // Variantes para las animaciones condicionadas
+  const fadeInVariants = {
+    hidden: { opacity: 0, y: -20 },
+    visible: { opacity: 1, y: 0 }
+  };
+  
+  const noAnimationVariants = {
+    hidden: { opacity: 1, y: 0 },
+    visible: { opacity: 1, y: 0 }
+  };
+  
+  // Usar el hook con los argumentos necesarios
+  const animationVariants = useConditionalAnimation(fadeInVariants, noAnimationVariants);
+  const animationTransition = useConditionalTransition(0.3);
 
   // Verificación de autenticación
   useEffect(() => {
@@ -186,8 +205,9 @@ export default function ExplorePage() {
 
       <div className="container relative z-10 mx-auto px-4 py-8 max-w-7xl">
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={animationVariants.hidden}
+          animate={animationVariants.visible}
+          transition={animationTransition}
           className="space-y-8"
         >
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -225,8 +245,9 @@ export default function ExplorePage() {
             </div>
           ) : users.length === 0 ? (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={animationVariants.hidden}
+              animate={animationVariants.visible}
+              transition={animationTransition}
               className="flex flex-col items-center justify-center py-16 text-center"
             >
               <div className="p-6 rounded-full bg-blue-100/50 dark:bg-blue-900/30 mb-4">
@@ -241,16 +262,17 @@ export default function ExplorePage() {
           ) : (
             <>
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                initial={animationVariants.hidden}
+                animate={animationVariants.visible}
+                transition={animationTransition}
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
               >
                 {paginatedUsers.map((user, index) => (
                   <motion.div
                     key={user.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
+                    initial={animationVariants.hidden}
+                    animate={animationVariants.visible}
+                    transition={animationTransition}
                   >
                     <UserCard
                       user={user}
@@ -269,31 +291,48 @@ export default function ExplorePage() {
               </motion.div>
 
               {totalPages > 1 && (
-                <div className="flex justify-center gap-2 mt-4">
+                <motion.div 
+                  className="flex justify-center gap-3 mt-6"
+                  initial={animationVariants.hidden}
+                  animate={animationVariants.visible}
+                  transition={{ ...animationTransition, delay: 0.2 }}
+                >
                   <Button
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700"
+                    className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 transition-all duration-200"
                     variant="outline"
+                    size="sm"
                   >
                     Anterior
                   </Button>
-
-                  <span className="flex items-center px-4 text-sm">
-                    Página {currentPage} de {totalPages}
-                  </span>
-
+                  <div className="flex items-center gap-2">
+                    {Array.from({ length: totalPages }).map((_, idx) => (
+                      <motion.button
+                        key={idx}
+                        onClick={() => setCurrentPage(idx + 1)}
+                        className={`h-8 w-8 flex items-center justify-center rounded-md transition-all duration-200 ${
+                          currentPage === idx + 1
+                            ? "bg-blue-600 text-white dark:bg-blue-700 shadow-sm"
+                            : "bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                        }`}
+                        whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+                        whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+                      >
+                        {idx + 1}
+                      </motion.button>
+                    ))}
+                  </div>
                   <Button
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700"
+                    className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 transition-all duration-200"
                     variant="outline"
+                    size="sm"
                   >
                     Siguiente
                   </Button>
-                </div>
+                </motion.div>
               )}
             </>
           )}

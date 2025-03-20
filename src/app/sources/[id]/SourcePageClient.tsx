@@ -1,7 +1,7 @@
 // src/app/sources/[id]/SourcePageClient.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Source } from "@/src/interface/source";
 import { Article } from "@/src/interface/article";
 import { SourceImage } from "./SourceImage.client";
@@ -11,9 +11,11 @@ import { useSession } from "next-auth/react";
 import CommentForm from "@/src/app/components/Comments/CommentForm";
 import CommentList from "@/src/app/components/Comments/CommentList";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
-import { useCallback } from "react";
-import { Heart } from "lucide-react";
+import { Heart, Star } from "lucide-react";
 import { API_ROUTES } from "@/src/config/api-routes";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+import { useAnimationSettings, useConditionalTransition } from "@/src/app/hooks/useAnimationSettings";
 
 interface SourcePageClientProps {
   source: Source;
@@ -42,6 +44,25 @@ export default function SourcePageClient({
   const [commentsCount, setCommentsCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const router = useRouter();
+
+  // Obtener configuración de animaciones
+  const animationsEnabled = useAnimationSettings();
+
+  // Variantes para animaciones
+  const fadeInVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+
+  const noAnimationVariants = {
+    hidden: { opacity: 1, y: 0 },
+    visible: { opacity: 1, y: 0 }
+  };
+
+  // Usar las variantes adecuadas según la configuración
+  const animationVariants = animationsEnabled ? fadeInVariants : noAnimationVariants;
+  const animationTransition = useConditionalTransition(0.5);
 
   useEffect(() => {
     const loadFavorites = async () => {
@@ -104,12 +125,13 @@ export default function SourcePageClient({
     }
 
     try {
+      // Usar directamente API_ROUTES para construir la URL
       const response = await fetch(
         `${window.location.origin}${API_ROUTES.sources.articles(source.id, order, source.language)}`
       );
-      
+
       if (!response.ok) throw new Error("Error fetching articles");
-      
+
       const fetchedArticles = await response.json();
       setArticles(fetchedArticles);
       sessionStorage.setItem(cacheKey, JSON.stringify(fetchedArticles));
@@ -183,7 +205,7 @@ export default function SourcePageClient({
 
   useEffect(() => {
     fetchCommentsCount(true);
-  }, [fetchCommentsCount]); // Dependencia añadida
+  }, [fetchCommentsCount]);
 
   useEffect(() => {
     fetchCommentsCount(true);
@@ -202,34 +224,16 @@ export default function SourcePageClient({
     };
   }, [showComments, fetchCommentsCount]);
 
+  // Cargar artículos al inicio
   useEffect(() => {
-    fetchCommentsCount(true);
-  }, [refreshKey, fetchCommentsCount]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (showComments) {
-      // Primera llamada inmediata
-      fetchCommentsCount(true);
-      // Luego cada 10 segundos
-      interval = setInterval(() => fetchCommentsCount(true), 10000);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [showComments, fetchCommentsCount]); // Corregido: añadido fetchCommentsCount como dependencia
+    loadArticles();
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
-      <header className="relative bg-blue-800 py-16 md:py-24 overflow-hidden">
-        {/* Simplificación de capas de fondo */}
-        <div className="absolute inset-0 bg-black/20" />
-
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-gray-900">
+      <header className="relative py-16 md:py-24 overflow-hidden bg-blue-800 dark:bg-gradient-to-br dark:from-slate-900 dark:via-blue-950 dark:to-slate-900">
         {/* Patrones de fondo optimizados */}
         <div className="absolute inset-0 opacity-10">
-          {/* Reemplazar blur por SVG para mejor rendimiento */}
           <svg
             className="w-full h-full"
             viewBox="0 0 100 100"
@@ -254,29 +258,29 @@ export default function SourcePageClient({
 
         {/* Contenido principal */}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <button
+          <motion.button
             onClick={(e) => {
               e.stopPropagation();
               handleFavoriteClick(source.id);
             }}
-            className="absolute top-4 right-4 bg-white/90 hover:bg-white p-2 rounded-full text-xl transition-transform duration-300 hover:scale-105 shadow-lg z-10"
-            style={{ willChange: "transform" }}
+            className="absolute top-4 right-4 bg-white/90 hover:bg-white dark:bg-white/10 dark:hover:bg-white/20 p-2 rounded-full text-xl transition-transform duration-300 hover:scale-105 shadow-lg z-10"
+            whileHover={animationsEnabled ? { scale: 1.1 } : {}}
+            whileTap={animationsEnabled ? { scale: 0.9 } : {}}
           >
             <Heart
-              className={`w-6 h-6 ${
-                favorites.has(source.id)
+              className={`w-6 h-6 ${favorites.has(source.id)
                   ? "fill-current text-red-600" // Corazón lleno cuando está en favoritos
-                  : "stroke-current text-gray-400" // Corazón vacío cuando no está en favoritos
-              }`}
+                  : "stroke-current text-gray-400 dark:text-gray-300" // Corazón vacío cuando no está en favoritos
+                }`}
             />
-          </button>
+          </motion.button>
 
           <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
             <div className="flex-1 text-center md:text-left">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white dark:text-white mb-4">
                 {source.name}
               </h1>
-              <p className="text-xl text-gray-100/90 mb-6 max-w-2xl">
+              <p className="text-xl text-white/90 dark:text-gray-100/90 mb-6 max-w-2xl">
                 {source.description}
               </p>
 
@@ -288,7 +292,7 @@ export default function SourcePageClient({
                 href={source.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center bg-white/95 hover:bg-white text-blue-700 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                className="inline-flex items-center bg-white/95 hover:bg-white text-blue-700 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
               >
                 Visitar sitio web
                 <svg
@@ -309,7 +313,7 @@ export default function SourcePageClient({
 
             {source.imageUrl && (
               <div className="md:ml-4 transform hover:scale-105 transition-transform duration-300">
-                <div className="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden border-4 border-white/90 shadow-2xl relative">
+                <div className="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden border-4 border-white/90 dark:border-white/10 shadow-2xl relative">
                   <SourceImage
                     imageUrl={source.imageUrl}
                     name={source.name}
@@ -323,23 +327,22 @@ export default function SourcePageClient({
       </header>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
           <button
             onClick={() => setShowComments(!showComments)}
-            className="w-full p-3 sm:p-4 bg-gray-100 flex justify-between items-center"
+            className="w-full p-3 sm:p-4 bg-gray-100 dark:bg-gray-800 flex justify-between items-center"
           >
-            <h2 className="text-lg sm:text-xl font-semibold">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
               Comentarios ({commentsCount})
             </h2>
             <ChevronDownIcon
-              className={`w-5 h-5 sm:w-6 sm:h-6 transform transition-transform ${
-                showComments ? "rotate-180" : ""
-              }`}
+              className={`w-5 h-5 sm:w-6 sm:h-6 transform transition-transform text-gray-600 dark:text-white ${showComments ? "rotate-180" : ""
+                }`}
             />
           </button>
 
           {showComments && (
-            <div className="p-4 sm:p-6 bg-white">
+            <div className="p-4 sm:p-6 bg-white dark:bg-gray-900">
               <CommentForm
                 sourceId={source.id}
                 onCommentAdded={() => {
@@ -350,7 +353,7 @@ export default function SourcePageClient({
               {isLoadingComments ? (
                 <div className="text-center py-4">
                   <svg
-                    className="animate-spin h-6 h-6 sm:h-8 sm:w-8 text-blue-600 mx-auto"
+                    className="animate-spin h-6 h-6 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400 mx-auto"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -369,7 +372,7 @@ export default function SourcePageClient({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  <p className="text-gray-600 mt-2">Cargando comentarios...</p>
+                  <p className="text-gray-600 dark:text-gray-400 mt-2">Cargando comentarios...</p>
                 </div>
               ) : (
                 <CommentList
@@ -386,68 +389,69 @@ export default function SourcePageClient({
       </section>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <section className="mb-8">
+        <motion.div
+          initial={animationVariants.hidden}
+          animate={animationVariants.visible}
+          transition={animationTransition}
+          className="mb-6"
+        >
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="relative">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                 Artículos Destacados por{" "}
                 <span
                   onClick={rotateSort}
-                  className={`text-blue-600 cursor-pointer inline-block transition-all duration-300 ${
-                    isAnimating
+                  className={`text-blue-600 dark:text-blue-400 cursor-pointer inline-block transition-all duration-300 ${isAnimating
                       ? "opacity-0 transform -translate-y-4"
                       : "opacity-100"
-                  }`}
+                    }`}
                 >
                   {sortLabels[sortBy]}
                 </span>
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Haz clic en el criterio para cambiar el orden
               </p>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3 bg-white p-2 rounded-lg shadow-sm self-end">
-              <span className="text-xs sm:text-sm text-gray-500">
+            <div className="flex items-center gap-2 sm:gap-3 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm self-end">
+              <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                 Ordenar por:
               </span>
               <div className="flex gap-1">
                 <span
-                  className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-all ${
-                    sortBy === "relevancy"
+                  className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-all ${sortBy === "relevancy"
                       ? "bg-blue-600 text-white"
-                      : "text-gray-500"
-                  }`}
+                      : "text-gray-500 dark:text-gray-400"
+                    }`}
                 >
                   Relevancia
                 </span>
                 <span
-                  className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-all ${
-                    sortBy === "popularity"
+                  className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-all ${sortBy === "popularity"
                       ? "bg-blue-600 text-white"
-                      : "text-gray-500"
-                  }`}
+                      : "text-gray-500 dark:text-gray-400"
+                    }`}
                 >
                   Popularidad
                 </span>
                 <span
-                  className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-all ${
-                    sortBy === "publishedAt"
+                  className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-all ${sortBy === "publishedAt"
                       ? "bg-blue-600 text-white"
-                      : "text-gray-500"
-                  }`}
+                      : "text-gray-500 dark:text-gray-400"
+                    }`}
                 >
                   Fecha
                 </span>
               </div>
             </div>
           </div>
-        </section>
+        </motion.div>
 
         {articles.length === 0 ? (
-          <div className="text-center text-gray-500 py-12">
+          <div className="text-center text-gray-500 dark:text-gray-400 py-12">
             <svg
-              className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-gray-300 mb-4"
+              className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -462,11 +466,16 @@ export default function SourcePageClient({
             <p className="text-xl">No se encontraron artículos.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <motion.div
+            initial={animationVariants.hidden}
+            animate={animationVariants.visible}
+            transition={animationTransition}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+          >
             {articles.map((article) => (
               <article
                 key={article.url}
-                className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
               >
                 <figure className="relative h-40 sm:h-48">
                   {article.urlToImage ? (
@@ -478,9 +487,9 @@ export default function SourcePageClient({
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                    <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                       <svg
-                        className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400"
+                        className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 dark:text-gray-600"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -498,19 +507,19 @@ export default function SourcePageClient({
 
                 <div className="p-4 sm:p-6">
                   <header>
-                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 line-clamp-2 hover:text-blue-600">
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2 line-clamp-2 hover:text-blue-600 dark:hover:text-blue-400">
                       {article.title}
                     </h3>
                   </header>
 
                   {article.description && (
-                    <p className="text-sm sm:text-base text-gray-600 mb-4 line-clamp-3">
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">
                       {article.description}
                     </p>
                   )}
 
                   <footer className="mt-auto">
-                    <div className="flex items-center justify-between text-xs sm:text-sm text-gray-500 mb-4">
+                    <div className="flex items-center justify-between text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-4">
                       {article.author && (
                         <span className="flex items-center">
                           <svg
@@ -560,7 +569,7 @@ export default function SourcePageClient({
                       href={article.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors text-sm sm:text-base"
+                      className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-sm sm:text-base"
                     >
                       Leer más
                       <svg
@@ -581,7 +590,7 @@ export default function SourcePageClient({
                 </div>
               </article>
             ))}
-          </div>
+          </motion.div>
         )}
       </main>
     </div>

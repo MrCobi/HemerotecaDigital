@@ -32,6 +32,8 @@ import { Source } from "@/src/interface/source";
 import { useSession } from "next-auth/react";
 import { debounce } from "lodash";
 import { API_ROUTES } from "@/src/config/api-routes";
+import { motion } from "framer-motion";
+import { useAnimationSettings } from "@/src/app/hooks/useAnimationSettings";
 
 const languages = [
   { code: "es", name: "Español", flag: "🇪🇸" },
@@ -110,7 +112,7 @@ export default function SourcesPage({
       }, 300),
     [onSearch, onPageChange]
   );
-  
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -172,6 +174,24 @@ export default function SourcesPage({
     onPageChange(1);
   };
 
+  // Obtener la configuración de animaciones
+  const animationsEnabled = useAnimationSettings();
+
+  // Variantes para animaciones condicionales
+  const fadeInVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
+  };
+
+  const noAnimationVariants = {
+    hidden: { opacity: 1, y: 0 },
+    visible: { opacity: 1, y: 0 },
+  };
+
+  // Utilizar las variantes adecuadas según la configuración
+  const animationVariants = animationsEnabled ? fadeInVariants : noAnimationVariants;
+  const animationTransition = animationsEnabled ? { duration: 0.3 } : { duration: 0 };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -180,7 +200,7 @@ export default function SourcesPage({
           <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-blue-200/20 dark:bg-blue-400/5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
           <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-blue-100/20 dark:bg-blue-500/5 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2"></div>
         </div>
-        
+
         {!isFavoritePage && (
           <div
             className={`text-center mb-16 transition-all duration-1000 ${
@@ -303,19 +323,25 @@ export default function SourcesPage({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute top-4 left-4 text-red-400 hover:text-red-500 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm hover:bg-white/100 dark:hover:bg-gray-800/100 shadow-md hover:shadow-lg"
+                      className="absolute top-4 left-4 h-9 w-9 rounded-full flex items-center justify-center text-red-400 hover:text-red-500 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm hover:bg-white/100 dark:hover:bg-gray-800/100 shadow-md hover:shadow-lg z-10"
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleFavorite(source.id);
                       }}
                     >
-                      <Heart
-                        className={`w-6 h-6 ${
-                          favorites.has(source.id)
-                            ? "fill-current stroke-red-600"
-                            : "stroke-current stroke-2"
-                        }`}
-                      />
+                      <motion.div
+                        initial={animationVariants.hidden}
+                        animate={animationVariants.visible}
+                        transition={animationTransition}
+                      >
+                        <Heart
+                          className={`w-5 h-5 ${
+                            favorites.has(source.id)
+                              ? "fill-current text-red-500 dark:text-red-400 stroke-red-600 dark:stroke-red-500"
+                              : "stroke-current stroke-2 text-red-400 dark:text-red-300"
+                          }`}
+                        />
+                      </motion.div>
                     </Button>
                   </div>
                   <CardHeader>
@@ -345,14 +371,22 @@ export default function SourcesPage({
         )}
 
         {showPagination && totalSources > sourcesPerPage && (
-          <div className="mt-12 flex flex-col items-center space-y-4">
+          <motion.div 
+            className="mt-12 flex flex-col items-center space-y-4"
+            initial={animationVariants.hidden}
+            animate={animationVariants.visible}
+            transition={{ ...animationTransition, delay: 0.3 }}
+          >
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Mostrando {Math.min(sourcesPerPage, sources.length)} de {totalSources} fuentes
+            </p>
             <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() => onPageChange(1)}
                 disabled={currentPage === 1}
-                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
               >
                 <ChevronsLeft className="h-4 w-4" />
               </Button>
@@ -361,7 +395,7 @@ export default function SourcesPage({
                 size="icon"
                 onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -380,18 +414,23 @@ export default function SourcesPage({
                   }
 
                   return (
-                    <Button
+                    <motion.div
                       key={pageNum}
-                      variant={currentPage === pageNum ? "default" : "outline"}
-                      onClick={() => onPageChange(pageNum)}
-                      className={`w-10 h-10 p-0 ${
-                        currentPage === pageNum
-                          ? "bg-blue-600 text-white hover:bg-blue-700"
-                          : "dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
-                      }`}
+                      whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+                      whileTap={animationsEnabled ? { scale: 0.95 } : {}}
                     >
-                      {pageNum}
-                    </Button>
+                      <Button
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        onClick={() => onPageChange(pageNum)}
+                        className={`w-10 h-10 p-0 ${
+                          currentPage === pageNum
+                            ? "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
+                            : "dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                        } transition-all duration-200`}
+                      >
+                        {pageNum}
+                      </Button>
+                    </motion.div>
                   );
                 })}
               </div>
@@ -403,7 +442,7 @@ export default function SourcesPage({
                   onPageChange(Math.min(totalPages, currentPage + 1))
                 }
                 disabled={currentPage === totalPages}
-                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -412,18 +451,12 @@ export default function SourcesPage({
                 size="icon"
                 onClick={() => onPageChange(totalPages)}
                 disabled={currentPage === totalPages}
-                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
               >
                 <ChevronsRight className="h-4 w-4" />
               </Button>
             </div>
-
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Mostrando {(currentPage - 1) * sourcesPerPage + 1} -{" "}
-              {Math.min(currentPage * sourcesPerPage, totalSources)} de{" "}
-              {totalSources} fuentes
-            </p>
-          </div>
+          </motion.div>
         )}
 
         {sources.length === 0 && !isLoading && (

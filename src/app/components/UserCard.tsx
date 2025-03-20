@@ -32,7 +32,7 @@ export const UserCard = memo(function UserCard({ user, action }: UserCardProps) 
   };
 
   return (
-    <Card className="group overflow-hidden border-border hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300 hover:shadow-lg bg-white dark:bg-gray-800/90">
+    <Card className="group overflow-hidden border-[hsl(var(--border))] hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300 hover:shadow-lg bg-white dark:bg-gray-800/90">
       <Link href={`/users/${user.username}`} className="block">
         <div className="relative">
           <div
