@@ -1,0 +1,90 @@
+/* Estilos globales para MUI en modo oscuro */
+
+/* Menú desplegable del Autocomplete */
+.dark .MuiAutocomplete-popper .MuiPaper-root {
+  background-color: #1f2937 !important;
+  color: #e5e7eb !important;
+  border: 1px solid rgba(75, 85, 99, 0.5) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Opciones en el menú del Autocomplete */
+.dark .MuiAutocomplete-popper .MuiAutocomplete-option,
+.dark .MuiAutocomplete-popper .MuiAutocomplete-listbox .MuiAutocomplete-option {
+  color: #e5e7eb !important;
+}
+
+/* Hover sobre las opciones */
+.dark .MuiAutocomplete-popper .MuiAutocomplete-option:hover,
+.dark .MuiAutocomplete-popper .MuiAutocomplete-listbox .MuiAutocomplete-option:hover {
+  background-color: rgba(96, 165, 250, 0.2) !important;
+}
+
+/* Opción seleccionada */
+.dark .MuiAutocomplete-popper .MuiAutocomplete-option[aria-selected="true"],
+.dark .MuiAutocomplete-popper .MuiAutocomplete-listbox .MuiAutocomplete-option[aria-selected="true"] {
+  background-color: rgba(96, 165, 250, 0.3) !important;
+}
+
+/* Mensaje de no opciones */
+.dark .MuiAutocomplete-popper .MuiAutocomplete-noOptions {
+  color: #9ca3af !important;
+}
+
+/* Listbox de opciones */
+.dark .MuiAutocomplete-popper .MuiAutocomplete-listbox {
+  background-color: #1f2937 !important;
+  color: #e5e7eb !important;
+}
+
+/* Grupo de opciones */
+.dark .MuiAutocomplete-popper .MuiAutocomplete-groupLabel {
+  color: #9ca3af !important;
+  background-color: #111827 !important;
+}
+
+/* Inputs y etiquetas en modo oscuro */
+.dark .MuiTextField-root .MuiInputBase-root {
+  color: #e5e7eb !important;
+}
+
+.dark .MuiTextField-root .MuiInputLabel-root {
+  color: #9ca3af !important;
+}
+
+.dark .MuiTextField-root .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(75, 85, 99, 0.8) !important;
+}
+
+.dark .MuiTextField-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(96, 165, 250, 0.8) !important;
+}
+
+.dark .MuiTextField-root .Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(96, 165, 250, 1) !important;
+}
+
+.dark .MuiTextField-root .MuiInputLabel-root.Mui-focused {
+  color: rgb(96, 165, 250) !important;
+}
+
+/* Aumentar la especificidad para asegurar que se aplican los estilos */
+html.dark body .MuiAutocomplete-popper .MuiPaper-root {
+  background-color: #1f2937 !important;
+  color: #e5e7eb !important;
+}
+
+html.dark body .MuiAutocomplete-popper .MuiAutocomplete-option {
+  color: #e5e7eb !important;
+}
+
+/* Sobrescribir estilos en modo oscuro con alta prioridad */
+.MuiAutocomplete-popper .MuiPaper-root.MuiPaper-root {
+  background-color: white;
+  color: #111827;
+}
+
+.dark .MuiAutocomplete-popper .MuiPaper-root.MuiPaper-root {
+  background-color: #1f2937 !important;
+  color: #e5e7eb !important;
+}
