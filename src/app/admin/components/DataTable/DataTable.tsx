@@ -113,7 +113,7 @@ export default function DataTable<T>({
   };
 
   return (
-    <div className={cn("bg-card rounded-md shadow-sm overflow-hidden", className)}>
+    <div className={cn("bg-card rounded-md shadow-sm", className)}>
       <div className="p-4 bg-card border-b border-border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="w-full sm:w-64">
           <TableFilter 
@@ -141,11 +141,11 @@ export default function DataTable<T>({
         />
       </div>
       
-      <div className="overflow-x-auto">
-        {data.length > 0 ? (
-          <>
-            {/* Tabla para pantallas medianas y grandes */}
-            <table className="w-full hidden md:table">
+      {data.length > 0 ? (
+        <>
+          {/* Tabla para pantallas medianas y grandes */}
+          <div className="w-full hidden md:block">
+            <table className="w-full table-fixed">
               <thead className="bg-muted/30">
                 <tr>
                   {columns.map((column, index) => (
@@ -175,7 +175,7 @@ export default function DataTable<T>({
                       <td
                         key={colIndex}
                         className={cn(
-                          "px-6 py-4",
+                          "px-6 py-4 break-words",
                           column.className
                         )}
                       >
@@ -186,24 +186,24 @@ export default function DataTable<T>({
                 ))}
               </tbody>
             </table>
-            
-            {/* Vista para móviles */}
-            <div className="md:hidden">
-              {data.map((item, index) => renderMobileRow(item, index))}
-            </div>
-            
-            <div className="border-t border-border">
-              <Pagination 
-                currentPage={currentPage} 
-                totalPages={totalPages} 
-                onPageChange={onPageChange} 
-              />
-            </div>
-          </>
-        ) : (
-          <EmptyTable message={emptyMessage} />
-        )}
-      </div>
+          </div>
+          
+          {/* Vista para móviles */}
+          <div className="md:hidden">
+            {data.map((item, index) => renderMobileRow(item, index))}
+          </div>
+          
+          <div className="border-t border-border">
+            <Pagination 
+              currentPage={currentPage} 
+              totalPages={totalPages} 
+              onPageChange={onPageChange} 
+            />
+          </div>
+        </>
+      ) : (
+        <EmptyTable message={emptyMessage} />
+      )}
     </div>
   );
 }

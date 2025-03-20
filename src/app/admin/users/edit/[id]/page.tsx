@@ -1,33 +1,69 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { CldImage } from "next-cloudinary";
-import { CustomUser as User} from "@/src/interface/user";
-import { API_ROUTES } from "@/src/config/api-routes";
+import Image from "next/image";
+
+// Definición del tipo de usuario adaptada al esquema actual
+type User = {
+  id: string;
+  name: string | null;
+  email: string;
+  image: string | null;
+  role: "ADMIN" | "EDITOR" | "USER";
+  createdAt: Date;
+  updatedAt: Date;
+  emailVerified: Date | null;
+};
 
 export default function EditUserPage() {
   const { id } = useParams();
   const router = useRouter();
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "user" });
+  const [form, setForm] = useState({ 
+    name: "", 
+    email: "", 
+    password: "", 
+    role: "USER" as "ADMIN" | "EDITOR" | "USER"
+  });
   const [userInfo, setUserInfo] = useState<User | null>(null);
-  const [preview, setPreview] = useState("/images/default_periodico.jpg");
+  const [preview, setPreview] = useState("/placeholders/user.png");
   const roles = [
-    { value: "user", label: "Usuario" },
-    { value: "admin", label: "Admin" },
+    { value: "USER", label: "Usuario" },
+    { value: "EDITOR", label: "Editor" },
+    { value: "ADMIN", label: "Administrador" },
   ];
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     async function fetchUser() {
-      const res = await fetch(API_ROUTES.users.crud.get(id as string));
-      if (res.ok) {
-        const data = await res.json();
-        setForm({ name: data.name, email: data.email, password: "", role: data.role });
-        setUserInfo(data);
-        if (data.image) setPreview(data.image);
+      try {
+        setIsLoading(true);
+        const res = await fetch(`/api/users/${id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setForm({ 
+            name: data.name || "", 
+            email: data.email, 
+            password: "", 
+            role: data.role 
+          });
+          setUserInfo(data);
+          if (data.image) setPreview(data.image);
+        } else {
+          setError("No se pudo cargar la información del usuario");
+        }
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        setError("Error al cargar los datos del usuario");
+      } finally {
+        setIsLoading(false);
       }
     }
-    fetchUser();
+    
+    if (id) {
+      fetchUser();
+    }
   }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -49,100 +85,133 @@ export default function EditUserPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccessMessage("");
+    
+    try {
+      const updateData = {
+        ...form,
+        // Si el password está vacío, no lo enviamos
+        ...(form.password === "" && { password: undefined })
+      };
+      
+      const res = await fetch(`/api/users/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
 
-    const res = await fetch(API_ROUTES.users.crud.update(id as string), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-
-    if (res.ok) {
-      router.push("/admin/users");
-    } else {
-      const data = await res.json();
-      setError(data.error || "Error al actualizar el usuario");
+      if (res.ok) {
+        setSuccessMessage("Usuario actualizado correctamente");
+        setTimeout(() => {
+          router.push("/admin/users");
+        }, 1500);
+      } else {
+        const data = await res.json();
+        setError(data.error || "Error al actualizar el usuario");
+      }
+    } catch (error) {
+      console.error("Error updating user:", error);
+      setError("Ha ocurrido un error al actualizar el usuario");
     }
   };
 
-  if (!userInfo) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl overflow-hidden">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-foreground">Editar Usuario</h1>
+          <button
+            onClick={() => router.back()}
+            className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-md transition-colors"
+          >
+            Volver
+          </button>
+        </div>
+
+        <div className="bg-card rounded-lg shadow-md overflow-hidden">
           <div className="md:flex">
             {/* Panel lateral izquierdo */}
-            <div className="md:w-1/3 bg-gradient-to-b from-blue-600 to-blue-800 p-8 text-white">
+            <div className="md:w-1/3 bg-primary/10 p-8">
               <div className="text-center">
                 <div className="relative w-32 h-32 mx-auto mb-4">
-                  <CldImage
+                  <Image
                     src={preview}
                     alt="Preview"
-                    fill
-                    className="rounded-full object-cover border-4 border-white/50"
+                    width={128}
+                    height={128}
+                    className="rounded-full object-cover border-4 border-primary/30"
                   />
                 </div>
-                <h2 className="text-xl font-semibold mb-2">{userInfo.name}</h2>
-                <p className="text-blue-200 text-sm mb-4">
-                  ID: {userInfo.id}
-                </p>
-                <div className="space-y-2 text-left text-sm">
-                  <p className="flex items-center">
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
-                    </svg>
-                    Creado: {new Date(userInfo.createdAt).toLocaleDateString()}
-                  </p>
-                  <p className="flex items-center">
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-                    </svg>
-                    Última actualización: {new Date(userInfo.updatedAt).toLocaleDateString()}
-                  </p>
-                </div>
+                {userInfo && (
+                  <>
+                    <h2 className="text-xl font-semibold mb-2">{userInfo.name}</h2>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      ID: {userInfo.id}
+                    </p>
+                    <div className="space-y-2 text-left text-sm">
+                      <p className="flex items-center">
+                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
+                        </svg>
+                        Creado: {new Date(userInfo.createdAt).toLocaleDateString()}
+                      </p>
+                      {userInfo.updatedAt && (
+                        <p className="flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                          </svg>
+                          Última actualización: {new Date(userInfo.updatedAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
             {/* Formulario lado derecho */}
             <div className="md:w-2/3 p-8">
-              <div className="mb-6">
-                <h1 className="text-2xl font-bold text-white">Editar Usuario</h1>
-                <p className="text-gray-400">Modifica los datos del usuario</p>
-              </div>
-
               {error && (
-                <div className="mb-4 p-4 bg-red-500/10 border border-red-500 rounded-lg">
-                  <p className="text-red-500 text-sm">{error}</p>
+                <div className="mb-4 p-4 bg-destructive/10 border border-destructive rounded-lg">
+                  <p className="text-destructive text-sm">{error}</p>
+                </div>
+              )}
+              
+              {successMessage && (
+                <div className="mb-4 p-4 bg-green-500/10 border border-green-500 rounded-lg">
+                  <p className="text-green-500 text-sm">{successMessage}</p>
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Imagen de perfil
                     </label>
                     <input
                       type="file"
                       accept="image/*"
                       onChange={handleImageChange}
-                      className="block w-full text-sm text-gray-400
+                      className="block w-full text-sm text-muted-foreground
                         file:mr-4 file:py-2 file:px-4
                         file:rounded-full file:border-0
                         file:text-sm file:font-semibold
-                        file:bg-blue-50 file:text-blue-700
-                        hover:file:bg-blue-100"
+                        file:bg-primary/10 file:text-primary
+                        hover:file:bg-primary/20"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Nombre completo
                     </label>
                     <input
@@ -150,13 +219,12 @@ export default function EditUserPage() {
                       name="name"
                       value={form.name}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 bg-white/10 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                      required
+                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:border-primary"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Correo electrónico
                     </label>
                     <input
@@ -164,13 +232,13 @@ export default function EditUserPage() {
                       name="email"
                       value={form.email}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 bg-white/10 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:border-primary"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Nueva Contraseña (Opcional)
                     </label>
                     <input
@@ -178,23 +246,23 @@ export default function EditUserPage() {
                       name="password"
                       value={form.password}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 bg-white/10 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:border-primary"
                       placeholder="Dejar en blanco para mantener la actual"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Rol
                     </label>
                     <select
                       name="role"
                       value={form.role}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 bg-white/10 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:border-primary"
                     >
                       {roles.map((role) => (
-                        <option className="bg-gray-800" key={role.value} value={role.value}>
+                        <option key={role.value} value={role.value}>
                           {role.label}
                         </option>
                       ))}
@@ -202,19 +270,19 @@ export default function EditUserPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end space-x-4 mt-6">
+                <div className="flex justify-end space-x-4">
                   <button
                     type="button"
-                    onClick={() => router.push('/admin/users')}
-                    className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white focus:outline-none"
+                    onClick={() => router.back()}
+                    className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+                    className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg"
                   >
-                    Guardar cambios
+                    Guardar Cambios
                   </button>
                 </div>
               </form>

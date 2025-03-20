@@ -102,7 +102,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
 
   return (
     <div>
-      <div className="p-4 bg-card border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="p-4 bg-card border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
           <div className="w-full sm:w-64">
             <TableFilter 
@@ -116,7 +116,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
               className={`px-3 py-1 text-sm rounded-md ${
                 filterType === "all" 
                   ? "bg-primary text-white" 
-                  : "bg-card hover:bg-accent/50 text-foreground"
+                  : "bg-card hover:bg-accent/50 text-foreground border border-gray-200 dark:border-gray-700"
               }`}
             >
               Todos
@@ -126,7 +126,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
               className={`px-3 py-1 text-sm rounded-md ${
                 filterType === "read" 
                   ? "bg-primary text-white" 
-                  : "bg-card hover:bg-accent/50 text-foreground"
+                  : "bg-card hover:bg-accent/50 text-foreground border border-gray-200 dark:border-gray-700"
               }`}
             >
               Leídos
@@ -136,7 +136,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
               className={`px-3 py-1 text-sm rounded-md ${
                 filterType === "unread" 
                   ? "bg-primary text-white" 
-                  : "bg-card hover:bg-accent/50 text-foreground"
+                  : "bg-card hover:bg-accent/50 text-foreground border border-gray-200 dark:border-gray-700"
               }`}
             >
               No leídos
@@ -152,8 +152,8 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       <div className="overflow-x-auto">
         {paginatedMessages.length > 0 ? (
           <>
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-card">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-card text-foreground">
                 <tr>
                   <th
                     scope="col"
@@ -190,12 +190,16 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-card divide-y divide-gray-200">
+              <tbody className="bg-card divide-y divide-gray-200 dark:divide-gray-700">
                 {paginatedMessages.map((message) => (
-                  <tr key={message.id} className={`hover:bg-accent/5 transition-colors ${message.isRead ? "" : "bg-blue-50"}`}>
+                  <tr key={message.id} className={`hover:bg-accent/5 transition-colors ${message.isRead ? "" : "bg-blue-50/10 dark:bg-blue-900/10 border-l-4 border-blue-500 dark:border-blue-600"}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
-                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${message.isRead ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"}`}
+                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          message.isRead 
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" 
+                            : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                        }`}
                       >
                         {message.isRead ? "Leído" : "No leído"}
                       </span>
@@ -279,7 +283,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
               </tbody>
             </table>
             
-            <div className="border-t border-gray-200">
+            <div className="border-t border-gray-200 dark:border-gray-700">
               <Pagination 
                 currentPage={currentPage} 
                 totalPages={totalPages} 
