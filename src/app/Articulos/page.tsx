@@ -201,12 +201,12 @@ const Page = () => {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100">
+    <main className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Background decorative elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-blue-200/20 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-blue-100/20 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2"></div>
+          <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-blue-200/20 dark:bg-blue-400/5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-blue-100/20 dark:bg-blue-500/5 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2"></div>
         </div>
 
         {/* Content */}
@@ -229,7 +229,7 @@ const Page = () => {
           )}
 
           {!loading && firstVisit && articles.length === 0 && !error && (
-            <div className="flex flex-col items-center justify-center min-h-[500px] bg-white/50 rounded-2xl backdrop-blur-sm p-8 shadow-lg">
+            <div className="flex flex-col items-center justify-center min-h-[500px] bg-white/50 dark:bg-gray-800/50 rounded-2xl backdrop-blur-sm p-8 shadow-lg">
               <Image
                 src="/images/PrimeraVista.png"
                 alt="No articles found"
@@ -237,10 +237,10 @@ const Page = () => {
                 height={300}
                 className="animate-float"
               />
-              <h1 className="text-2xl sm:text-3xl font-bold text-blue-800 mt-6 text-center">
+              <h1 className="text-2xl sm:text-3xl font-bold text-blue-800 dark:text-blue-300 mt-6 text-center">
                 Empieza a buscar noticias
               </h1>
-              <p className="text-blue-600 mt-4 text-center max-w-md">
+              <p className="text-blue-600 dark:text-blue-400 mt-4 text-center max-w-md">
                 Utiliza el formulario de búsqueda para encontrar artículos de tu
                 interés
               </p>

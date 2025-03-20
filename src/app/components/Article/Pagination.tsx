@@ -22,7 +22,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pr
     <button
       disabled={currentPage === 1}
       onClick={() => onPageChange(currentPage - 1)}
-      className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed text-sm sm:text-base"
+      className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed text-sm sm:text-base text-gray-800 dark:text-gray-200"
     >
       Anterior
     </button>
@@ -36,8 +36,8 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pr
             onClick={() => onPageChange(page)}
             className={`px-3 py-2 rounded text-sm sm:text-base ${
               page === currentPage
-                ? "bg-blue-500 text-white"
-                : "bg-gray-200 hover:bg-gray-300"
+                ? "bg-blue-500 dark:bg-blue-600 text-white"
+                : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
             }`}
           >
             {page}
@@ -47,7 +47,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pr
 
       {/* Paginación compacta visible en pantallas pequeñas */}
       <div className="sm:hidden flex items-center space-x-2">
-        <span className="text-sm sm:text-base">
+        <span className="text-sm sm:text-base text-gray-800 dark:text-gray-200">
           Página {currentPage} de {totalPages}
         </span>
       </div>
@@ -56,7 +56,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pr
     <button
       disabled={currentPage === totalPages}
       onClick={() => onPageChange(currentPage + 1)}
-      className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed text-sm sm:text-base"
+      className="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed text-sm sm:text-base text-gray-800 dark:text-gray-200"
     >
       Siguiente
     </button>

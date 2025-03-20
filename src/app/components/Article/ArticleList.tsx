@@ -35,7 +35,7 @@ export default function ArticleList({ articles }: Props) {
           articles.map((article, index) => (
             <article
               key={index}
-              className={`group relative bg-white rounded-lg shadow-md overflow-hidden 
+              className={`group relative bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden 
                          transform transition-all duration-700 ease-in-out hover:-translate-y-2 hover:shadow-xl 
                          ${showArticles ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
               style={{ transitionDelay: `${index * 100}ms` }}
@@ -58,13 +58,14 @@ export default function ArticleList({ articles }: Props) {
 
               <div className="p-4 sm:p-6 relative">
                 <div className="absolute inset-0 bg-gradient-to-b from-blue-900/90 to-indigo-900/95 
+                              dark:from-blue-950/90 dark:to-indigo-950/95 
                               opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-in-out z-10"></div>
                 
                 <div className="relative z-20 group-hover:opacity-0 transition-opacity duration-500">
-                  <p className="text-gray-600 mb-4 line-clamp-3 text-sm sm:text-base">
+                  <p className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3 text-sm sm:text-base">
                     {article.description}
                   </p>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
+                  <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
                     <div className="flex items-center">
                       <User className="w-4 h-4 mr-1" />
                       <span className="truncate max-w-[120px]">
@@ -76,10 +77,10 @@ export default function ArticleList({ articles }: Props) {
                       <span>{formatDate(article.publishedAt)}</span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                     <Link 
                       href={`/sources/${article.source.id}`}
-                      className="text-sm text-gray-500 hover:text-blue-600"
+                      className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
                       aria-label={`Ver más noticias de ${article.source.name}`}
                     >
                       {article.source.name || 'El Mundo'}
@@ -88,7 +89,7 @@ export default function ArticleList({ articles }: Props) {
                       href={article.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium text-sm"
+                      className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium text-sm"
                     >
                       Leer más
                       <ArrowRight className="ml-1 w-4 h-4" />
@@ -169,7 +170,7 @@ export default function ArticleList({ articles }: Props) {
           ))
         ) : (
           <div className="col-span-full text-center py-12">
-            <p className="text-gray-500 text-lg">No hay artículos disponibles.</p>
+            <p className="text-gray-500 dark:text-gray-400 text-lg">No hay artículos disponibles.</p>
           </div>
         )}
       </div>

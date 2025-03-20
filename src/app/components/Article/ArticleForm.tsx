@@ -35,10 +35,10 @@ const SearchForm: React.FC<SearchFormProps> = ({
   return (
     <form
     onSubmit={handleSearch}
-    className="p-8 bg-gradient-to-r from-white-100 to-blue-200 shadow-lg rounded-xl max-w-6xl mx-auto space-y-8 mb-10"
+    className="p-8 bg-gradient-to-r from-white-100 to-blue-200 dark:from-gray-800 dark:to-gray-900 shadow-lg rounded-xl max-w-6xl mx-auto space-y-8 mb-10"
   >
     {/* Título */}
-    <h2 className="text-4xl font-bold text-center text-gray-800">
+    <h2 className="text-4xl font-bold text-center text-gray-800 dark:text-white">
       Buscar Artículos 📰
     </h2>
   
@@ -51,9 +51,9 @@ const SearchForm: React.FC<SearchFormProps> = ({
           value={searchParams.q}
           onChange={handleInputChange}
           placeholder="Palabras clave o frases"
-          className="w-full p-4 pl-12 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          className="w-full p-4 pl-12 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:placeholder-gray-400 transition-all"
         />
-        <div className="absolute top-4 left-3 text-gray-500">
+        <div className="absolute top-4 left-3 text-gray-500 dark:text-gray-400">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-6 w-6"
@@ -75,7 +75,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
       <div className="relative flex flex-col justify-center">
         <label
           htmlFor="sources"
-          className="block mb-2 text-sm font-medium text-gray-700"
+          className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300"
         ></label>
         <Autocomplete
           id="sources"
@@ -109,6 +109,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
                   </>
                 ),
               }}
+              className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:placeholder-gray-400"
             />
           )}
         />
@@ -120,7 +121,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
       <div>
         <label
           htmlFor="language"
-          className="block mb-2 text-sm font-medium text-gray-700"
+          className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Idioma:
         </label>
@@ -129,7 +130,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
           name="language"
           value={searchParams.language}
           onChange={handleInputChange}
-          className="w-full p-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          className="w-full p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
         >
           <option value="es">Español</option>
           <option value="en">Inglés</option>
@@ -145,7 +146,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
       <div>
         <label
           htmlFor="sortBy"
-          className="block mb-2 text-sm font-medium text-gray-700"
+          className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Ordenar por:
         </label>
@@ -154,7 +155,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
           name="sortBy"
           value={searchParams.sortBy}
           onChange={handleInputChange}
-          className="w-full p-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          className="w-full p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
         >
           <option value="relevancy">Relevancia</option>
           <option value="popularity">Popularidad</option>
@@ -168,7 +169,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
       <div className="relative">
         <label
           htmlFor="from"
-          className="block mb-2 text-sm font-medium text-gray-700"
+          className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Fecha desde:
         </label>
@@ -180,9 +181,9 @@ const SearchForm: React.FC<SearchFormProps> = ({
           onChange={handleInputChange}
           min="2024-12-25"
           max={new Date().toISOString().split("T")[0]}
-          className="w-full p-4 pl-12 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          className="w-full p-4 pl-12 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
         />
-        <div className="absolute top-12 left-3 text-gray-500">
+        <div className="absolute top-12 left-3 text-gray-500 dark:text-gray-400">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-5 w-5"
@@ -202,7 +203,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
       <div className="relative">
         <label
           htmlFor="to"
-          className="block mb-2 text-sm font-medium text-gray-700"
+          className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Fecha hasta:
         </label>
@@ -215,9 +216,9 @@ const SearchForm: React.FC<SearchFormProps> = ({
           placeholder="dd-mm-yyyy"
           min="2024-12-25"
           max={new Date().toISOString().split("T")[0]}
-          className="w-full p-4 pl-12 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          className="w-full p-4 pl-12 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
         />
-        <div className="absolute top-12 left-3 text-gray-500">
+        <div className="absolute top-12 left-3 text-gray-500 dark:text-gray-400">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-5 w-5"
@@ -240,7 +241,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
     <div className="flex justify-center">
       <button
         type="submit"
-        className="px-8 py-4 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+        className="px-8 py-4 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
       >
         Buscar
       </button>
