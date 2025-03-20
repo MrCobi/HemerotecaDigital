@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 
 export default function ConfirmDeletionPage() {
   const searchParams = useSearchParams();
@@ -11,6 +12,7 @@ export default function ConfirmDeletionPage() {
   
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const { theme } = useTheme();
 
   useEffect(() => {
     if (!token) {
@@ -53,13 +55,13 @@ export default function ConfirmDeletionPage() {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100">
-        <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
-          <h1 className="text-2xl font-bold text-center text-gray-900">Procesando tu solicitud</h1>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+          <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-white">Procesando tu solicitud</h1>
           <div className="flex justify-center">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent dark:border-blue-500 dark:border-t-transparent rounded-full animate-spin"></div>
           </div>
-          <p className="text-center text-gray-600">Estamos verificando tu solicitud de eliminación de cuenta...</p>
+          <p className="text-center text-gray-600 dark:text-gray-300">Estamos verificando tu solicitud de eliminación de cuenta...</p>
         </div>
       </div>
     );
@@ -67,17 +69,17 @@ export default function ConfirmDeletionPage() {
 
   if (status === "success") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100">
-        <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-gray-800 rounded-lg shadow-md">
           <div className="flex flex-col items-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-center text-gray-900">Cuenta eliminada correctamente</h1>
+            <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-white">Cuenta eliminada correctamente</h1>
           </div>
-          <p className="text-center text-gray-600">
+          <p className="text-center text-gray-600 dark:text-gray-300">
             Tu cuenta ha sido eliminada permanentemente. Serás redirigido a la página principal en unos segundos.
           </p>
         </div>
@@ -86,19 +88,19 @@ export default function ConfirmDeletionPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-gray-800 rounded-lg shadow-md">
         <div className="flex flex-col items-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-center text-gray-900">Error</h1>
+          <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-white">Error</h1>
         </div>
-        <p className="text-center text-gray-600">{errorMessage}</p>
+        <p className="text-center text-gray-600 dark:text-gray-300">{errorMessage}</p>
         <div className="flex justify-center">
-          <Link href="/settings" className="text-blue-600 hover:text-blue-800">
+          <Link href="/settings" className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
             Volver a configuración
           </Link>
         </div>

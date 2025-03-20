@@ -1,14 +1,24 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { API_ROUTES } from "@/src/config/api-routes";
+import { useTheme } from "next-themes";
 
 export default function ResendVerificationPage() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const { setTheme } = useTheme();
+
+  // Aplicar el tema según la preferencia del sistema
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(systemPrefersDark ? 'dark' : 'light');
+    }
+  }, [setTheme]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

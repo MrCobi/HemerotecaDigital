@@ -5,10 +5,20 @@ import Link from 'next/link';
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useTheme } from "next-themes";
 
 export default function VerificationPendingPage() {
   const router = useRouter();
   const { data: session } = useSession();
+  const { setTheme } = useTheme();
+
+  // Aplicar el tema según la preferencia del sistema
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(systemPrefersDark ? 'dark' : 'light');
+    }
+  }, [setTheme]);
 
   // If the user is already verified or logged in, redirect to home
   useEffect(() => {

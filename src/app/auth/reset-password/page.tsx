@@ -22,6 +22,7 @@ import { AlertCircle, CheckCircle, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { API_ROUTES } from "@/src/config/api-routes";
+import { useTheme } from "next-themes";
 
 // Esquema de validación para el formulario
 const resetPasswordSchema = z.object({
@@ -50,10 +51,19 @@ const ResetPasswordPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const { setTheme } = useTheme();
   
   const [status, setStatus] = useState<VerificationStatus>(VerificationStatus.LOADING);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Aplicar el tema según la preferencia del sistema
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(systemPrefersDark ? 'dark' : 'light');
+    }
+  }, [setTheme]);
 
   // Configuración del formulario con React Hook Form y Zod
   const form = useForm<ResetPasswordFormValues>({
@@ -245,23 +255,34 @@ const ResetPasswordPage = () => {
   };
 
   return (
-    <div className="container flex items-center justify-center min-h-[80vh] py-12">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Restablecer contraseña</CardTitle>
-          <CardDescription>
-            Crea una nueva contraseña segura para tu cuenta.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {renderContent()}
-        </CardContent>
-        {status !== VerificationStatus.VALID && status !== VerificationStatus.LOADING && (
-          <CardFooter className="flex justify-center">
-            <Button variant="link" asChild>
-              <Link href="/api/auth/signin">Volver al inicio de sesión</Link>
-            </Button>
-          </CardFooter>
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+      <Card className="w-full max-w-md mx-auto shadow-lg dark:bg-gray-800 dark:border-gray-700">
+        {status === VerificationStatus.VALID ? (
+          <>
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-center dark:text-white">Restablecer contraseña</CardTitle>
+              <CardDescription className="text-center dark:text-gray-300">
+                Crea una nueva contraseña para tu cuenta
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {renderContent()}
+            </CardContent>
+          </>
+        ) : (
+          <>
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-center dark:text-white">Restablecimiento de contraseña</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderContent()}
+            </CardContent>
+            <CardFooter className="flex justify-center">
+              <Link href="/api/auth/signin" className="text-primary underline-offset-4 hover:underline font-medium">
+                Volver al inicio de sesión
+              </Link>
+            </CardFooter>
+          </>
         )}
       </Card>
     </div>

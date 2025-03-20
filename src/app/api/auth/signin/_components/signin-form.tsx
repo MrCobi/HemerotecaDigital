@@ -56,15 +56,15 @@ export default function SigninForm({ isVerified }: SigninFormProps) {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 p-4 relative overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 p-4 relative overflow-hidden">
       {/* Elementos decorativos */}
       <div className="absolute top-20 left-20 w-32 h-32 bg-gradient-to-br from-amber-300 to-orange-400 dark:from-amber-400/20 dark:to-orange-500/20 rounded-full opacity-60 blur-xl"></div>
-      <div className="absolute bottom-20 right-20 w-40 h-40 bg-gradient-to-tr from-blue-400 to-indigo-500 dark:from-blue-500/30 dark:to-indigo-600/30 rounded-full opacity-60 blur-xl"></div>
+      <div className="absolute bottom-20 right-20 w-40 h-40 bg-gradient-to-tr from-blue-400 to-blue-500 dark:from-blue-500/20 dark:to-blue-600/20 rounded-full opacity-60 blur-xl"></div>
       <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-gradient-to-br from-pink-300 to-purple-400 dark:from-pink-400/20 dark:to-purple-500/20 rounded-full opacity-40 blur-xl"></div>
 
-      <div className="max-w-md w-full bg-white dark:bg-blue-900/80 rounded-2xl shadow-xl overflow-hidden z-10">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800/80 rounded-2xl shadow-xl overflow-hidden z-10">
         <div className="px-8 pt-8 pb-6 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 mb-4">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-8 w-8 text-white"
@@ -146,7 +146,7 @@ export default function SigninForm({ isVerified }: SigninFormProps) {
                           type="email"
                           placeholder="ej. usuario@correo.com"
                           {...field}
-                          className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-blue-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-blue-800/70 dark:text-white dark:placeholder-blue-300/70 transition-all"
+                          className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800/70 dark:text-white dark:placeholder-blue-200/70 transition-all"
                         />
                       </div>
                     </FormControl>
@@ -187,7 +187,7 @@ export default function SigninForm({ isVerified }: SigninFormProps) {
                           type={showPassword ? "text" : "password"}
                           placeholder="••••••••"
                           {...field}
-                          className="w-full pl-10 pr-10 py-3 border border-gray-200 dark:border-blue-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-blue-800/70 dark:text-white dark:placeholder-blue-300/70 transition-all"
+                          className="w-full pl-10 pr-10 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800/70 dark:text-white dark:placeholder-blue-200/70 transition-all"
                         />
                         <button
                           type="button"
@@ -273,7 +273,7 @@ export default function SigninForm({ isVerified }: SigninFormProps) {
               {/* Botón de Iniciar Sesión */}
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 dark:from-blue-600 dark:to-indigo-700 dark:hover:from-blue-500 dark:hover:to-indigo-600 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg hover:shadow-xl"
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-400 dark:hover:to-blue-500 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg hover:shadow-xl"
                 disabled={isPending}
               >
                 {isPending ? (
@@ -308,10 +308,10 @@ export default function SigninForm({ isVerified }: SigninFormProps) {
               {/* Separador de opciones */}
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300 dark:border-blue-700"></div>
+                  <div className="w-full border-t border-gray-300 dark:border-gray-700"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white dark:bg-blue-900/80 text-gray-500 dark:text-gray-400">
+                  <span className="px-2 bg-white dark:bg-gray-800/80 text-gray-500 dark:text-blue-200">
                     O continúa con
                   </span>
                 </div>
@@ -320,7 +320,7 @@ export default function SigninForm({ isVerified }: SigninFormProps) {
               {/* Botón de inicio de sesión con Google */}
               <Button
                 type="button"
-                className="w-full bg-white dark:bg-blue-800/50 hover:bg-gray-50 dark:hover:bg-blue-800 text-gray-700 dark:text-white border border-gray-300 dark:border-blue-700 font-medium py-3 px-4 rounded-xl transition-all shadow hover:shadow-md flex items-center justify-center"
+                className="w-full bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-white border border-gray-300 dark:border-gray-700 font-medium py-3 px-4 rounded-xl transition-all shadow hover:shadow-md flex items-center justify-center"
                 onClick={() => signIn("google", { callbackUrl: "/home" })}
               >
                 <svg 
@@ -361,9 +361,9 @@ export default function SigninForm({ isVerified }: SigninFormProps) {
           </Form>
         </div>
 
-        <div className="px-8 py-4 bg-gray-50 dark:bg-blue-950/50 border-t border-gray-100 dark:border-blue-800">
+        <div className="px-8 py-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800">
           <div className="flex items-center justify-center space-x-4">
-            <div className="flex items-center text-xs text-gray-500 dark:text-blue-300">
+            <div className="flex items-center text-xs text-gray-500 dark:text-blue-200">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-4 w-4 mr-1"
@@ -380,8 +380,8 @@ export default function SigninForm({ isVerified }: SigninFormProps) {
               </svg>
               Conexión segura
             </div>
-            <div className="h-4 border-r border-gray-300 dark:border-blue-700"></div>
-            <div className="flex items-center text-xs text-gray-500 dark:text-blue-300">
+            <div className="h-4 border-r border-gray-300 dark:border-gray-700"></div>
+            <div className="flex items-center text-xs text-gray-500 dark:text-blue-200">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-4 w-4 mr-1"

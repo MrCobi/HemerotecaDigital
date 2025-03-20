@@ -169,9 +169,9 @@ export default function SignupForm() {
           key={i}
           className={`h-1 w-full rounded-full transition-all ${
             passwordStrength > i ? 
-            (passwordStrength >= 3 ? 'bg-green-500 dark:bg-green-400' : 
+            (passwordStrength >= 3 ? 'bg-blue-500 dark:bg-blue-400' : 
              passwordStrength >= 2 ? 'bg-yellow-500 dark:bg-yellow-400' : 'bg-red-500 dark:bg-red-400') : 
-            'bg-gray-200 dark:bg-blue-800'
+            'bg-gray-200 dark:bg-gray-700'
           }`}
         />
       ))}
@@ -179,8 +179,8 @@ export default function SignupForm() {
   ), [passwordStrength]);
 
   return (
-    <div className="flex min-h-screen w-full dark:bg-blue-950">
-      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12 dark:bg-blue-950">
+    <div className="flex min-h-screen w-full dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900">
+      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12 dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900">
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">Registro en Hemeroteca Digital</h1>
@@ -201,7 +201,7 @@ export default function SignupForm() {
                           {...field}
                           type="text"
                           placeholder="Ej. María González"
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-blue-800 dark:bg-blue-900/60 dark:text-white dark:placeholder-blue-300/70 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800/60 dark:text-white dark:placeholder-blue-200/70 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all"
                         />
                       </FormControl>
                       <FormMessage className="text-red-500 dark:text-red-400 text-sm" />
@@ -220,7 +220,7 @@ export default function SignupForm() {
                           {...field}
                           type="text"
                           placeholder="Ej. maria_2023"
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-blue-800 dark:bg-blue-900/60 dark:text-white dark:placeholder-blue-300/70 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800/60 dark:text-white dark:placeholder-blue-200/70 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all"
                         />
                       </FormControl>
                       <FormMessage className="text-red-500 dark:text-red-400 text-sm" />
@@ -240,7 +240,7 @@ export default function SignupForm() {
                         {...field}
                         type="email"
                         placeholder="Ej. ejemplo@correo.com"
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-blue-800 dark:bg-blue-900/60 dark:text-white dark:placeholder-blue-300/70 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800/60 dark:text-white dark:placeholder-blue-200/70 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all"
                       />
                     </FormControl>
                     <FormMessage className="text-red-500 dark:text-red-400 text-sm" />
@@ -265,7 +265,7 @@ export default function SignupForm() {
                         >
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <div className="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-blue-800 text-white text-xs rounded p-2 w-48 shadow-lg">
+                        <div className="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs rounded p-2 w-48 shadow-lg">
                           Requisitos:
                           <ul className="list-disc pl-4 mt-1">
                             <li>Mínimo 6 caracteres</li>
@@ -280,7 +280,7 @@ export default function SignupForm() {
                           {...field}
                           type={showPassword ? "text" : "password"}
                           placeholder="Mínimo 6 caracteres"
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-blue-800 dark:bg-blue-900/60 dark:text-white dark:placeholder-blue-300/70 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all pr-10"
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800/60 dark:text-white dark:placeholder-blue-200/70 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all pr-10"
                         />
                         <button
                           type="button"
@@ -319,7 +319,7 @@ export default function SignupForm() {
                           {...field}
                           type={showConfirmPassword ? "text" : "password"}
                           placeholder="Repite tu contraseña"
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-blue-800 dark:bg-blue-900/60 dark:text-white dark:placeholder-blue-300/70 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all pr-10"
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800/60 dark:text-white dark:placeholder-blue-200/70 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all pr-10"
                         />
                         <button
                           type="button"
@@ -356,7 +356,7 @@ export default function SignupForm() {
                         {...field}
                         type="text"
                         placeholder="Ej. Estudiante de historia"
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-blue-800 dark:bg-blue-900/60 dark:text-white dark:placeholder-blue-300/70 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800/60 dark:text-white dark:placeholder-blue-200/70 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all"
                       />
                     </FormControl>
                     <FormMessage className="text-red-500 dark:text-red-400 text-sm" />
@@ -379,7 +379,7 @@ export default function SignupForm() {
                               alt="Vista previa"
                               width={96}
                               height={96}
-                              className="rounded-full object-cover w-24 h-24 border-4 border-blue-100 dark:border-blue-800 shadow-md"
+                              className="rounded-full object-cover w-24 h-24 border-4 border-gray-200 dark:border-gray-700 shadow-md"
                             />
                             <button
                               type="button"
@@ -398,20 +398,15 @@ export default function SignupForm() {
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M6 18L18 6M6 6l12 12"
-                                />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                               </svg>
                             </button>
                           </div>
                         ) : (
-                          <div className="w-24 h-24 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center border-4 border-gray-200 dark:border-blue-800">
+                          <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center border-4 border-gray-200 dark:border-gray-700">
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
-                              className="h-12 w-12 text-blue-500 dark:text-blue-300"
+                              className="h-12 w-12 text-gray-500 dark:text-blue-300"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -426,7 +421,7 @@ export default function SignupForm() {
                           </div>
                         )}
                       </div>
-                      <label className="bg-white dark:bg-blue-900 py-2 px-3 border border-gray-300 dark:border-blue-800 dark:text-white rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-blue-300 hover:bg-gray-50 dark:hover:bg-blue-800 cursor-pointer">
+                      <label className="bg-white dark:bg-gray-800 py-2 px-3 border border-gray-300 dark:border-gray-700 dark:text-blue-200 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-blue-200 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
                         Seleccionar imagen
                         <Input
                           type="file"
@@ -453,9 +448,9 @@ export default function SignupForm() {
               )}
 
               {uploadProgress > 0 && uploadProgress < 100 && (
-                <div className="w-full bg-gray-200 dark:bg-blue-800 rounded-full h-2.5">
+                <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2.5">
                   <div
-                    className="bg-blue-600 dark:bg-blue-400 h-2.5 rounded-full transition-all"
+                    className="bg-blue-500 dark:bg-blue-400 h-2.5 rounded-full transition-all"
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
@@ -464,7 +459,7 @@ export default function SignupForm() {
               <Button
                 type="submit"
                 disabled={isPending}
-                className="w-full py-3 px-4 bg-blue-600 rounded-xl text-white font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full py-3 px-4 bg-blue-500 rounded-xl text-white font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isPending ? (
                   <div className="flex items-center justify-center">
@@ -496,10 +491,10 @@ export default function SignupForm() {
               {/* Separador de opciones */}
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300 dark:border-blue-700"></div>
+                  <div className="w-full border-t border-gray-300 dark:border-gray-700"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white dark:bg-blue-900/80 text-gray-500 dark:text-gray-400">
+                  <span className="px-2 bg-white dark:bg-gray-800/80 text-gray-500 dark:text-gray-400">
                     O regístrate con
                   </span>
                 </div>
@@ -508,7 +503,7 @@ export default function SignupForm() {
               {/* Botón de registro con Google */}
               <Button
                 type="button"
-                className="w-full bg-white dark:bg-blue-800/50 hover:bg-gray-50 dark:hover:bg-blue-800 text-gray-700 dark:text-white border border-gray-300 dark:border-blue-700 font-medium py-3 px-4 rounded-xl transition-all shadow hover:shadow-md flex items-center justify-center"
+                className="w-full bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-white border border-gray-300 dark:border-gray-700 font-medium py-3 px-4 rounded-xl transition-all shadow hover:shadow-md flex items-center justify-center"
                 onClick={() => signIn("google", { callbackUrl: "/home" })}
               >
                 <svg 
@@ -517,19 +512,19 @@ export default function SignupForm() {
                   xmlns="http://www.w3.org/2000/svg"
                 >
                   <path
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    d="M22 6.77 14.47 3 7.77 6.76 4.83 4.54 3 7.75 7.75 18.48 18.54 7.75 20.71 4.54 17.25 6.76z"
                     fill="#4285F4"
                   />
                   <path
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    d="M' 7.75 18.48 14.25 20.78 17.25 17.78 12 10.5l-2.55 2.55L7.75 14.1 5.45 11.84 10.32 7.29"
                     fill="#34A853"
                   />
                   <path
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    d="M10.32 7.29 7.75 4.04 4.78 6.26l2.08-2.08C6.13 2.35 8.06 2 10.32 2c2.33 0 3.53 2 2.37 3.65l-2.79-2.79A.996.996 0 0 0 8 3.65 1 1 0 0 0 6 3.73l2 2z"
                     fill="#FBBC05"
                   />
                   <path
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    d="M14.53 10.47 16.88 12.84l-1.67 1.67H12v2.34h3.35l-1.67 1.67L11.12 16h2.46l2.13-2.13z"
                     fill="#EA4335"
                   />
                 </svg>
@@ -538,7 +533,7 @@ export default function SignupForm() {
 
               <div className="text-center mt-4 text-sm text-gray-600 dark:text-blue-200">
                 ¿Ya tienes una cuenta?{" "}
-                <Link href="/api/auth/signin" className="text-blue-600 hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200 font-medium">
+                <Link href="/api/auth/signin" className="text-blue-500 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200 font-medium">
                   Inicia sesión
                 </Link>
               </div>
@@ -547,8 +542,8 @@ export default function SignupForm() {
         </div>
       </div>
 
-      <div className="hidden lg:block lg:w-1/2 bg-blue-100 dark:bg-blue-800 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-indigo-600/40 dark:from-blue-500/30 dark:to-indigo-800/50"></div>
+      <div className="hidden lg:block lg:w-1/2 bg-blue-100 dark:bg-gradient-to-br dark:from-gray-800 dark:to-gray-900 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-indigo-600/40 dark:from-blue-500/10 dark:to-indigo-800/20"></div>
         <div className="absolute inset-0 flex items-center justify-center p-12">
           <div className="max-w-lg text-center">
             <div className="mb-8">
@@ -571,7 +566,7 @@ export default function SignupForm() {
                 { value: "+50", label: "Años de historia" },
                 { value: "+200", label: "Fuentes" }
               ].map((item, index) => (
-                <div key={index} className="bg-white/20 dark:bg-blue-900/30 backdrop-blur-sm p-4 rounded-lg shadow-lg">
+                <div key={index} className="bg-white/20 dark:bg-gray-800/30 backdrop-blur-sm p-4 rounded-lg shadow-lg">
                   <h3 className="font-bold text-white">{item.value}</h3>
                   <p className="text-white/80 text-sm">{item.label}</p>
                 </div>

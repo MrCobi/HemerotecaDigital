@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { API_ROUTES } from "@/src/config/api-routes";
+import { useTheme } from "next-themes";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
@@ -13,6 +14,15 @@ export default function VerifyEmailPage() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState<string>("");
   const [userData, setUserData] = useState<{id: string; email: string; name?: string} | null>(null);
+  const { setTheme } = useTheme();
+
+  // Aplicar el tema según la preferencia del sistema
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(systemPrefersDark ? 'dark' : 'light');
+    }
+  }, [setTheme]);
 
   useEffect(() => {
     if (!token) {
@@ -98,9 +108,9 @@ export default function VerifyEmailPage() {
   }, [token, router]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold text-center text-gray-800">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4 dark:bg-gray-900">
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md dark:bg-gray-800">
+        <h1 className="text-2xl font-bold text-center text-gray-800 dark:text-gray-200">
           {status === "loading" && "Verificando correo electrónico..."}
           {status === "success" && "¡Verificación exitosa!"}
           {status === "error" && "Error de verificación"}
@@ -108,18 +118,18 @@ export default function VerifyEmailPage() {
         
         {status === "loading" && (
           <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 dark:border-blue-300"></div>
           </div>
         )}
         
         {status === "success" && (
           <div className="space-y-4 text-center">
-            <p className="text-green-600">Tu correo electrónico ha sido verificado correctamente.</p>
-            <p className="text-gray-600">
+            <p className="text-green-600 dark:text-green-300">Tu correo electrónico ha sido verificado correctamente.</p>
+            <p className="text-gray-600 dark:text-gray-400">
               {userData ? "Iniciando sesión automáticamente..." : "Serás redirigido automáticamente..."}
             </p>
             <Link href="/home">
-              <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded">
+              <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded dark:bg-blue-700 dark:hover:bg-blue-600">
                 Ir a la página principal
               </button>
             </Link>
@@ -128,16 +138,16 @@ export default function VerifyEmailPage() {
         
         {status === "error" && (
           <div className="space-y-4 text-center">
-            <p className="text-red-600">{message}</p>
-            <p className="text-gray-600">Serás redirigido automáticamente...</p>
+            <p className="text-red-600 dark:text-red-300">{message}</p>
+            <p className="text-gray-600 dark:text-gray-400">Serás redirigido automáticamente...</p>
             <div className="flex flex-col space-y-2">
               <Link href="/auth/resend-verification">
-                <button className="w-full border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 font-medium py-2 px-4 rounded">
+                <button className="w-full border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 font-medium py-2 px-4 rounded dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200">
                   Reenviar verificación
                 </button>
               </Link>
               <Link href="/api/auth/signin">
-                <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded">
+                <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded dark:bg-blue-700 dark:hover:bg-blue-600">
                   Volver al inicio de sesión
                 </button>
               </Link>
