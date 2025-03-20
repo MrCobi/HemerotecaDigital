@@ -148,3 +148,105 @@ export const sendPasswordResetEmail = async (email: string, token: string) => {
     return { success: false, error: "Internal server error" };
   }
 };
+
+export const sendAccountDeletionEmail = async (email: string, token: string) => {
+  // Ensure we have the correct URL with no trailing slash
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  
+  // Create the full deletion confirmation link
+  const deletionLink = `${cleanBaseUrl}/auth/confirm-deletion?token=${token}`;
+  
+  console.log("Sending account deletion confirmation email to:", email);
+  console.log("Deletion confirmation link:", deletionLink);
+
+  try {
+    const _result = await mailjetClient.post("send", { version: "v3.1" }).request({
+      Messages: [
+        {
+          From: {
+            Email: "hemerotecadigitalreal@gmail.com",
+            Name: "HemoPress",
+          },
+          To: [
+            {
+              Email: email,
+              Name: "Usuario",
+            },
+          ],
+          Subject: "Confirmación para eliminar tu cuenta - HemoPress",
+          HTMLPart: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { text-align: center; padding: 20px 0; }
+                .content { padding: 20px; background-color: #f8f9fa; border-radius: 5px; }
+                .button { 
+                  display: inline-block; 
+                  background-color: #e53e3e; 
+                  color: white !important; 
+                  text-decoration: none; 
+                  padding: 12px 24px; 
+                  border-radius: 4px; 
+                  margin: 20px 0;
+                }
+                .warning {
+                  color: #e53e3e;
+                  font-weight: bold;
+                }
+                .link-container { 
+                  margin: 15px 0; 
+                  padding: 10px; 
+                  background-color: #e9ecef; 
+                  border-radius: 4px; 
+                  word-break: break-all;
+                }
+                .footer { text-align: center; font-size: 12px; color: #6c757d; margin-top: 30px; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>Confirmación de Eliminación de Cuenta</h1>
+                </div>
+                <div class="content">
+                  <p>Hola,</p>
+                  <p>Hemos recibido una solicitud para eliminar tu cuenta de HemoPress. Para confirmar esta acción, por favor haz clic en el botón a continuación:</p>
+                  
+                  <div style="text-align: center;">
+                    <a href="${deletionLink}" class="button">Confirmar eliminación de cuenta</a>
+                  </div>
+                  
+                  <p class="warning">ADVERTENCIA: Esta acción no se puede deshacer. Toda tu información y contenido se eliminará permanentemente.</p>
+                  
+                  <p>Si el botón no funciona, copia y pega el siguiente enlace en tu navegador:</p>
+                  <div class="link-container">
+                    ${deletionLink}
+                  </div>
+                  
+                  <p>Este enlace expirará en 24 horas por motivos de seguridad.</p>
+                  <p>Si no has solicitado eliminar tu cuenta, puedes ignorar este correo y tu cuenta permanecerá activa.</p>
+                </div>
+                <div class="footer">
+                  <p> 2025 HemoPress. Todos los derechos reservados.</p>
+                </div>
+              </div>
+            </body>
+            </html>
+          `,
+          TextPart: `Hemos recibido una solicitud para eliminar tu cuenta de HemoPress. Para confirmar esta acción, visita el siguiente enlace: ${deletionLink} (Este enlace expirará en 24 horas por motivos de seguridad). ADVERTENCIA: Esta acción no se puede deshacer. Toda tu información y contenido se eliminará permanentemente.`
+        },
+      ],
+    });
+
+    console.log("Account deletion confirmation email sent successfully");
+    return { success: true };
+
+  } catch (error) {
+    console.error("Mailjet error:", error);
+    return { success: false, error: "Error interno al enviar el correo" };
+  }
+};
