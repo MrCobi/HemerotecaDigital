@@ -15,7 +15,7 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
       <UnreadMessagesProvider>
         <Navbar />
 
@@ -23,7 +23,7 @@ export default function ClientLayout({
           <Suspense
             fallback={
               <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="animate-pulse text-blue-600">Cargando...</div>
+                <div className="animate-pulse text-blue-600 dark:text-blue-400">Cargando...</div>
               </div>
             }
           >
