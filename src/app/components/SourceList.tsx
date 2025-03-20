@@ -173,8 +173,14 @@ export default function SourcesPage({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-600/5 to-indigo-600/5">
+    <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        {/* Background decorative elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-blue-200/20 dark:bg-blue-400/5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-blue-100/20 dark:bg-blue-500/5 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2"></div>
+        </div>
+        
         {!isFavoritePage && (
           <div
             className={`text-center mb-16 transition-all duration-1000 ${
@@ -183,14 +189,14 @@ export default function SourcesPage({
                 : "opacity-0 translate-y-10"
             }`}
           >
-            <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
+            <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-4">
               Fuentes de Noticias
             </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               Explora nuestra colección de periódicos y medios de comunicación
               de todo el mundo
             </p>
-            <div className="h-1 w-20 bg-blue-600 mx-auto mt-6"></div>
+            <div className="h-1 w-20 bg-blue-600 dark:bg-blue-500 mx-auto mt-6"></div>
           </div>
         )}
 
@@ -202,10 +208,10 @@ export default function SourcesPage({
                 : "opacity-0 translate-y-10"
             }`}
           >
-            <Card className="backdrop-blur-sm bg-white/80 border-blue-100">
+            <Card className="backdrop-blur-sm bg-white/80 dark:bg-gray-800/80 border-blue-100 dark:border-gray-700">
               <CardHeader>
-                <CardTitle className="text-blue-900">Filtrar Fuentes</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-blue-900 dark:text-blue-300">Filtrar Fuentes</CardTitle>
+                <CardDescription className="dark:text-gray-400">
                   Encuentra las fuentes que más te interesan
                 </CardDescription>
               </CardHeader>
@@ -216,14 +222,14 @@ export default function SourcesPage({
                       value={selectedLanguage}
                       onValueChange={handleLanguageChange}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full dark:bg-gray-700 dark:text-white dark:border-gray-600">
                         <Globe2 className="w-4 h-4 mr-2" />
                         <SelectValue placeholder="Seleccionar idioma" />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los idiomas</SelectItem>
+                      <SelectContent className="dark:bg-gray-800 dark:text-white dark:border-gray-700">
+                        <SelectItem value="all" className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">Todos los idiomas</SelectItem>
                         {languages.map((lang) => (
-                          <SelectItem key={lang.code} value={lang.code}>
+                          <SelectItem key={lang.code} value={lang.code} className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">
                             <span className="flex items-center">
                               <span className="mr-2">{lang.flag}</span>
                               {lang.name}
@@ -235,13 +241,13 @@ export default function SourcesPage({
                   </div>
                   <div className="flex-1">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
                       <Input
                         type="text"
                         placeholder="Buscar por nombre..."
                         value={searchTerm}
                         onChange={(e) => handleSearch(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:placeholder-gray-400"
                       />
                     </div>
                   </div>
@@ -279,7 +285,7 @@ export default function SourcesPage({
                 }`}
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
-                <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-blue-100 group hover:scale-[1.02]">
+                <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-blue-100 dark:border-gray-700 dark:bg-gray-800 group hover:scale-[1.02]">
                   <div className="relative h-48">
                     <div
                       className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
@@ -288,7 +294,7 @@ export default function SourcesPage({
                       }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute top-4 right-4 bg-white/90 px-3 py-1 rounded-full text-sm font-medium text-gray-800 flex items-center shadow-lg">
+                    <div className="absolute top-4 right-4 bg-white/90 dark:bg-gray-800/90 px-3 py-1 rounded-full text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center shadow-lg">
                       {languages.find((l) => l.code === source.language)?.flag}{" "}
                       <span className="ml-2">
                         {languages.find((l) => l.code === source.language)?.name}
@@ -297,7 +303,7 @@ export default function SourcesPage({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute top-4 left-4 text-red-400 hover:text-red-500 bg-white/90 backdrop-blur-sm hover:bg-white/100 shadow-md hover:shadow-lg"
+                      className="absolute top-4 left-4 text-red-400 hover:text-red-500 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm hover:bg-white/100 dark:hover:bg-gray-800/100 shadow-md hover:shadow-lg"
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleFavorite(source.id);
@@ -313,8 +319,8 @@ export default function SourcesPage({
                     </Button>
                   </div>
                   <CardHeader>
-                    <CardTitle className="text-blue-900">{source.name}</CardTitle>
-                    <CardDescription>{source.description}</CardDescription>
+                    <CardTitle className="text-blue-900 dark:text-blue-300">{source.name}</CardTitle>
+                    <CardDescription className="dark:text-gray-400">{source.description}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex justify-between items-center">
@@ -327,7 +333,7 @@ export default function SourcesPage({
                         <Info className="w-4 h-4 mr-2" />
                         Ver detalles
                       </Button>
-                      <span className="text-sm text-blue-600 font-medium px-3 py-1 bg-blue-50 rounded-full">
+                      <span className="text-sm text-blue-600 dark:text-blue-400 font-medium px-3 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-full">
                         {source.category}
                       </span>
                     </div>
@@ -346,7 +352,7 @@ export default function SourcesPage({
                 size="icon"
                 onClick={() => onPageChange(1)}
                 disabled={currentPage === 1}
-                className="w-10 h-10 p-0"
+                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 <ChevronsLeft className="h-4 w-4" />
               </Button>
@@ -355,7 +361,7 @@ export default function SourcesPage({
                 size="icon"
                 onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="w-10 h-10 p-0"
+                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -381,7 +387,7 @@ export default function SourcesPage({
                       className={`w-10 h-10 p-0 ${
                         currentPage === pageNum
                           ? "bg-blue-600 text-white hover:bg-blue-700"
-                          : ""
+                          : "dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
                       }`}
                     >
                       {pageNum}
@@ -397,7 +403,7 @@ export default function SourcesPage({
                   onPageChange(Math.min(totalPages, currentPage + 1))
                 }
                 disabled={currentPage === totalPages}
-                className="w-10 h-10 p-0"
+                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -406,13 +412,13 @@ export default function SourcesPage({
                 size="icon"
                 onClick={() => onPageChange(totalPages)}
                 disabled={currentPage === totalPages}
-                className="w-10 h-10 p-0"
+                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 <ChevronsRight className="h-4 w-4" />
               </Button>
             </div>
 
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Mostrando {(currentPage - 1) * sourcesPerPage + 1} -{" "}
               {Math.min(currentPage * sourcesPerPage, totalSources)} de{" "}
               {totalSources} fuentes
@@ -421,12 +427,12 @@ export default function SourcesPage({
         )}
 
         {sources.length === 0 && !isLoading && (
-          <div className="text-center py-16 bg-white/50 backdrop-blur-sm rounded-xl border border-blue-100">
-            <Search className="w-16 h-16 mx-auto text-blue-300 mb-4" />
-            <h3 className="text-2xl font-bold text-blue-900 mb-2">
+          <div className="text-center py-16 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-blue-100 dark:border-gray-700">
+            <Search className="w-16 h-16 mx-auto text-blue-300 dark:text-blue-500 mb-4" />
+            <h3 className="text-2xl font-bold text-blue-900 dark:text-blue-300 mb-2">
               No se encontraron resultados
             </h3>
-            <p className="text-blue-600">
+            <p className="text-blue-600 dark:text-blue-400">
               Intenta con otros términos de búsqueda o cambia el filtro de
               idioma
             </p>
