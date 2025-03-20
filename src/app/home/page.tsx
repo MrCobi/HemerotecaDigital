@@ -737,12 +737,15 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20">
-      <section className="relative min-h-[50vh] w-full overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-900">
-        <div className="absolute inset-0 overflow-hidden">
-          {decorativeElements.map((element, i) => (
+      <section
+        id="hero-section"
+        className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-900 dark:from-gray-800 dark:to-gray-900 text-white"
+      >
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          {decorativeElements.map((element, index) => (
             <div
-              key={i}
-              className="absolute animate-pulse hidden sm:block"
+              key={index}
+              className="absolute rounded-full opacity-50 animate-pulse"
               style={{
                 left: element.left,
                 top: element.top,
@@ -754,8 +757,8 @@ export default function HomePage() {
               }}
             />
           ))}
-          <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-blue-500/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2"></div>
+          <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-blue-500/5 dark:bg-blue-400/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 dark:bg-indigo-400/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2"></div>
         </div>
 
         <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 flex flex-col justify-center">
@@ -765,10 +768,10 @@ export default function HomePage() {
             transition={{ duration: 0.5 }}
             className="max-w-3xl"
           >
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 sm:mb-6 leading-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white dark:text-white mb-4 sm:mb-6 leading-tight">
               Bienvenido, {session?.user?.name || "Investigador"}
             </h1>
-            <p className="text-sm sm:text-base md:text-lg text-blue-100 mb-6 sm:mb-8 max-w-2xl">
+            <p className="text-sm sm:text-base md:text-lg text-blue-100 dark:text-gray-200 mb-6 sm:mb-8 max-w-2xl">
               Continúa explorando nuestra colección de documentos y descubre
               nuevas perspectivas de las noticias.
             </p>
@@ -782,7 +785,7 @@ export default function HomePage() {
                 <Input
                   type="text"
                   placeholder="Buscar por título o palabra clave..."
-                  className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-blue-200 focus-visible:ring-white/30 focus-visible:border-white/30 pr-12 py-5" // Añade padding
+                  className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white dark:text-white placeholder:text-blue-200 dark:placeholder:text-gray-300 focus-visible:ring-white/30 focus-visible:border-white/30 pr-12 py-5" // Añade padding
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -792,7 +795,7 @@ export default function HomePage() {
                   }}
                 />
                 <Button 
-                  className="ml-2 bg-white text-blue-600 hover:bg-blue-50 absolute right-0 top-1/2 -translate-y-1/2 z-20"
+                  className="ml-2 bg-white dark:bg-gray-200 text-blue-600 dark:text-blue-800 hover:bg-blue-50 dark:hover:bg-gray-300 absolute right-0 top-1/2 -translate-y-1/2 z-20"
                   onClick={() => {
                     if (searchQuery.trim()) {
                       router.push(`/Articulos?q=${encodeURIComponent(searchQuery.trim())}`);
@@ -802,14 +805,14 @@ export default function HomePage() {
                   <Search className="h-5 w-5" /> {/* Icono más grande */}
                 </Button>
               </div>
-              <div className="flex items-center mt-2 text-sm text-blue-200 relative z-10">
+              <div className="flex items-center mt-2 text-sm text-blue-200 dark:text-gray-300 relative z-10">
                 <Link href="/Articulos" passHref legacyBehavior>
                   <Button
                     variant="link"
-                    className="text-blue-200 hover:text-white p-0 h-auto"
+                    className="text-blue-200 dark:text-gray-300 hover:text-white dark:hover:text-white p-0 h-auto"
                     asChild
                   >
-                    <a className="flex items-center px-2 py-1 -ml-2 hover:bg-blue-600/10 rounded-md transition-colors">
+                    <a className="flex items-center px-2 py-1 -ml-2 hover:bg-blue-600/10 dark:hover:bg-gray-700/30 rounded-md transition-colors">
                       <Filter className="h-3 w-3 mr-1" /> Búsqueda avanzada
                     </a>
                   </Button>
@@ -823,7 +826,7 @@ export default function HomePage() {
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 1440 120"
-            className="w-full h-auto text-white"
+            className="w-full h-auto text-white dark:text-gray-900"
           >
             <path
               fill="currentColor"
@@ -883,8 +886,8 @@ export default function HomePage() {
         className="py-12 sm:py-16 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 dark:from-blue-900/30 dark:to-indigo-900/30 relative"
       >
         <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-blue-500/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2"></div>
+          <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-blue-500/5 dark:bg-blue-400/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 dark:bg-indigo-400/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2"></div>
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -918,7 +921,7 @@ export default function HomePage() {
             {featuredArticles.map((article) => (
               <article
                 key={article.url}
-                className="bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
               >
                 <figure className="relative h-40 sm:h-48">
                   {article.urlToImage ? (
@@ -930,9 +933,9 @@ export default function HomePage() {
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                    <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                       <svg
-                        className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400"
+                        className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 dark:text-gray-500"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -950,19 +953,19 @@ export default function HomePage() {
 
                 <div className="p-4 sm:p-6">
                   <header>
-                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 line-clamp-2 hover:text-blue-600">
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2 line-clamp-2 hover:text-blue-600 dark:hover:text-blue-400">
                       {article.title}
                     </h3>
                   </header>
 
                   {article.description && (
-                    <p className="text-sm sm:text-base text-gray-600 mb-4 line-clamp-3">
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4 line-clamp-3">
                       {article.description}
                     </p>
                   )}
 
                   <footer className="mt-auto">
-                    <div className="flex items-center justify-between text-xs sm:text-sm text-gray-500 mb-4">
+                    <div className="flex items-center justify-between text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-4">
                       {article.author && (
                         <span className="flex items-center">
                           <svg
@@ -997,38 +1000,25 @@ export default function HomePage() {
                             d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                           />
                         </svg>
-                        {new Date(article.publishedAt).toLocaleDateString(
-                          "es-ES",
-                          {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                          }
-                        )}
+                        <span>
+                          {new Date(article.publishedAt).toLocaleDateString(
+                            "es-ES",
+                            {
+                              day: "numeric",
+                              month: "short",
+                            }
+                          )}
+                        </span>
                       </time>
                     </div>
-
-                    <a
+                    <Link
                       href={article.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors text-sm sm:text-base"
+                      className="inline-block px-4 py-2 bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-200 dark:hover:bg-blue-800/60 text-blue-700 dark:text-blue-300 rounded-md text-xs sm:text-sm transition-colors"
                     >
-                      Leer más
-                      <svg
-                        className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M14 5l7 7m0 0l-7 7m7-7H3"
-                        />
-                      </svg>
-                    </a>
+                      Leer artículo
+                    </Link>
                   </footer>
                 </div>
               </article>
