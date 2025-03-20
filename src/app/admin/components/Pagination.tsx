@@ -1,14 +1,21 @@
 "use client";
 
 import React from "react";
+import { cn } from "@/lib/utils";
 
 type PaginationProps = {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  className?: string;
 };
 
-export default function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
+export default function Pagination({ 
+  currentPage, 
+  totalPages, 
+  onPageChange,
+  className 
+}: PaginationProps) {
   // Generar números de páginas para mostrar (mostrar 5 páginas, centradas en la página actual)
   const getPageNumbers = () => {
     const pageNumbers = [];
@@ -40,27 +47,29 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
   if (totalPages <= 1) return null; // No mostrar paginación si solo hay una página
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 sm:px-6">
+    <div className={cn("flex items-center justify-between px-4 py-3 sm:px-6", className)}>
       <div className="flex flex-1 justify-between sm:hidden">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`relative inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium ${
+          className={cn(
+            "relative inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium",
             currentPage === 1
-              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-              : "bg-white text-gray-700 hover:bg-gray-50"
-          }`}
+              ? "border-border bg-muted text-muted-foreground cursor-not-allowed"
+              : "border-border bg-background text-foreground hover:bg-muted/50 transition-colors"
+          )}
         >
           Anterior
         </button>
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`relative ml-3 inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium ${
+          className={cn(
+            "relative ml-3 inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium",
             currentPage === totalPages
-              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-              : "bg-white text-gray-700 hover:bg-gray-50"
-          }`}
+              ? "border-border bg-muted text-muted-foreground cursor-not-allowed"
+              : "border-border bg-background text-foreground hover:bg-muted/50 transition-colors"
+          )}
         >
           Siguiente
         </button>
@@ -68,8 +77,8 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
       <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
-            Mostrando página <span className="font-medium">{currentPage}</span> de{" "}
-            <span className="font-medium">{totalPages}</span>
+            Mostrando página <span className="font-medium text-foreground">{currentPage}</span> de{" "}
+            <span className="font-medium text-foreground">{totalPages}</span>
           </p>
         </div>
         <div>
@@ -77,11 +86,13 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
             <button
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className={`relative inline-flex items-center rounded-l-md px-2 py-2 ${
+              className={cn(
+                "relative inline-flex items-center rounded-l-md px-2 py-2 transition-colors",
                 currentPage === 1
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-card text-gray-500 hover:bg-accent focus:z-10"
-              }`}
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : "bg-background text-foreground hover:bg-muted/50 focus:z-10"
+              )}
+              aria-label="Anterior"
             >
               <span className="sr-only">Anterior</span>
               <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -98,11 +109,12 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
                 key={page}
                 onClick={() => onPageChange(page)}
                 aria-current={currentPage === page ? "page" : undefined}
-                className={`relative inline-flex items-center px-4 py-2 text-sm font-medium ${
+                className={cn(
+                  "relative inline-flex items-center px-4 py-2 text-sm font-medium transition-colors",
                   currentPage === page
-                    ? "z-10 bg-primary text-white focus:z-20"
-                    : "bg-card text-foreground hover:bg-accent focus:z-20"
-                }`}
+                    ? "z-10 bg-primary text-primary-foreground focus:z-20"
+                    : "bg-background text-foreground hover:bg-muted/50 focus:z-20"
+                )}
               >
                 {page}
               </button>
@@ -111,11 +123,13 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
             <button
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className={`relative inline-flex items-center rounded-r-md px-2 py-2 ${
+              className={cn(
+                "relative inline-flex items-center rounded-r-md px-2 py-2 transition-colors",
                 currentPage === totalPages
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-card text-gray-500 hover:bg-accent focus:z-10"
-              }`}
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : "bg-background text-foreground hover:bg-muted/50 focus:z-10"
+              )}
+              aria-label="Siguiente"
             >
               <span className="sr-only">Siguiente</span>
               <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
