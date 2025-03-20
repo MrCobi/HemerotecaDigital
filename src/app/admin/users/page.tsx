@@ -4,6 +4,40 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/db";
 import UsersTable from "./UsersTable";
 
+// Importar el tipo User y Role del componente UsersTable
+import type { User, Role } from "./UsersTable";
+
+// Definir una interfaz que coincida con lo que Prisma devuelve
+interface UserWithCounts {
+  id: string;
+  name: string | null;
+  email: string;
+  emailVerified: Date | null;
+  image: string | null;
+  role: "user" | "admin"; // Roles en minuscula como en Prisma
+  createdAt: Date;
+  _count: {
+    accounts: number;
+    comments: number;
+    favoriteSources: number;
+    ratings: number;
+    sentMessages: number;
+    receivedMessages: number;
+  };
+}
+
+// Función auxiliar para convertir roles de Prisma al tipo Role del componente
+const mapPrismaRoleToComponentRole = (prismaRole: string): Role => {
+  switch (prismaRole) {
+    case "admin":
+      return "ADMIN";
+    case "user":
+      return "USER";
+    default:
+      return "EDITOR";
+  }
+};
+
 export default async function UsersPage() {
   const session = await auth();
 
@@ -36,6 +70,17 @@ export default async function UsersPage() {
       orderBy: { createdAt: "desc" }
     });
 
+    // Convertir los roles de minúscula (Prisma) a mayúscula (componente) y adaptar la estructura
+    const formattedUsers: User[] = users.map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      emailVerified: user.emailVerified,
+      image: user.image,
+      role: mapPrismaRoleToComponentRole(user.role),
+      createdAt: user.createdAt
+    }));
+
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="sm:flex sm:items-center sm:justify-between mb-8">
@@ -57,7 +102,7 @@ export default async function UsersPage() {
         </div>
 
         <div className="bg-card shadow rounded-lg overflow-hidden mt-8">
-          <UsersTable users={users} />
+          <UsersTable users={formattedUsers} />
         </div>
       </div>
     );

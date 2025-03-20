@@ -6,10 +6,10 @@ import Link from "next/link";
 import { DataTable, Column } from "../components/DataTable";
 
 // Definimos el tipo Role explícitamente
-type Role = "ADMIN" | "EDITOR" | "USER";
+export type Role = "ADMIN" | "EDITOR" | "USER";
 
 // Definimos el tipo User manualmente ya que tenemos problemas con la importación de Prisma
-interface User {
+export interface User {
   id: string;
   name: string | null;
   email: string;
