@@ -18,11 +18,11 @@ export default function VerificationPendingPage() {
   }, [session, router]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white shadow-md rounded-lg">
+    <div className="flex flex-col items-center justify-center min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900">
+      <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-gray-800 shadow-md rounded-lg">
         <div className="text-center">
-          <h2 className="mt-6 text-2xl font-extrabold text-gray-900">Verificación Pendiente</h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <h2 className="mt-6 text-2xl font-extrabold text-gray-900 dark:text-white">Verificación Pendiente</h2>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
             Hemos enviado un correo electrónico a tu dirección de correo para verificar tu cuenta.
           </p>
         </div>
@@ -39,22 +39,22 @@ export default function VerificationPendingPage() {
         </div>
 
         <div className="space-y-4">
-          <p className="text-sm text-gray-500 text-center">
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
             Por favor, revisa tu bandeja de entrada y haz clic en el enlace de verificación para activar tu cuenta.
           </p>
-          <p className="text-sm text-gray-500 text-center">
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
             Si no has recibido el correo electrónico, comprueba tu carpeta de spam o solicita un nuevo enlace de verificación.
           </p>
         </div>
 
         <div className="flex flex-col space-y-3">
-          <button className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+          <button className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-700 dark:hover:bg-blue-800">
             <Link href="/auth/resend-verification" className="text-white no-underline">
               Reenviar correo de verificación
             </Link>
           </button>
-          <button className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-            <Link href="/api/auth/signin" className="text-gray-700 no-underline">
+          <button className="w-full py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+            <Link href="/api/auth/signin" className="text-gray-700 dark:text-gray-200 no-underline">
               Volver al inicio de sesión
             </Link>
           </button>
