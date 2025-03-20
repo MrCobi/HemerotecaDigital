@@ -284,7 +284,7 @@ export default function SourcePageClient({
                 {source.description}
               </p>
 
-              <div className="w-full max-w-sm md:mx-0 mb-6">
+              <div className="w-full max-w-sm md:mx-0 mb-6 relative z-10">
                 <StarRating sourceId={source.id} />
               </div>
 

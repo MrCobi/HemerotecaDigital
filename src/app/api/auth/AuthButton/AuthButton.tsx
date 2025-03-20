@@ -149,12 +149,12 @@ const AuthButton = () => {
         >
           <div className="bg-white dark:bg-gray-800 rounded-lg">
             <div className="menu-container py-1">
-              <Link href="/profile" passHref>
+              <Link href="/api/auth/dashboard" passHref>
                 <motion.div
                   className="px-4 py-3 flex items-center gap-3 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                   onClick={() => {
                     handleClose();
-                    router.push("/profile");
+                    router.push("/api/auth/dashboard");
                   }}
                   whileHover={animationsEnabled ? { x: 5 } : {}}
                   whileTap={animationsEnabled ? { scale: 0.98 } : {}}
@@ -176,7 +176,7 @@ const AuthButton = () => {
                   <span className="font-medium">Mi Perfil</span>
                 </motion.div>
               </Link>
-              <Link href="/api/auth/dashboard" passHref>
+              <Link href={session.user?.username ? `/users/${session.user.username}` : "#"} passHref>
                 <motion.div
                   className="px-4 py-3 flex items-center gap-3 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                   onClick={handleClose}
@@ -312,7 +312,7 @@ const AuthButton = () => {
                       viewBox="0 0 24 24"
                       xmlns="http://www.w3.org/2000/svg"
                     >
-                      <path d="M12 14c3.31 0 6-2.69 6-6s-2.69-6-6-6-6 2.69-6 6 2.69 6 6 6zm0-10c2.21 0 4 1.79 4 4s-1.79 4-4 4-4-1.79-4-4 1.79-4 4-4zm0 12c-4.42 0-8 1.79-8 4v2h16v-2c0-2.21-3.58-4-8-4zm-6 4c.47-.72 2.78-2 6-2s5.53 1.28 6 2H6z" />
+                      <path d="M12 14c3.31 0 6-2.69 6-6s-2.69-6-6-6-6 2.69-6 6 2.69 6 6 6zm0-10c2.21 0 4 1.79 4 4s-1.79 4-4 4-4-1.79-4-4 1.79-4 4-4zm-6 4c.47-.72 2.78-2 6-2s5.53 1.28 6 2H6z" />
                     </svg>
                     <span className="font-medium">Administrador</span>
                   </motion.div>

@@ -53,7 +53,7 @@ export const API_ROUTES = {
   },
   sources: {
     list: (page: number = 1, limit: number = 10, language?: string, search?: string) =>
-      `/api/sources?page=${page}&limit=${limit}${language && language !== 'all' ? `&language=${language}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
+      `/api/sources?page=${page}&limit=${limit}${language ? `&language=${language}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
     get: (id: string) => `/api/sources/${id}`,
     byCategory: (category: string) => `/api/sources/categories/${encodeURIComponent(category)}`,
     details: "/api/sources/details",

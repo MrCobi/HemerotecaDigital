@@ -380,27 +380,42 @@ export default function SourcesPage({
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Mostrando {Math.min(sourcesPerPage, sources.length)} de {totalSources} fuentes
             </p>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => onPageChange(1)}
-                disabled={currentPage === 1}
-                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+            <div className="flex items-center space-x-2 overflow-visible w-full justify-center relative">
+              {/* Primera página */}
+              <motion.div
+                whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+                whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+                className="relative z-10"
               >
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => onPageChange(1)}
+                  disabled={currentPage === 1}
+                  className="w-10 h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+              </motion.div>
+              
+              {/* Página anterior */}
+              <motion.div
+                whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+                whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+                className="relative z-10"
               >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="w-10 h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </motion.div>
 
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-1 relative z-10">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
                   if (totalPages <= 5) {
@@ -418,11 +433,12 @@ export default function SourcesPage({
                       key={pageNum}
                       whileHover={animationsEnabled ? { scale: 1.05 } : {}}
                       whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+                      className="relative z-10"
                     >
                       <Button
                         variant={currentPage === pageNum ? "default" : "outline"}
                         onClick={() => onPageChange(pageNum)}
-                        className={`w-10 h-10 p-0 ${
+                        className={`w-10 h-10 p-0 relative ${
                           currentPage === pageNum
                             ? "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
                             : "dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -434,27 +450,42 @@ export default function SourcesPage({
                   );
                 })}
               </div>
-
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() =>
-                  onPageChange(Math.min(totalPages, currentPage + 1))
-                }
-                disabled={currentPage === totalPages}
-                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+              
+              {/* Página siguiente */}
+              <motion.div
+                whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+                whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+                className="relative z-10"
               >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => onPageChange(totalPages)}
-                disabled={currentPage === totalPages}
-                className="w-10 h-10 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() =>
+                    onPageChange(Math.min(totalPages, currentPage + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="w-10 h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </motion.div>
+              
+              {/* Última página */}
+              <motion.div
+                whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+                whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+                className="relative z-10"
               >
-                <ChevronsRight className="h-4 w-4" />
-              </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => onPageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="w-10 h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </motion.div>
             </div>
           </motion.div>
         )}

@@ -135,74 +135,59 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
   };
 
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <div className="bg-gradient-to-br from-gray-700/30 to-gray-600/30 p-3 sm:p-4 rounded-xl backdrop-blur-sm border border-white/20">
-        <div className="flex items-center justify-between mb-1 sm:mb-2">
-          <div className="flex items-center gap-2 sm:gap-3">
-            {renderStars(averageRating)}
-            <span className="text-xl sm:text-2xl font-bold text-white">
-              {averageRating ? averageRating.toFixed(1) : "0.0"}
-            </span>
-          </div>
-          <div
-            className="relative"
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setShowTooltip(false)}
-          >
-            <div className="text-xs sm:text-sm text-white/90 cursor-help flex items-center">
-              <span className="font-bold mr-1">{totalRatings}</span>
-              <span>{totalRatings === 1 ? 'valoración' : 'valoraciones'}</span>
-            </div>
-            {showTooltip && (
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1 bg-gray-800/95 text-white text-xs rounded whitespace-nowrap z-10">
-                Total de valoraciones recibidas
-                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800/95"></div>
-              </div>
-            )}
-          </div>
+    <div className="flex flex-col items-start gap-2 relative">
+      <div className="flex items-center gap-2 flex-wrap z-10">
+        <div className="flex items-center">
+          {renderStars(averageRating, false)}
+        </div>
+        <div className="flex items-center text-white/90 dark:text-gray-200 text-sm">
+          <span className="font-semibold mr-1">{averageRating.toFixed(1)}</span>
+          <span>
+            ({totalRatings} {totalRatings === 1 ? "valoración" : "valoraciones"})
+          </span>
         </div>
       </div>
 
-      {session ? (
-        <div className="bg-gradient-to-br from-gray-700/20 to-gray-600/20 p-3 sm:p-4 rounded-xl backdrop-blur-sm border border-white/10">
-          <div className="flex items-center justify-between mb-1 sm:mb-2">
-            <span className="text-xs sm:text-sm font-medium text-white/90">Tu valoración</span>
+      {session?.user?.id && (
+        <div className="relative z-20 w-full">
+          <h4 className="text-sm font-medium text-white/80 dark:text-gray-300 mb-1">
+            Tu valoración
+          </h4>
+          <div className="flex items-center gap-2">
+            <div className="flex">{renderStars(userRating, true)}</div>
+
             {userRating > 0 && (
-              <span className="text-xs sm:text-sm font-bold text-yellow-400">
-                {userRating} {userRating === 1 ? 'estrella' : 'estrellas'}
-              </span>
+              <button
+                onClick={handleRemoveRating}
+                disabled={loading}
+                className="ml-2 text-xs sm:text-sm text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
+              >
+                <svg
+                  className="w-3 h-3 sm:w-4 sm:h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
+                </svg>
+                <span className="whitespace-nowrap">Quitar valoración</span>
+              </button>
             )}
           </div>
-          {renderStars(userRating, true)}
-          {userRating > 0 && (
-            <button
-              onClick={handleRemoveRating}
-              disabled={loading}
-              className="mt-2 sm:mt-3 text-xs sm:text-sm text-red-400 hover:text-red-300 transition-colors flex items-center gap-1"
-            >
-              <svg
-                className="w-3 h-3 sm:w-4 sm:h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
-              Quitar valoración
-            </button>
-          )}
         </div>
-      ) : (
-        <div className="bg-gradient-to-br from-gray-700/20 to-gray-600/20 p-3 sm:p-4 rounded-xl backdrop-blur-sm border border-white/10">
-          <div className="flex items-center justify-center gap-1 sm:gap-2 text-white/80">
+      )}
+
+      {!session?.user?.id && (
+        <div className="relative z-20 bg-white/10 dark:bg-gray-800/50 p-2 rounded-md mt-2">
+          <div className="flex items-center gap-2 text-white/80 dark:text-gray-300 text-sm">
             <svg
-              className="w-4 h-4 sm:w-5 sm:h-5"
-              fill="none"
+              className="w-4 h-4"
+              fill="none" 
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
@@ -213,7 +198,7 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
                 d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
               />
             </svg>
-            <span className="text-xs sm:text-sm">Inicia sesión para valorar</span>
+            <span>Inicia sesión para valorar</span>
           </div>
         </div>
       )}

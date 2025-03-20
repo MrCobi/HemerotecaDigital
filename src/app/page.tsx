@@ -57,11 +57,11 @@ const StatItem = ({
   const count = useCounter(isVisible ? value : 0, 2000);
 
   return (
-    <div className="transform transition-all duration-500 hover:scale-105 p-4 sm:p-6 bg-white/10 dark:bg-blue-900/30 rounded-lg backdrop-blur-sm">
-      <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1 sm:mb-2">
+    <div className="transform transition-all duration-500 hover:scale-105 p-4 bg-white/10 dark:bg-blue-900/30 rounded-lg backdrop-blur-sm">
+      <div className="text-3xl font-bold text-white mb-2">
         {count}+
       </div>
-      <div className="text-sm sm:text-base text-blue-100">{label}</div>
+      <div className="text-base text-blue-100">{label}</div>
     </div>
   );
 };
@@ -150,16 +150,16 @@ export default function HomePage() {
               isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
             }`}
           >
-            <p className="text-blue-300 dark:text-blue-200 font-medium mb-2 sm:mb-3 tracking-wider uppercase text-sm sm:text-base mt-5">
+            <p className="text-blue-300 dark:text-blue-200 font-medium mb-2 sm:mb-3 tracking-wider uppercase text-base">
               Archivo histórico digital
             </p>
-            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight">
+            <h1 className="text-4xl font-bold text-white mb-4 sm:mb-6 leading-tight">
               Descubre el Mundo{" "}
               <span className="block mt-1 sm:mt-2">
                 de las Noticias Históricas
               </span>
             </h1>
-            <p className="text-sm sm:text-base md:text-lg text-gray-200 dark:text-blue-200 mb-6 sm:mb-8 max-w-2xl">
+            <p className="text-base text-gray-200 dark:text-blue-200 mb-6 sm:mb-8 max-w-2xl">
               Explora nuestra vasta colección de artículos, periódicos y documentos
               históricos digitalizados que abarcan más de cinco décadas de
               historia.
@@ -167,7 +167,7 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Button
                 size="lg"
-                className="w-full sm:w-auto bg-white dark:bg-blue-100 text-blue-600 dark:text-blue-900 hover:bg-gray-100 dark:hover:bg-blue-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1 hover:scale-105 transition-all duration-300 text-sm sm:text-base"
+                className="w-full sm:w-auto bg-white dark:bg-blue-100 text-blue-600 dark:text-blue-900 hover:bg-gray-100 dark:hover:bg-blue-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1 hover:scale-105 transition-all duration-300 text-base"
                 onClick={() => router.push("/api/auth/signin")}
               >
                 Iniciar Sesión
@@ -175,7 +175,7 @@ export default function HomePage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="w-full sm:w-auto text-white dark:text-blue-200 border-white dark:border-blue-200 hover:bg-white/10 dark:hover:bg-blue-800/30 text-sm sm:text-base"
+                className="w-full sm:w-auto text-white dark:text-blue-200 border-white dark:border-blue-200 hover:bg-white/10 dark:hover:bg-blue-800/30 text-base"
                 onClick={() => router.push("/api/auth/signup")}
               >
                 Registrarse
@@ -202,7 +202,7 @@ export default function HomePage() {
       {/* Stats Section */}
       <section
         id="stats-section"
-        className="py-12 sm:py-16 bg-gradient-to-r from-blue-600 to-indigo-900 dark:from-blue-900 dark:to-indigo-950 text-white relative overflow-hidden"
+        className="py-12 bg-gradient-to-r from-blue-600 to-indigo-900 dark:from-blue-900 dark:to-indigo-950 text-white relative overflow-hidden"
       >
         {/* Background blur effects for depth */}
         <div className="absolute inset-0">
@@ -237,7 +237,7 @@ export default function HomePage() {
             <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">
               Cómo Funciona Nuestra Hemeroteca
             </h2>
-            <p className="text-lg text-gray-600 dark:text-blue-200 max-w-3xl mx-auto">
+            <p className="text-base text-gray-600 dark:text-blue-200 max-w-3xl mx-auto">
               Descubre el proceso que seguimos para preservar y hacer accesible la
               historia a través de nuestros documentos.
             </p>
@@ -277,10 +277,10 @@ export default function HomePage() {
                 <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 dark:from-blue-400 dark:to-indigo-500 flex items-center justify-center text-white font-bold mb-4">
                   {step.number}
                 </div>
-                <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
+                <h3 className="text-base font-bold text-gray-800 dark:text-white mb-4">
                   {step.title}
                 </h3>
-                <p className="text-gray-600 dark:text-blue-200">{step.description}</p>
+                <p className="text-base text-gray-600 dark:text-blue-200">{step.description}</p>
               </div>
             ))}
           </div>
@@ -294,7 +294,7 @@ export default function HomePage() {
             <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">
               Explora Nuestra Línea del Tiempo
             </h2>
-            <p className="text-lg text-gray-600 dark:text-blue-200 max-w-3xl mx-auto">
+            <p className="text-base text-gray-600 dark:text-blue-200 max-w-3xl mx-auto">
               Navega por nuestros documentos organizados cronológicamente.
             </p>
           </div>
@@ -335,13 +335,13 @@ export default function HomePage() {
               >
                 <div className="absolute left-0 top-0 transform -translate-x-1/2 w-6 h-6 rounded-full bg-white dark:bg-blue-950 border-4 border-blue-500 dark:border-blue-400" />
                 <div className="bg-white dark:bg-blue-900 p-6 rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-100 dark:border-blue-800">
-                  <div className="text-xl font-bold text-blue-600 dark:text-blue-300 mb-2">
+                  <div className="text-base font-bold text-blue-600 dark:text-blue-300 mb-2">
                     {event.year}
                   </div>
-                  <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">
+                  <h3 className="text-base font-bold text-gray-800 dark:text-white mb-2">
                     {event.title}
                   </h3>
-                  <p className="text-gray-600 dark:text-blue-200">{event.description}</p>
+                  <p className="text-base text-gray-600 dark:text-blue-200">{event.description}</p>
                   <Button
                     className="mt-4"
                     size="sm"
@@ -362,7 +362,7 @@ export default function HomePage() {
           <h2 className="text-4xl font-bold mb-6">
             Comienza a Explorar la Historia Hoy
           </h2>
-          <p className="text-xl mb-8 text-gray-200 dark:text-blue-200">
+          <p className="text-base mb-8 text-gray-200 dark:text-blue-200">
             Únete a miles de investigadores, historiadores y mentes curiosas para
             descubrir el pasado a través de nuestro archivo.
           </p>

@@ -247,22 +247,22 @@ const TrendsSection = () => {
             onValueChange={setActiveTab}
             className="w-full mt-2"
           >
-            <TabsList className="grid w-full grid-cols-3 bg-gray-100 dark:bg-gray-800 rounded-md">
+            <TabsList className="grid w-full grid-cols-3 bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden">
               <TabsTrigger
                 value="api"
-                className="text-gray-700 dark:text-gray-300"
+                className="text-gray-700 dark:text-gray-300 py-2 px-1 text-sm"
               >
                 Noticias
               </TabsTrigger>
               <TabsTrigger
                 value="favorites"
-                className="text-gray-700 dark:text-gray-300"
+                className="text-gray-700 dark:text-gray-300 py-2 px-1 text-sm"
               >
                 Favoritos
               </TabsTrigger>
               <TabsTrigger
                 value="comments"
-                className="text-gray-700 dark:text-gray-300"
+                className="text-gray-700 dark:text-gray-300 py-2 px-1 text-sm"
               >
                 Comentarios
               </TabsTrigger>
@@ -270,7 +270,7 @@ const TrendsSection = () => {
           </Tabs>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-2 pt-2 pb-4 px-4">
         {activeTab === "api" && (
           <>
             {trends.api.length === 0 ? (
