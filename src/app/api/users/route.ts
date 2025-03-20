@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../lib/auth-utils";
-import { User } from "@prisma/client";
 
 // Esta ruta es solo para administradores
-export const GET = withAuth(async (req: Request, { userId: _userId, user }: { userId: string, user: User }) => {
+export const GET = withAuth(async (req: Request, { userId: _userId, user }: { userId: string, user: any }) => {
   try {
     // Verificar si el usuario es admin
     if (user.role !== "admin") {

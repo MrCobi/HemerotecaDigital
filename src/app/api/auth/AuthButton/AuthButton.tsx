@@ -299,7 +299,7 @@ const AuthButton = () => {
 
               <div className="my-1 border-t border-gray-200 dark:border-gray-700"></div>
               {isAdmin && (
-                <Link href="/admin/users" passHref>
+                <Link href="/admin/dashboard" passHref>
                   <motion.div
                     className="px-4 py-3 flex items-center gap-3 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                     onClick={handleClose}
@@ -314,7 +314,7 @@ const AuthButton = () => {
                     >
                       <path d="M12 14c3.31 0 6-2.69 6-6s-2.69-6-6-6-6 2.69-6 6 2.69 6 6 6zm0-10c2.21 0 4 1.79 4 4s-1.79 4-4 4-4-1.79-4-4 1.79-4 4-4zm-6 4c.47-.72 2.78-2 6-2s5.53 1.28 6 2H6z" />
                     </svg>
-                    <span className="font-medium">Administrador</span>
+                    <span className="font-medium">Panel Admin</span>
                   </motion.div>
                 </Link>
               )}
