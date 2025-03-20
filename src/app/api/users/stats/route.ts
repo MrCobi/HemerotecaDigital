@@ -2,8 +2,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../../lib/auth-utils";
+import { User } from "@prisma/client";
 
-export const GET = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }) => {
+export const GET = withAuth(async (req: Request, { userId, user }: { userId: string, user: User }) => {
     try {
       const [favorites, comments, ratings, activities] = await Promise.all([
         prisma.favoriteSource.count({ where: { userId } }),

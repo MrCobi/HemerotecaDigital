@@ -151,7 +151,7 @@ const useCounter = (end: number, duration: number = 2000) => {
 
 const TrendsSection = () => {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: _session, status } = useSession();
   const [trends, setTrends] = useState<Trends>({
     api: [],
     favorites: [],

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../../../lib/auth-utils";
 
-export const GET = withAuth(async (request: Request, { userId }: { userId: string }) => {
+export const GET = withAuth(async (request: Request, { userId: _userId }: { userId: string }) => {
   const { searchParams } = new URL(request.url);
   const sourceId = searchParams.get("sourceId");
 

@@ -1,9 +1,9 @@
 import prisma from "@/lib/db";
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { Article } from "@/src/interface/article";
 import { withAuth } from "../../../../lib/auth-utils";
 
-type NewsApiTrend = Article & {
+type _NewsApiTrend = Article & {
   localSourceId: string | null;
 };
 
@@ -24,7 +24,7 @@ function isApiError(error: unknown): error is ApiError {
   );
 }
 
-async function fetchWithRetry(url: string, retries = 3, delay = 1000) {
+async function _fetchWithRetry(url: string, retries = 3, delay = 1000) {
   for (let i = 0; i < retries; i++) {
     try {
       const response = await fetch(url);
@@ -74,7 +74,7 @@ async function fetchWithRetry(url: string, retries = 3, delay = 1000) {
   throw new Error('Max retries reached');
 }
 
-export const GET = withAuth(async (req: NextRequest, { userId }: { userId: string }) => {
+export const GET = withAuth(async (req, { userId }: { userId: string }) => {
   try {
     // 1. Fuentes más favoritadas
     const topFavorites = await prisma.favoriteSource.groupBy({
@@ -152,7 +152,7 @@ export const GET = withAuth(async (req: NextRequest, { userId }: { userId: strin
     const activityMap = new Map<string, { sourceId: string, activity: number }>();
     
     // Ponderar comentarios (más peso)
-    recentComments.forEach((item: any) => {
+    recentComments.forEach((item: { sourceId: string; _count: number }) => {
       activityMap.set(item.sourceId, { 
         sourceId: item.sourceId, 
         activity: item._count * 2
@@ -160,7 +160,7 @@ export const GET = withAuth(async (req: NextRequest, { userId }: { userId: strin
     });
     
     // Añadir valoraciones
-    recentRatings.forEach((item: any) => {
+    recentRatings.forEach((item: { sourceId: string; _count: number }) => {
       if (activityMap.has(item.sourceId)) {
         const current = activityMap.get(item.sourceId)!;
         activityMap.set(item.sourceId, {
@@ -272,13 +272,13 @@ export const GET = withAuth(async (req: NextRequest, { userId }: { userId: strin
     ];
 
     // Obtener noticias destacadas de NewsAPI
-    let newsApiTrends: any[] = [];
+    let newsApiTrends: { title: string; url: string }[] = [];
     try {
       const newsApiUrl = "https://newsapi.org/v2/top-headlines?country=us&apiKey=da3db1fa448a49d9a84fbdd13e4d6098";
       const newsResponse = await fetch(newsApiUrl);
       if (newsResponse.ok) {
         const newsData = await newsResponse.json();
-        newsApiTrends = newsData.articles.map((article: any) => ({
+        newsApiTrends = newsData.articles.map((article: { title: string; url: string }) => ({
           title: article.title,
           url: article.url
         })).slice(0, 8); // Limitar a 8 artículos

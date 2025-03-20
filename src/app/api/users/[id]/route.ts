@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import bcrypt from "bcryptjs";
-import { Prisma } from "@prisma/client";
+import { Prisma, User } from "@prisma/client";
 import { withAuth } from "../../../../lib/auth-utils";
 
 // GET para obtener detalles de un usuario específico
@@ -43,7 +43,7 @@ export async function GET(req: Request, context: { params: Promise<{ id?: string
 }
 
 // PUT para actualizar un usuario existente
-export const PUT = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }, context: { params: Promise<{ id: string }> }) => {
+export const PUT = withAuth(async (req: Request, { userId, user }: { userId: string, user: User }, context: { params: Promise<{ id: string }> }) => {
   try {
     const { id } = await context.params;
     
@@ -138,7 +138,7 @@ export const PUT = withAuth(async (req: Request, { userId, user }: { userId: str
 });
 
 // DELETE para eliminar un usuario
-export const DELETE = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }, context: { params: Promise<{ id: string }> }) => {
+export const DELETE = withAuth(async (req: Request, { userId, user }: { userId: string, user: User }, context: { params: Promise<{ id: string }> }) => {
   try {
     const { id } = await context.params;
     

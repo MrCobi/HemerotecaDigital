@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../lib/auth-utils";
+import { User } from "@prisma/client";
 
 // POST para seguir a un usuario
-export const POST = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }) => {
+export const POST = withAuth(async (req: Request, { userId, user: _user }: { userId: string, user: User }) => {
   try {
     const { followingId } = await req.json();
 
@@ -91,7 +92,7 @@ export const POST = withAuth(async (req: Request, { userId, user }: { userId: st
 });
 
 // DELETE para dejar de seguir a un usuario
-export const DELETE = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }) => {
+export const DELETE = withAuth(async (req: Request, { userId, user: _user }: { userId: string, user: User }) => {
   try {
     const { searchParams } = new URL(req.url);
     const targetUserId = searchParams.get("targetUserId");

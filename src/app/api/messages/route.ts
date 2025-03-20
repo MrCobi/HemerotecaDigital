@@ -1,10 +1,10 @@
 // src/app/api/messages/route.ts
-import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { messageEvents } from "./sse-messages/message-event-manager";
 import { withAuth } from "../../../lib/auth-utils";
+import { User } from "@prisma/client";
 
-export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: any }) => {
+export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: User }) => {
   try {
     const { receiverId, content, priority, tempId } = await request.json();
     
@@ -302,7 +302,13 @@ export const GET = withAuth(async (request: Request, { userId }: { userId: strin
   
   try {
     // Construir condiciones de búsqueda
-    const whereCondition: any = {
+    const whereCondition: {
+      OR: [
+        { senderId: string; receiverId: string; },
+        { senderId: string; receiverId: string; }
+      ];
+      createdAt?: { lt: Date };
+    } = {
       OR: [
         { senderId: userId, receiverId: conversationWith },
         { senderId: conversationWith, receiverId: userId }

@@ -57,10 +57,10 @@ export const API_ROUTES = {
     get: (id: string) => `/api/sources/${id}`,
     byCategory: (category: string) => `/api/sources/categories/${encodeURIComponent(category)}`,
     details: "/api/sources/details",
-    getDetails: (sourceIds: string[]) => `/api/sources/details`,
+    getDetails: (_sourceIds: string[]) => `/api/sources/details`,
     ratings: {
       add: "/api/sources/ratings",
-      delete: (sourceId: string) => `/api/sources/ratings?sourceId=${sourceId}`,
+      delete: (_sourceId: string) => `/api/sources/ratings?sourceId=${_sourceId}`,
       get: (sourceId: string) => `/api/sources/ratings?sourceId=${sourceId}`,
       average: (sourceId: string) => `/api/sources/ratings/average?sourceId=${sourceId}`
     },
@@ -69,7 +69,7 @@ export const API_ROUTES = {
   },
   favorites: {
     add: "/api/favorites/add",
-    remove: (sourceId: string) => `/api/favorites/remove`,
+    remove: (_sourceId: string) => `/api/favorites/remove`,
     removeByPost: "/api/favorites/remove",  // Para cuando se envía por POST
     check: (sourceId: string) => `/api/favorites/check/${sourceId}`,
     user: (userId: string, page: number = 1, limit: number = 10) =>

@@ -15,7 +15,7 @@ interface ActivityResult {
 
 export const GET = withAuth(async (
   request: Request,
-  { userId: currentUserId }: { userId: string },
+  { userId: _currentUserId }: { userId: string },
   context: { params: Promise<{ userId: string }> }
 ) => {
   try {

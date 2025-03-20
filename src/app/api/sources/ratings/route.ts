@@ -2,9 +2,10 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../../lib/auth-utils";
+import { User } from "@prisma/client";
 
 // Manejar solicitudes GET
-export const GET = withAuth(async (request: Request, { userId, user }: { userId: string, user: any }) => {
+export const GET = withAuth(async (request: Request, { userId, user: _user }: { userId: string, user: User }) => {
   const { searchParams } = new URL(request.url);
   const sourceId = searchParams.get("sourceId");
 
@@ -40,7 +41,7 @@ export const GET = withAuth(async (request: Request, { userId, user }: { userId:
 });
 
 // Método POST modificado
-export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: any }) => {
+export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: User }) => {
   const { sourceId, value } = await request.json();
 
   if (!sourceId || value < 1 || value > 5) {
@@ -108,7 +109,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
 });
 
 // Método DELETE modificado
-export const DELETE = withAuth(async (req: Request, { userId, user }: { userId: string, user: any }) => {
+export const DELETE = withAuth(async (req: Request, { userId, user: _user }: { userId: string, user: User }) => {
   const { searchParams } = new URL(req.url);
   const sourceId = searchParams.get("sourceId");
 
@@ -142,7 +143,7 @@ export const DELETE = withAuth(async (req: Request, { userId, user }: { userId: 
           userId: userId,
           type: "rating_removed",
           sourceName: rating.source.name,
-          userName: user.name || "", // Incluir el nombre del usuario
+          userName: _user.name || "", // Incluir el nombre del usuario
           createdAt: new Date(),
         }
       });

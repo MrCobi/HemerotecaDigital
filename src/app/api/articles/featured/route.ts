@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
-import { Article } from "@/src/interface/article";
 import { API_ROUTES } from "@/src/config/api-routes";
 
 // Define una interfaz para los artículos que devolverá la API
@@ -48,7 +47,7 @@ async function fetchWithRetry(url: string, retries = 3, delay = 1000) {
   throw new Error('Max retries reached');
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     // Usar la URL configurada en API_ROUTES para las noticias destacadas
     const data = await fetchWithRetry(API_ROUTES.external.news);

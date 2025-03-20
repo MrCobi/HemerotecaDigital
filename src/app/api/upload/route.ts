@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { withAuth } from "../../../lib/auth-utils";
 
@@ -9,7 +9,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export const POST = withAuth(async (req: NextRequest, { userId }: { userId: string }) => {
+export const POST = withAuth(async (req: Request, { userId }: { userId: string }) => {
   try {
     const data = await req.formData();
     const file: File | null = data.get('file') as unknown as File;

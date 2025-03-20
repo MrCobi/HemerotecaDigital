@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { Readable } from 'stream';
 
 // Configurar Cloudinary
 cloudinary.config({
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     const fileId = `upload_${timestamp}_${randomId}`;
 
     // Subir a Cloudinary
-    return new Promise<NextResponse>((resolve, reject) => {
+    return new Promise<NextResponse>((resolve, _reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           resource_type: 'auto',
@@ -63,7 +64,6 @@ export async function POST(req: NextRequest) {
       );
 
       // Escribir el archivo en el stream
-      const Readable = require('stream').Readable;
       const readableStream = new Readable();
       readableStream.push(buffer);
       readableStream.push(null);

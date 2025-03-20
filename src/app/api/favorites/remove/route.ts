@@ -1,20 +1,19 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../../lib/auth-utils";
-import { NextRequest } from "next/server";
 
 // Implementación del método DELETE (para compatibilidad con REST)
-export const DELETE = withAuth(async (req: NextRequest, { userId }: { userId: string }) => {
+export const DELETE = withAuth(async (req: Request, { userId }: { userId: string }) => {
   return await removeFavorite(req, userId);
 });
 
 // Implementación del método POST (para clientes que prefieren usar POST)
-export const POST = withAuth(async (req: NextRequest, { userId }: { userId: string }) => {
+export const POST = withAuth(async (req: Request, { userId }: { userId: string }) => {
   return await removeFavorite(req, userId);
 });
 
 // Función auxiliar que maneja la lógica común entre DELETE y POST
-async function removeFavorite(req: NextRequest, userId: string) {
+async function removeFavorite(req: Request, userId: string) {
   try {
     let sourceId;
     

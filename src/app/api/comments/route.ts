@@ -2,8 +2,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../lib/auth-utils";
+import { User } from "@prisma/client";
 
-export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: any }) => {
+export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: User }) => {
   try {
     const { content, sourceId } = await request.json();
     const trimmedContent = content?.trim() || "";

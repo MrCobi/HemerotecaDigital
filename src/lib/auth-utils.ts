@@ -1,6 +1,15 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { type User as _User } from "@prisma/client";
+
+/**
+ * Interfaz para parámetros de autenticación pasados a las rutas API
+ */
+export interface AuthParams {
+  userId: string;
+  user: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+}
 
 /**
  * Verifica la sesión del usuario y devuelve información útil.
@@ -82,8 +91,11 @@ export async function verifyAdminRole(userId: string) {
  * @param options Opciones de configuración
  * @returns Función manejadora protegida
  */
-export function withAuth(handler: Function, options: { requireAdmin?: boolean } = {}) {
-  return async (req: Request, ...args: any[]) => {
+export function withAuth(
+  handler: (req: Request, auth: AuthParams, ...args: any[]) => Promise<Response>, // eslint-disable-line @typescript-eslint/no-explicit-any
+  options: { requireAdmin?: boolean } = {}
+) {
+  return async (req: Request, ...args: any[]) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     // Verificar autenticación
     const { authenticated, response, userId, user } = await verifySession();
     
