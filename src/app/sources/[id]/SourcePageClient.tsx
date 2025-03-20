@@ -243,14 +243,14 @@ export default function SourcePageClient({
               cx="25"
               cy="75"
               r="30"
-              fill="rgba(59, 130, 246, 0.15)"
+              fill="rgba(209, 213, 219, 0.2)"
               className="animate-pulse-slow"
             />
             <circle
               cx="75"
               cy="25"
               r="25"
-              fill="rgba(79, 70, 229, 0.1)"
+              fill="rgba(156, 163, 175, 0.2)"
               className="animate-pulse-slow delay-1000"
             />
           </svg>
@@ -292,7 +292,7 @@ export default function SourcePageClient({
                 href={source.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center bg-white/95 hover:bg-white text-blue-700 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                className="inline-flex items-center bg-white/95 hover:bg-white text-gray-700 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
               >
                 Visitar sitio web
                 <svg

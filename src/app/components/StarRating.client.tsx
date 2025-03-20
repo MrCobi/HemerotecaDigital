@@ -138,12 +138,12 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      <div className="bg-gradient-to-br from-blue-600/10 to-indigo-600/10 p-3 sm:p-4 rounded-xl backdrop-blur-sm border border-white/20">
+      <div className="bg-gradient-to-br from-gray-700/30 to-gray-600/30 p-3 sm:p-4 rounded-xl backdrop-blur-sm border border-white/20">
         <div className="flex items-center justify-between mb-1 sm:mb-2">
           <div className="flex items-center gap-2 sm:gap-3">
             {renderStars(averageRating)}
             <span className="text-xl sm:text-2xl font-bold text-white">
-              {averageRating.toFixed(1)}
+              {averageRating ? averageRating.toFixed(1) : "0.0"}
             </span>
           </div>
           <div 
@@ -151,13 +151,14 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
           >
-            <span className="text-xs sm:text-sm text-white/80 cursor-help">
-            {formatRatingCount(totalRatings)} {totalRatings === 1 ? 'valoración' : 'valoraciones'}
-            </span>
+            <div className="text-xs sm:text-sm text-white/90 cursor-help flex items-center">
+              <span className="font-bold mr-1">{totalRatings}</span>
+              <span>{totalRatings === 1 ? 'valoración' : 'valoraciones'}</span>
+            </div>
             {showTooltip && (
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1 bg-black/90 text-white text-xs rounded whitespace-nowrap z-10">
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 sm:px-3 py-1 bg-gray-800/95 text-white text-xs rounded whitespace-nowrap z-10">
                 Total de valoraciones recibidas
-                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-black/90"></div>
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-800/95"></div>
               </div>
             )}
           </div>
@@ -165,7 +166,7 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
       </div>
 
       {session ? (
-        <div className="bg-gradient-to-br from-blue-600/5 to-indigo-600/5 p-3 sm:p-4 rounded-xl backdrop-blur-sm border border-white/10">
+        <div className="bg-gradient-to-br from-gray-700/20 to-gray-600/20 p-3 sm:p-4 rounded-xl backdrop-blur-sm border border-white/10">
           <div className="flex items-center justify-between mb-1 sm:mb-2">
             <span className="text-xs sm:text-sm font-medium text-white/90">Tu valoración</span>
             {userRating > 0 && (
@@ -199,7 +200,7 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
           )}
         </div>
       ) : (
-        <div className="bg-gradient-to-br from-blue-600/5 to-indigo-600/5 p-3 sm:p-4 rounded-xl backdrop-blur-sm border border-white/10">
+        <div className="bg-gradient-to-br from-gray-700/20 to-gray-600/20 p-3 sm:p-4 rounded-xl backdrop-blur-sm border border-white/10">
           <div className="flex items-center justify-center gap-1 sm:gap-2 text-white/80">
             <svg
               className="w-4 h-4 sm:w-5 sm:h-5"
