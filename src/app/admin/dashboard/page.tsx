@@ -115,7 +115,7 @@ export default async function AdminDashboard() {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {adminModules.map((module) => (
           <Link key={module.title} href={module.href} className="block">
-            <div className={`rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 bg-white dark:bg-gray-800`}>
+            <div className="rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 bg-card">
               <div className={`p-4 ${module.color} text-white flex justify-between items-center`}>
                 <div className="flex-shrink-0">
                   {module.icon}
@@ -123,20 +123,20 @@ export default async function AdminDashboard() {
                 <span className="text-2xl font-bold">{module.count}</span>
               </div>
               <div className="p-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{module.title}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{module.description}</p>
+                <h3 className="text-lg font-medium text-foreground">{module.title}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
               </div>
             </div>
           </Link>
         ))}
       </div>
 
-      <div className="mt-12 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Acciones rápidas</h2>
+      <div className="mt-12 bg-card rounded-lg shadow p-6">
+        <h2 className="text-xl font-semibold mb-4 text-foreground">Acciones rápidas</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link
             href="/admin/users/create"
-            className="flex items-center p-3 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+            className="flex items-center p-3 rounded-md hover:bg-accent/50 transition-colors duration-200"
           >
             <div className="flex-shrink-0 mr-3 h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" viewBox="0 0 20 20" fill="currentColor">
@@ -151,7 +151,7 @@ export default async function AdminDashboard() {
 
           <Link
             href="/admin/sources/create"
-            className="flex items-center p-3 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+            className="flex items-center p-3 rounded-md hover:bg-accent/50 transition-colors duration-200"
           >
             <div className="flex-shrink-0 mr-3 h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" viewBox="0 0 20 20" fill="currentColor">
@@ -166,7 +166,7 @@ export default async function AdminDashboard() {
 
           <Link
             href="/admin/comments"
-            className="flex items-center p-3 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+            className="flex items-center p-3 rounded-md hover:bg-accent/50 transition-colors duration-200"
           >
             <div className="flex-shrink-0 mr-3 h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" viewBox="0 0 20 20" fill="currentColor">

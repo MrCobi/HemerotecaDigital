@@ -1,8 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
-import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import Pagination from "../components/Pagination";
 import RowsPerPageSelector from "../components/RowsPerPageSelector";
@@ -13,24 +13,22 @@ type User = {
   name: string | null;
   email: string | null;
   image: string | null;
-  role: string;
+};
+
+type Follow = {
+  id: string;
+  followerId: string;
+  followingId: string;
   createdAt: Date;
-  emailVerified: Date | null;
-  _count?: {
-    comments: number;
-    ratings: number;
-    favoriteSources: number;
-    sentMessages: number;
-    receivedMessages: number;
-    accounts: number;
-  };
+  follower: User;
+  following: User;
 };
 
-type UsersTableProps = {
-  users: User[];
+type FollowsTableProps = {
+  follows: Follow[];
 };
 
-export default function UsersTable({ users }: UsersTableProps) {
+export default function FollowsTable({ follows }: FollowsTableProps) {
   // Estado para paginación y filtrado
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -41,35 +39,36 @@ export default function UsersTable({ users }: UsersTableProps) {
     setCurrentPage(1);
   }, [filterValue, rowsPerPage]);
 
-  // Filtra los usuarios por nombre o email
-  const filteredUsers = useMemo(() => {
-    if (!filterValue) return users;
+  // Filtra las relaciones de seguimiento según los criterios seleccionados
+  const filteredFollows = useMemo(() => {
+    if (!filterValue) return follows;
     
-    const lowercasedFilter = filterValue.toLowerCase();
-    return users.filter(user => {
-      const nameMatch = user.name?.toLowerCase().includes(lowercasedFilter) || false;
-      const emailMatch = user.email?.toLowerCase().includes(lowercasedFilter) || false;
-      return nameMatch || emailMatch;
+    return follows.filter((follow) => {
+      const lowercasedFilter = filterValue.toLowerCase();
+      
+      const followerNameMatch = follow.follower.name?.toLowerCase().includes(lowercasedFilter) || false;
+      const followerEmailMatch = follow.follower.email?.toLowerCase().includes(lowercasedFilter) || false;
+      
+      const followingNameMatch = follow.following.name?.toLowerCase().includes(lowercasedFilter) || false;
+      const followingEmailMatch = follow.following.email?.toLowerCase().includes(lowercasedFilter) || false;
+      
+      return followerNameMatch || followerEmailMatch || followingNameMatch || followingEmailMatch;
     });
-  }, [users, filterValue]);
+  }, [follows, filterValue]);
 
   // Calcula el total de páginas
-  const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
+  const totalPages = Math.ceil(filteredFollows.length / rowsPerPage);
 
-  // Obtiene los usuarios para la página actual
-  const paginatedUsers = useMemo(() => {
+  // Obtiene las relaciones para la página actual
+  const paginatedFollows = useMemo(() => {
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
-    return filteredUsers.slice(startIndex, endIndex);
-  }, [filteredUsers, currentPage, rowsPerPage]);
+    return filteredFollows.slice(startIndex, endIndex);
+  }, [filteredFollows, currentPage, rowsPerPage]);
 
   const handleDelete = (id: string) => {
-    // Implementar lógica de eliminación de usuario
-    console.log(`Eliminar usuario ${id}`);
-  };
-
-  const handleReload = () => {
-    window.location.reload();
+    // Implementar lógica de eliminación
+    console.log(`Eliminar relación de seguimiento ${id}`);
   };
 
   return (
@@ -78,7 +77,7 @@ export default function UsersTable({ users }: UsersTableProps) {
         <div className="w-full sm:w-64">
           <TableFilter 
             onFilterChange={setFilterValue} 
-            placeholder="Buscar por nombre o email..."
+            placeholder="Buscar seguidores..." 
           />
         </div>
         <RowsPerPageSelector 
@@ -88,7 +87,7 @@ export default function UsersTable({ users }: UsersTableProps) {
       </div>
     
       <div className="overflow-x-auto">
-        {paginatedUsers.length > 0 ? (
+        {paginatedFollows.length > 0 ? (
           <>
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-card">
@@ -97,25 +96,19 @@ export default function UsersTable({ users }: UsersTableProps) {
                     scope="col"
                     className="px-6 py-3 text-left text-xs font-medium text-foreground/70 uppercase tracking-wider"
                   >
-                    Usuario
+                    Seguidor
                   </th>
                   <th
                     scope="col"
                     className="px-6 py-3 text-left text-xs font-medium text-foreground/70 uppercase tracking-wider"
                   >
-                    Rol
+                    Sigue a
                   </th>
                   <th
                     scope="col"
                     className="px-6 py-3 text-left text-xs font-medium text-foreground/70 uppercase tracking-wider"
                   >
-                    Actividad
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-foreground/70 uppercase tracking-wider"
-                  >
-                    Fecha Registro
+                    Fecha de seguimiento
                   </th>
                   <th scope="col" className="relative px-6 py-3">
                     <span className="sr-only">Acciones</span>
@@ -123,77 +116,71 @@ export default function UsersTable({ users }: UsersTableProps) {
                 </tr>
               </thead>
               <tbody className="bg-card divide-y divide-gray-200">
-                {paginatedUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-accent/5 transition-colors">
+                {paginatedFollows.map((follow) => (
+                  <tr key={follow.id} className="hover:bg-accent/5 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
                           <img
                             className="h-10 w-10 rounded-full object-cover"
-                            src={user.image || "/placeholders/user.png"}
-                            alt={user.name || "Usuario sin nombre"}
+                            src={follow.follower.image || "/placeholders/user.png"}
+                            alt={follow.follower.name || "Usuario"}
                           />
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-foreground">
-                            {user.name || "Usuario sin nombre"}
+                            {follow.follower.name || "Usuario sin nombre"}
                           </div>
-                          <div className="text-sm text-muted-foreground">{user.email}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {follow.follower.email || "Sin correo"}
+                          </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === "admin" ? "bg-purple-100 text-purple-800" : "bg-green-100 text-green-800"}`}>
-                        {user.role === "admin" ? "Administrador" : "Usuario"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {user._count ? (
-                        <div className="flex flex-col text-sm text-muted-foreground">
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                            <div>
-                              <span className="font-medium">{user._count.comments || 0}</span> comentarios
-                            </div>
-                            <div>
-                              <span className="font-medium">{user._count.ratings || 0}</span> valoraciones
-                            </div>
-                            <div>
-                              <span className="font-medium">{user._count.favoriteSources || 0}</span> favoritos
-                            </div>
-                            <div>
-                              <span className="font-medium">{user._count.sentMessages || 0}</span> mensajes enviados
-                            </div>
-                            <div>
-                              <span className="font-medium">{user._count.receivedMessages || 0}</span> mensajes recibidos
-                            </div>
-                            <div>
-                              <span className="font-medium">{user._count.accounts || 0}</span> cuentas
-                            </div>
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <img
+                            className="h-10 w-10 rounded-full object-cover"
+                            src={follow.following.image || "/placeholders/user.png"}
+                            alt={follow.following.name || "Usuario"}
+                          />
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-foreground">
+                            {follow.following.name || "Usuario sin nombre"}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {follow.following.email || "Sin correo"}
                           </div>
                         </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Sin actividad</span>
-                      )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(user.createdAt), { locale: es, addSuffix: true })}
+                        {formatDistanceToNow(new Date(follow.createdAt), { 
+                          locale: es, 
+                          addSuffix: true 
+                        })}
                       </div>
-                      {user.emailVerified && (
-                        <div className="text-xs text-green-600">Email verificado</div>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
                         <Link
-                          href={`/admin/users/edit/${user.id}`}
+                          href={`/admin/users/view/${follow.followerId}`}
                           className="text-primary hover:text-primary/80 transition-colors duration-200 mr-2"
                         >
-                          Editar
+                          Ver seguidor
+                        </Link>
+                        <Link
+                          href={`/admin/users/view/${follow.followingId}`}
+                          className="text-primary hover:text-primary/80 transition-colors duration-200 mr-2"
+                        >
+                          Ver seguido
                         </Link>
                         <button
                           className="text-destructive hover:text-destructive/80 transition-colors duration-200"
-                          onClick={() => handleDelete(user.id)}
+                          onClick={() => handleDelete(follow.id)}
                         >
                           Eliminar
                         </button>
@@ -225,12 +212,14 @@ export default function UsersTable({ users }: UsersTableProps) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
               />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-foreground">No hay usuarios que coincidan con la búsqueda</h3>
+            <h3 className="mt-2 text-sm font-medium text-foreground">No hay relaciones de seguimiento</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {filterValue ? "Intenta con otros términos de búsqueda" : "Aún no hay usuarios registrados en el sistema"}
+              {filterValue 
+                ? "Intenta ajustar los filtros de búsqueda"
+                : "No se encontraron relaciones de seguimiento en el sistema."}
             </p>
             {filterValue && (
               <div className="mt-6">
@@ -238,7 +227,7 @@ export default function UsersTable({ users }: UsersTableProps) {
                   onClick={() => setFilterValue("")}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                 >
-                  Limpiar filtro
+                  Limpiar filtros
                 </button>
               </div>
             )}
