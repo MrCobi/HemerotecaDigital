@@ -25,6 +25,7 @@ import { API_ROUTES } from "@/src/config/api-routes";
 const ExtendedSignUpSchema = SignUpSchema.extend({
   confirmPassword: z.string()
     .min(1, "La confirmación de contraseña es requerida"),
+  bio: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Las contraseñas no coinciden",
   path: ["confirmPassword"],
@@ -51,6 +52,7 @@ export default function SignupForm() {
       name: "",
       username: "",
       image: "",
+      bio: "",
     },
     mode: "onChange",
   });
@@ -337,6 +339,25 @@ export default function SignupForm() {
                           )}
                         </button>
                       </div>
+                    </FormControl>
+                    <FormMessage className="text-red-500 dark:text-red-400 text-sm" />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="bio"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700 dark:text-gray-200 font-medium">Biografía (opcional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="text"
+                        placeholder="Ej. Estudiante de historia"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-blue-800 dark:bg-blue-900/60 dark:text-white dark:placeholder-blue-300/70 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      />
                     </FormControl>
                     <FormMessage className="text-red-500 dark:text-red-400 text-sm" />
                   </FormItem>

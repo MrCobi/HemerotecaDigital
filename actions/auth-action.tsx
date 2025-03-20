@@ -45,10 +45,12 @@ export const loginAction = async (values: z.infer<typeof loginSchema>) => {
 
 export const registerAction = async (values: z.infer<typeof SignUpSchema>) => {
   try {
-    const { data, success } = SignUpSchema.safeParse(values);
-    if (!success) {
+    const validationResult = SignUpSchema.safeParse(values);
+    if (!validationResult.success) {
       return { error: "Datos de registro no válidos" };
     }
+
+    const data = validationResult.data;
 
     // Verificar si el username ya existe
     const existingUserByUsername = await prisma.user.findUnique({
@@ -79,7 +81,8 @@ export const registerAction = async (values: z.infer<typeof SignUpSchema>) => {
         username: data.username,
         email: data.email,
         password: hashedPassword,
-        image: data.image || "/images/AvatarPredeterminado.webp",
+        image: data.image,
+        bio: data.bio || null,
         emailVerified,
       },
       select: {
@@ -89,6 +92,7 @@ export const registerAction = async (values: z.infer<typeof SignUpSchema>) => {
         image: true,
         role: true,
         username: true,
+        bio: true,
       },
     });
 

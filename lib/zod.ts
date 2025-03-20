@@ -31,5 +31,7 @@ export const SignUpSchema = object({
     .min(6, "Mínimo 6 caracteres")
     .max(32, "Máximo 32 caracteres"),
 
-    image: string().optional().default("/images/AvatarPredeterminado.webp"),
+  image: string().optional().default("/images/AvatarPredeterminado.webp"),
+  
+  bio: string().max(500, "La biografía no puede exceder los 500 caracteres").optional(),
 });
