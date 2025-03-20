@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import prisma from "@/lib/db";
 import type { Role } from "@prisma/client";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { loginSchema } from "@/lib/zod";
 import jwt from "jsonwebtoken";
@@ -22,6 +23,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     maxAge: 30 * 24 * 60 * 60
   },
   providers: [
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code"
+        }
+      }
+    }),
     Credentials({
       name: "credentials",
       credentials: {
@@ -150,6 +162,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     })
   ],
   callbacks: {
+    async signIn({ account, profile, user }) {
+      // Para usuarios que se autentican con Google, marcarlos automáticamente como verificados
+      if (account?.provider === "google") {
+        // Si el correo está verificado en Google, lo consideramos verificado en nuestra app
+        if (profile?.email_verified) {
+          // Si es la primera vez que el usuario inicia sesión con Google
+          if (user) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { emailVerified: new Date() }
+            });
+          }
+          return true;
+        }
+      }
+      
+      return true; // Para otros providers, seguimos el flujo normal
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
