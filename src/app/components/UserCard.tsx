@@ -32,7 +32,7 @@ export const UserCard = memo(function UserCard({ user, action }: UserCardProps) 
   };
 
   return (
-    <Card className="group overflow-hidden border-border hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300 hover:shadow-lg">
+    <Card className="group overflow-hidden border-border hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300 hover:shadow-lg bg-white dark:bg-gray-800/90">
       <Link href={`/users/${user.username}`} className="block">
         <div className="relative">
           <div
@@ -46,10 +46,10 @@ export const UserCard = memo(function UserCard({ user, action }: UserCardProps) 
 
           <motion.div
             whileHover={{ scale: 1.01 }}
-            className="relative pt-14 pb-6 px-6 bg-card text-card-foreground transition-colors duration-300"
+            className="relative pt-14 pb-6 px-6 bg-transparent text-card-foreground transition-colors duration-300"
           >
             <div className="absolute left-1/2 top-0 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="relative w-20 h-20 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-800 shadow-lg group-hover:ring-blue-200 dark:group-hover:ring-blue-900 transition-all duration-300">
+              <div className="relative w-20 h-20 rounded-full overflow-hidden ring-4 ring-white dark:ring-gray-700 shadow-lg group-hover:ring-blue-200 dark:group-hover:ring-blue-900 transition-all duration-300">
                 {user.image && (user.image.includes('cloudinary') || 
                 (!user.image.startsWith('/') && !user.image.startsWith('http'))) ? (
                   <CldImage
@@ -87,7 +87,7 @@ export const UserCard = memo(function UserCard({ user, action }: UserCardProps) 
               </h3>
               <Badge
                 variant="secondary"
-                className="mt-1 bg-blue-100/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                className="mt-1 bg-blue-100/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-none"
               >
                 @{user.username}
               </Badge>

@@ -201,7 +201,7 @@ export default function ExplorePage() {
             </div>
 
             <div className="w-full md:w-96 relative">
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none">
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-300 pointer-events-none">
                 <Search className="h-4 w-4" />
               </div>
               <Input
@@ -209,7 +209,7 @@ export default function ExplorePage() {
                 placeholder="Buscar por nombre, nombre de usuario o bio..."
                 value={searchQuery}
                 onChange={handleSearch}
-                className="pl-10 bg-background/80 backdrop-blur-sm border-border focus-visible:border-blue-300 dark:focus-visible:border-blue-700 transition-all"
+                className="pl-10 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-gray-200 dark:border-gray-700 focus-visible:ring-blue-500 dark:focus-visible:ring-blue-600 focus-visible:ring-offset-0 focus-visible:border-blue-300 dark:focus-visible:border-blue-700 transition-all"
               />
             </div>
           </div>
@@ -273,6 +273,8 @@ export default function ExplorePage() {
                   <Button
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
+                    className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700"
+                    variant="outline"
                   >
                     Anterior
                   </Button>
@@ -286,6 +288,8 @@ export default function ExplorePage() {
                       setCurrentPage((p) => Math.min(totalPages, p + 1))
                     }
                     disabled={currentPage === totalPages}
+                    className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700"
+                    variant="outline"
                   >
                     Siguiente
                   </Button>
