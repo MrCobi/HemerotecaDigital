@@ -101,7 +101,7 @@ export default async function AdminDashboard() {
         <h1 className="text-3xl font-bold text-foreground">Panel de Administración</h1>
         <div className="flex space-x-4">
           <Link
-            href="/"
+            href="/home"
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors duration-200"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
