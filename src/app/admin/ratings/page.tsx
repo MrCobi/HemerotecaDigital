@@ -44,7 +44,7 @@ export default async function RatingsPage() {
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
           <div className="py-4">
-            <div className="bg-white shadow rounded-lg">
+            <div className="bg-card dark:bg-card shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
                 <RatingsTable ratings={ratings} />
               </div>

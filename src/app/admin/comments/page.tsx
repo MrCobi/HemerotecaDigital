@@ -64,7 +64,7 @@ export default async function CommentsPage() {
           </div>
         </div>
 
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-card dark:bg-card shadow rounded-lg overflow-hidden">
           <CommentsTable comments={comments} />
         </div>
       </div>
@@ -78,7 +78,7 @@ export default async function CommentsPage() {
           <h1 className="text-3xl font-bold text-foreground">Gestión de Comentarios</h1>
         </div>
         
-        <div className="bg-white shadow rounded-lg p-6 text-center">
+        <div className="bg-card dark:bg-card shadow rounded-lg p-6 text-center">
           <div className="text-red-500 text-xl mb-4">Error al cargar los comentarios</div>
           <p className="mb-4">Ha ocurrido un error al intentar cargar los comentarios. Por favor, intenta nuevamente.</p>
           <Link

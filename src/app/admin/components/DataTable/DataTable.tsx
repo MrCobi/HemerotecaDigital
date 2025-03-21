@@ -62,7 +62,7 @@ export default function DataTable<T>({
       <div key={index} className="block md:hidden">
         <div 
           className={cn(
-            "p-4 border-b border-border cursor-pointer hover:bg-muted/50 transition-colors",
+            "p-4 border-b border-border cursor-pointer hover:bg-muted/50 transition-colors bg-transparent",
             onRowClick && "cursor-pointer"
           )}
           onClick={() => onRowClick?.(item)}
@@ -113,8 +113,8 @@ export default function DataTable<T>({
   };
 
   return (
-    <div className={cn("bg-card rounded-md shadow-sm", className)}>
-      <div className="p-4 bg-card border-b border-border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className={cn("bg-card dark:bg-background rounded-md shadow-sm", className)}>
+      <div className="p-4 border-b border-border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card dark:bg-transparent">
         <div className="w-full sm:w-64">
           <TableFilter 
             onFilterChange={onFilterChange} 
@@ -145,7 +145,7 @@ export default function DataTable<T>({
         <>
           {/* Tabla para pantallas medianas y grandes */}
           <div className="w-full hidden md:block">
-            <table className="w-full table-fixed">
+            <table className="w-full table-fixed bg-transparent">
               <thead className="bg-muted/30">
                 <tr>
                   {columns.map((column, index) => (
@@ -161,7 +161,7 @@ export default function DataTable<T>({
                   ))}
                 </tr>
               </thead>
-              <tbody className="bg-card divide-y divide-border">
+              <tbody className="bg-transparent divide-y divide-border">
                 {data.map((item, rowIndex) => (
                   <tr 
                     key={rowIndex} 
@@ -193,7 +193,7 @@ export default function DataTable<T>({
             {data.map((item, index) => renderMobileRow(item, index))}
           </div>
           
-          <div className="border-t border-border">
+          <div className="border-t border-border bg-transparent">
             <Pagination 
               currentPage={currentPage} 
               totalPages={totalPages} 
@@ -202,7 +202,9 @@ export default function DataTable<T>({
           </div>
         </>
       ) : (
-        <EmptyTable message={emptyMessage} />
+        <div className="p-4">
+          <EmptyTable message={emptyMessage} />
+        </div>
       )}
     </div>
   );
