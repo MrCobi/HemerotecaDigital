@@ -191,12 +191,14 @@ model DirectMessage {
   receiverId String   @map("receiver_id")
   read       Boolean  @default(false)
   createdAt  DateTime @default(now()) @map("created_at")
+  tempId     String?  @map("temp_id")
   sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@index([senderId, receiverId])
   @@index([createdAt])
   @@index([senderId, receiverId, createdAt], map: "sender_receiver_created_idx")
+  @@index([tempId])
   @@map("direct_messages") // Nombre real de la tabla en MySQL
 }
 

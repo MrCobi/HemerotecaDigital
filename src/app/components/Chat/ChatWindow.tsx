@@ -52,6 +52,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [canSendMessages, setCanSendMessages] = useState<boolean | null>(null);
+  const [isCheckingRelationship, setIsCheckingRelationship] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -122,6 +124,34 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       );
     }
   });
+
+  // Verificar si los usuarios se siguen mutuamente
+  useEffect(() => {
+    if (!otherUser?.id || !currentUserId || !isOpen) return;
+    
+    const checkMutualFollow = async () => {
+      try {
+        setIsCheckingRelationship(true);
+        const response = await fetch(`/api/relationships/check?targetUserId=${otherUser.id}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          // Solo permitir enviar mensajes si ambos usuarios se siguen mutuamente
+          setCanSendMessages(data.isMutualFollow);
+        } else {
+          console.error('Error al verificar relación de seguimiento');
+          setCanSendMessages(false);
+        }
+      } catch (error) {
+        console.error('Error al verificar relación de seguimiento:', error);
+        setCanSendMessages(false);
+      } finally {
+        setIsCheckingRelationship(false);
+      }
+    };
+    
+    checkMutualFollow();
+  }, [otherUser?.id, currentUserId, isOpen]);
 
   // Función para manejar nuevos mensajes
   const handleNewMessage = (message: MessageType) => {
@@ -263,6 +293,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!newMessage.trim() || !currentUserId || !otherUser) return;
+    
+    // Verificar si los usuarios se siguen mutuamente antes de enviar
+    if (canSendMessages === false) {
+      console.error('No se pueden enviar mensajes: los usuarios no se siguen mutuamente');
+      return;
+    }
 
     try {
       setIsSending(true);
@@ -714,6 +750,50 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     loadHistoricalMessages();
   }, [loadHistoricalMessages]);
 
+  // Capturar focus para evitar que la ventana se vuelva a abrir
+  useEffect(() => {
+    const closeOnEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    // Agregar el event listener cuando la ventana está abierta
+    if (isOpen) {
+      window.addEventListener('keydown', closeOnEscape);
+    }
+
+    // Remover cuando se desmonta o cierra
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [isOpen, onClose]);
+
+  // No permitir que la ventana se abra sin interacción del usuario
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    // Si la ventana está abierta y no hay actividad reciente, cerrarla después de un tiempo
+    if (isOpen) {
+      const lastMessageTime = messages.length > 0
+        ? new Date(messages[messages.length - 1].createdAt).getTime()
+        : Date.now();
+        
+      const timeSinceLastMessage = Date.now() - lastMessageTime;
+      
+      // Si no ha habido actividad en más de 5 minutos y la ventana se abrió automáticamente, cerrarla
+      if (timeSinceLastMessage > 5 * 60 * 1000) {
+        timeoutId = setTimeout(() => {
+          onClose();
+        }, 1000);
+      }
+    }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isOpen, messages, onClose]);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       // Solo permitir cerrar si es un evento real del usuario
@@ -722,110 +802,84 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         handleClose();
       }
     }}>
-      <DialogContent className="sm:max-w-[500px] md:max-w-[600px] lg:max-w-[700px] max-h-[90vh] p-0">
-        <div className="flex flex-col h-[80vh] bg-gradient-to-br from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20">
-          {/* Header */}
-          <DialogHeader className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm flex flex-row items-center">
-            <div className="flex items-center space-x-3 flex-1">
-              <Avatar className="h-10 w-10 border-2 border-blue-100 dark:border-blue-800">
-                <AvatarImage src={otherUser?.image || ''} alt={otherUser?.username || ''} />
-                <AvatarFallback className="bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-200">
-                  {otherUser?.username ? otherUser.username[0].toUpperCase() : '?'}
-                </AvatarFallback>
+      <DialogContent className="sm:max-w-[500px] p-0 h-[80vh] flex flex-col">
+        <DialogHeader className="px-4 py-2 border-b">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={otherUser?.image || '/images/AvatarPredeterminado.webp'} />
+                <AvatarFallback>{otherUser?.name?.charAt(0) || otherUser?.username?.charAt(0) || '?'}</AvatarFallback>
               </Avatar>
-              <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-                {otherUser?.username || 'Chat'}
+              <DialogTitle className="text-base font-medium">
+                {otherUser?.name || otherUser?.username || 'Usuario'}
               </DialogTitle>
             </div>
-            {isMobile && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="rounded-full" 
-                onClick={handleClose}
-              >
-                <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-              </Button>
-            )}
-          </DialogHeader>
-          
-          {/* Messages Area */}
-          <div 
-            ref={chatContainerRef} 
-            className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent"
-            onScroll={handleScroll}
-          >
-            {/* Message loading indicator */}
-            {isLoadingMessages && (
-              <div className="flex justify-center my-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 dark:border-blue-400"></div>
-              </div>
-            )}
-            
-            {/* Messages */}
-            {renderMessagesByDate()}
-            
-            {/* Typing indicator */}
-            {peerIsTyping && (
-              <div className="flex justify-start">
-                <div className="bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded-lg px-3 py-2 text-sm animate-pulse">
-                  Escribiendo...
-                </div>
-              </div>
-            )}
-            
-            {/* Bottom reference for auto-scroll */}
-            <div ref={messagesEndRef} />
-            
-            {/* Scroll to bottom button */}
-            {!isAtBottom && messages.length > 5 && (
-              <button
-                onClick={scrollToBottom}
-                className="absolute bottom-20 right-4 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 rounded-full p-2 shadow-md hover:bg-blue-200 dark:hover:bg-blue-800 transition-all"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                  />
-                </svg>
-              </button>
-            )}
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-          
-          {/* Input Area */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-            <div className="flex items-end space-x-2">
-              <Textarea
-                ref={messageInputRef}
-                value={newMessage}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                placeholder="Escribe un mensaje..."
-                className="flex-1 min-h-[60px] max-h-[120px] resize-none border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus-visible:ring-blue-500 dark:focus-visible:ring-blue-400"
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || isSending}
-                className={`px-3 py-2 h-[60px] bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white ${
-                  !newMessage.trim() || isSending
-                    ? "opacity-50 cursor-not-allowed"
-                    : ""
-                }`}
-              >
-                <Send className="h-5 w-5" />
-              </Button>
+        </DialogHeader>
+
+        {/* Contenedor de mensajes con scroll */}
+        <div 
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto p-4 space-y-4"
+        >
+          {isLoadingMessages ? (
+            <div className="flex justify-center items-center h-full">
+              <span className="loader"></span>
             </div>
-          </div>
+          ) : messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-2">
+              <p>No hay mensajes todavía</p>
+              {canSendMessages === false && (
+                <div className="bg-yellow-100 text-yellow-800 p-3 rounded-md text-sm">
+                  Para poder enviar mensajes, ambos usuarios deben seguirse mutuamente.
+                </div>
+              )}
+            </div>
+          ) : (
+            renderMessagesByDate()
+          )}
+          
+          {/* Indicador "Escribiendo..." */}
+          {peerIsTyping && (
+            <div className="flex items-center space-x-2 text-muted-foreground text-xs italic">
+              <span className="typing-indicator"></span>
+              <span>Escribiendo...</span>
+            </div>
+          )}
+          
+          <div ref={messagesEndRef} />
         </div>
+
+        {/* Formulario de envío */}
+        <form onSubmit={handleSendMessage} className="border-t p-4">
+          {canSendMessages === false && (
+            <div className="bg-yellow-100 text-yellow-800 p-3 mb-3 rounded-md text-sm">
+              Para poder enviar mensajes, ambos usuarios deben seguirse mutuamente.
+            </div>
+          )}
+          <div className="flex items-end gap-2">
+            <Textarea
+              ref={messageInputRef}
+              className="min-h-10 flex-1 resize-none"
+              placeholder={canSendMessages === false ? "No puedes enviar mensajes" : "Escribe tu mensaje..."}
+              value={newMessage}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              disabled={isSending || canSendMessages === false}
+              rows={1}
+            />
+            <Button 
+              type="submit" 
+              size="icon" 
+              disabled={isSending || !newMessage.trim() || canSendMessages === false}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

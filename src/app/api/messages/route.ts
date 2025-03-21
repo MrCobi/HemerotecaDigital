@@ -23,6 +23,43 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    // Verificar si los usuarios se siguen mutuamente
+    const mutualFollow = await prisma.follow.findMany({
+      where: {
+        OR: [
+          {
+            AND: [
+              { followerId: userId },
+              { followingId: receiverId }
+            ]
+          },
+          {
+            AND: [
+              { followerId: receiverId },
+              { followingId: userId }
+            ]
+          }
+        ]
+      }
+    });
+
+    // Verificar que ambos usuarios se sigan mutuamente
+    const userFollowsReceiver = mutualFollow.some(follow => 
+      follow.followerId === userId && follow.followingId === receiverId
+    );
+    const receiverFollowsUser = mutualFollow.some(follow => 
+      follow.followerId === receiverId && follow.followingId === userId
+    );
+
+    if (!userFollowsReceiver || !receiverFollowsUser) {
+      return new Response(JSON.stringify({ 
+        error: 'No se pueden enviar mensajes: los usuarios deben seguirse mutuamente' 
+      }), { 
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
     
     // Generar ID temporal único si no se proporciona
     const messageId = tempId || `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -73,26 +110,55 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
     }
     
     // Crear promesa para el proceso de base de datos
-    const dbPromise = prisma.directMessage.create({
-      data: {
-        content,
-        senderId: userId,
-        receiverId,
-      },
-      select: {
-        id: true,
-        content: true,
-        createdAt: true, 
-        read: true,
-        senderId: true,
-        receiverId: true
+    const dbPromise = async () => {
+      // Verificar si ya existe un mensaje con este tempId para evitar duplicados
+      if (tempId) {
+        const existingMessage = await prisma.directMessage.findFirst({
+          where: {
+            OR: [
+              { tempId: tempId },
+              { 
+                AND: [
+                  { senderId: userId },
+                  { receiverId: receiverId },
+                  { content: content },
+                  { createdAt: { gt: new Date(Date.now() - 60000) } } // Mensajes en el último minuto
+                ]
+              }
+            ]
+          }
+        });
+
+        if (existingMessage) {
+          console.log(`Mensaje duplicado detectado con tempId: ${tempId}. ID existente: ${existingMessage.id}`);
+          return existingMessage;
+        }
       }
-    });
+
+      // Si no es duplicado, crear el mensaje
+      return prisma.directMessage.create({
+        data: {
+          content,
+          senderId: userId,
+          receiverId,
+          tempId
+        },
+        select: {
+          id: true,
+          content: true,
+          createdAt: true, 
+          read: true,
+          senderId: true,
+          receiverId: true,
+          tempId: true
+        }
+      });
+    };
     
     // Para mensajes de alta prioridad, no esperamos a la base de datos
     if (priority === 'high') {
       // Iniciar escritura en DB pero no esperar
-      dbPromise.then(message => {
+      dbPromise().then(message => {
         // Cuando finalice, enviar mensaje con ID real para reconciliación
         const finalMessage = {
           ...message,
@@ -151,7 +217,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
     
     // Para mensajes de prioridad normal, esperar a la confirmación de la DB
     try {
-      const message = await dbPromise;
+      const message = await dbPromise();
       
       // Mensaje definitivo con el ID real de la base de datos
       const finalMessage = {

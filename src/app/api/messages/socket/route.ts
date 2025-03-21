@@ -33,12 +33,40 @@ export async function POST(request: Request) {
     
     console.log(`API Socket: Guardando mensaje de ${senderId} para ${receiverId}`);
     
+    // Verificar si ya existe un mensaje con este tempId para evitar duplicados
+    if (tempId) {
+      const existingMessage = await prisma.directMessage.findFirst({
+        where: {
+          OR: [
+            { tempId: tempId },
+            { 
+              AND: [
+                { senderId: senderId },
+                { receiverId: receiverId },
+                { content: content },
+                { createdAt: { gt: new Date(Date.now() - 60000) } } // Mensajes en el último minuto
+              ]
+            }
+          ]
+        }
+      });
+
+      if (existingMessage) {
+        console.log(`Socket API: Mensaje duplicado detectado con tempId: ${tempId}. ID existente: ${existingMessage.id}`);
+        return new Response(JSON.stringify(existingMessage), { 
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
     // Guardar el mensaje en la base de datos
     const message = await prisma.directMessage.create({
       data: {
         content,
         senderId,
         receiverId,
+        tempId
       },
       select: {
         id: true,
@@ -46,7 +74,8 @@ export async function POST(request: Request) {
         createdAt: true, 
         read: true,
         senderId: true,
-        receiverId: true
+        receiverId: true,
+        tempId: true
       }
     });
     
@@ -54,7 +83,6 @@ export async function POST(request: Request) {
     const formattedMessage = {
       ...message,
       createdAt: message.createdAt.toISOString(),
-      tempId: tempId || null, // Para reconciliación con mensaje temporal
       sender: {
         id: senderId
       },
