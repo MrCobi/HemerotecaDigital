@@ -2,9 +2,13 @@
 
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { DataTable, Column } from "../components/DataTable";
-import { ActivityItem } from ".";
 import Link from "next/link";
+import Image from "next/image";
+import { CldImage } from "next-cloudinary";
+import DataTable, { Column } from "../components/DataTable/DataTable";
+import { ActivityItem } from ".";
+import { Badge } from "@/src/app/components/ui/badge";
+import { MessageSquare, Star, Heart, LogIn } from "lucide-react";
 
 type ActivityTableProps = {
   activities: ActivityItem[];
@@ -29,13 +33,12 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
       const matchesFilter =
         !filterValue ||
         activity.userName?.toLowerCase().includes(filterValue.toLowerCase()) ||
-        activity.userEmail?.toLowerCase().includes(filterValue.toLowerCase());
+        activity.userEmail?.toLowerCase().includes(filterValue.toLowerCase()) ||
+        activity.targetName?.toLowerCase().includes(filterValue.toLowerCase());
 
       const matchesType =
         !typeFilter ||
-        (typeFilter === "comment" && activity.type === "comment") ||
-        (typeFilter === "rating" && activity.type === "rating") ||
-        (typeFilter === "favorite" && activity.type === "favorite");
+        activity.type === typeFilter;
 
       return matchesFilter && matchesType;
     });
@@ -48,26 +51,35 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
   const currentActivities = filteredActivities.slice(startIndex, endIndex);
 
   // Columnas de la tabla
-  const columns: Column<ActivityItem>[] = [
+  const columns: Column<ActivityItem>[] = useMemo(() => [
     {
       accessorKey: "type",
       header: "Tipo",
       cell: (activity: ActivityItem) => {
         let type = "";
         let className = "";
+        let Icon = null;
 
         switch (activity.type) {
           case 'comment':
             type = "Comentario";
             className = "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+            Icon = MessageSquare;
             break;
           case 'rating':
             type = "Valoración";
             className = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+            Icon = Star;
             break;
           case 'favorite':
             type = "Favorito";
             className = "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+            Icon = Heart;
+            break;
+          case 'login':
+            type = "Inicio de sesión";
+            className = "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+            Icon = LogIn;
             break;
           default:
             type = "Desconocido";
@@ -75,7 +87,8 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
         }
 
         return (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${className}`}>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${className} flex items-center`}>
+            {Icon && <Icon className="h-3 w-3 mr-1" />}
             {type}
           </span>
         );
@@ -90,33 +103,74 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
           <option value="comment">Comentarios</option>
           <option value="rating">Valoraciones</option>
           <option value="favorite">Favoritos</option>
+          <option value="login">Inicios de sesión</option>
         </select>
       )
     },
     {
       accessorKey: "user",
       header: "Usuario",
-      cell: (activity: ActivityItem) => (
-        <div className="flex items-center">
-          <div className="h-8 w-8 flex-shrink-0 rounded-full bg-muted flex items-center justify-center mr-3">
-            {activity.userImage ? (
-              <img
-                className="h-8 w-8 rounded-full"
-                src={activity.userImage}
-                alt={activity.userName || ""}
-              />
-            ) : (
-              <span className="text-muted-foreground text-sm font-medium">
-                {(activity.userName || activity.userEmail?.charAt(0))?.toUpperCase() || "?"}
-              </span>
-            )}
+      cell: (activity: ActivityItem) => {
+        const user = {
+          name: activity.userName,
+          email: activity.userEmail,
+          image: activity.userImage
+        };
+
+        return (
+          <div className="flex items-center">
+            <div className="flex-shrink-0 h-8 w-8">
+              {user?.image && user?.image.includes('cloudinary') ? (
+                <CldImage
+                  src={user.image}
+                  alt={user?.name || "Avatar"}
+                  width={32}
+                  height={32}
+                  crop="fill"
+                  gravity="face"
+                  className="h-8 w-8 rounded-full object-cover"
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/AvatarPredeterminado.webp";
+                  }}
+                />
+              ) : user?.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
+                <CldImage
+                  src={user.image}
+                  alt={user?.name || "Avatar"}
+                  width={32}
+                  height={32}
+                  crop="fill"
+                  gravity="face"
+                  className="h-8 w-8 rounded-full object-cover"
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/AvatarPredeterminado.webp";
+                  }}
+                />
+              ) : (
+                <Image
+                  src={user?.image || "/images/AvatarPredeterminado.webp"}
+                  alt={user?.name || "Avatar"}
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 rounded-full object-cover"
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/AvatarPredeterminado.webp";
+                  }}
+                />
+              )}
+            </div>
+            <div className="ml-3">
+              <div className="text-sm font-medium text-foreground">
+                {user.name || "Usuario sin nombre"}
+              </div>
+              <div className="text-xs text-muted-foreground">{user.email || "Sin correo"}</div>
+            </div>
           </div>
-          <div>
-            <div className="font-medium text-foreground">{activity.userName || "Usuario"}</div>
-            <div className="text-sm text-muted-foreground">{activity.userEmail || "Sin correo"}</div>
-          </div>
-        </div>
-      )
+        );
+      }
     },
     {
       accessorKey: "source",
@@ -132,7 +186,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
 
         return sourceId ? (
           <Link
-            href={`/admin/sources/${sourceId}`}
+            href={`/admin/sources/view/${sourceId}`}
             className="text-primary hover:text-primary/80 transition-colors"
           >
             {sourceName}
@@ -173,10 +227,10 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
         );
       }
     }
-  ];
+  ], [typeFilter]);
 
   return (
-    <DataTable
+    <DataTable<ActivityItem>
       data={currentActivities}
       columns={columns}
       currentPage={currentPage}
@@ -184,7 +238,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
       onPageChange={setCurrentPage}
       onFilterChange={setFilterValue}
       filterValue={filterValue}
-      filterPlaceholder="Buscar por usuario..."
+      filterPlaceholder="Buscar por usuario o fuente..."
       rowsPerPage={rowsPerPage}
       onRowsPerPageChange={setRowsPerPage}
       emptyMessage="No se encontraron actividades"
