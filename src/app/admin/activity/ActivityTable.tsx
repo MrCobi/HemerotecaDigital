@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import Image from "next/image";
+import { CldImage } from "next-cloudinary";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { ActivityItem } from "./types";
 import {
@@ -162,36 +162,69 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
             <div className="flex-shrink-0 h-8 w-8">
               {user?.image ? (
                 user.image.includes('cloudinary.com') ? (
-                  <Image 
-                    src={user.image}
+                  <CldImage 
+                    src={(() => {
+                      // Extraer el public_id limpio, manejando diferentes formatos
+                      let publicId = user.image;
+
+                      // Si es una URL completa de Cloudinary
+                      if (user.image.includes('cloudinary.com')) {
+                        // Extraer el public_id eliminando la parte de la URL
+                        // Buscamos 'hemeroteca_digital' como punto de referencia seguro
+                        const match = user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                        if (match && match[1]) {
+                          publicId = `hemeroteca_digital/${match[1]}`;
+                        } else {
+                          // Si no encontramos el patrón específico, intentamos una extracción más general
+                          publicId = user.image.replace(/.*\/v\d+\//, '').split('?')[0];
+                        }
+                      }
+
+                      // Verificar que el ID no esté duplicado o anidado
+                      if (publicId.includes('https://')) {
+                        console.warn('ID público contiene URL completa en activity:', publicId);
+                        publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                      }
+
+                      console.log('Public ID extraído en ActivityTable:', publicId);
+                      return publicId;
+                    })()}
                     alt={user?.name || "Avatar"}
                     width={32}
                     height={32}
+                    crop="fill"
+                    gravity="face"
                     className="h-8 w-8 rounded-full object-cover"
                     onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                      console.error('Error cargando imagen en ActivityTable:', user.image);
                       const target = e.target as HTMLImageElement;
                       target.src = "/images/AvatarPredeterminado.webp";
                     }}
                   />
                 ) : (
-                  <Image
+                  <CldImage
                     src={user.image}
                     alt={user?.name || "Avatar"}
                     width={32}
                     height={32}
+                    crop="fill"
+                    gravity="face"
                     className="h-8 w-8 rounded-full object-cover"
                     onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                      console.error('Error cargando imagen en ActivityTable:', user.image);
                       const target = e.target as HTMLImageElement;
                       target.src = "/images/AvatarPredeterminado.webp";
                     }}
                   />
                 )
               ) : (
-                <Image
+                <CldImage
                   src="/images/AvatarPredeterminado.webp"
                   alt={user?.name || "Avatar"}
                   width={32}
                   height={32}
+                  crop="fill"
+                  gravity="face"
                   className="h-8 w-8 rounded-full object-cover"
                 />
               )}

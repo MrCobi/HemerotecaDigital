@@ -159,7 +159,32 @@ export default function CreateUserPage() {
                   {imageUrl && imageUrl.includes('cloudinary') ? (
                     // Si la imagen tiene un formato de Cloudinary público (URL completa)
                     <CldImage
-                      src={imageUrl}
+                      src={(() => {
+                        // Extraer el public_id limpio, manejando diferentes formatos
+                        let publicId = imageUrl;
+
+                        // Si es una URL completa de Cloudinary
+                        if (imageUrl.includes('cloudinary.com')) {
+                          // Extraer el public_id eliminando la parte de la URL
+                          // Buscamos 'hemeroteca_digital' como punto de referencia seguro
+                          const match = imageUrl.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                          if (match && match[1]) {
+                            publicId = `hemeroteca_digital/${match[1]}`;
+                          } else {
+                            // Si no encontramos el patrón específico, intentamos una extracción más general
+                            publicId = imageUrl.replace(/.*\/v\d+\//, '').split('?')[0];
+                          }
+                        }
+
+                        // Verificar que el ID no esté duplicado o anidado
+                        if (publicId.includes('https://')) {
+                          console.warn('ID público contiene URL completa en crear usuario:', publicId);
+                          publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                        }
+
+                        console.log('Public ID extraído en crear usuario:', publicId);
+                        return publicId;
+                      })()}
                       alt="Preview"
                       width={128}
                       height={128}
@@ -168,6 +193,7 @@ export default function CreateUserPage() {
                       className="rounded-full object-cover border-4 border-primary/30"
                       priority
                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        console.error('Error cargando imagen en crear usuario:', imageUrl);
                         const target = e.target as HTMLImageElement;
                         target.src = "/images/AvatarPredeterminado.webp";
                       }}
@@ -175,7 +201,19 @@ export default function CreateUserPage() {
                   ) : imageUrl && !imageUrl.startsWith('/') && !imageUrl.startsWith('http') ? (
                     // Si la imagen es un public_id de Cloudinary (sin https:// o /)
                     <CldImage
-                      src={imageUrl}
+                      src={(() => {
+                        // Para IDs simples, verificar si hay anidamiento
+                        let publicId = imageUrl;
+                        
+                        // Verificar que el ID no esté duplicado o anidado
+                        if (publicId.includes('https://')) {
+                          console.warn('ID público contiene URL completa en crear usuario (2):', publicId);
+                          publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                        }
+
+                        console.log('Public ID extraído en crear usuario (2):', publicId);
+                        return publicId;
+                      })()}
                       alt="Preview"
                       width={128}
                       height={128}
@@ -183,6 +221,7 @@ export default function CreateUserPage() {
                       gravity="face"
                       className="rounded-full object-cover border-4 border-primary/30"
                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        console.error('Error cargando imagen en crear usuario (2):', imageUrl);
                         const target = e.target as HTMLImageElement;
                         target.src = "/images/AvatarPredeterminado.webp";
                       }}
