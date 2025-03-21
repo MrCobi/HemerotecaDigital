@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import prisma from "@/lib/db";
 import RatingsTable from "./RatingsTable";
+import ActionButton from "../components/ActionButton";
 
 export default async function RatingsPage() {
   const session = await auth();
