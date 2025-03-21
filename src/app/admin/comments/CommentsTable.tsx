@@ -3,6 +3,7 @@
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect, useMemo } from "react";
 import Pagination from "../components/Pagination";
 import RowsPerPageSelector from "../components/RowsPerPageSelector";
@@ -221,11 +222,13 @@ export default function CommentsTable({ comments }: CommentsTableProps) {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {comment.user ? (
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-8 w-8">
-                            <img
-                              className="h-8 w-8 rounded-full object-cover"
-                              src={comment.user.image || "/placeholders/user.png"}
+                          <div className="flex-shrink-0 h-8 w-8 mr-3">
+                            <Image
+                              src={comment.user.image || "/images/AvatarPredeterminado.webp"}
                               alt={comment.user.name || "Usuario"}
+                              width={32}
+                              height={32}
+                              className="h-8 w-8 rounded-full object-cover"
                             />
                           </div>
                           <div className="ml-3">

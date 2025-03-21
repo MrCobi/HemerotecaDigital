@@ -20,6 +20,8 @@ import {
   AlertDialogTrigger,
 } from "@/src/app/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { CldImage } from "next-cloudinary";
+import Image from "next/image";
 
 // Componente para el diálogo de confirmación de eliminación
 interface DeleteUserDialogProps {
@@ -178,16 +180,51 @@ export default function UsersTable({ users }: UsersTableProps) {
       cell: (user: User) => (
         <div className="flex items-center">
           <div className="h-10 w-10 flex-shrink-0 rounded-full bg-muted flex items-center justify-center mr-3">
-            {user.image ? (
-              <img
-                className="h-10 w-10 rounded-full"
+            {user.image && user.image.includes('cloudinary') ? (
+              // Si la imagen tiene un formato de Cloudinary público (URL completa)
+              <CldImage
                 src={user.image}
-                alt={user.name || ""}
+                alt={user.name || "Avatar"}
+                width={40}
+                height={40}
+                crop="fill"
+                gravity="face"
+                className="h-10 w-10 rounded-full object-cover"
+                priority
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/images/AvatarPredeterminado.webp";
+                }}
+              />
+            ) : user.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
+              // Si la imagen es un public_id de Cloudinary (sin https:// o /)
+              <CldImage
+                src={user.image}
+                alt={user.name || "Avatar"}
+                width={40}
+                height={40}
+                crop="fill"
+                gravity="face"
+                className="h-10 w-10 rounded-full object-cover"
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/images/AvatarPredeterminado.webp";
+                }}
               />
             ) : (
-              <span className="text-muted-foreground text-sm font-medium">
-                {(user.name || user.email.charAt(0)).toUpperCase()}
-              </span>
+              // Para imágenes locales o fallback
+              <Image
+                src={user.image || "/images/AvatarPredeterminado.webp"}
+                alt={user.name || "Avatar"}
+                width={40}
+                height={40}
+                className="h-10 w-10 rounded-full object-cover"
+                priority
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/images/AvatarPredeterminado.webp";
+                }}
+              />
             )}
           </div>
           <div>

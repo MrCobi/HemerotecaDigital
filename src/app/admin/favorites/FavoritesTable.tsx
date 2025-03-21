@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import { useState, useEffect, useMemo } from "react";
@@ -164,11 +165,13 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
                   <tr key={favorite.id} className="hover:bg-accent/5 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <img
-                            className="h-10 w-10 rounded-full object-cover"
-                            src={favorite.user.image || "/placeholders/user.png"}
+                        <div className="flex-shrink-0 h-8 w-8 mr-3">
+                          <Image
+                            src={favorite.user.image || "/images/AvatarPredeterminado.webp"}
                             alt={favorite.user.name || "Usuario"}
+                            width={32}
+                            height={32}
+                            className="h-8 w-8 rounded-full object-cover"
                           />
                         </div>
                         <div className="ml-4">
@@ -184,10 +187,12 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
-                          <img
+                          <Image
+                            src={favorite.source.imageUrl || "/images/default_periodico.jpg"}
+                            alt={favorite.source.name || "Fuente"}
+                            width={40}
+                            height={40}
                             className="h-10 w-10 rounded-md object-cover"
-                            src={favorite.source.imageUrl || "/placeholders/source.png"}
-                            alt={favorite.source.name}
                           />
                         </div>
                         <div className="ml-4">

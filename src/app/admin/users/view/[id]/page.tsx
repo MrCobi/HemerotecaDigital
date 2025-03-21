@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/src/app/components/ui/badge";
 import { User, Settings, Clock, Mail, CalendarDays, Shield, Hash, MessageCircle, Star, BookMarked, Send, Inbox, UserCheck, AlertCircle, Loader2 } from "lucide-react";
 import { CldImage } from "next-cloudinary";
+import Image from "next/image";
 import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
 
 type PageProps = {
@@ -233,13 +234,52 @@ export default function UserViewPage({ params }: PageProps) {
             <div className="md:w-1/3 bg-primary/10 p-6">
               <div className="text-center">
                 <div className="relative w-32 h-32 mx-auto mb-4">
-                  <CldImage
-                    src={user.image || "/placeholders/user.png"}
-                    alt={user.name || "Usuario"}
-                    width={128}
-                    height={128}
-                    className="rounded-full object-cover border-4 border-primary/30"
-                  />
+                  {user.image && user.image.includes('cloudinary') ? (
+                    // Si la imagen tiene un formato de Cloudinary público (URL completa)
+                    <CldImage
+                      src={user.image}
+                      alt={user.name || "Avatar"}
+                      width={128}
+                      height={128}
+                      crop="fill"
+                      gravity="face"
+                      className="rounded-full object-cover border-4 border-primary/30"
+                      priority
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : user.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
+                    // Si la imagen es un public_id de Cloudinary (sin https:// o /)
+                    <CldImage
+                      src={user.image}
+                      alt={user.name || "Avatar"}
+                      width={128}
+                      height={128}
+                      crop="fill"
+                      gravity="face"
+                      className="rounded-full object-cover border-4 border-primary/30"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : (
+                    // Para imágenes locales o fallback
+                    <Image
+                      src={user.image || "/images/AvatarPredeterminado.webp"}
+                      alt={user.name || "Avatar"}
+                      width={128}
+                      height={128}
+                      className="rounded-full object-cover border-4 border-primary/30"
+                      priority
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  )}
                   <Badge className={`absolute bottom-0 right-0 ${
                     roleBadgeStyles[user.role as keyof typeof roleBadgeStyles] || roleBadgeStyles.user
                   }`}>

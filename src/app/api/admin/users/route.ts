@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
         username: body.username,
         email: body.email,
         password: hashedPassword,
-        image: body.image,
+        image: body.image || "/images/AvatarPredeterminado.webp",
         role: body.role || "user",
         bio: body.bio,
       },

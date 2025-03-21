@@ -104,7 +104,7 @@ export async function PATCH(
         name: body.name,
         username: body.username,
         email: body.email,
-        image: body.image,
+        image: body.image || "/images/AvatarPredeterminado.webp",
         role: body.role,
         bio: body.bio,
         showActivity: body.showActivity,

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import Link from "next/link";
+import Image from 'next/image';
 
 type Source = {
   id: string;
@@ -167,10 +168,12 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
                   <td className="px-4 py-4">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
-                        <img
-                          className="h-10 w-10 rounded-md object-cover"
-                          src={source.imageUrl || "/placeholders/source.png"}
+                        <Image
+                          src={source.imageUrl || "/images/default_periodico.jpg"}
                           alt={source.name}
+                          width={40}
+                          height={40}
+                          className="h-10 w-10 rounded-full object-cover bg-background"
                         />
                       </div>
                       <div className="ml-4">
@@ -279,10 +282,12 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
             >
               <div className="flex items-center mb-2">
                 <div className="h-10 w-10 mr-3 flex-shrink-0">
-                  <img
-                    className="h-10 w-10 rounded-md object-cover"
-                    src={source.imageUrl || "/placeholders/source.png"}
+                  <Image
+                    src={source.imageUrl || "/images/default_periodico.jpg"}
                     alt={source.name}
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 rounded-full object-cover bg-background"
                   />
                 </div>
                 <div>
@@ -450,7 +455,7 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
                 >
                   <span className="sr-only">Siguiente</span>
                   <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010 1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                   </svg>
                 </button>
                 <button
@@ -460,7 +465,7 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
                 >
                   <span className="sr-only">Última</span>
                   <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010 1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                   </svg>
                 </button>
               </nav>

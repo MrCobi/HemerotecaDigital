@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo } from "react";
 import Pagination from "../components/Pagination";
 import RowsPerPageSelector from "../components/RowsPerPageSelector";
 import TableFilter from "../components/TableFilter";
+import Image from "next/image";
 
 type User = {
   id: string;
@@ -120,11 +121,13 @@ export default function FollowsTable({ follows }: FollowsTableProps) {
                   <tr key={follow.id} className="hover:bg-accent/5 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <img
-                            className="h-10 w-10 rounded-full object-cover"
-                            src={follow.follower.image || "/placeholders/user.png"}
-                            alt={follow.follower.name || "Usuario"}
+                        <div className="h-8 w-8 flex-shrink-0 rounded-full bg-muted flex items-center justify-center mr-2">
+                          <Image
+                            src={follow.follower.image || "/images/AvatarPredeterminado.webp"}
+                            alt={follow.follower.name || ""}
+                            width={32}
+                            height={32}
+                            className="h-8 w-8 rounded-full object-cover"
                           />
                         </div>
                         <div className="ml-4">
@@ -139,11 +142,13 @@ export default function FollowsTable({ follows }: FollowsTableProps) {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <img
-                            className="h-10 w-10 rounded-full object-cover"
-                            src={follow.following.image || "/placeholders/user.png"}
-                            alt={follow.following.name || "Usuario"}
+                        <div className="h-8 w-8 flex-shrink-0 rounded-full bg-muted flex items-center justify-center mr-2">
+                          <Image
+                            src={follow.following.image || "/images/AvatarPredeterminado.webp"}
+                            alt={follow.following.name || ""}
+                            width={32}
+                            height={32}
+                            className="h-8 w-8 rounded-full object-cover"
                           />
                         </div>
                         <div className="ml-4">

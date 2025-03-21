@@ -10,7 +10,7 @@ import { Label } from "@/src/app/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/app/components/ui/select";
 import { Loader2, ArrowLeft, Save } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
-import { CldImage } from "next-cloudinary";
+import { CldImage, CldUploadWidget } from "next-cloudinary";
 
 // Definición del tipo de usuario adaptada al esquema actual
 type User = {
@@ -20,9 +20,9 @@ type User = {
   image: string | null;
   role: string;
   username: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  emailVerified: Date | null;
+  createdAt: string;
+  updatedAt: string;
+  emailVerified: string | null;
   bio: string | null;
   showActivity: boolean;
   showFavorites: boolean;
@@ -31,18 +31,18 @@ type User = {
 export default function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [id, setId] = useState<string | null>(null);
-  const [form, setForm] = useState({ 
-    name: "", 
+  const [form, setForm] = useState({
+    name: "",
     username: "",
-    email: "", 
-    password: "", 
+    email: "",
+    password: "",
     role: "",
     bio: "",
     showActivity: true,
     showFavorites: true
   });
   const [userInfo, setUserInfo] = useState<User | null>(null);
-  const [preview, setPreview] = useState("/placeholders/user.png");
+  const [preview, setPreview] = useState<string>("");
   const roles = [
     { value: "user", label: "Usuario" },
     { value: "editor", label: "Editor" },
@@ -65,32 +65,32 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
         setIsLoading(false);
       }
     }
-    
+
     getParamId();
   }, [params]);
 
   useEffect(() => {
     if (!id) return;
-    
+
     async function fetchUser() {
       try {
         setIsLoading(true);
         const res = await fetch(`/api/admin/users/${id}`);
-        
+
         if (!res.ok) {
           throw new Error(`Error: ${res.status}`);
         }
-        
+
         const data = await res.json();
-        setForm({ 
-          name: data.name || "", 
+        setForm({
+          name: data.name || "",
           username: data.username || "",
-          email: data.email, 
-          password: "", 
+          email: data.email,
+          password: "",
           role: data.role,
           bio: data.bio || "",
           showActivity: data.showActivity !== undefined ? data.showActivity : true,
-          showFavorites: data.showFavorites !== undefined ? data.showFavorites : true 
+          showFavorites: data.showFavorites !== undefined ? data.showFavorites : true
         });
         setUserInfo(data);
         if (data.image) setPreview(data.image);
@@ -101,7 +101,7 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
         setIsLoading(false);
       }
     }
-    
+
     fetchUser();
   }, [id]);
 
@@ -134,14 +134,14 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
     setError("");
     setSuccessMessage("");
     setIsSaving(true);
-    
+
     try {
       const updateData = {
         ...form,
         // Si el password está vacío, no lo enviamos
         ...(form.password === "" && { password: undefined })
       };
-      
+
       const res = await fetch(`/api/admin/users/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -194,13 +194,52 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
             <div className="md:w-1/3 bg-primary/10 p-6">
               <div className="text-center">
                 <div className="relative w-32 h-32 mx-auto mb-4">
-                  <CldImage
-                    src={preview}
-                    alt="Preview"
-                    width={128}
-                    height={128}
-                    className="rounded-full object-cover border-4 border-primary/30"
-                  />
+                  {preview && preview.includes('cloudinary') ? (
+                    // Si la imagen tiene un formato de Cloudinary público (URL completa)
+                    <CldImage
+                      src={preview}
+                      alt={form.name || "Avatar"}
+                      width={128}
+                      height={128}
+                      crop="fill"
+                      gravity="face"
+                      className="rounded-full object-cover border-4 border-primary/30"
+                      priority
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : preview && !preview.startsWith('/') && !preview.startsWith('http') ? (
+                    // Si la imagen es un public_id de Cloudinary (sin https:// o /)
+                    <CldImage
+                      src={preview}
+                      alt={form.name || "Avatar"}
+                      width={128}
+                      height={128}
+                      crop="fill"
+                      gravity="face"
+                      className="rounded-full object-cover border-4 border-primary/30"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : (
+                    // Para imágenes locales o fallback
+                    <Image
+                      src={preview || "/images/AvatarPredeterminado.webp"}
+                      alt={form.name || "Avatar"}
+                      width={128}
+                      height={128}
+                      className="rounded-full object-cover border-4 border-primary/30"
+                      priority
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  )}
                 </div>
                 {userInfo && (
                   <>
@@ -211,13 +250,13 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                     <div className="space-y-2 text-left text-sm">
                       <p className="flex items-center">
                         <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
+                          <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
                         </svg>
                         Creado: {new Date(userInfo.createdAt).toLocaleDateString()}
                       </p>
                       <p className="flex items-center">
                         <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                         </svg>
                         Última actualización: {new Date(userInfo.updatedAt).toLocaleDateString()}
                       </p>
@@ -234,7 +273,7 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              
+
               {successMessage && (
                 <Alert className="mb-4 border-green-500 text-green-500">
                   <AlertDescription>{successMessage}</AlertDescription>
@@ -332,7 +371,7 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                     </div>
                   </CardContent>
                 </Card>
-                
+
                 <Card>
                   <CardHeader>
                     <CardTitle>Seguridad y permisos</CardTitle>
@@ -353,8 +392,8 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
 
                     <div>
                       <Label htmlFor="role">Rol</Label>
-                      <Select 
-                        value={form.role} 
+                      <Select
+                        value={form.role}
                         onValueChange={handleRoleChange}
                       >
                         <SelectTrigger className="mt-1">

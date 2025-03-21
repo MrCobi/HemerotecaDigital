@@ -355,7 +355,7 @@ export default function DashboardPage() {
                           gravity="face"
                           className="object-cover"
                           priority
-                          onError={(e) => {
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                             const target = e.target as HTMLImageElement;
                             target.src = "/images/AvatarPredeterminado.webp";
                           }}
@@ -370,7 +370,7 @@ export default function DashboardPage() {
                           crop="fill"
                           gravity="face"
                           className="object-cover"
-                          onError={(e) => {
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                             const target = e.target as HTMLImageElement;
                             target.src = "/images/AvatarPredeterminado.webp";
                           }}
@@ -384,7 +384,7 @@ export default function DashboardPage() {
                           height={48}
                           className="object-cover"
                           priority
-                          onError={(e) => {
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>  ) => {
                             const target = e.target as HTMLImageElement;
                             target.src = "/images/AvatarPredeterminado.webp";
                           }}
@@ -537,7 +537,7 @@ export default function DashboardPage() {
                           gravity="face"
                           className="object-cover w-full h-full"
                           priority
-                          onError={(e) => {
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                             const target = e.target as HTMLImageElement;
                             target.src = "/images/AvatarPredeterminado.webp";
                           }}
@@ -552,7 +552,7 @@ export default function DashboardPage() {
                           crop="fill"
                           gravity="face"
                           className="object-cover w-full h-full"
-                          onError={(e) => {
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                             const target = e.target as HTMLImageElement;
                             target.src = "/images/AvatarPredeterminado.webp";
                           }}

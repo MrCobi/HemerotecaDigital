@@ -13,6 +13,7 @@ import { CldUploadWidget } from "next-cloudinary";
 import Image from "next/image";
 import { SignUpSchema } from "@/lib/zod";
 import { z } from "zod";
+import { CldImage } from "next-cloudinary";
 
 // Esquema extendido para incluir el rol para administradores
 const AdminUserSchema = SignUpSchema.extend({
@@ -29,7 +30,7 @@ export default function CreateUserPage() {
     email: "", 
     password: "", 
     role: "user",
-    image: "/placeholders/user.png",
+    image: "",
     bio: ""
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -100,7 +101,7 @@ export default function CreateUserPage() {
         username: form.username,
         email: form.email,
         password: form.password, 
-        image: imageUrl || form.image,
+        image: imageUrl || "",
         bio: form.bio || null,
         role: form.role
       };
@@ -156,18 +157,51 @@ export default function CreateUserPage() {
             <div className="md:w-1/3 bg-primary/10 p-6">
               <div className="text-center">
                 <div className="relative w-32 h-32 mx-auto mb-4">
-                  {imageUrl ? (
-                    <Image
+                  {imageUrl && imageUrl.includes('cloudinary') ? (
+                    // Si la imagen tiene un formato de Cloudinary público (URL completa)
+                    <CldImage
                       src={imageUrl}
                       alt="Preview"
                       width={128}
                       height={128}
+                      crop="fill"
+                      gravity="face"
                       className="rounded-full object-cover border-4 border-primary/30"
+                      priority
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : imageUrl && !imageUrl.startsWith('/') && !imageUrl.startsWith('http') ? (
+                    // Si la imagen es un public_id de Cloudinary (sin https:// o /)
+                    <CldImage
+                      src={imageUrl}
+                      alt="Preview"
+                      width={128}
+                      height={128}
+                      crop="fill"
+                      gravity="face"
+                      className="rounded-full object-cover border-4 border-primary/30"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
                     />
                   ) : (
-                    <div className="w-full h-full rounded-full bg-muted flex items-center justify-center border-4 border-primary/30">
-                      <UserPlus className="h-12 w-12 text-muted-foreground" />
-                    </div>
+                    // Para imágenes locales o fallback
+                    <Image
+                      src="/images/AvatarPredeterminado.webp"
+                      alt="Imagen de perfil predeterminada"
+                      width={128}
+                      height={128}
+                      className="rounded-full object-cover border-4 border-primary/30"
+                      priority
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
                   )}
                 </div>
                 <div className="mb-6">
