@@ -45,12 +45,26 @@ export const POST = withAuth(async (req: Request, { userId }: { userId: string }
       );
     }
 
-    // Añadir a favoritos
-    const _favorite = await prisma.favoriteSource.create({
-      data: {
-        userId,
-        sourceId,
-      },
+    // Añadir a favoritos y registrar actividad
+    await prisma.$transaction(async (tx) => {
+      // Añadir a favoritos
+      await tx.favoriteSource.create({
+        data: {
+          userId,
+          sourceId,
+        },
+      });
+      
+      // Registrar actividad
+      await tx.activityHistory.create({
+        data: {
+          userId,
+          type: "favorite",
+          sourceName: source.name,
+          userName: (await tx.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || '',
+          createdAt: new Date(),
+        },
+      });
     });
 
     return NextResponse.json(

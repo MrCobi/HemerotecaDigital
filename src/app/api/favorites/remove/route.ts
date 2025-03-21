@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../../lib/auth-utils";
+import { revalidateTag } from "next/cache";
+
 
 // Implementación del método DELETE (para compatibilidad con REST)
 export const DELETE = withAuth(async (req: Request, { userId }: { userId: string }) => {
@@ -34,20 +36,58 @@ async function removeFavorite(req: Request, userId: string) {
       );
     }
 
-    // Eliminar el favorito de la base de datos
-    const result = await prisma.favoriteSource.deleteMany({
+    // Verificar si la fuente existe
+    const source = await prisma.source.findUnique({
+      where: { id: sourceId },
+    });
+
+    if (!source) {
+      return NextResponse.json(
+        { error: "La fuente especificada no existe" },
+        { status: 404 }
+      );
+    }
+
+    // Verificar si existe el favorito
+    const existingFavorite = await prisma.favoriteSource.findFirst({
       where: {
         userId,
         sourceId,
       },
     });
 
-    if (result.count === 0) {
+    if (!existingFavorite) {
       return NextResponse.json(
         { message: "No se encontró el favorito o ya fue eliminado" },
         { status: 404 }
       );
     }
+
+    // Eliminar el favorito y registrar actividad
+    await prisma.$transaction(async (tx) => {
+      // Eliminar favorito
+      await tx.favoriteSource.deleteMany({
+        where: {
+          userId,
+          sourceId,
+        },
+      });
+      
+      // Registrar actividad
+      await tx.activityHistory.create({
+        data: {
+          userId,
+          type: "unfavorite",
+          sourceName: source.name,
+          userName: (await tx.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || '',
+          createdAt: new Date(),
+        },
+      });
+    });
+
+    // Revalidar cache
+    revalidateTag(`user-${userId}-favorites`);
+    revalidateTag(`user-${userId}-activity`);
 
     return NextResponse.json(
       { message: "Favorito eliminado con éxito", success: true },

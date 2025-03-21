@@ -74,7 +74,8 @@ export const API_ROUTES = {
     check: (sourceId: string) => `/api/favorites/check/${sourceId}`,
     user: (userId: string, page: number = 1, limit: number = 10) =>
       `/api/favorites/${userId}?page=${page}&limit=${limit}`,
-    list: "/api/favorites/list"
+    list: "/api/favorites/list",
+    default: "/api/favorites" // Ruta principal que registra actividades
   },
   comments: {
     create: "/api/comments",

@@ -132,8 +132,8 @@ export default function SourcesPage({
 
     try {
       if (favorites.has(sourceId)) {
-        await fetch(API_ROUTES.favorites.removeByPost, {
-          method: "POST",
+        await fetch(API_ROUTES.favorites.default, {
+          method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sourceId }),
         });
@@ -143,7 +143,7 @@ export default function SourcesPage({
           return newFav;
         });
       } else {
-        await fetch(API_ROUTES.favorites.add, {
+        await fetch(API_ROUTES.favorites.default, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sourceId }),
