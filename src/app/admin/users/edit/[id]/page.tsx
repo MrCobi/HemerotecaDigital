@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button, buttonVariants } from "@/src/app/components/ui/button";
@@ -8,9 +8,9 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/src/app/
 import { Input } from "@/src/app/components/ui/input";
 import { Label } from "@/src/app/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/app/components/ui/select";
-import { Loader2, ArrowLeft, Save } from "lucide-react";
+import { Loader2, ArrowLeft, Save, Image as ImageIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
-import { CldImage, CldUploadWidget } from "next-cloudinary";
+import { toast } from "sonner";
 
 // Definición del tipo de usuario adaptada al esquema actual
 type User = {
@@ -43,6 +43,9 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
   });
   const [userInfo, setUserInfo] = useState<User | null>(null);
   const [preview, setPreview] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const roles = [
     { value: "user", label: "Usuario" },
     { value: "editor", label: "Editor" },
@@ -52,6 +55,58 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+
+  // Manejador de cambio de archivo
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      // Verificar que sea un archivo de imagen
+      if (!selectedFile.type.startsWith('image/')) {
+        setUploadError('Solo se permiten archivos de imagen');
+        toast.error('Solo se permiten archivos de imagen');
+        return;
+      }
+      setFile(selectedFile);
+      const reader = new FileReader();
+      reader.onload = () => setPreview(reader.result as string);
+      reader.readAsDataURL(selectedFile);
+      setUploadError(null);
+      toast.info('Imagen seleccionada. Guarde para aplicar los cambios.');
+    }
+  }, []);
+
+  // Función para subir archivo
+  const uploadFile = useCallback((file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append("file", file);
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percent);
+        }
+      });
+
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
+            // Construir la URL completa a partir del public_id
+            const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'demo';
+            const fullUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${response.url}`;
+            resolve(fullUrl);
+          } else {
+            reject(new Error(xhr.statusText || "Error al subir el archivo"));
+          }
+        }
+      };
+
+      xhr.open("POST", "/api/upload");
+      xhr.send(formData);
+    });
+  }, []);
 
   // Obtener el ID de los parámetros (que ahora son una Promise)
   useEffect(() => {
@@ -93,7 +148,9 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
           showFavorites: data.showFavorites !== undefined ? data.showFavorites : true
         });
         setUserInfo(data);
-        if (data.image) setPreview(data.image);
+        if (data.image) {
+          setPreview(data.image);
+        }
       } catch (error) {
         console.error("Error fetching user:", error);
         setError("Error al cargar los datos del usuario. Por favor, inténtalo de nuevo.");
@@ -117,18 +174,6 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
     setForm({ ...form, [name]: value });
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-        // Aquí podrías manejar la subida de la imagen
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -136,10 +181,27 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
     setIsSaving(true);
 
     try {
+      let imageUrl = null;
+      
+      // Si hay un archivo nuevo, subirlo
+      if (file) {
+        try {
+          imageUrl = await uploadFile(file);
+        } catch (uploadError) {
+          console.error("Error al subir imagen:", uploadError);
+          toast.error("Error al subir la imagen. Intentando guardar sin imagen.");
+        }
+      } else if (preview) {
+        // Mantener la imagen actual si existe y no hay un nuevo archivo
+        imageUrl = preview;
+      }
+      
       const updateData = {
         ...form,
         // Si el password está vacío, no lo enviamos
-        ...(form.password === "" && { password: undefined })
+        ...(form.password === "" && { password: undefined }),
+        // Incluir la URL de la imagen
+        image: imageUrl
       };
 
       const res = await fetch(`/api/admin/users/${id}`, {
@@ -150,16 +212,19 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
 
       if (res.ok) {
         setSuccessMessage("Usuario actualizado correctamente");
+        toast.success("Usuario actualizado con éxito");
         setTimeout(() => {
           router.push("/admin/users");
         }, 1500);
       } else {
         const data = await res.json();
         setError(data.error || "Error al actualizar el usuario");
+        toast.error(data.error || "Error al actualizar el usuario");
       }
     } catch (error) {
       console.error("Error updating user:", error);
       setError("Ha ocurrido un error al actualizar el usuario");
+      toast.error("Ha ocurrido un error al actualizar el usuario");
     } finally {
       setIsSaving(false);
     }
@@ -194,50 +259,27 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
             <div className="md:w-1/3 bg-primary/10 p-6">
               <div className="text-center">
                 <div className="relative w-32 h-32 mx-auto mb-4">
-                  {preview && preview.includes('cloudinary') ? (
-                    // Si la imagen tiene un formato de Cloudinary público (URL completa)
-                    <CldImage
-                      src={preview}
-                      alt={form.name || "Avatar"}
-                      width={128}
-                      height={128}
-                      crop="fill"
-                      gravity="face"
-                      className="rounded-full object-cover border-4 border-primary/30"
-                      priority
-                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
-                    />
-                  ) : preview && !preview.startsWith('/') && !preview.startsWith('http') ? (
-                    // Si la imagen es un public_id de Cloudinary (sin https:// o /)
-                    <CldImage
-                      src={preview}
-                      alt={form.name || "Avatar"}
-                      width={128}
-                      height={128}
-                      crop="fill"
-                      gravity="face"
-                      className="rounded-full object-cover border-4 border-primary/30"
-                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
-                    />
+                  {preview ? (
+                    <>
+                      <Image
+                        src={preview}
+                        alt={form.name || "Avatar"}
+                        fill
+                        className="rounded-full object-cover"
+                        priority
+                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
+                      />
+                    </>
                   ) : (
-                    // Para imágenes locales o fallback
                     <Image
-                      src={preview || "/images/AvatarPredeterminado.webp"}
+                      src="/images/AvatarPredeterminado.webp"
                       alt={form.name || "Avatar"}
-                      width={128}
-                      height={128}
+                      fill
                       className="rounded-full object-cover border-4 border-primary/30"
                       priority
-                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
                     />
                   )}
                 </div>
@@ -288,13 +330,30 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                   <CardContent className="space-y-4">
                     <div>
                       <Label htmlFor="imageUpload">Imagen de perfil</Label>
-                      <Input
-                        id="imageUpload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="mt-1"
-                      />
+                      <div className="space-y-3 mt-2">
+                        {/* Widget de subida de archivo */}
+                        <input
+                          id="imageUpload"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                        />
+                        
+                        {uploadProgress > 0 && (
+                          <div className="bg-primary/10 text-primary p-2 rounded-md">
+                            Subiendo imagen... {uploadProgress}%
+                          </div>
+                        )}
+                        {uploadError && (
+                          <div className="bg-destructive/10 text-destructive p-2 rounded-md">
+                            {uploadError}
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Imagen recomendada: cuadrada, mínimo 200x200px. Formatos aceptados: JPG, PNG.
+                        </p>
+                      </div>
                     </div>
 
                     <div>

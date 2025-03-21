@@ -19,7 +19,6 @@ import {
   AlertDialogTrigger,
 } from "@/src/app/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { CldImage } from "next-cloudinary";
 import Image from "next/image";
 
 // Componente para el diálogo de confirmación de eliminación
@@ -121,6 +120,12 @@ export default function UsersTable({ users }: UsersTableProps) {
   const [filterValue, setFilterValue] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | null>(null);
   const router = useRouter();
+  const [localUsers, setLocalUsers] = useState<User[]>(users);
+
+  // Actualizar localUsers cuando cambia users (por ejemplo, al montar el componente)
+  useMemo(() => {
+    setLocalUsers(users);
+  }, [users]);
 
   const handleRoleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value as Role | "all";
@@ -129,9 +134,9 @@ export default function UsersTable({ users }: UsersTableProps) {
   };
 
   const filteredUsers = useMemo(() => {
-    if (!filterValue && roleFilter === null) return users;
+    if (!filterValue && roleFilter === null) return localUsers;
 
-    return users.filter((user) => {
+    return localUsers.filter((user) => {
       const matchesFilter =
         !filterValue ||
         user.name?.toLowerCase().includes(filterValue.toLowerCase()) ||
@@ -143,7 +148,7 @@ export default function UsersTable({ users }: UsersTableProps) {
 
       return matchesFilter && matchesRole;
     });
-  }, [users, filterValue, roleFilter]);
+  }, [localUsers, filterValue, roleFilter]);
 
   // Paginación
   const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
@@ -164,11 +169,19 @@ export default function UsersTable({ users }: UsersTableProps) {
         throw new Error(data.error || 'Error desconocido');
       }
       
-      // Recargar la página para actualizar la lista
-      router.refresh();
+      // Actualizar la lista de usuarios localmente en lugar de recargar la página
+      setLocalUsers(prev => prev.filter(user => user.id !== userId));
+      
+      // Mostrar notificación de éxito
+      toast.success("Usuario eliminado correctamente");
+      
+      // Si estamos en la última página y ya no hay elementos, retrocedemos una página
+      if (paginatedUsers.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      }
     } catch (error) {
       console.error("Error al eliminar usuario:", error);
-      throw error;
+      toast.error("Error al eliminar el usuario");
     }
   };
 
@@ -179,50 +192,27 @@ export default function UsersTable({ users }: UsersTableProps) {
       cell: (user: User) => (
         <div className="flex items-center">
           <div className="h-10 w-10 flex-shrink-0 rounded-full bg-muted flex items-center justify-center mr-3">
-            {user.image && user.image.includes('cloudinary') ? (
-              // Si la imagen tiene un formato de Cloudinary público (URL completa)
-              <CldImage
+            {user.image ? (
+              <Image
                 src={user.image}
                 alt={user.name || "Avatar"}
                 width={40}
                 height={40}
-                crop="fill"
-                gravity="face"
                 className="h-10 w-10 rounded-full object-cover"
                 priority
-                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = "/images/AvatarPredeterminado.webp";
-                }}
-              />
-            ) : user.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
-              // Si la imagen es un public_id de Cloudinary (sin https:// o /)
-              <CldImage
-                src={user.image}
-                alt={user.name || "Avatar"}
-                width={40}
-                height={40}
-                crop="fill"
-                gravity="face"
-                className="h-10 w-10 rounded-full object-cover"
                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                   const target = e.target as HTMLImageElement;
                   target.src = "/images/AvatarPredeterminado.webp";
                 }}
               />
             ) : (
-              // Para imágenes locales o fallback
               <Image
-                src={user.image || "/images/AvatarPredeterminado.webp"}
+                src="/images/AvatarPredeterminado.webp"
                 alt={user.name || "Avatar"}
                 width={40}
                 height={40}
                 className="h-10 w-10 rounded-full object-cover"
                 priority
-                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = "/images/AvatarPredeterminado.webp";
-                }}
               />
             )}
           </div>
