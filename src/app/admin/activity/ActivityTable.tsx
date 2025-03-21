@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import Image from "next/image";
-import { CldImage } from "next-cloudinary";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { ActivityItem } from "./types";
 import {
@@ -161,45 +160,39 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
         return (
           <div className="flex items-center">
             <div className="flex-shrink-0 h-8 w-8">
-              {user?.image && user.image.includes('cloudinary') ? (
-                <CldImage
-                  src={user.image}
-                  alt={user?.name || "Avatar"}
-                  width={32}
-                  height={32}
-                  crop="fill"
-                  gravity="face"
-                  className="h-8 w-8 rounded-full object-cover"
-                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/images/AvatarPredeterminado.webp";
-                  }}
-                />
-              ) : user?.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
-                <CldImage
-                  src={user.image}
-                  alt={user?.name || "Avatar"}
-                  width={32}
-                  height={32}
-                  crop="fill"
-                  gravity="face"
-                  className="h-8 w-8 rounded-full object-cover"
-                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/images/AvatarPredeterminado.webp";
-                  }}
-                />
+              {user?.image ? (
+                user.image.includes('cloudinary.com') ? (
+                  <Image 
+                    src={user.image}
+                    alt={user?.name || "Avatar"}
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 rounded-full object-cover"
+                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/images/AvatarPredeterminado.webp";
+                    }}
+                  />
+                ) : (
+                  <Image
+                    src={user.image}
+                    alt={user?.name || "Avatar"}
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 rounded-full object-cover"
+                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/images/AvatarPredeterminado.webp";
+                    }}
+                  />
+                )
               ) : (
                 <Image
-                  src={user?.image || "/images/AvatarPredeterminado.webp"}
+                  src="/images/AvatarPredeterminado.webp"
                   alt={user?.name || "Avatar"}
                   width={32}
                   height={32}
                   className="h-8 w-8 rounded-full object-cover"
-                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/images/AvatarPredeterminado.webp";
-                  }}
                 />
               )}
             </div>

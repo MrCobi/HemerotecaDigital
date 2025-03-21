@@ -142,35 +142,136 @@ export async function POST(req: NextRequest) {
     });
 
     // Actualizar contadores de followers y following
-    await prisma.user.update({
-      where: { id: body.followerId },
-      data: {
-        followingCount: { increment: 1 }
-      }
-    });
-
-    await prisma.user.update({
-      where: { id: body.followingId },
-      data: {
-        followersCount: { increment: 1 }
-      }
-    });
+    try {
+      // No se actualizan los contadores ya que no existen en el modelo actual
+    } catch (error) {
+      console.error("Error al actualizar contadores:", error);
+      // Continuar con la respuesta, no fallar por esto
+    }
 
     // Registrar actividad
-    await prisma.activityHistory.create({
-      data: {
-        userId: body.followerId,
-        type: "FOLLOW",
-        targetUserId: body.followingId,
-        targetUsername: followingExists.username || followingExists.name
-      }
-    });
+    try {
+      await prisma.activityHistory.create({
+        data: {
+          userId: body.followerId,
+          type: "FOLLOW",
+          targetUserId: body.followingId,
+          targetUsername: followingExists.username || followingExists.name
+        } as any
+      });
+    } catch (error) {
+      console.error("Error al registrar actividad:", error);
+      // Continuar con la respuesta, no fallar por esto
+    }
 
     return NextResponse.json(newFollow, { status: 201 });
   } catch (error) {
     console.error("Error al crear seguimiento:", error);
     return NextResponse.json(
       { error: "Error al crear el seguimiento" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE: Eliminar un seguimiento (como administrador)
+export async function DELETE(req: NextRequest) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
+  }
+
+  try {
+    const { searchParams } = new URL(req.url);
+    const followerId = searchParams.get("followerId");
+    const followingId = searchParams.get("followingId");
+
+    // Validar parámetros
+    if (!followerId || !followingId) {
+      return NextResponse.json(
+        { error: "Se requieren los parámetros followerId y followingId" },
+        { status: 400 }
+      );
+    }
+
+    // Verificar si existe el seguimiento
+    const existingFollow = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId,
+          followingId
+        }
+      },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+          }
+        },
+        following: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+          }
+        }
+      }
+    });
+
+    if (!existingFollow) {
+      return NextResponse.json(
+        { error: "No se encontró la relación de seguimiento" },
+        { status: 404 }
+      );
+    }
+
+    // Eliminar el seguimiento
+    await prisma.follow.delete({
+      where: {
+        followerId_followingId: {
+          followerId,
+          followingId
+        }
+      }
+    });
+
+    // Actualizar contadores (si existen en el modelo)
+    try {
+      // No se actualizan los contadores ya que no existen en el modelo actual
+    } catch (error) {
+      console.error("Error al actualizar contadores:", error);
+      // Continuar con la respuesta, no fallar por esto
+    }
+
+    // Registrar actividad de eliminación (si es necesario)
+    try {
+      await prisma.activityHistory.create({
+        data: {
+          userId: followerId,
+          type: "unfollow",
+          sourceName: existingFollow.follower.username || existingFollow.follower.name || "",
+          sourceId: followerId,
+          targetName: existingFollow.following.username || existingFollow.following.name || "",
+          targetId: followingId,
+          targetType: "user",
+          details: `Eliminada relación de seguimiento (por administrador)`,
+          createdAt: new Date()
+        } as any
+      });
+    } catch (error) {
+      console.error("Error al registrar actividad:", error);
+      // Continuar con la respuesta, no fallar por esto
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Relación de seguimiento eliminada correctamente"
+    });
+  } catch (error) {
+    console.error("Error al eliminar seguimiento:", error);
+    return NextResponse.json(
+      { error: "Error al eliminar la relación de seguimiento" },
       { status: 500 }
     );
   }

@@ -229,7 +229,7 @@ export default function AdminDashboard() {
           </Link>
 
           <Link
-            href="/admin/sources/create"
+            href="/admin/sources/new"
             className="flex items-center p-3 rounded-md hover:bg-accent/50 transition-colors duration-200"
           >
             <div className="flex-shrink-0 mr-3 h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
