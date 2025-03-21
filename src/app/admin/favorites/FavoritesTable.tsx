@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { CldImage } from "next-cloudinary";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
 import { ExternalLink, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 type Favorite = {
   id: string;
@@ -43,12 +43,19 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [favoriteToDelete, setFavoriteToDelete] = useState<string | null>(null);
+  const [localFavorites, setLocalFavorites] = useState<Favorite[]>(favorites);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Actualizar localFavorites cuando cambian los favoritos (al montar el componente)
+  useMemo(() => {
+    setLocalFavorites(favorites);
+  }, [favorites]);
 
   // Obtiene categorías únicas para el filtro
   const uniqueCategories = useMemo(() => {
-    const categories = favorites.map(favorite => favorite.source.category);
+    const categories = localFavorites.map(favorite => favorite.source.category);
     return [...new Set(categories)].sort();
-  }, [favorites]);
+  }, [localFavorites]);
 
   const handleCategoryFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -58,9 +65,9 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
 
   // Filtra los favoritos según los criterios seleccionados
   const filteredFavorites = useMemo(() => {
-    if (!filterValue && categoryFilter === null) return favorites;
+    if (!filterValue && categoryFilter === null) return localFavorites;
     
-    return favorites.filter((favorite) => {
+    return localFavorites.filter((favorite) => {
       // Filtrar por categoría
       if (categoryFilter !== null && favorite.source.category !== categoryFilter) {
         return false;
@@ -80,7 +87,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
       
       return true;
     });
-  }, [favorites, filterValue, categoryFilter]);
+  }, [localFavorites, filterValue, categoryFilter]);
 
   // Paginación
   const totalPages = Math.ceil(filteredFavorites.length / rowsPerPage);
@@ -88,11 +95,38 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
   const endIndex = startIndex + rowsPerPage;
   const currentFavorites = filteredFavorites.slice(startIndex, endIndex);
 
-  const handleDelete = (id: string) => {
-    // Implementar lógica de eliminación
-    console.log(`Eliminar favorito ${id}`);
-    setIsDeleteDialogOpen(false);
-    setFavoriteToDelete(null);
+  const handleDelete = async (id: string) => {
+    try {
+      setIsDeleting(true);
+      const response = await fetch(`/api/admin/favorites/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error desconocido');
+      }
+      
+      // Actualizar la lista de favoritos localmente
+      setLocalFavorites(prev => prev.filter(favorite => favorite.id !== id));
+      
+      // Si estamos en la última página y ya no hay elementos, retrocedemos una página
+      if (currentFavorites.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      }
+      
+      // Cerrar el diálogo
+      setIsDeleteDialogOpen(false);
+      setFavoriteToDelete(null);
+      
+      // Mostrar notificación de éxito
+      toast.success("Favorito eliminado correctamente");
+    } catch (error) {
+      console.error("Error al eliminar favorito:", error);
+      toast.error("No se pudo eliminar el favorito");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const columns: Column<Favorite>[] = useMemo(() => [
@@ -106,47 +140,17 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
         return (
           <div className="flex items-center">
             <div className="flex-shrink-0 h-8 w-8">
-              {user?.image && user?.image.includes('cloudinary') ? (
-                <CldImage
-                  src={user.image}
-                  alt={user?.name || "Avatar"}
-                  width={32}
-                  height={32}
-                  crop="fill"
-                  gravity="face"
-                  className="h-8 w-8 rounded-full object-cover"
-                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/images/AvatarPredeterminado.webp";
-                  }}
-                />
-              ) : user?.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
-                <CldImage
-                  src={user.image}
-                  alt={user?.name || "Avatar"}
-                  width={32}
-                  height={32}
-                  crop="fill"
-                  gravity="face"
-                  className="h-8 w-8 rounded-full object-cover"
-                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/images/AvatarPredeterminado.webp";
-                  }}
-                />
-              ) : (
-                <Image
-                  src={user?.image || "/images/AvatarPredeterminado.webp"}
-                  alt={user?.name || "Avatar"}
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 rounded-full object-cover"
-                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/images/AvatarPredeterminado.webp";
-                  }}
-                />
-              )}
+              <Image
+                src={user?.image || "/images/AvatarPredeterminado.webp"}
+                alt={user?.name || "Avatar"}
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-full object-cover"
+                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/images/AvatarPredeterminado.webp";
+                }}
+              />
             </div>
             <div className="ml-3">
               <div className="text-sm font-medium text-foreground">
@@ -186,7 +190,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
             </div>
             <div>
               <Link
-                href={`/admin/sources/view/${source.id}`}
+                href={`/sources/${source.id}`}
                 className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
               >
                 {source.name}
@@ -251,7 +255,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
         return (
           <div className="flex justify-end space-x-2">
             <Link
-              href={`/admin/sources/view/${favorite.source.id}`}
+              href={`/sources/${favorite.source.id}`}
               className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-offset-background transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               Ver fuente
@@ -275,7 +279,19 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setFavoriteToDelete(null)}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleDelete(favorite.id)}>Eliminar</AlertDialogAction>
+                  <AlertDialogAction 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDelete(favorite.id);
+                    }}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting && favoriteToDelete === favorite.id ? (
+                      <span className="animate-pulse">Eliminando...</span>
+                    ) : (
+                      "Eliminar"
+                    )}
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -283,7 +299,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
         );
       }
     }
-  ], [isDeleteDialogOpen, favoriteToDelete, categoryFilter]);
+  ], [isDeleteDialogOpen, favoriteToDelete, categoryFilter, isDeleting]);
 
   return (
     <div className="space-y-4">
