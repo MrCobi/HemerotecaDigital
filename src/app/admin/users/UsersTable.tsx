@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { DataTable, Column } from "../components/DataTable";
-import { Button } from "@/src/app/components/ui/button";
+import { Button, buttonVariants } from "@/src/app/components/ui/button";
 import { Trash2, Edit, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -206,9 +206,7 @@ export default function UsersTable({ users }: UsersTableProps) {
               e.stopPropagation();
               handleDeleteUser(user.id);
             }}
-            className="inline-flex items-center text-red-600 hover:text-red-700 font-medium transition-colors text-sm bg-red-100 hover:bg-red-200 px-2 py-1 rounded-md dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-800/50"
-            variant="ghost"
-            size="sm"
+            className="inline-flex items-center text-red-600 hover:text-red-700 font-medium transition-colors text-sm bg-red-100 hover:bg-red-200 px-2 py-1 rounded-md dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-800/50 text-sm"
           >
             <Trash2 className="w-4 h-4 mr-1" />
             Eliminar
@@ -231,7 +229,6 @@ export default function UsersTable({ users }: UsersTableProps) {
       rowsPerPage={rowsPerPage}
       onRowsPerPageChange={setRowsPerPage}
       emptyMessage="No se encontraron usuarios"
-      onRowClick={(user) => window.location.href = `/admin/users/${user.id}`}
     />
   );
 }

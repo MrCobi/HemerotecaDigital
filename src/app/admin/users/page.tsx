@@ -1,30 +1,9 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import prisma from "@/lib/db";
 import UsersTable from "./UsersTable";
-
-// Importar el tipo User y Role del componente UsersTable
 import type { User, Role } from "./UsersTable";
-
-// Definir una interfaz que coincida con lo que Prisma devuelve
-interface UserWithCounts {
-  id: string;
-  name: string | null;
-  email: string;
-  emailVerified: Date | null;
-  image: string | null;
-  role: "user" | "admin"; // Roles en minuscula como en Prisma
-  createdAt: Date;
-  _count: {
-    accounts: number;
-    comments: number;
-    favoriteSources: number;
-    ratings: number;
-    sentMessages: number;
-    receivedMessages: number;
-  };
-}
+import prisma from "@/lib/db";
 
 // Función auxiliar para convertir roles de Prisma al tipo Role del componente
 const mapPrismaRoleToComponentRole = (prismaRole: string): Role => {
@@ -44,9 +23,9 @@ export default async function UsersPage() {
   if (!session) redirect("/api/auth/signin");
   if (session.user.role !== "admin") redirect("/acceso-denegado");
 
-  // Acceder directamente a la base de datos en lugar de a través de la API
   try {
-    // Obtener usuarios directamente desde la base de datos con conteos de relaciones
+    // Obtener datos de usuario directamente a través de prisma
+    // para evitar problemas de solicitudes de API desde la página del servidor
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -72,7 +51,7 @@ export default async function UsersPage() {
     });
 
     // Convertir los roles de minúscula (Prisma) a mayúscula (componente) y adaptar la estructura
-    const formattedUsers: User[] = users.map(user => ({
+    const formattedUsers: User[] = users.map((user: any) => ({
       id: user.id,
       name: user.name,
       username: user.username || undefined,

@@ -1,7 +1,16 @@
 "use client";
+
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { Button, buttonVariants } from "@/src/app/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/src/app/components/ui/card";
+import { Input } from "@/src/app/components/ui/input";
+import { Label } from "@/src/app/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/app/components/ui/select";
+import { Loader2, ArrowLeft, Save } from "lucide-react";
+import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
+import { CldImage } from "next-cloudinary";
 
 // Definición del tipo de usuario adaptada al esquema actual
 type User = {
@@ -9,53 +18,58 @@ type User = {
   name: string | null;
   email: string;
   image: string | null;
-  role: "ADMIN" | "EDITOR" | "USER";
+  role: string;
+  username: string | null;
   createdAt: Date;
   updatedAt: Date;
   emailVerified: Date | null;
 };
 
-export default function EditUserPage() {
-  const { id } = useParams();
+export default function EditUserPage({ params }: { params: { id: string } }) {
+  const id = params.id;
   const router = useRouter();
   const [form, setForm] = useState({ 
     name: "", 
+    username: "",
     email: "", 
     password: "", 
-    role: "USER" as "ADMIN" | "EDITOR" | "USER"
+    role: ""
   });
   const [userInfo, setUserInfo] = useState<User | null>(null);
   const [preview, setPreview] = useState("/placeholders/user.png");
   const roles = [
-    { value: "USER", label: "Usuario" },
-    { value: "EDITOR", label: "Editor" },
-    { value: "ADMIN", label: "Administrador" },
+    { value: "user", label: "Usuario" },
+    { value: "editor", label: "Editor" },
+    { value: "admin", label: "Administrador" },
   ];
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     async function fetchUser() {
       try {
         setIsLoading(true);
-        const res = await fetch(`/api/users/${id}`);
-        if (res.ok) {
-          const data = await res.json();
-          setForm({ 
-            name: data.name || "", 
-            email: data.email, 
-            password: "", 
-            role: data.role 
-          });
-          setUserInfo(data);
-          if (data.image) setPreview(data.image);
-        } else {
-          setError("No se pudo cargar la información del usuario");
+        const res = await fetch(`/api/admin/users/${id}`);
+        
+        if (!res.ok) {
+          throw new Error(`Error: ${res.status}`);
         }
+        
+        const data = await res.json();
+        setForm({ 
+          name: data.name || "", 
+          username: data.username || "",
+          email: data.email, 
+          password: "", 
+          role: data.role 
+        });
+        setUserInfo(data);
+        if (data.image) setPreview(data.image);
       } catch (error) {
         console.error("Error fetching user:", error);
-        setError("Error al cargar los datos del usuario");
+        setError("Error al cargar los datos del usuario. Por favor, inténtalo de nuevo.");
       } finally {
         setIsLoading(false);
       }
@@ -66,8 +80,12 @@ export default function EditUserPage() {
     }
   }, [id]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleRoleChange = (value: string) => {
+    setForm({ ...form, role: value });
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,6 +104,7 @@ export default function EditUserPage() {
     e.preventDefault();
     setError("");
     setSuccessMessage("");
+    setIsSaving(true);
     
     try {
       const updateData = {
@@ -94,8 +113,8 @@ export default function EditUserPage() {
         ...(form.password === "" && { password: undefined })
       };
       
-      const res = await fetch(`/api/users/${id}`, {
-        method: "PUT",
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateData),
       });
@@ -112,6 +131,8 @@ export default function EditUserPage() {
     } catch (error) {
       console.error("Error updating user:", error);
       setError("Ha ocurrido un error al actualizar el usuario");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -128,21 +149,23 @@ export default function EditUserPage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-foreground">Editar Usuario</h1>
-          <button
+          <Button
+            type="button"
+            className={`flex items-center gap-2 ${buttonVariants({ variant: "outline" })}`}
             onClick={() => router.back()}
-            className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-md transition-colors"
           >
+            <ArrowLeft className="h-4 w-4" />
             Volver
-          </button>
+          </Button>
         </div>
 
-        <div className="bg-card rounded-lg shadow-md overflow-hidden">
+        <div className="bg-card rounded-xl shadow-md overflow-hidden">
           <div className="md:flex">
             {/* Panel lateral izquierdo */}
-            <div className="md:w-1/3 bg-primary/10 p-8">
+            <div className="md:w-1/3 bg-primary/10 p-6">
               <div className="text-center">
                 <div className="relative w-32 h-32 mx-auto mb-4">
-                  <Image
+                  <CldImage
                     src={preview}
                     alt="Preview"
                     width={128}
@@ -154,7 +177,7 @@ export default function EditUserPage() {
                   <>
                     <h2 className="text-xl font-semibold mb-2">{userInfo.name}</h2>
                     <p className="text-muted-foreground text-sm mb-4">
-                      ID: {userInfo.id}
+                      ID: {userInfo.id.substring(0, 8)}...
                     </p>
                     <div className="space-y-2 text-left text-sm">
                       <p className="flex items-center">
@@ -163,14 +186,12 @@ export default function EditUserPage() {
                         </svg>
                         Creado: {new Date(userInfo.createdAt).toLocaleDateString()}
                       </p>
-                      {userInfo.updatedAt && (
-                        <p className="flex items-center">
-                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-                          </svg>
-                          Última actualización: {new Date(userInfo.updatedAt).toLocaleDateString()}
-                        </p>
-                      )}
+                      <p className="flex items-center">
+                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                        </svg>
+                        Última actualización: {new Date(userInfo.updatedAt).toLocaleDateString()}
+                      </p>
                     </div>
                   </>
                 )}
@@ -178,113 +199,134 @@ export default function EditUserPage() {
             </div>
 
             {/* Formulario lado derecho */}
-            <div className="md:w-2/3 p-8">
+            <div className="md:w-2/3 p-6">
               {error && (
-                <div className="mb-4 p-4 bg-destructive/10 border border-destructive rounded-lg">
-                  <p className="text-destructive text-sm">{error}</p>
-                </div>
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
               
               {successMessage && (
-                <div className="mb-4 p-4 bg-green-500/10 border border-green-500 rounded-lg">
-                  <p className="text-green-500 text-sm">{successMessage}</p>
-                </div>
+                <Alert className="mb-4 border-green-500 text-green-500">
+                  <AlertDescription>{successMessage}</AlertDescription>
+                </Alert>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Imagen de perfil
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="block w-full text-sm text-muted-foreground
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-full file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-primary/10 file:text-primary
-                        hover:file:bg-primary/20"
-                    />
-                  </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Información personal</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="imageUpload">Imagen de perfil</Label>
+                      <Input
+                        id="imageUpload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="mt-1"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Nombre completo
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={form.name}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:border-primary"
-                    />
-                  </div>
+                    <div>
+                      <Label htmlFor="name">Nombre completo</Label>
+                      <Input
+                        id="name"
+                        type="text"
+                        name="name"
+                        value={form.name}
+                        onChange={handleChange}
+                        className="mt-1"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Correo electrónico
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={form.email}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:border-primary"
-                      required
-                    />
-                  </div>
+                    <div>
+                      <Label htmlFor="username">Nombre de usuario</Label>
+                      <Input
+                        id="username"
+                        type="text"
+                        name="username"
+                        value={form.username}
+                        onChange={handleChange}
+                        className="mt-1"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Nueva Contraseña (Opcional)
-                    </label>
-                    <input
-                      type="password"
-                      name="password"
-                      value={form.password}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:border-primary"
-                      placeholder="Dejar en blanco para mantener la actual"
-                    />
-                  </div>
+                    <div>
+                      <Label htmlFor="email">Correo electrónico</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        name="email"
+                        value={form.email}
+                        onChange={handleChange}
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Seguridad y permisos</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="password">Nueva Contraseña (Opcional)</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        name="password"
+                        value={form.password}
+                        onChange={handleChange}
+                        className="mt-1"
+                        placeholder="Dejar en blanco para mantener la actual"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Rol
-                    </label>
-                    <select
-                      name="role"
-                      value={form.role}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:border-primary"
+                    <div>
+                      <Label htmlFor="role">Rol</Label>
+                      <Select 
+                        value={form.role} 
+                        onValueChange={handleRoleChange}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Seleccionar rol" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roles.map((role) => (
+                            <SelectItem key={role.value} value={role.value}>
+                              {role.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex justify-end space-x-4 pt-4">
+                    <Button
+                      type="button"
+                      className={buttonVariants({ variant: "outline" })}
+                      onClick={() => router.back()}
                     >
-                      {roles.map((role) => (
-                        <option key={role.value} value={role.value}>
-                          {role.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex justify-end space-x-4">
-                  <button
-                    type="button"
-                    onClick={() => router.back()}
-                    className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg"
-                  >
-                    Guardar Cambios
-                  </button>
-                </div>
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={isSaving}
+                      className="flex items-center gap-2"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      {isSaving ? "Guardando..." : "Guardar Cambios"}
+                    </Button>
+                  </CardFooter>
+                </Card>
               </form>
             </div>
           </div>

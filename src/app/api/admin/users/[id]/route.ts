@@ -9,13 +9,13 @@ async function isAdmin() {
 }
 
 // GET: Obtener detalles de un usuario por ID
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
   }
 
   try {
-    const userId = params.id;
+    const { id: userId } = await params;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -50,14 +50,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // PATCH: Actualizar información de un usuario
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
   }
 
   try {
-    const userId = params.id;
+    const { id: userId } = await params;
     const body = await req.json();
 
     // Validar que el usuario existe
@@ -123,14 +123,14 @@ export async function PATCH(
 // DELETE: Eliminar un usuario y todos sus datos asociados
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
   }
 
   try {
-    const userId = params.id;
+    const { id: userId } = await params;
 
     // Verificar que el usuario existe
     const user = await prisma.user.findUnique({
