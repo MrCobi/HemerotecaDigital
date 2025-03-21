@@ -8,7 +8,7 @@ import { CldImage } from "next-cloudinary";
 import { useState, useEffect, useMemo } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
-import { Trash2, Eye, CheckCircle, Mail } from "lucide-react";
+import { Trash2, Eye, CheckCircle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
 
 type Message = {

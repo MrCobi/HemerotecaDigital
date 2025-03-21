@@ -12,7 +12,6 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
   const [totalRatings, setTotalRatings] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hoverRating, setHoverRating] = useState(0);
-  const [showTooltip, setShowTooltip] = useState(false);
 
   useEffect(() => {
     const fetchRatings = async () => {

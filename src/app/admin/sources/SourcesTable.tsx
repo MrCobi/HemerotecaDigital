@@ -5,7 +5,6 @@ import { format } from "date-fns";
 import Link from "next/link";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button, buttonVariants } from "@/src/app/components/ui/button";
-import { Badge } from "@/src/app/components/ui/badge";
 import { Trash2, Edit, ExternalLink, Star, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -24,12 +23,12 @@ import Image from "next/image";
 
 // Componente para el diálogo de confirmación de eliminación
 interface DeleteSourceDialogProps {
-  sourceId: string;
+  _sourceId: string;
   sourceName: string;
   onDelete: () => Promise<void>;
 }
 
-function DeleteSourceDialog({ sourceId, sourceName, onDelete }: DeleteSourceDialogProps) {
+function DeleteSourceDialog({ _sourceId, sourceName, onDelete }: DeleteSourceDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
@@ -75,7 +74,7 @@ function DeleteSourceDialog({ sourceId, sourceName, onDelete }: DeleteSourceDial
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
           <AlertDialogAction
-            onClick={(e: any) => {
+            onClick={(e: React.MouseEvent) => {
               e.preventDefault();
               handleDelete();
             }}
@@ -328,7 +327,7 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
               Editar
             </Link>
             <DeleteSourceDialog
-              sourceId={source.id}
+              _sourceId={source.id}
               sourceName={source.name}
               onDelete={() => handleDeleteSource(source.id)}
             />

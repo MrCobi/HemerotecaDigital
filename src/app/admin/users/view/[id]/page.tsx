@@ -8,7 +8,7 @@ import { es } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/app/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/src/app/components/ui/card";
 import { Badge } from "@/src/app/components/ui/badge";
-import { User, Settings, Clock, Mail, CalendarDays, Shield, Hash, MessageCircle, Star, BookMarked, Send, Inbox, UserCheck, AlertCircle, Loader2 } from "lucide-react";
+import { User, Settings, Clock, Mail, CalendarDays, Shield, MessageCircle, Star, BookMarked, Inbox, UserCheck, AlertCircle, Loader2 } from "lucide-react";
 import { CldImage } from "next-cloudinary";
 import Image from "next/image";
 import { Alert, AlertDescription } from "@/src/app/components/ui/alert";

@@ -11,9 +11,8 @@ import { useSession } from "next-auth/react";
 import CommentForm from "@/src/app/components/Comments/CommentForm";
 import CommentList from "@/src/app/components/Comments/CommentList";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
-import { Heart, Star } from "lucide-react";
+import { Heart } from "lucide-react";
 import { API_ROUTES } from "@/src/config/api-routes";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAnimationSettings, useConditionalTransition } from "@/src/app/hooks/useAnimationSettings";
 
@@ -44,7 +43,6 @@ export default function SourcePageClient({
   const [commentsCount, setCommentsCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
-  const router = useRouter();
 
   // Obtener configuración de animaciones
   const animationsEnabled = useAnimationSettings();

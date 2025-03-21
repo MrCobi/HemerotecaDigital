@@ -4,12 +4,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { CldImage } from "next-cloudinary";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
-import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState, useEffect, useMemo } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
-import { Trash2, Book, Star } from "lucide-react";
+import { Trash2, Book } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
 
 type Rating = {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { CldImage } from "next-cloudinary";
 
 export default function MobileMenu({
   username,
@@ -33,7 +34,7 @@ export default function MobileMenu({
         <div className="absolute top-16 left-0 right-0 bg-card shadow-lg border-t border-border z-50">
           <div className="p-4 border-b border-border flex items-center">
             <div className="flex-shrink-0 h-10 w-10">
-              <img
+              <CldImage
                 className="h-10 w-10 rounded-full object-cover"
                 src={userImage || `/images/AvatarPredeterminado.webp`}
                 alt={username || "Administrador"}

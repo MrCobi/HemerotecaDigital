@@ -7,8 +7,7 @@ import Image from "next/image";
 import { CldImage } from "next-cloudinary";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { ActivityItem } from "./types";
-import { Badge } from "@/src/app/components/ui/badge";
-import { 
+import {
   MessageSquare, 
   Star, 
   Heart, 

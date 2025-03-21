@@ -4,7 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { CldImage } from "next-cloudinary";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { useState, useMemo } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";

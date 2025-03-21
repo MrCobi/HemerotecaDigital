@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ReactNode } from "react";
 import MobileMenu from "./components/MobileMenu";
+import { CldImage } from "next-cloudinary";
 
 export default async function AdminLayout({
   children,
@@ -99,7 +100,7 @@ export default async function AdminLayout({
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {session.user.image ? (
-                <img className="h-10 w-10 rounded-full" src={session.user.image} alt={session.user.name || "Administrator"} />
+                <CldImage className="h-10 w-10 rounded-full" src={session.user.image} alt={session.user.name || "Administrator"} />
               ) : (
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="text-primary text-lg font-medium">

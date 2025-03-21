@@ -2,7 +2,7 @@
 import { useSession, signOut } from "next-auth/react";
 import React from "react";
 import Link from "next/link";
-import { Menu, MenuItem } from "@mui/material";
+import { Menu } from "@mui/material";
 import { CldImage } from 'next-cloudinary';
 import Image from 'next/image';
 import { motion } from "framer-motion";

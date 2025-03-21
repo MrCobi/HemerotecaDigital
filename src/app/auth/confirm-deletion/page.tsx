@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
-import { useTheme } from "next-themes";
 
 export default function ConfirmDeletionPage() {
   const searchParams = useSearchParams();
@@ -12,7 +11,6 @@ export default function ConfirmDeletionPage() {
   
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
-  const { theme } = useTheme();
 
   useEffect(() => {
     if (!token) {

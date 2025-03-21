@@ -9,7 +9,7 @@ import { CldImage } from "next-cloudinary";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button, buttonVariants } from "@/src/app/components/ui/button";
 import { Badge } from "@/src/app/components/ui/badge";
-import { Trash2, Edit, ExternalLink, AlertTriangle, MessageSquare } from "lucide-react";
+import { Trash2, ExternalLink, AlertTriangle, MessageSquare } from "lucide-react";
 
 import {
   AlertDialog,
