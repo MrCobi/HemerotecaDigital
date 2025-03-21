@@ -59,9 +59,13 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
           userId: userId,
           type: "comment",
           sourceName: sourceExists.name,
-          userName: user.name || "",
+          sourceId: sourceId,
+          targetName: null,
+          targetId: null,
+          targetType: null,
+          details: `Comentaste: "${trimmedContent.length > 50 ? trimmedContent.substring(0, 50) + '...' : trimmedContent}"`,
           createdAt: new Date(),
-        },
+        } as any,
       });
 
       // 4. Limitar a 20 actividades

@@ -76,12 +76,16 @@ async function removeFavorite(req: Request, userId: string) {
       // Registrar actividad
       await tx.activityHistory.create({
         data: {
-          userId,
-          type: "unfavorite",
+          userId: userId,
+          type: "favorite_removed",
           sourceName: source.name,
-          userName: (await tx.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || '',
-          createdAt: new Date(),
-        },
+          sourceId: source.id,
+          targetName: null,
+          targetId: null,
+          targetType: null,
+          details: `Eliminaste ${source.name} de favoritos`,
+          createdAt: new Date()
+        } as any
       });
     });
 

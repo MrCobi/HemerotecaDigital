@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import Link from "next/link";
 import Image from "next/image";
 import { CldImage } from "next-cloudinary";
 import DataTable, { Column } from "../components/DataTable/DataTable";
@@ -41,8 +40,8 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
     return activities.filter((activity) => {
       const matchesFilter =
         !filterValue ||
-        activity.userName?.toLowerCase().includes(filterValue.toLowerCase()) ||
-        activity.userEmail?.toLowerCase().includes(filterValue.toLowerCase()) ||
+        activity.user?.name?.toLowerCase().includes(filterValue.toLowerCase()) ||
+        activity.user?.email?.toLowerCase().includes(filterValue.toLowerCase()) ||
         activity.targetName?.toLowerCase().includes(filterValue.toLowerCase());
 
       const matchesType =
@@ -157,16 +156,12 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
       accessorKey: "user",
       header: "Usuario",
       cell: (activity: ActivityItem) => {
-        const user = {
-          name: activity.userName,
-          email: activity.userEmail,
-          image: activity.userImage
-        };
+        const user = activity.user;
 
         return (
           <div className="flex items-center">
             <div className="flex-shrink-0 h-8 w-8">
-              {user?.image && user?.image.includes('cloudinary') ? (
+              {user?.image && user.image.includes('cloudinary') ? (
                 <CldImage
                   src={user.image}
                   alt={user?.name || "Avatar"}
@@ -210,9 +205,9 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
             </div>
             <div className="ml-3">
               <div className="text-sm font-medium text-foreground">
-                {user.name || "Usuario sin nombre"}
+                {user?.name || ""}
               </div>
-              <div className="text-xs text-muted-foreground">{user.email || "Sin correo"}</div>
+              {user?.email && <div className="text-xs text-muted-foreground">{user.email}</div>}
             </div>
           </div>
         );
@@ -222,6 +217,29 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
       accessorKey: "source",
       header: "Fuente",
       cell: (activity: ActivityItem) => {
+        // Primero intentamos usar sourceName si está disponible
+        if (activity.sourceName) {
+          // Si tenemos sourceId (contenido en targetId cuando es de tipo source)
+          if (activity.targetType === 'source' && activity.targetId) {
+            return (
+              <a
+                href={`/sources/${activity.targetId}`}
+                className="text-primary hover:text-primary/80 transition-colors"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {activity.sourceName}
+              </a>
+            );
+          }
+          return (
+            <span className="text-foreground">
+              {activity.sourceName}
+            </span>
+          );
+        }
+
+        // Si no hay sourceName, intentamos usar targetId y targetName como fallback
         let sourceId = "";
         let sourceName = "";
 
@@ -230,35 +248,18 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
           sourceName = activity.targetName;
         }
 
-        return sourceId ? (
-          <Link
-            href={`/admin/sources/view/${sourceId}`}
+        return sourceId && activity.targetType === 'source' ? (
+          <a
+            href={`/sources/${sourceId}`}
             className="text-primary hover:text-primary/80 transition-colors"
+            target="_blank"
+            rel="noopener noreferrer"
           >
             {sourceName}
-          </Link>
+          </a>
         ) : (
           <span className="text-muted-foreground">N/A</span>
         );
-      }
-    },
-    {
-      accessorKey: "details",
-      header: "Detalles",
-      cell: (activity: ActivityItem) => {
-        if (activity.details) {
-          return (
-            <div className="max-w-md">
-              <p className="text-sm text-foreground truncate">{activity.details}</p>
-            </div>
-          );
-        } else {
-          return (
-            <span className="text-foreground">
-              Sin detalles
-            </span>
-          );
-        }
       }
     },
     {

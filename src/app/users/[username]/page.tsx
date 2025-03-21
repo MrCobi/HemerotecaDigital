@@ -39,9 +39,19 @@ type Activity = {
   | "comment_deleted"
   | "unfollow"
   | "favorite";
-  sourceName?: string; // Usar source_name
-  userName?: string;
-  createdAt: string; // Usar created_at
+  sourceName: string | null;
+  targetName: string | null;
+  targetId: string | null;
+  targetType: string | null;
+  details: string | null;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string | null;
+    username: string | null;
+    email: string | null;
+    image: string | null;
+  };
 };
 
 interface UserStats {
@@ -513,7 +523,7 @@ export default function UserProfilePage() {
                                   `Eliminaste la valoración de ${activity.sourceName || "una fuente"
                                   }.`}
                                 {activity.type === "follow" &&
-                                  `Comenzaste a seguir a ${activity.userName || "un usuario"
+                                  `Comenzaste a seguir a ${activity.user.name || "un usuario"
                                   }.`}
                                 {activity.type === "comment_reply" &&
                                   `Respondiste a un comentario en ${activity.sourceName || "una fuente"
@@ -522,17 +532,17 @@ export default function UserProfilePage() {
                                   `Eliminaste un comentario en ${activity.sourceName || "una fuente"
                                   }.`}
                                 {activity.type === "unfollow" &&
-                                  `Dejaste de seguir a ${activity.userName || "un usuario"
+                                  `Dejaste de seguir a ${activity.user.name || "un usuario"
                                   }.`}
                                 {activity.type === "favorite" &&
-                                  `${activity.userName || "un usuario"} marcó como favorito a ${activity.sourceName || "una fuente"
+                                  `${activity.user.name || "un usuario"} marcó como favorito a ${activity.sourceName || "una fuente"
                                   }.`}
                                 {/* Texto de fallback para tipos no reconocidos */}
                                 {!["favorite_added", "favorite_removed", "comment", "rating_added",
                                   "rating_removed", "follow", "comment_reply", "comment_deleted",
                                   "unfollow", "favorite"].includes(activity.type) &&
                                   `Actividad: ${activity.type || "desconocida"} ${activity.sourceName ? `en ${activity.sourceName}` :
-                                    activity.userName ? `con ${activity.userName}` :
+                                    activity.user.name ? `con ${activity.user.name}` :
                                       ""
                                   }`}
                               </p>

@@ -66,9 +66,19 @@ export default function DashboardPage() {
       | "comment_deleted"
       | "unfollow"
       | "favorite";
-    source_name?: string; // Usar source_name
-    user_name?: string;
-    created_at: string; // Usar created_at
+    sourceName: string | null;
+    targetName: string | null;
+    targetId: string | null;
+    targetType: string | null;
+    details: string | null;
+    createdAt: string;
+    user: {
+      id: string;
+      name: string | null;
+      username: string | null;
+      email: string | null;
+      image: string | null;
+    };
   };
 
   useEffect(() => {
@@ -806,58 +816,58 @@ export default function DashboardPage() {
                               <p className="text-sm text-gray-600 dark:text-gray-400">
                                 {activity.type === "favorite_added" &&
                                   `Agregaste ${
-                                    activity.source_name || "una fuente"
+                                    activity.sourceName || "una fuente"
                                   } a favoritos.`}
                                 {activity.type === "favorite_removed" &&
                                   `Eliminaste ${
-                                    activity.source_name || "una fuente"
+                                    activity.sourceName || "una fuente"
                                   } de favoritos.`}
                                 {activity.type === "comment" &&
                                   `Comentaste en ${
-                                    activity.source_name || "una fuente"
+                                    activity.sourceName || "una fuente"
                                   }.`}
                                 {activity.type === "rating_added" &&
                                   `Valoraste ${
-                                    activity.source_name || "una fuente"
+                                    activity.sourceName || "una fuente"
                                   }.`}
                                 {activity.type === "rating_removed" &&
                                   `Eliminaste la valoración de ${
-                                    activity.source_name || "una fuente"
+                                    activity.sourceName || "una fuente"
                                   }.`}
                                 {activity.type === "follow" &&
                                   `Comenzaste a seguir a ${
-                                    activity.user_name || "un usuario"
+                                    activity.user.name || "un usuario"
                                   }.`}
                                 {activity.type === "comment_reply" &&
                                   `Respondiste a un comentario en ${
-                                    activity.source_name || "una fuente"
+                                    activity.sourceName || "una fuente"
                                   }.`}
                                 {activity.type === "comment_deleted" &&
                                   `Eliminaste un comentario en ${
-                                    activity.source_name || "una fuente"
+                                    activity.sourceName || "una fuente"
                                   }.`}
                                 {activity.type === "unfollow" &&
                                   `Dejaste de seguir a ${
-                                    activity.user_name || "un usuario"
+                                    activity.user.name || "un usuario"
                                   }.`}
                                 {activity.type === "favorite" &&
                                   `Marcaste como favorito a ${
-                                    activity.source_name || "una fuente"
+                                    activity.sourceName || "una fuente"
                                   }.`}
                                 {/* Texto de fallback para tipos no reconocidos */}
                                 {!["favorite_added", "favorite_removed", "comment", "rating_added", 
                                    "rating_removed", "follow", "comment_reply", "comment_deleted", 
                                    "unfollow", "favorite"].includes(activity.type) &&
                                    `Actividad: ${activity.type || "desconocida"} ${
-                                     activity.source_name ? `en ${activity.source_name}` : 
-                                     activity.user_name ? `con ${activity.user_name}` : 
+                                     activity.sourceName ? `en ${activity.sourceName}` : 
+                                     activity.user.name ? `con ${activity.user.name}` : 
                                      ""
                                    }`}
                               </p>
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {activity.created_at
+                                {activity.createdAt
                                   ? new Date(
-                                      activity.created_at
+                                      activity.createdAt
                                     ).toLocaleDateString("es-ES", {
                                       day: "numeric",
                                       month: "long",

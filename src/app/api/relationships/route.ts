@@ -66,9 +66,12 @@ export const POST = withAuth(async (req: Request, { userId, user: _user }: { use
         userId: userId,
         type: "follow",
         sourceName: null,
-        userName: followingUser.username || followingUser.name || "",
+        targetName: followingUser.username || followingUser.name || "",
+        targetId: followingId,
+        targetType: "user",
+        details: `Comenzaste a seguir a ${followingUser.username || followingUser.name || ""}`,
         createdAt: new Date()
-      }
+      } as any
     });
 
     // Revalidar caché
@@ -180,9 +183,12 @@ export const DELETE = withAuth(async (req: Request, { userId, user: _user }: { u
         userId: userId,
         type: "unfollow",
         sourceName: null,
-        userName: userExists.username || userExists.name || "",
+        targetName: userExists.username || userExists.name || "",
+        targetId: targetUserId,
+        targetType: "user",
+        details: `Dejaste de seguir a ${userExists.username || userExists.name || ""}`,
         createdAt: new Date()
-      }
+      } as any
     });
 
     // Revalidar caché

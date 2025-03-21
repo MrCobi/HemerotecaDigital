@@ -57,13 +57,17 @@ interface Activity {
     | "comment_deleted"
     | "favorite";
   sourceName: string | null;
-  userName: string | null;
+  targetName: string | null;
+  targetId: string | null;
+  targetType: string | null;
+  details: string | null;
   createdAt: string;
   user: {
     id: string;
-    name: string;
+    name: string | null;
     username: string | null;
     image: string | null;
+    email: string | null;
   };
 }
 
@@ -789,7 +793,7 @@ export default function HomePage() {
             transition={animationTransition}
             className="max-w-3xl"
           >
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white dark:text-white mb-4 sm:mb-6 leading-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white dark:text-white mb-4 sm:mb-6 leading-tight">
               Bienvenido, {session?.user?.name || "Investigador"}
             </h1>
             <p className="text-sm sm:text-base md:text-lg text-blue-100 dark:text-gray-200 mb-6 sm:mb-8 max-w-2xl">
@@ -1193,7 +1197,7 @@ export default function HomePage() {
                                 (!activity.user.image.startsWith('/') && !activity.user.image.startsWith('http'))) ? (
                                   <CldImage
                                     src={activity.user.image}
-                                    alt={activity.user.name}
+                                    alt={activity.user.name || "Usuario"}
                                     width={40}
                                     height={40}
                                     crop="fill"
@@ -1207,7 +1211,7 @@ export default function HomePage() {
                                 ) : (
                                   <Image
                                     src={activity.user.image || "/images/AvatarPredeterminado.webp"}
-                                    alt={activity.user.name}
+                                    alt={activity.user.name || "Usuario"}
                                     width={40}
                                     height={40}
                                     className="h-10 w-10 rounded-full"
@@ -1307,7 +1311,7 @@ export default function HomePage() {
                                   })()}
                                 </span>{" "}
                                 <span className="font-medium text-blue-600 dark:text-blue-400">
-                                  {activity.sourceName || activity.userName}
+                                  {activity.sourceName || activity.targetName || ""}
                                 </span>
                               </p>
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">

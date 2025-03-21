@@ -35,17 +35,19 @@ export async function DELETE(
             }
 
             // 3. Registrar en historial antes de eliminar
-            // Falta el campo userName
             await tx.activityHistory.create({
                 data: {
                   userId: session.user.id,
                   type: "comment_deleted",
                   sourceName: comment.source?.name || "Fuente desconocida",
-                  userName: session.user.name, // Agregar esta línea
+                  sourceId: comment.sourceId,
+                  targetName: null,
+                  targetId: null,
+                  targetType: null,
+                  details: `Eliminaste un comentario en ${comment.source?.name || "Fuente desconocida"}`,
                   createdAt: new Date(),
-                },
+                } as any,
               });
-
 
             // 4. Eliminar comentario y respuestas
             await tx.comment.delete({

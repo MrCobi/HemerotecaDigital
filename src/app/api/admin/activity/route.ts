@@ -70,8 +70,23 @@ export async function GET(req: NextRequest) {
       prisma.activityHistory.count({ where })
     ]);
 
+    // Mapear los datos al formato esperado por el cliente
+    const formattedActivities = activities.map((activity: any) => ({
+      id: activity.id,
+      type: activity.type,
+      userId: activity.userId,
+      createdAt: activity.createdAt,
+      sourceName: activity.sourceName,
+      sourceId: activity.sourceId,
+      targetName: activity.targetName,
+      targetId: activity.targetId,
+      targetType: activity.targetType,
+      details: activity.details,
+      user: activity.user
+    }));
+
     return NextResponse.json({
-      activities,
+      activities: formattedActivities,
       pagination: {
         total,
         page,

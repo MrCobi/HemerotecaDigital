@@ -81,19 +81,20 @@ model PasswordResetToken {
 }
 
 model Source {
-  id              String           @id @default(cuid())
-  name            String
-  description     String
-  url             String           @db.VarChar(512)
-  imageUrl        String?          @map("image_url") @db.VarChar(512)
-  category        String
-  language        String
-  country         String
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
-  comments        Comment[]
-  favoriteSources FavoriteSource[]
-  ratings         Rating[]
+  id                 String           @id @default(cuid())
+  name               String
+  description        String
+  url                String           @db.VarChar(512)
+  imageUrl           String?          @map("image_url") @db.VarChar(512)
+  category           String
+  language           String
+  country            String
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  comments           Comment[]
+  favoriteSources    FavoriteSource[]
+  ratings            Rating[]
+  activityHistories  ActivityHistory[] @relation("ActivityToSource")
 
   @@fulltext([name, description])
   @@map("sources")
@@ -169,11 +170,17 @@ model ActivityHistory {
   userId     String   @map("user_id")
   type       String
   sourceName String?  @map("source_name")
-  userName   String?  @map("user_name")
+  sourceId   String?  @map("source_id")
+  targetName String?  @map("target_name")
+  targetId   String?  @map("target_id")
+  targetType String?  @map("target_type")
+  details    String?  @db.Text
   createdAt  DateTime @default(now()) @map("created_at")
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source     Source?  @relation("ActivityToSource", fields: [sourceId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([sourceId])
   @@map("activity_history")
 }
 

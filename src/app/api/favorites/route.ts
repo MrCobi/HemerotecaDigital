@@ -79,11 +79,15 @@ export const POST = withAuth(async (request: Request, { userId }: { userId: stri
       prisma.activityHistory.create({
         data: {
           userId: userId,
-          type: "favorite",
+          type: "favorite_added",
           sourceName: sourceExists.name,
-          userName: (await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || '',
+          sourceId: sourceExists.id,
+          targetName: null,
+          targetId: null,
+          targetType: null,
+          details: `Agregaste ${sourceExists.name} a favoritos`,
           createdAt: new Date(),
-        },
+        } as any,
       }),
     ]);
 
@@ -149,9 +153,13 @@ export const DELETE = withAuth(async (request: Request, { userId }: { userId: st
           userId: userId,
           type: "favorite_removed",
           sourceName: favorite.source.name,
-          userName: (await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || '',
+          sourceId: favorite.source.id,
+          targetName: null,
+          targetId: null,
+          targetType: null,
+          details: `Eliminaste ${favorite.source.name} de favoritos`,
           createdAt: new Date()
-        },
+        } as any,
       })
     ]);
 

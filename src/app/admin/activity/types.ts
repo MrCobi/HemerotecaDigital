@@ -61,14 +61,19 @@ export interface ActivityItem {
   id: string;
   type: ActivityType;
   userId: string;
-  userName: string | null;
-  userEmail: string | null;
-  userImage: string | null;
-  targetName: string;
-  targetId: string;
-  targetType: TargetType;
   createdAt: Date;
+  sourceName: string | null;
+  targetName: string | null;
+  targetId: string | null;
+  targetType: TargetType | null;
   details: string | null;
+  user: {
+    id: string;
+    name: string | null;
+    username: string | null;
+    email: string | null;
+    image: string | null;
+  };
 }
 
 export interface ActivityTableProps {

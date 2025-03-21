@@ -76,9 +76,13 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
           userId: userId,
           type: value === 0 ? "rating_removed" : "rating_added",
           sourceName: source.name,
-          userName: user.name || "", // Incluir el nombre del usuario
+          sourceId: sourceId,
+          targetName: null,
+          targetId: null,
+          targetType: null,
+          details: `Valoración ${value === 0 ? "eliminada" : value.toString()} para ${source.name}`,
           createdAt: new Date(),
-        }
+        } as any
       });
 
       // 4. Limitar a 20 actividades
@@ -143,9 +147,13 @@ export const DELETE = withAuth(async (req: Request, { userId, user: _user }: { u
           userId: userId,
           type: "rating_removed",
           sourceName: rating.source.name,
-          userName: _user.name || "", // Incluir el nombre del usuario
+          sourceId: sourceId,
+          targetName: null,
+          targetId: null,
+          targetType: null,
+          details: `Valoración eliminada para ${rating.source.name}`,
           createdAt: new Date(),
-        }
+        } as any
       });
 
       // 4. Limitar a 20 actividades

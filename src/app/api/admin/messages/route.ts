@@ -16,7 +16,7 @@ export async function GET() {
 
   try {
     // Obtener mensajes con información de remitente y destinatario
-    const messages = await prisma.message.findMany({
+    const messages = await prisma.directMessage.findMany({
       include: {
         sender: {
           select: {
@@ -27,7 +27,7 @@ export async function GET() {
             email: true,
           }
         },
-        recipient: {
+        receiver: {
           select: {
             id: true,
             name: true,
@@ -99,11 +99,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Crear el nuevo mensaje
-    const newMessage = await prisma.message.create({
+    const newMessage = await prisma.directMessage.create({
       data: {
         content: body.content,
         senderId: body.senderId,
-        recipientId: body.recipientId,
+        receiverId: body.recipientId,
         read: false
       },
       include: {
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
             image: true,
           }
         },
-        recipient: {
+        receiver: {
           select: {
             id: true,
             name: true,
@@ -131,9 +131,14 @@ export async function POST(req: NextRequest) {
       data: {
         userId: body.senderId,
         type: "MESSAGE_SENT",
-        targetUserId: body.recipientId,
-        targetUsername: recipientExists.username || recipientExists.name
-      }
+        sourceName: null,
+        sourceId: null,
+        targetName: recipientExists.username || recipientExists.name || "",
+        targetId: body.recipientId,
+        targetType: "user",
+        details: `Enviaste un mensaje a ${recipientExists.username || recipientExists.name || ""}`,
+        createdAt: new Date()
+      } as any
     });
 
     return NextResponse.json(newMessage, { status: 201 });

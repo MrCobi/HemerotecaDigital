@@ -3,7 +3,10 @@ export interface ActivityHistory {
     type: string;
     createdAt: Date;
     userId: string;
-    userName: string | null;
     sourceName: string | null;
+    sourceId: string | null;
+    targetName: string | null;
+    targetId: string | null;
+    targetType: string | null;
+    details: string | null;
   }
-  

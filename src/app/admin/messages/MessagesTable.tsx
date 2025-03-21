@@ -4,18 +4,18 @@ import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import Link from "next/link";
 import Image from "next/image";
-import { CldImage } from "next-cloudinary";
 import { useState, useEffect, useMemo } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
 import { Trash2, Eye, CheckCircle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 type Message = {
   id: string;
   content: string;
-  createdAt: Date;
-  isRead: boolean;
+  createdAt: string; // ISO date string
+  read: boolean;
   senderId: string;
   receiverId: string;
   sender: {
@@ -44,6 +44,14 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
   const [filterType, setFilterType] = useState<"all" | "read" | "unread">("all");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+  const [localMessages, setLocalMessages] = useState<Message[]>(messages);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isMarkingAsRead, setIsMarkingAsRead] = useState<string | null>(null);
+
+  // Actualizar localMessages cuando cambian los mensajes (al montar el componente)
+  useEffect(() => {
+    setLocalMessages(messages);
+  }, [messages]);
 
   // Reset a la página 1 cuando cambia el filtro o el número de filas
   useEffect(() => {
@@ -52,15 +60,15 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
 
   // Filtra los mensajes por contenido, remitente o destinatario
   const filteredMessages = useMemo(() => {
-    if (!filterValue && filterType === "all") return messages;
+    if (!filterValue && filterType === "all") return localMessages;
     
-    let filtered = [...messages];
+    let filtered = [...localMessages];
     
     // Filtrar por estado (leído/no leído)
     if (filterType === "read") {
-      filtered = filtered.filter(message => message.isRead);
+      filtered = filtered.filter(message => message.read);
     } else if (filterType === "unread") {
-      filtered = filtered.filter(message => !message.isRead);
+      filtered = filtered.filter(message => !message.read);
     }
     
     // Filtrar por texto si hay un valor
@@ -79,7 +87,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     }
     
     return filtered;
-  }, [messages, filterValue, filterType]);
+  }, [localMessages, filterValue, filterType]);
 
   // Calcula el total de páginas
   const totalPages = Math.ceil(filteredMessages.length / rowsPerPage);
@@ -91,69 +99,103 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     return filteredMessages.slice(startIndex, endIndex);
   }, [filteredMessages, currentPage, rowsPerPage]);
 
-  const handleDelete = (id: string) => {
-    // Implementar lógica de eliminación
-    console.log(`Eliminar mensaje ${id}`);
-    setIsDeleteDialogOpen(false);
-    setMessageToDelete(null);
+  const handleDelete = async (id: string) => {
+    try {
+      setIsDeleting(true);
+      const response = await fetch(`/api/admin/messages/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error desconocido');
+      }
+      
+      // Actualizar la lista de mensajes localmente
+      setLocalMessages(prev => prev.filter(message => message.id !== id));
+      
+      // Si estamos en la última página y ya no hay elementos, retrocedemos una página
+      if (paginatedMessages.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      }
+      
+      // Cerrar el diálogo
+      setIsDeleteDialogOpen(false);
+      setMessageToDelete(null);
+      
+      // Mostrar notificación de éxito
+      toast.success("Mensaje eliminado correctamente");
+    } catch (error) {
+      console.error("Error al eliminar mensaje:", error);
+      toast.error("No se pudo eliminar el mensaje");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
-  const handleMarkAsRead = (id: string) => {
-    // Implementar lógica para marcar como leído
-    console.log(`Marcar mensaje ${id} como leído`);
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      setIsMarkingAsRead(id);
+      const response = await fetch(`/api/admin/messages/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ read: true }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error desconocido');
+      }
+      
+      // Actualizar el estado localmente
+      setLocalMessages(prev => 
+        prev.map(message => 
+          message.id === id ? { ...message, read: true } : message
+        )
+      );
+      
+      toast.success("Mensaje marcado como leído");
+    } catch (error) {
+      console.error("Error al marcar mensaje como leído:", error);
+      toast.error("No se pudo marcar el mensaje como leído");
+    } finally {
+      setIsMarkingAsRead(null);
+    }
   };
 
   // Función para renderizar la imagen del usuario
   const renderUserImage = (user: Message['sender'] | Message['receiver'], size: number = 32) => {
     if (!user) return null;
     
-    if (user?.image && user?.image.includes('cloudinary')) {
-      return (
-        <CldImage
-          src={user.image}
-          alt={user?.name || "Avatar"}
-          width={size}
-          height={size}
-          crop="fill"
-          gravity="face"
-          className={`h-${size/4} w-${size/4} rounded-full object-cover`}
-          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-            const target = e.target as HTMLImageElement;
-            target.src = "/images/AvatarPredeterminado.webp";
-          }}
-        />
-      );
-    } else if (user?.image && !user.image.startsWith('/') && !user.image.startsWith('http')) {
-      return (
-        <CldImage
-          src={user.image}
-          alt={user?.name || "Avatar"}
-          width={size}
-          height={size}
-          crop="fill"
-          gravity="face"
-          className={`h-${size/4} w-${size/4} rounded-full object-cover`}
-          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-            const target = e.target as HTMLImageElement;
-            target.src = "/images/AvatarPredeterminado.webp";
-          }}
-        />
-      );
-    } else {
-      return (
-        <Image
-          src={user?.image || "/images/AvatarPredeterminado.webp"}
-          alt={user?.name || "Avatar"}
-          width={size}
-          height={size}
-          className={`h-${size/4} w-${size/4} rounded-full object-cover`}
-          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-            const target = e.target as HTMLImageElement;
-            target.src = "/images/AvatarPredeterminado.webp";
-          }}
-        />
-      );
-    }
+    const defaultImage = "/images/AvatarPredeterminado.webp";
+    
+    return (
+      <div className="h-8 w-8 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
+        {user.image ? (
+          <Image
+            src={user.image}
+            alt={user?.name || "Avatar"}
+            width={size}
+            height={size}
+            className="h-full w-full object-cover rounded-full"
+            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+              const target = e.target as HTMLImageElement;
+              target.src = defaultImage;
+            }}
+          />
+        ) : (
+          <Image
+            src={defaultImage}
+            alt="Avatar predeterminado"
+            width={size}
+            height={size}
+            className="h-full w-full object-cover rounded-full"
+          />
+        )}
+      </div>
+    );
   };
 
   // Filtro de estado del mensaje
@@ -195,17 +237,17 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
   const columns: Column<Message>[] = useMemo(() => [
     {
       header: "Estado",
-      accessorKey: "isRead",
+      accessorKey: "read",
       cell: (message: Message) => {
         return (
           <span
             className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-              message.isRead 
+              message.read 
                 ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" 
                 : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
             }`}
           >
-            {message.isRead ? "Leído" : "No leído"}
+            {message.read ? "Leído" : "No leído"}
           </span>
         );
       },
@@ -299,14 +341,19 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
               <Eye className="h-3.5 w-3.5 mr-1" />
               Ver
             </Link>
-            {!message.isRead && (
+            {!message.read && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handleMarkAsRead(message.id)}
+                disabled={isMarkingAsRead === message.id}
                 className="inline-flex items-center rounded-md bg-green-100 px-2 py-1 text-xs font-medium text-green-800 ring-offset-background transition-colors hover:bg-green-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                {isMarkingAsRead === message.id ? (
+                  <div className="h-3.5 w-3.5 mr-1 animate-spin rounded-full border-b-2 border-green-800"></div>
+                ) : (
+                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                )}
                 Marcar leído
               </Button>
             )}
@@ -329,7 +376,20 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setMessageToDelete(null)}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleDelete(message.id)}>Eliminar</AlertDialogAction>
+                  <AlertDialogAction 
+                    onClick={() => handleDelete(message.id)}
+                    disabled={isDeleting}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <div className="h-4 w-4 mr-2 animate-spin rounded-full border-b-2 border-white"></div>
+                        Eliminando...
+                      </>
+                    ) : (
+                      'Eliminar'
+                    )}
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -337,7 +397,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
     },
-  ], [isDeleteDialogOpen, messageToDelete]);
+  ], [isDeleteDialogOpen, messageToDelete, isDeleting, isMarkingAsRead, filterType]);
 
   return (
     <div className="space-y-4">
@@ -352,7 +412,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         filterPlaceholder="Buscar por usuario o contenido..."
         rowsPerPage={rowsPerPage}
         onRowsPerPageChange={setRowsPerPage}
-        emptyMessage="No hay mensajes para mostrar"
+        emptyMessage="No hay mensajes que mostrar"
       />
     </div>
   );

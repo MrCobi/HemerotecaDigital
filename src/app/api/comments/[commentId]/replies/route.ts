@@ -64,9 +64,13 @@ export async function POST(
           userId: session.user.id,
           type: "comment_reply",
           sourceName: parentComment.source.name,
-          userName: parentComment.user.name, // Nombre del autor original
+          sourceId: parentComment.sourceId,
+          targetName: parentComment.user.name,
+          targetId: parentComment.userId,
+          targetType: "user",
+          details: `Respondiste a un comentario de ${parentComment.user.name} en ${parentComment.source.name}`,
           createdAt: new Date(),
-        },
+        } as any,
       });
 
       // 4. Limitar a 20 actividades

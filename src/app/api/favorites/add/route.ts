@@ -58,12 +58,16 @@ export const POST = withAuth(async (req: Request, { userId }: { userId: string }
       // Registrar actividad
       await tx.activityHistory.create({
         data: {
-          userId,
-          type: "favorite",
+          userId: userId,
+          type: "favorite_added",
           sourceName: source.name,
-          userName: (await tx.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || '',
-          createdAt: new Date(),
-        },
+          sourceId: source.id,
+          targetName: null,
+          targetId: null,
+          targetType: null,
+          details: `Agregaste ${source.name} a favoritos`,
+          createdAt: new Date()
+        } as any
       });
     });
 

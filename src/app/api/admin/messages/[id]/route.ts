@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const { id: messageId } = await params;
 
-    const message = await prisma.message.findUnique({
+    const message = await prisma.directMessage.findUnique({
       where: { id: messageId },
       include: {
         sender: {
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             bio: true,
           }
         },
-        recipient: {
+        receiver: {
           select: {
             id: true,
             name: true,
@@ -71,7 +71,7 @@ export async function PATCH(
     const body = await req.json();
 
     // Validar que el mensaje existe
-    const existingMessage = await prisma.message.findUnique({
+    const existingMessage = await prisma.directMessage.findUnique({
       where: { id: messageId },
     });
 
@@ -80,7 +80,7 @@ export async function PATCH(
     }
 
     // Actualizar el mensaje
-    const updatedMessage = await prisma.message.update({
+    const updatedMessage = await prisma.directMessage.update({
       where: { id: messageId },
       data: {
         read: body.read !== undefined ? body.read : existingMessage.read,
@@ -95,7 +95,7 @@ export async function PATCH(
             image: true,
           }
         },
-        recipient: {
+        receiver: {
           select: {
             id: true,
             name: true,
@@ -129,7 +129,7 @@ export async function DELETE(
     const { id: messageId } = await params;
 
     // Verificar que el mensaje existe
-    const message = await prisma.message.findUnique({
+    const message = await prisma.directMessage.findUnique({
       where: { id: messageId }
     });
 
@@ -138,7 +138,7 @@ export async function DELETE(
     }
 
     // Eliminar el mensaje
-    await prisma.message.delete({
+    await prisma.directMessage.delete({
       where: { id: messageId },
     });
 
