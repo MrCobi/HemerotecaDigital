@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
-import { es } from "date-fns/locale";
-import { useState, useEffect, useMemo } from "react";
-import Pagination from "../components/Pagination";
-import RowsPerPageSelector from "../components/RowsPerPageSelector";
-import TableFilter from "../components/TableFilter";
 import Image from "next/image";
+import { CldImage } from "next-cloudinary";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { useState, useMemo } from "react";
+import DataTable, { Column } from "../components/DataTable/DataTable";
+import { Button } from "@/src/app/components/ui/button";
+import { Trash2, User } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
 
 type User = {
   id: string;
@@ -34,11 +36,8 @@ export default function FollowsTable({ follows }: FollowsTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterValue, setFilterValue] = useState("");
-
-  // Reset a la página 1 cuando cambia el filtro o el número de filas
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterValue, rowsPerPage]);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [followToDelete, setFollowToDelete] = useState<string | null>(null);
 
   // Filtra las relaciones de seguimiento según los criterios seleccionados
   const filteredFollows = useMemo(() => {
@@ -57,188 +56,195 @@ export default function FollowsTable({ follows }: FollowsTableProps) {
     });
   }, [follows, filterValue]);
 
-  // Calcula el total de páginas
+  // Paginación
   const totalPages = Math.ceil(filteredFollows.length / rowsPerPage);
-
-  // Obtiene las relaciones para la página actual
-  const paginatedFollows = useMemo(() => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return filteredFollows.slice(startIndex, endIndex);
-  }, [filteredFollows, currentPage, rowsPerPage]);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const currentFollows = filteredFollows.slice(startIndex, endIndex);
 
   const handleDelete = (id: string) => {
     // Implementar lógica de eliminación
     console.log(`Eliminar relación de seguimiento ${id}`);
+    setIsDeleteDialogOpen(false);
+    setFollowToDelete(null);
   };
 
-  return (
-    <div>
-      <div className="p-4 bg-card border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="w-full sm:w-64">
-          <TableFilter 
-            onFilterChange={setFilterValue} 
-            placeholder="Buscar seguidores..." 
-          />
-        </div>
-        <RowsPerPageSelector 
-          rowsPerPage={rowsPerPage} 
-          onRowsPerPageChange={setRowsPerPage} 
-        />
-      </div>
+  // Función para renderizar la imagen del usuario
+  const renderUserImage = (user: User, size: number = 32) => {
+    if (!user) return null;
     
-      <div className="overflow-x-auto">
-        {paginatedFollows.length > 0 ? (
-          <>
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-card">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-foreground/70 uppercase tracking-wider"
-                  >
-                    Seguidor
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-foreground/70 uppercase tracking-wider"
-                  >
-                    Sigue a
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-foreground/70 uppercase tracking-wider"
-                  >
-                    Fecha de seguimiento
-                  </th>
-                  <th scope="col" className="relative px-6 py-3">
-                    <span className="sr-only">Acciones</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-card divide-y divide-gray-200">
-                {paginatedFollows.map((follow) => (
-                  <tr key={follow.id} className="hover:bg-accent/5 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-8 w-8 flex-shrink-0 rounded-full bg-muted flex items-center justify-center mr-2">
-                          <Image
-                            src={follow.follower.image || "/images/AvatarPredeterminado.webp"}
-                            alt={follow.follower.name || ""}
-                            width={32}
-                            height={32}
-                            className="h-8 w-8 rounded-full object-cover"
-                          />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-foreground">
-                            {follow.follower.name || "Usuario sin nombre"}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {follow.follower.email || "Sin correo"}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-8 w-8 flex-shrink-0 rounded-full bg-muted flex items-center justify-center mr-2">
-                          <Image
-                            src={follow.following.image || "/images/AvatarPredeterminado.webp"}
-                            alt={follow.following.name || ""}
-                            width={32}
-                            height={32}
-                            className="h-8 w-8 rounded-full object-cover"
-                          />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-foreground">
-                            {follow.following.name || "Usuario sin nombre"}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {follow.following.email || "Sin correo"}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(follow.createdAt), { 
-                          locale: es, 
-                          addSuffix: true 
-                        })}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <Link
-                          href={`/admin/users/view/${follow.followerId}`}
-                          className="text-primary hover:text-primary/80 transition-colors duration-200 mr-2"
-                        >
-                          Ver seguidor
-                        </Link>
-                        <Link
-                          href={`/admin/users/view/${follow.followingId}`}
-                          className="text-primary hover:text-primary/80 transition-colors duration-200 mr-2"
-                        >
-                          Ver seguido
-                        </Link>
-                        <button
-                          className="text-destructive hover:text-destructive/80 transition-colors duration-200"
-                          onClick={() => handleDelete(follow.id)}
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            
-            <div className="border-t border-gray-200">
-              <Pagination 
-                currentPage={currentPage} 
-                totalPages={totalPages} 
-                onPageChange={setCurrentPage} 
-              />
+    if (user?.image && user?.image.includes('cloudinary')) {
+      return (
+        <CldImage
+          src={user.image}
+          alt={user?.name || "Avatar"}
+          width={size}
+          height={size}
+          crop="fill"
+          gravity="face"
+          className={`h-${size/4} w-${size/4} rounded-full object-cover`}
+          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+            const target = e.target as HTMLImageElement;
+            target.src = "/images/AvatarPredeterminado.webp";
+          }}
+        />
+      );
+    } else if (user?.image && !user.image.startsWith('/') && !user.image.startsWith('http')) {
+      return (
+        <CldImage
+          src={user.image}
+          alt={user?.name || "Avatar"}
+          width={size}
+          height={size}
+          crop="fill"
+          gravity="face"
+          className={`h-${size/4} w-${size/4} rounded-full object-cover`}
+          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+            const target = e.target as HTMLImageElement;
+            target.src = "/images/AvatarPredeterminado.webp";
+          }}
+        />
+      );
+    } else {
+      return (
+        <Image
+          src={user?.image || "/images/AvatarPredeterminado.webp"}
+          alt={user?.name || "Avatar"}
+          width={size}
+          height={size}
+          className={`h-${size/4} w-${size/4} rounded-full object-cover`}
+          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+            const target = e.target as HTMLImageElement;
+            target.src = "/images/AvatarPredeterminado.webp";
+          }}
+        />
+      );
+    }
+  };
+
+  const columns: Column<Follow>[] = useMemo(() => [
+    {
+      header: "Seguidor",
+      accessorKey: "follower",
+      cell: (follow: Follow) => {
+        const { follower } = follow;
+        return (
+          <div className="flex items-center">
+            <div className="h-8 w-8 flex-shrink-0 mr-3">
+              {renderUserImage(follower)}
             </div>
-          </>
-        ) : (
-          <div className="text-center py-10">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="mx-auto h-12 w-12 text-muted-foreground"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-foreground">No hay relaciones de seguimiento</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {filterValue 
-                ? "Intenta ajustar los filtros de búsqueda"
-                : "No se encontraron relaciones de seguimiento en el sistema."}
-            </p>
-            {filterValue && (
-              <div className="mt-6">
-                <button
-                  onClick={() => setFilterValue("")}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                >
-                  Limpiar filtros
-                </button>
-              </div>
-            )}
+            <div>
+              <Link
+                href={`/admin/users/view/${follower.id}`}
+                className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
+              >
+                {follower.name || "Usuario sin nombre"}
+              </Link>
+              <div className="text-xs text-muted-foreground">{follower.email || "Sin correo"}</div>
+            </div>
           </div>
-        )}
-      </div>
+        );
+      },
+    },
+    {
+      header: "Sigue a",
+      accessorKey: "following",
+      cell: (follow: Follow) => {
+        const { following } = follow;
+        return (
+          <div className="flex items-center">
+            <div className="h-8 w-8 flex-shrink-0 mr-3">
+              {renderUserImage(following)}
+            </div>
+            <div>
+              <Link
+                href={`/admin/users/view/${following.id}`}
+                className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
+              >
+                {following.name || "Usuario sin nombre"}
+              </Link>
+              <div className="text-xs text-muted-foreground">{following.email || "Sin correo"}</div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      header: "Fecha",
+      accessorKey: "createdAt",
+      cell: (follow: Follow) => {
+        const date = new Date(follow.createdAt);
+        return (
+          <div className="text-sm text-muted-foreground">
+            {format(date, "dd/MM/yyyy")}
+          </div>
+        );
+      },
+    },
+    {
+      header: "Acciones",
+      id: "actions",
+      cell: (follow: Follow) => {
+        return (
+          <div className="flex justify-end space-x-2">
+            <Link
+              href={`/admin/users/view/${follow.followerId}`}
+              className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-offset-background transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <User className="h-3.5 w-3.5 mr-1" />
+              Ver seguidor
+            </Link>
+            <Link
+              href={`/admin/users/view/${follow.followingId}`}
+              className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-offset-background transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <User className="h-3.5 w-3.5 mr-1" />
+              Ver seguido
+            </Link>
+            <AlertDialog open={isDeleteDialogOpen && followToDelete === follow.id} onOpenChange={setIsDeleteDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={() => setFollowToDelete(follow.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción eliminará la relación de seguimiento y no se puede deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setFollowToDelete(null)}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleDelete(follow.id)}>Eliminar</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        );
+      },
+    },
+  ], [isDeleteDialogOpen, followToDelete]);
+
+  return (
+    <div className="space-y-4">
+      <DataTable<Follow>
+        data={currentFollows}
+        columns={columns}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        onFilterChange={setFilterValue}
+        filterValue={filterValue}
+        filterPlaceholder="Buscar por nombre o email..."
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={setRowsPerPage}
+        emptyMessage="No hay relaciones de seguimiento para mostrar"
+      />
     </div>
   );
 }
