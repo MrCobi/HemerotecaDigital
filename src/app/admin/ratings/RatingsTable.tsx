@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { CldImage } from "next-cloudinary";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import { useState, useEffect, useMemo } from "react";
@@ -15,8 +14,8 @@ type Rating = {
   id: string;
   value: number;
   comment: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   userId: string;
   sourceId: string;
   user: {
@@ -27,15 +26,17 @@ type Rating = {
   };
   source: {
     id: string;
-    title: string;
+    title?: string;
+    name?: string;
   };
 };
 
 type RatingsTableProps = {
   ratings: Rating[];
+  onRatingDeleted?: (id: string) => void;
 };
 
-export default function RatingsTable({ ratings }: RatingsTableProps) {
+export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableProps) {
   // Estado para paginación y filtrado
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -43,6 +44,13 @@ export default function RatingsTable({ ratings }: RatingsTableProps) {
   const [ratingFilter, setRatingFilter] = useState<number | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [ratingToDelete, setRatingToDelete] = useState<string | null>(null);
+  const [localRatings, setLocalRatings] = useState<Rating[]>(ratings);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Actualizar localRatings cuando cambian las ratings (al montar el componente)
+  useMemo(() => {
+    setLocalRatings(ratings);
+  }, [ratings]);
 
   // Reset a la página 1 cuando cambia el filtro o el número de filas
   useEffect(() => {
@@ -51,29 +59,29 @@ export default function RatingsTable({ ratings }: RatingsTableProps) {
 
   // Filtra las calificaciones según los criterios seleccionados
   const filteredRatings = useMemo(() => {
-    if (!filterValue && ratingFilter === null) return ratings;
-    
-    return ratings.filter((rating) => {
+    if (!filterValue && ratingFilter === null) return localRatings;
+
+    return localRatings.filter((rating) => {
       // Filtrar por valor de calificación
       if (ratingFilter !== null && rating.value !== ratingFilter) {
         return false;
       }
-      
+
       // Filtrar por texto si hay un valor
       if (filterValue) {
         const lowercasedFilter = filterValue.toLowerCase();
-        
+
         const userNameMatch = rating.user?.name?.toLowerCase().includes(lowercasedFilter) || false;
         const userEmailMatch = rating.user?.email?.toLowerCase().includes(lowercasedFilter) || false;
-        const sourceTitleMatch = rating.source.title.toLowerCase().includes(lowercasedFilter);
-        const commentMatch = rating.comment?.toLowerCase().includes(lowercasedFilter) || false;
-        
-        return userNameMatch || userEmailMatch || sourceTitleMatch || commentMatch;
+        const sourceTitleMatch = rating.source?.title?.toLowerCase().includes(lowercasedFilter) || false;
+        const sourceNameMatch = rating.source?.name?.toLowerCase().includes(lowercasedFilter) || false;
+
+        return userNameMatch || userEmailMatch || sourceTitleMatch || sourceNameMatch;
       }
-      
+
       return true;
     });
-  }, [ratings, filterValue, ratingFilter]);
+  }, [localRatings, filterValue, ratingFilter]);
 
   // Calcula el total de páginas
   const totalPages = Math.ceil(filteredRatings.length / rowsPerPage);
@@ -85,64 +93,56 @@ export default function RatingsTable({ ratings }: RatingsTableProps) {
     return filteredRatings.slice(startIndex, endIndex);
   }, [filteredRatings, currentPage, rowsPerPage]);
 
-  const handleDelete = (id: string) => {
-    // Implementar lógica de eliminación
-    console.log(`Eliminar valoración ${id}`);
-    setIsDeleteDialogOpen(false);
-    setRatingToDelete(null);
+  const handleDelete = async (id: string): Promise<void> => {
+    try {
+      setIsDeleting(true);
+      const response = await fetch(`/api/admin/ratings/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al eliminar la valoración');
+      }
+
+      // Actualizar el estado local en lugar de recargar todos los datos
+      setLocalRatings(prev => prev.filter(rating => rating.id !== id));
+
+      // Si estamos en la última página y ya no hay elementos, retrocedemos una página
+      if (paginatedRatings.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      }
+
+      // Notificar al componente padre si es necesario
+      if (onRatingDeleted) {
+        onRatingDeleted(id);
+      }
+
+      // Actualizar el estado local
+      setIsDeleteDialogOpen(false);
+      setRatingToDelete(null);
+    } catch (error) {
+      console.error('Error al eliminar la valoración:', error);
+      alert('Error al eliminar la valoración. Por favor, inténtalo de nuevo.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Función para renderizar la imagen del usuario
   const renderUserImage = (user: Rating['user'], size: number = 32) => {
     if (!user) return null;
-    
-    if (user?.image && user?.image.includes('cloudinary')) {
-      return (
-        <CldImage
-          src={user.image}
-          alt={user?.name || "Avatar"}
-          width={size}
-          height={size}
-          crop="fill"
-          gravity="face"
-          className={`h-${size/4} w-${size/4} rounded-full object-cover`}
-          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-            const target = e.target as HTMLImageElement;
-            target.src = "/images/AvatarPredeterminado.webp";
-          }}
-        />
-      );
-    } else if (user?.image && !user.image.startsWith('/') && !user.image.startsWith('http')) {
-      return (
-        <CldImage
-          src={user.image}
-          alt={user?.name || "Avatar"}
-          width={size}
-          height={size}
-          crop="fill"
-          gravity="face"
-          className={`h-${size/4} w-${size/4} rounded-full object-cover`}
-          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-            const target = e.target as HTMLImageElement;
-            target.src = "/images/AvatarPredeterminado.webp";
-          }}
-        />
-      );
-    } else {
-      return (
-        <Image
-          src={user?.image || "/images/AvatarPredeterminado.webp"}
-          alt={user?.name || "Avatar"}
-          width={size}
-          height={size}
-          className={`h-${size/4} w-${size/4} rounded-full object-cover`}
-          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-            const target = e.target as HTMLImageElement;
-            target.src = "/images/AvatarPredeterminado.webp";
-          }}
-        />
-      );
-    }
+
+    // Usar imagen predeterminada para evitar errores
+    return (
+      <Image
+        src="/images/AvatarPredeterminado.webp"
+        alt={user?.name || "Avatar"}
+        width={size}
+        height={size}
+        className="h-8 w-8 rounded-full object-cover"
+      />
+    );
   };
 
   // Renderizar estrellas para la calificación
@@ -224,10 +224,10 @@ export default function RatingsTable({ ratings }: RatingsTableProps) {
         return (
           <div>
             <Link
-              href={`/admin/sources/${rating.source.id}`}
+              href={`/sources/${rating.sourceId}`}
               className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
             >
-              {rating.source.title}
+              {rating.source?.title || rating.source?.name || rating.sourceId}
             </Link>
           </div>
         );
@@ -240,25 +240,14 @@ export default function RatingsTable({ ratings }: RatingsTableProps) {
       filterElement: ratingFilterElement,
     },
     {
-      header: "Comentario",
-      accessorKey: "comment",
-      cell: (rating: Rating) => {
-        return (
-          <div className="text-sm text-foreground max-w-md">
-            {rating.comment ? (
-              <p className="line-clamp-2">{rating.comment}</p>
-            ) : (
-              <span className="text-muted-foreground italic">Sin comentario</span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
       header: "Fecha",
       accessorKey: "createdAt",
       cell: (rating: Rating) => {
-        const date = new Date(rating.createdAt);
+        // Asegurarse de que createdAt sea una fecha válida
+        const date = typeof rating.createdAt === 'string' 
+          ? new Date(rating.createdAt) 
+          : rating.createdAt;
+        
         return (
           <div className="text-sm text-muted-foreground">
             {formatDistanceToNow(date, { locale: es, addSuffix: true })}
@@ -273,7 +262,7 @@ export default function RatingsTable({ ratings }: RatingsTableProps) {
         return (
           <div className="flex justify-end space-x-2">
             <Link
-              href={`/admin/sources/${rating.source.id}`}
+              href={`/sources/${rating.sourceId}`}
               className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-offset-background transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <Book className="h-3.5 w-3.5 mr-1" />
@@ -298,7 +287,19 @@ export default function RatingsTable({ ratings }: RatingsTableProps) {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setRatingToDelete(null)}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleDelete(rating.id)}>Eliminar</AlertDialogAction>
+                  <AlertDialogAction 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDelete(rating.id);
+                    }}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting && ratingToDelete === rating.id ? (
+                      <span className="animate-pulse">Eliminando...</span>
+                    ) : (
+                      "Eliminar"
+                    )}
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -318,7 +319,7 @@ export default function RatingsTable({ ratings }: RatingsTableProps) {
         onPageChange={setCurrentPage}
         onFilterChange={setFilterValue}
         filterValue={filterValue}
-        filterPlaceholder="Buscar por usuario, fuente o comentario..."
+        filterPlaceholder="Buscar por usuario o fuente..."
         rowsPerPage={rowsPerPage}
         onRowsPerPageChange={setRowsPerPage}
         emptyMessage="No hay valoraciones para mostrar"

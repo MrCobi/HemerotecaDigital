@@ -12,56 +12,65 @@ export default function RatingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadRatings() {
-      try {
-        // Verificar sesión
-        const sessionRes = await fetch('/api/auth/session');
-        const sessionData = await sessionRes.json();
-        
-        if (!sessionData || !sessionData.user) {
-          router.push("/api/auth/signin");
-          return;
-        }
-        
-        if (sessionData.user.role !== "admin") {
-          router.push("/acceso-denegado");
-          return;
-        }
-
-        // Cargar datos de valoraciones
-        const res = await fetch('/api/admin/ratings');
-        
-        if (!res.ok) {
-          throw new Error('Error al cargar valoraciones');
-        }
-        
-        const data = await res.json();
-        
-        // Manejo de diferentes formatos de respuesta
-        let ratingsArray = [];
-        if (Array.isArray(data)) {
-          // Si es un array directamente
-          ratingsArray = data;
-        } else if (data.ratings && Array.isArray(data.ratings)) {
-          // Si tiene una propiedad ratings que es un array
-          ratingsArray = data.ratings;
-        } else if (data.id) {
-          // Si es un solo rating
-          ratingsArray = [data];
-        }
-        
-        setRatings(ratingsArray);
-        setLoading(false);
-      } catch (err) {
-        console.error("Error al cargar valoraciones:", err);
-        setError("Error al cargar datos de valoraciones");
-        setLoading(false);
+  const loadRatings = async () => {
+    setLoading(true);
+    try {
+      // Verificar sesión
+      const sessionRes = await fetch('/api/auth/session');
+      const sessionData = await sessionRes.json();
+      
+      if (!sessionData || !sessionData.user) {
+        router.push("/api/auth/signin");
+        return;
       }
-    }
+      
+      if (sessionData.user.role !== "admin") {
+        router.push("/acceso-denegado");
+        return;
+      }
 
+      // Cargar datos de valoraciones
+      const res = await fetch('/api/admin/ratings');
+      
+      if (!res.ok) {
+        throw new Error('Error al cargar valoraciones');
+      }
+      
+      const data = await res.json();
+      
+      // Manejo de diferentes formatos de respuesta
+      let ratingsArray = [];
+      if (Array.isArray(data)) {
+        // Si es un array directamente
+        ratingsArray = data;
+      } else if (data.ratings && Array.isArray(data.ratings)) {
+        // Si tiene una propiedad ratings que es un array
+        ratingsArray = data.ratings;
+      } else if (data.id) {
+        // Si es un solo rating
+        ratingsArray = [data];
+      }
+      
+      setRatings(ratingsArray);
+      setError(null);
+    } catch (err) {
+      console.error("Error al cargar valoraciones:", err);
+      setError("Error al cargar datos de valoraciones");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadRatings();
   }, [router]);
+
+  // Esta función ya no es necesaria porque RatingsTable maneja las actualizaciones localmente
+  // La dejamos como respaldo por si se necesita recargar toda la tabla en algún momento
+  const handleRatingDeleted = () => {
+    // Comentado para no recargar la página completa, ahora se actualiza localmente
+    // loadRatings();
+  };
 
   if (loading) {
     return (
@@ -97,7 +106,7 @@ export default function RatingsPage() {
       </div>
 
       <div className="bg-card shadow rounded-lg overflow-hidden mt-8">
-        <RatingsTable ratings={ratings} />
+        <RatingsTable ratings={ratings} onRatingDeleted={handleRatingDeleted} />
       </div>
     </div>
   );
