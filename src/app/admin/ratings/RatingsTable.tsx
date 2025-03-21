@@ -135,14 +135,33 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
     if (!user) return null;
 
     if (user.image) {
+      // Extraer el public_id limpio, manejando diferentes formatos
+      let publicId = user.image;
+
+      // Si es una URL completa de Cloudinary
+      if (user.image.includes('cloudinary.com')) {
+        // Extraer el public_id eliminando la parte de la URL
+        // Buscamos 'hemeroteca_digital' como punto de referencia seguro
+        const match = user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+        if (match && match[1]) {
+          publicId = `hemeroteca_digital/${match[1]}`;
+        } else {
+          // Si no encontramos el patrón específico, intentamos una extracción más general
+          publicId = user.image.replace(/.*\/v\d+\//, '').split('?')[0];
+        }
+      }
+
+      // Verificar que el ID no esté duplicado o anidado
+      if (publicId.includes('https://')) {
+        console.warn('ID público contiene URL completa:', publicId);
+        publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+      }
+
+      console.log('Public ID extraído:', publicId);
+
       return (
         <CldImage
-          src={user.image.includes('https://') ? 
-            // Si es una URL completa, extraer solo el public_id
-            user.image.replace(/.*\/v\d+\//, '') : 
-            // Si no, usar directamente (asumiendo que es un public_id)
-            user.image
-          }
+          src={publicId}
           alt={user?.name || "Avatar"}
           width={size}
           height={size}
@@ -150,6 +169,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
           gravity="face"
           className="h-8 w-8 rounded-full object-cover"
           onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+            console.error('Error cargando imagen:', publicId);
             const target = e.target as HTMLImageElement;
             target.src = "/images/AvatarPredeterminado.webp";
           }}
