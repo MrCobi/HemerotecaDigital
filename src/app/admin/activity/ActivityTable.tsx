@@ -6,9 +6,19 @@ import Link from "next/link";
 import Image from "next/image";
 import { CldImage } from "next-cloudinary";
 import DataTable, { Column } from "../components/DataTable/DataTable";
-import { ActivityItem } from ".";
+import { ActivityItem } from "./types";
 import { Badge } from "@/src/app/components/ui/badge";
-import { MessageSquare, Star, Heart, LogIn, UserPlus } from "lucide-react";
+import { 
+  MessageSquare, 
+  Star, 
+  Heart, 
+  LogIn, 
+  UserPlus, 
+  UserMinus, 
+  StarOff, 
+  MessageSquareX,
+  ReplyIcon
+} from "lucide-react";
 
 type ActivityTableProps = {
   activities: ActivityItem[];
@@ -66,10 +76,26 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
             className = "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
             Icon = MessageSquare;
             break;
+          case 'comment_reply':
+            type = "Respuesta";
+            className = "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300";
+            Icon = ReplyIcon;
+            break;
+          case 'comment_deleted':
+            type = "Comentario eliminado";
+            className = "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+            Icon = MessageSquareX;
+            break;
           case 'rating':
+          case 'rating_added':
             type = "Valoración";
             className = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
             Icon = Star;
+            break;
+          case 'rating_removed':
+            type = "Valoración eliminada";
+            className = "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+            Icon = StarOff;
             break;
           case 'favorite':
             type = "Favorito";
@@ -85,6 +111,11 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
             type = "Seguimiento";
             className = "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300";
             Icon = UserPlus;
+            break;
+          case 'unfollow':
+            type = "Dejar de seguir";
+            className = "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300";
+            Icon = UserMinus;
             break;
           default:
             type = "Desconocido";
@@ -106,10 +137,14 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
         >
           <option value="all">Todos los tipos</option>
           <option value="comment">Comentarios</option>
-          <option value="rating">Valoraciones</option>
+          <option value="comment_reply">Respuestas</option>
+          <option value="comment_deleted">Comentarios eliminados</option>
+          <option value="rating_added">Valoraciones</option>
+          <option value="rating_removed">Valoraciones eliminadas</option>
           <option value="favorite">Favoritos</option>
           <option value="login">Inicios de sesión</option>
           <option value="follow">Seguimientos</option>
+          <option value="unfollow">Dejar de seguir</option>
         </select>
       ),
     },

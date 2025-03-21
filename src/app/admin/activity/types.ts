@@ -3,7 +3,7 @@
 export interface User {
   id: string;
   name: string | null;
-  email: string;
+  email: string | null;
   image: string | null;
 }
 
@@ -41,16 +41,40 @@ export interface FavoriteWithDetails {
   source: Source;
 }
 
-export type ActivityItem = {
+export type ActivityType = 
+  | 'comment' 
+  | 'comment_reply' 
+  | 'comment_deleted' 
+  | 'rating' 
+  | 'rating_added'
+  | 'rating_removed'
+  | 'favorite' 
+  | 'login' 
+  | 'follow'
+  | 'unfollow'
+  | 'unknown';
+
+export type TargetType = 'source' | 'user' | 'comment';
+
+export interface ActivityItem {
   id: string;
-  type: 'comment' | 'rating' | 'favorite' | 'login' | 'follow';
+  type: ActivityType;
   userId: string;
   userName: string | null;
   userEmail: string | null;
   userImage: string | null;
   targetName: string;
   targetId: string;
-  targetType: string;
+  targetType: TargetType;
   createdAt: Date;
   details: string | null;
-};
+}
+
+export interface ActivityTableProps {
+  activities: ActivityItem[];
+}
+
+export interface ActivityFilter {
+  query: string;
+  type: ActivityType | null;
+}
