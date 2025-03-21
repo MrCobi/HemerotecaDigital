@@ -101,6 +101,11 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
             className = "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
             Icon = Heart;
             break;
+          case 'favorite_removed':
+            type = "Favorito eliminado";
+            className = "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300";
+            Icon = Heart;
+            break;
           case 'login':
             type = "Inicio de sesión";
             className = "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
@@ -141,6 +146,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
           <option value="rating_added">Valoraciones</option>
           <option value="rating_removed">Valoraciones eliminadas</option>
           <option value="favorite">Favoritos</option>
+          <option value="favorite_removed">Favoritos eliminados</option>
           <option value="login">Inicios de sesión</option>
           <option value="follow">Seguimientos</option>
           <option value="unfollow">Dejar de seguir</option>

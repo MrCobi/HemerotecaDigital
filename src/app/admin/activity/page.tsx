@@ -1,17 +1,13 @@
 "use client";
 
-import { Metadata } from "next";
 import ActivityTable from "./ActivityTable";
 import { ActivityItem, User } from "./types";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-// Esta metadata no funciona en client components, pero la dejamos por compatibilidad
-// con futuras migraciones si es necesario
-export const metadata = {
-  title: "Actividad de Usuarios | Panel de Administración",
-  description: "Monitorea la actividad de usuarios en la Hemeroteca Digital",
-};
+// Quitamos la exportación de metadata ya que no es compatible con componentes cliente
+// La metadata debe ir en un archivo separado como metadata.ts en la misma carpeta
 
 export default function ActivityPage() {
   const router = useRouter();
