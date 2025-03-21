@@ -223,7 +223,32 @@ export default function EditUserPage() {
                     {formData.image && (formData.image.includes('cloudinary') || 
                     (!formData.image.startsWith('/') && !formData.image.startsWith('http') && !formData.image.startsWith('data:'))) ? (
                       <CldImage
-                        src={formData.image}
+                        src={(() => {
+                          // Extraer el public_id limpio, manejando diferentes formatos
+                          let publicId = formData.image;
+
+                          // Si es una URL completa de Cloudinary
+                          if (formData.image.includes('cloudinary.com')) {
+                            // Extraer el public_id eliminando la parte de la URL
+                            // Buscamos 'hemeroteca_digital' como punto de referencia seguro
+                            const match = formData.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                            if (match && match[1]) {
+                              publicId = `hemeroteca_digital/${match[1]}`;
+                            } else {
+                              // Si no encontramos el patrón específico, intentamos una extracción más general
+                              publicId = formData.image.replace(/.*\/v\d+\//, '').split('?')[0];
+                            }
+                          }
+
+                          // Verificar que el ID no esté duplicado o anidado
+                          if (publicId.includes('https://')) {
+                            console.warn('ID público contiene URL completa en editor de perfil:', publicId);
+                            publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                          }
+
+                          console.log('Public ID extraído en editor de perfil:', publicId);
+                          return publicId;
+                        })()}
                         alt={user?.name || "Avatar"}
                         width={200}
                         height={200}
@@ -232,6 +257,7 @@ export default function EditUserPage() {
                         className="object-cover w-full h-full"
                         priority
                         onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                          console.error('Error cargando imagen en editor de perfil:', formData.image);
                           const target = e.target as HTMLImageElement;
                           target.src = "/images/AvatarPredeterminado.webp";
                         }}
@@ -245,6 +271,7 @@ export default function EditUserPage() {
                         className="object-cover w-full h-full"
                         priority
                         onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                          console.error('Error cargando imagen en editor de perfil:', formData.image);
                           const target = e.target as HTMLImageElement;
                           target.src = "/images/AvatarPredeterminado.webp";
                         }}

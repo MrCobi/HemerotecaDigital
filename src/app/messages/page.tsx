@@ -690,7 +690,32 @@ export default function MessagesPage() {
                       <Avatar className="h-14 w-14 border-2 border-blue-200 dark:border-blue-800 group-hover:border-blue-500">
                         {currentOtherUser?.image && currentOtherUser.image.includes("cloudinary") ? (
                           <CldImage
-                            src={currentOtherUser.image}
+                            src={(() => {
+                              // Extraer el public_id limpio, manejando diferentes formatos
+                              let publicId = currentOtherUser.image;
+
+                              // Si es una URL completa de Cloudinary
+                              if (currentOtherUser.image.includes('cloudinary.com')) {
+                                // Extraer el public_id eliminando la parte de la URL
+                                // Buscamos 'hemeroteca_digital' como punto de referencia seguro
+                                const match = currentOtherUser.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                                if (match && match[1]) {
+                                  publicId = `hemeroteca_digital/${match[1]}`;
+                                } else {
+                                  // Si no encontramos el patrón específico, intentamos una extracción más general
+                                  publicId = currentOtherUser.image.replace(/.*\/v\d+\//, '').split('?')[0];
+                                }
+                              }
+
+                              // Verificar que el ID no esté duplicado o anidado
+                              if (publicId.includes('https://')) {
+                                console.warn('ID público contiene URL completa en mensajes:', publicId);
+                                publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                              }
+
+                              console.log('Public ID extraído en mensajes:', publicId);
+                              return publicId;
+                            })()}
                             alt={currentOtherUser?.username || "Usuario"}
                             width={56}
                             height={56}
@@ -699,6 +724,7 @@ export default function MessagesPage() {
                             className="rounded-full object-cover"
                             priority
                             onError={(e) => {
+                              console.error('Error cargando imagen en mensajes:', currentOtherUser.image);
                               const target = e.target as HTMLImageElement;
                               target.src = "/images/AvatarPredeterminado.webp";
                             }}
@@ -707,7 +733,19 @@ export default function MessagesPage() {
                           !currentOtherUser.image.startsWith("/") &&
                           !currentOtherUser.image.startsWith("http") ? (
                           <CldImage
-                            src={currentOtherUser.image}
+                            src={(() => {
+                              // Extraer el public_id limpio, manejando diferentes formatos
+                              let publicId = currentOtherUser.image;
+
+                              // Verificar que el ID no esté duplicado o anidado
+                              if (publicId.includes('https://')) {
+                                console.warn('ID público contiene URL completa en mensajes (2):', publicId);
+                                publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                              }
+
+                              console.log('Public ID extraído en mensajes (2):', publicId);
+                              return publicId;
+                            })()}
                             alt={currentOtherUser?.username || "Usuario"}
                             width={56}
                             height={56}
@@ -715,6 +753,7 @@ export default function MessagesPage() {
                             gravity="face"
                             className="rounded-full object-cover"
                             onError={(e) => {
+                              console.error('Error cargando imagen en mensajes (2):', currentOtherUser.image);
                               const target = e.target as HTMLImageElement;
                               target.src = "/images/AvatarPredeterminado.webp";
                             }}

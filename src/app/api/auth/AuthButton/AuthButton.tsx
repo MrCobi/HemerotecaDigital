@@ -72,7 +72,32 @@ const AuthButton = () => {
               {session.user.image && (session.user.image.includes('cloudinary') || 
               (!session.user.image.startsWith('/') && !session.user.image.startsWith('http'))) ? (
                 <CldImage
-                  src={session.user.image}
+                  src={(() => {
+                    // Extraer el public_id limpio, manejando diferentes formatos
+                    let publicId = session.user.image;
+
+                    // Si es una URL completa de Cloudinary
+                    if (session.user.image.includes('cloudinary.com')) {
+                      // Extraer el public_id eliminando la parte de la URL
+                      // Buscamos 'hemeroteca_digital' como punto de referencia seguro
+                      const match = session.user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                      if (match && match[1]) {
+                        publicId = `hemeroteca_digital/${match[1]}`;
+                      } else {
+                        // Si no encontramos el patrón específico, intentamos una extracción más general
+                        publicId = session.user.image.replace(/.*\/v\d+\//, '').split('?')[0];
+                      }
+                    }
+
+                    // Verificar que el ID no esté duplicado o anidado
+                    if (publicId.includes('https://')) {
+                      console.warn('ID público contiene URL completa en AuthButton:', publicId);
+                      publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                    }
+
+                    console.log('Public ID extraído en AuthButton:', publicId);
+                    return publicId;
+                  })()}
                   alt={session.user?.name || "Usuario"}
                   width={48}
                   height={48}
@@ -80,6 +105,7 @@ const AuthButton = () => {
                   gravity="face"
                   className="w-full h-full object-cover"
                   onError={(e) => {
+                    console.error('Error cargando imagen en AuthButton:', session.user.image);
                     const target = e.target as HTMLImageElement;
                     target.src = "/images/AvatarPredeterminado.webp";
                   }}

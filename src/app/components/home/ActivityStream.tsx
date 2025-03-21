@@ -63,7 +63,32 @@ export function ActivityStream() {
               {activity.user.avatar && (activity.user.avatar.includes('cloudinary') || 
               (!activity.user.avatar.startsWith('http') && !activity.user.avatar.startsWith('/'))) ? (
                 <CldImage
-                  src={activity.user.avatar}
+                  src={(() => {
+                    // Extraer el public_id limpio, manejando diferentes formatos
+                    let publicId = activity.user.avatar;
+
+                    // Si es una URL completa de Cloudinary
+                    if (activity.user.avatar.includes('cloudinary.com')) {
+                      // Extraer el public_id eliminando la parte de la URL
+                      // Buscamos 'hemeroteca_digital' como punto de referencia seguro
+                      const match = activity.user.avatar.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                      if (match && match[1]) {
+                        publicId = `hemeroteca_digital/${match[1]}`;
+                      } else {
+                        // Si no encontramos el patrón específico, intentamos una extracción más general
+                        publicId = activity.user.avatar.replace(/.*\/v\d+\//, '').split('?')[0];
+                      }
+                    }
+
+                    // Verificar que el ID no esté duplicado o anidado
+                    if (publicId.includes('https://')) {
+                      console.warn('ID público contiene URL completa en ActivityStream:', publicId);
+                      publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                    }
+
+                    console.log('Public ID extraído en ActivityStream:', publicId);
+                    return publicId;
+                  })()}
                   alt={activity.user.name}
                   width={32}
                   height={32}
@@ -71,6 +96,7 @@ export function ActivityStream() {
                   gravity="face"
                   className="h-8 w-8 rounded-full"
                   onError={(e) => {
+                    console.error('Error cargando imagen en ActivityStream:', activity.user.avatar);
                     const target = e.target as HTMLImageElement;
                     target.src = "/images/AvatarPredeterminado.webp";
                   }}

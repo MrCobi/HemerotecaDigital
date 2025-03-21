@@ -211,7 +211,32 @@ export default function UserProfilePage() {
                   {user.image && (user.image.includes('cloudinary') || 
                   (!user.image.startsWith('/') && !user.image.startsWith('http'))) ? (
                     <CldImage
-                      src={user.image}
+                      src={(() => {
+                        // Extraer el public_id limpio, manejando diferentes formatos
+                        let publicId = user.image;
+
+                        // Si es una URL completa de Cloudinary
+                        if (user.image.includes('cloudinary.com')) {
+                          // Extraer el public_id eliminando la parte de la URL
+                          // Buscamos 'hemeroteca_digital' como punto de referencia seguro
+                          const match = user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                          if (match && match[1]) {
+                            publicId = `hemeroteca_digital/${match[1]}`;
+                          } else {
+                            // Si no encontramos el patrón específico, intentamos una extracción más general
+                            publicId = user.image.replace(/.*\/v\d+\//, '').split('?')[0];
+                          }
+                        }
+
+                        // Verificar que el ID no esté duplicado o anidado
+                        if (publicId.includes('https://')) {
+                          console.warn('ID público contiene URL completa en perfil:', publicId);
+                          publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                        }
+
+                        console.log('Public ID extraído en perfil de usuario:', publicId);
+                        return publicId;
+                      })()}
                       alt={user.name || "Avatar"}
                       width={200}
                       height={200}
@@ -220,6 +245,7 @@ export default function UserProfilePage() {
                       className="object-cover w-full h-full"
                       priority
                       onError={(e) => {
+                        console.error('Error cargando imagen en perfil de usuario:', user.image);
                         const target = e.target as HTMLImageElement;
                         target.src = "/images/AvatarPredeterminado.webp";
                       }}
