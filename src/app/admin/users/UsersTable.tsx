@@ -5,8 +5,97 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { DataTable, Column } from "../components/DataTable";
 import { Button, buttonVariants } from "@/src/app/components/ui/button";
-import { Trash2, Edit, User } from "lucide-react";
+import { Badge } from "@/src/app/components/ui/badge";
+import { Trash2, Edit, User, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/src/app/components/ui/alert-dialog";
+import { toast } from "sonner";
+
+// Componente para el diálogo de confirmación de eliminación
+interface DeleteUserDialogProps {
+  userId: string;
+  userName: string | null;
+  onDelete: () => Promise<void>;
+}
+
+function DeleteUserDialog({ userId, userName, onDelete }: DeleteUserDialogProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  async function handleDelete() {
+    try {
+      setIsDeleting(true);
+      await onDelete();
+      setIsOpen(false);
+      toast.success("Usuario eliminado correctamente");
+    } catch (error) {
+      console.error("Error al eliminar usuario:", error);
+      toast.error("Error al eliminar usuario");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+  
+  return (
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialogTrigger asChild>
+        <Button
+          variant="destructive"
+          size="icon"
+          className="h-8 w-8"
+          title="Eliminar usuario"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            Eliminar usuario
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            <div className="mb-2">
+              ¿Estás seguro de que deseas eliminar al usuario <span className="font-semibold">{userName || userId}</span>?
+            </div>
+            <div className="text-destructive font-medium">
+              Esta acción no se puede deshacer y eliminará toda la información asociada a este usuario.
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e: any) => {
+              e.preventDefault();
+              handleDelete();
+            }}
+            disabled={isDeleting}
+            className={buttonVariants({ variant: "destructive" })}
+          >
+            {isDeleting ? (
+              <>
+                <span className="animate-pulse">Eliminando...</span>
+              </>
+            ) : (
+              "Eliminar usuario"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 // Definimos el tipo Role explícitamente
 export type Role = "ADMIN" | "EDITOR" | "USER";
@@ -66,24 +155,21 @@ export default function UsersTable({ users }: UsersTableProps) {
 
   // Función para manejar la eliminación de un usuario
   const handleDeleteUser = async (userId: string) => {
-    if (confirm("¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.")) {
-      try {
-        const response = await fetch(`/api/admin/users/${userId}`, {
-          method: 'DELETE',
-        });
-        
-        if (response.ok) {
-          alert("Usuario eliminado correctamente");
-          // Recargar la página para actualizar la lista
-          router.refresh();
-        } else {
-          const data = await response.json();
-          alert(`Error al eliminar usuario: ${data.error || 'Error desconocido'}`);
-        }
-      } catch (error) {
-        console.error("Error al eliminar usuario:", error);
-        alert("Error al eliminar usuario. Consulta la consola para más detalles.");
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Error desconocido');
       }
+      
+      // Recargar la página para actualizar la lista
+      router.refresh();
+    } catch (error) {
+      console.error("Error al eliminar usuario:", error);
+      throw error;
     }
   };
 
@@ -201,16 +287,11 @@ export default function UsersTable({ users }: UsersTableProps) {
             <Edit className="w-4 h-4 mr-1" />
             Editar
           </Link>
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteUser(user.id);
-            }}
-            className="inline-flex items-center text-red-600 hover:text-red-700 font-medium transition-colors text-sm bg-red-100 hover:bg-red-200 px-2 py-1 rounded-md dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-800/50 text-sm"
-          >
-            <Trash2 className="w-4 h-4 mr-1" />
-            Eliminar
-          </Button>
+          <DeleteUserDialog
+            userId={user.id}
+            userName={user.name}
+            onDelete={() => handleDeleteUser(user.id)}
+          />
         </div>
       )
     }
