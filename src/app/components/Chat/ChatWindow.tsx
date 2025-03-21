@@ -49,7 +49,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 }) => {
   const { data: session } = useSession();
   const currentUserId = session?.user?.id;
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [canSendMessages, setCanSendMessages] = useState<boolean | null>(null);
@@ -188,56 +188,79 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     console.log('Objeto mensaje completo:', JSON.stringify(message, null, 2));
     
     setMessages(prevMessages => {
-      // Primero verificar si este mensaje ya existe en la lista
-      // Comparamos tanto id como tempId para cubrir mensajes locales y remotos
-      const existingMessage = prevMessages.find(msg => 
-        (msg.id && msg.id === message.id) || 
-        (msg.tempId && msg.tempId === message.tempId) ||
-        (message.id && msg.tempId === message.id) ||
-        (message.tempId && msg.id === message.tempId)
-      );
-      
-      console.log('¿Mensaje ya existe en la lista?', !!existingMessage);
-      
-      // Si el mensaje no existe, añadirlo a la lista
-      if (!existingMessage) {
-        console.log('Añadiendo nuevo mensaje a la lista. ID:', message.id || message.tempId);
+      // Comprobar si este mensaje es un duplicado usando una verificación más robusta
+      const isDuplicate = prevMessages.some(msg => {
+        // Si tiene ID o tempId y coinciden
+        if ((msg.id && msg.id === message.id) || 
+            (msg.tempId && msg.tempId === message.tempId) ||
+            (message.id && msg.tempId === message.id) ||
+            (message.tempId && msg.id === message.tempId)) {
+          return true;
+        }
         
-        // Crear una copia del arreglo y añadir el nuevo mensaje
-        const newMessagesList = [...prevMessages, message];
+        // Si tiene el mismo contenido, emisor, receptor y está dentro de un rango de tiempo cercano (5 segundos)
+        if (msg.content === message.content && 
+            msg.senderId === message.senderId && 
+            (msg.receiverId === message.receiverId || !msg.receiverId || !message.receiverId)) {
+          const msgTime = new Date(msg.createdAt).getTime();
+          const newMsgTime = new Date(message.createdAt).getTime();
+          return Math.abs(msgTime - newMsgTime) < 5000; // 5 segundos de margen
+        }
         
-        // Ordenar mensajes por fecha de creación
-        return newMessagesList.sort((a, b) => {
-          const timeA = new Date(a.createdAt).getTime();
-          const timeB = new Date(b.createdAt).getTime();
-          return timeA - timeB;
+        return false;
+      });
+      
+      console.log('¿Mensaje es duplicado?', isDuplicate);
+      
+      if (isDuplicate) {
+        console.log('Ignorando mensaje duplicado');
+        // Si es duplicado, actualizar propiedades como el ID o estado si es necesario
+        return prevMessages.map(msg => {
+          // Si coincide por ID o tempId
+          if ((msg.id && msg.id === message.id) || 
+              (msg.tempId && msg.tempId === message.tempId) ||
+              (message.id && msg.tempId === message.id) ||
+              (message.tempId && msg.id === message.tempId) ||
+              // O si coincide por contenido, tiempo y usuarios
+              (msg.content === message.content && 
+               msg.senderId === message.senderId && 
+               Math.abs(new Date(msg.createdAt).getTime() - new Date(message.createdAt).getTime()) < 5000)) {
+            
+            // Mantener el ID existente si es definitivo o usar el nuevo si existe
+            const finalId = msg.id || message.id;
+            // Mantener tempId solo si no hay ID definitivo
+            const finalTempId = finalId ? undefined : (msg.tempId || message.tempId);
+            
+            // Usar el mejor estado disponible
+            const finalStatus = message.status === 'error' ? 'error' : 
+                                (message.status === 'read' || msg.status === 'read') ? 'read' :
+                                (message.status === 'delivered' || msg.status === 'delivered') ? 'delivered' :
+                                (message.status === 'sent' || msg.status === 'sent') ? 'sent' :
+                                msg.status || 'sent';
+            
+            return { 
+              ...msg, 
+              id: finalId,
+              tempId: finalTempId,
+              status: finalStatus,
+              read: message.read || msg.read
+            };
+          }
+          return msg;
         });
       }
       
-      // Si el mensaje ya existe, actualizar su estado y contenido
-      console.log('Actualizando mensaje existente');
-      return prevMessages.map(msg => {
-        // Comparar todos los posibles IDs para encontrar coincidencias
-        if (
-          (msg.id && msg.id === message.id) || 
-          (msg.tempId && msg.tempId === message.tempId) ||
-          (message.id && msg.tempId === message.id) ||
-          (message.tempId && msg.id === message.tempId)
-        ) {
-          // Mantener el ID existente si es definitivo o usar el nuevo si existe
-          const finalId = msg.id || message.id;
-          // Mantener tempId solo si no hay ID definitivo
-          const finalTempId = finalId ? undefined : (msg.tempId || message.tempId);
-          
-          return { 
-            ...msg, 
-            ...message,
-            id: finalId,
-            tempId: finalTempId,
-            status: message.status || msg.status
-          };
-        }
-        return msg;
+      // Si no es duplicado, añadir el mensaje a la lista
+      console.log('Añadiendo nuevo mensaje a la lista. ID:', message.id || message.tempId);
+      
+      // Crear una copia del arreglo y añadir el nuevo mensaje
+      const newMessagesList = [...prevMessages, message];
+      
+      // Ordenar mensajes por fecha de creación
+      return newMessagesList.sort((a, b) => {
+        const timeA = new Date(a.createdAt).getTime();
+        const timeB = new Date(b.createdAt).getTime();
+        return timeA - timeB;
       });
     });
     
@@ -300,10 +323,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       return;
     }
 
+    // Crear tempId fuera del bloque try para que esté disponible en todo el ámbito de la función
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
     try {
       setIsSending(true);
-      
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       
       // Crear nuevo mensaje
       const message = {
@@ -329,42 +353,63 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
       }
       
-      // Enviar mensaje a través de Socket.io
-      const socketSuccess = sendSocketMessage(message);
+      // ESTRATEGIA DE ENVÍO: Primero intentar Socket.io, si falla, usar API REST
+      let messageSaved = false;
       
-      if (!socketSuccess) {
-        console.error('Error al enviar mensaje mediante Socket.io');
-        updateMessageStatus(tempId, 'error');
+      // Primero intenta enviar por Socket.io
+      if (connected) {
+        const socketSuccess = sendSocketMessage(message);
+        if (socketSuccess) {
+          console.log('Mensaje enviado exitosamente via Socket.io');
+          messageSaved = true;
+        } else {
+          console.error('Error al enviar mensaje mediante Socket.io');
+          // No actualizamos a error todavía, intentaremos la API REST
+        }
       } else {
-        console.log('Mensaje enviado exitosamente via Socket.io');
+        console.log('Socket no conectado, usando API REST directamente');
       }
       
-      // RESPALDO: También enviar el mensaje a la API REST para garantizar persistencia
-      try {
-        const response = await fetch(API_ROUTES.messages.send, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            content: message.content,
-            receiverId: message.receiverId,
-            tempId: message.tempId
-          }),
-        });
-        
-        if (!response.ok) {
-          console.warn('Advertencia: El mensaje se envió por Socket.io pero puede no haberse guardado en la base de datos');
-        } else {
-          const savedMessage = await response.json();
-          console.log('Mensaje guardado correctamente en base de datos vía API', savedMessage);
+      // Solo si Socket.io falló o no está conectado, usar API REST como respaldo
+      if (!messageSaved) {
+        try {
+          const response = await fetch(API_ROUTES.messages.send, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              content: message.content,
+              receiverId: message.receiverId,
+              tempId: message.tempId
+            }),
+          });
+          
+          if (!response.ok) {
+            console.error('Error al guardar mensaje vía API:', response.status);
+            updateMessageStatus(tempId, 'error');
+          } else {
+            const savedMessage = await response.json();
+            console.log('Mensaje guardado correctamente en base de datos vía API', savedMessage);
+            // Actualizar el estado del mensaje solo si tenemos un ID permanente
+            if (savedMessage.id) {
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.tempId === tempId 
+                    ? { ...msg, id: savedMessage.id, status: 'sent' } 
+                    : msg
+                )
+              );
+            }
+          }
+        } catch (apiError) {
+          console.error('Error al guardar mensaje vía API:', apiError);
+          updateMessageStatus(tempId, 'error');
         }
-      } catch (apiError) {
-        console.warn('Error al guardar mensaje vía API (fallback):', apiError);
-        // No actualizamos el estado del mensaje como error ya que Socket.io puede haberlo enviado correctamente
       }
     } catch (error) {
       console.error('Error al enviar mensaje:', error);
+      updateMessageStatus(tempId, 'error');
     } finally {
       setIsSending(false);
     }
@@ -715,34 +760,100 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [isOpen, otherUser?.id, currentUserId, messagesLoaded, loadHistoricalMessages]);
   
-  // Debug: Mostrar el avance del tiempo cada segundo
+  // Inicializar con mensajes iniciales solo al abrir la conversación
   useEffect(() => {
-    const interval = setInterval(() => {
-      // Verificar si otherUser y currentUserId estan definidos para confirmar inicializacion correcta
-      console.log('Estado actual de chat:', {
-        time: new Date().toISOString(),
-        otherUserId: otherUser?.id,
-        currentUserId,
-        mensajesEnLista: messages.length,
-        estadoConexion: connected ? 'Conectado' : 'Desconectado',
+    if (isOpen && otherUser && initialMessages.length > 0) {
+      console.log('Inicializando con mensajes iniciales al abrir la conversación', initialMessages.length);
+      
+      // Procesamos los mensajes iniciales para evitar duplicados
+      const processedMessages = initialMessages.filter((msg, index, self) => {
+        // Filtrar mensajes duplicados por ID o tempId
+        return self.findIndex(m => 
+          (m.id && m.id === msg.id) || 
+          (m.tempId && m.tempId === msg.tempId)
+        ) === index;
       });
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [otherUser?.id, currentUserId, messages.length, connected]);
-
-  // Limpiar estados al cerrar la ventana de chat
-  const handleClose = () => {
-    // Prevenir cierres inesperados cuando estamos enviando mensajes
-    if (isSending) {
-      console.log('Evitando cierre mientras se envía un mensaje');
-      return;
+      
+      setMessages(processedMessages);
+      setMessagesLoaded(true);
     }
-    
-    setIsSending(false);
-    setPeerIsTyping(false);
-    setNewMessage('');
-    setMessagesLoaded(false); // Resetear el estado de carga de mensajes
+  }, [isOpen, otherUser, initialMessages]);
+
+  // Cargar mensajes de la conversación cuando cambia la conversación o se abre la ventana
+  useEffect(() => {
+    if (isOpen && otherUser?.id && currentUserId && !messagesLoaded) {
+      const loadMessages = async () => {
+        setIsLoadingMessages(true);
+        
+        try {
+          console.log(`Cargando mensajes entre ${currentUserId} y ${otherUser.id}`);
+          const response = await fetch(`/api/messages?otherUserId=${otherUser.id}`);
+          
+          if (!response.ok) {
+            console.error('Error al cargar mensajes:', response.status);
+            return;
+          }
+          
+          const data = await response.json();
+          
+          if (data && Array.isArray(data.messages)) {
+            console.log(`Recibidos ${data.messages.length} mensajes de la API`);
+            
+            // Procesar mensajes para evitar duplicados
+            const uniqueMessages = data.messages.filter((msg: Message, index: number, self: Message[]) => {
+              // Filtrar mensajes duplicados por ID o contenido+tiempo
+              return self.findIndex((m: Message) => 
+                (m.id && m.id === msg.id) || 
+                (m.content === msg.content && 
+                 m.senderId === msg.senderId && 
+                 m.receiverId === msg.receiverId &&
+                 Math.abs(new Date(m.createdAt).getTime() - new Date(msg.createdAt).getTime()) < 5000)
+              ) === index;
+            });
+            
+            // Reemplazar mensajes en lugar de añadirlos
+            setMessages(uniqueMessages);
+            
+            // Marcar los mensajes no leídos como leídos
+            const unreadMessages = uniqueMessages.filter(
+              (msg: Message) => !msg.read && msg.senderId === otherUser.id
+            );
+            
+            for (const msg of unreadMessages) {
+              if (msg.id) {
+                markMessageAsRead(msg.id, conversationId || '');
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error al cargar mensajes:', error);
+        } finally {
+          setIsLoadingMessages(false);
+          setMessagesLoaded(true);
+        }
+      };
+      
+      loadMessages();
+    }
+  }, [isOpen, otherUser?.id, currentUserId, messagesLoaded, conversationId, markMessageAsRead]);
+
+  // Limpiar estado de mensajes al cerrar la ventana o cambiar de conversación
+  useEffect(() => {
+    if (!isOpen) {
+      // Al cerrar, no limpiamos los mensajes inmediatamente para evitar recargas al reabrir
+      return () => {
+        // Solo limpiar cuando cambia el otherUser (cambia de conversación)
+        if (!isOpen) {
+          console.log('Limpiando estado de mensajes al cambiar de conversación');
+          setMessagesLoaded(false);
+        }
+      };
+    }
+  }, [isOpen, otherUser?.id]);
+
+  // Manejar cierre de ventana
+  const handleClose = () => {
+    // No limpiar los mensajes al cerrar, solo cuando cambia la conversación
     onClose();
   };
 

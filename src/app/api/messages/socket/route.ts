@@ -44,7 +44,7 @@ export async function POST(request: Request) {
                 { senderId: senderId },
                 { receiverId: receiverId },
                 { content: content },
-                { createdAt: { gt: new Date(Date.now() - 60000) } } // Mensajes en el último minuto
+                { createdAt: { gt: new Date(Date.now() - 300000) } } // Extendido a 5 minutos para mayor seguridad
               ]
             }
           ]
@@ -53,6 +53,29 @@ export async function POST(request: Request) {
 
       if (existingMessage) {
         console.log(`Socket API: Mensaje duplicado detectado con tempId: ${tempId}. ID existente: ${existingMessage.id}`);
+        return new Response(JSON.stringify(existingMessage), { 
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    } else {
+      // Si no hay tempId, verificar igualmente si existe un mensaje similar reciente
+      const existingMessage = await prisma.directMessage.findFirst({
+        where: {
+          AND: [
+            { senderId: senderId },
+            { receiverId: receiverId },
+            { content: content },
+            { createdAt: { gt: new Date(Date.now() - 300000) } } // Últimos 5 minutos
+          ]
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      if (existingMessage) {
+        console.log(`Socket API: Mensaje similar reciente encontrado sin tempId. ID existente: ${existingMessage.id}`);
         return new Response(JSON.stringify(existingMessage), { 
           status: 200,
           headers: { 'Content-Type': 'application/json' }

@@ -122,7 +122,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
                   { senderId: userId },
                   { receiverId: receiverId },
                   { content: content },
-                  { createdAt: { gt: new Date(Date.now() - 60000) } } // Mensajes en el último minuto
+                  { createdAt: { gt: new Date(Date.now() - 300000) } } // Extendido a 5 minutos para mayor seguridad
                 ]
               }
             ]
@@ -133,26 +133,80 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
           console.log(`Mensaje duplicado detectado con tempId: ${tempId}. ID existente: ${existingMessage.id}`);
           return existingMessage;
         }
+      } else {
+        // Si no hay tempId, verificar igualmente si existe un mensaje similar reciente
+        const existingMessage = await prisma.directMessage.findFirst({
+          where: {
+            AND: [
+              { senderId: userId },
+              { receiverId: receiverId },
+              { content: content },
+              { createdAt: { gt: new Date(Date.now() - 300000) } } // Últimos 5 minutos
+            ]
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        });
+
+        if (existingMessage) {
+          console.log(`Mensaje similar reciente encontrado sin tempId. ID existente: ${existingMessage.id}`);
+          return existingMessage;
+        }
       }
 
       // Si no es duplicado, crear el mensaje
-      return prisma.directMessage.create({
-        data: {
-          content,
-          senderId: userId,
-          receiverId,
-          tempId
-        },
-        select: {
-          id: true,
-          content: true,
-          createdAt: true, 
-          read: true,
-          senderId: true,
-          receiverId: true,
-          tempId: true
+      try {
+        return prisma.directMessage.create({
+          data: {
+            content,
+            senderId: userId,
+            receiverId,
+            tempId
+          },
+          select: {
+            id: true,
+            content: true,
+            createdAt: true, 
+            read: true,
+            senderId: true,
+            receiverId: true,
+            tempId: true
+          }
+        });
+      } catch (error) {
+        // Si ocurre un error al crear, puede ser debido a una condición de carrera
+        // Intentar buscar nuevamente el mensaje
+        console.error("Error al crear mensaje, verificando si ya existe:", error);
+        const whereConditions: any[] = [
+          { 
+            AND: [
+              { senderId: userId },
+              { receiverId: receiverId },
+              { content: content },
+              { createdAt: { gt: new Date(Date.now() - 60000) } }
+            ]
+          }
+        ];
+        
+        // Añadir condición de tempId solo si existe
+        if (tempId) {
+          whereConditions.push({ tempId });
         }
-      });
+        
+        const possibleDuplicate = await prisma.directMessage.findFirst({
+          where: {
+            OR: whereConditions
+          }
+        });
+        
+        if (possibleDuplicate) {
+          console.log("Mensaje encontrado después de error de creación:", possibleDuplicate.id);
+          return possibleDuplicate;
+        }
+        
+        throw error; // Si no se encuentra, relanzar el error
+      }
     };
     
     // Para mensajes de alta prioridad, no esperamos a la base de datos
