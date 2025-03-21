@@ -8,8 +8,9 @@ import { es } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/app/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/src/app/components/ui/card";
 import { Badge } from "@/src/app/components/ui/badge";
-import { User, Settings, Clock, Mail, CalendarDays, Shield, Hash, MessageCircle, Star, BookMarked, Send, Inbox, UserCheck } from "lucide-react";
+import { User, Settings, Clock, Mail, CalendarDays, Shield, Hash, MessageCircle, Star, BookMarked, Send, Inbox, UserCheck, AlertCircle, Loader2 } from "lucide-react";
 import { CldImage } from "next-cloudinary";
+import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
 
 type PageProps = {
   params: Promise<{
@@ -27,6 +28,9 @@ type UserData = {
   createdAt: string;
   updatedAt: string;
   emailVerified: string | null;
+  bio: string | null;
+  showActivity: boolean;
+  showFavorites: boolean;
   _count: {
     comments: number;
     ratings: number;
@@ -49,6 +53,15 @@ export default function UserViewPage({ params }: PageProps) {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [resetPasswordStatus, setResetPasswordStatus] = useState<{
+    loading: boolean;
+    success: boolean;
+    error: string;
+  }>({
+    loading: false,
+    success: false,
+    error: "",
+  });
 
   useEffect(() => {
     async function getParamId() {
@@ -141,6 +154,57 @@ export default function UserViewPage({ params }: PageProps) {
       </div>
     );
   }
+
+  const handleResetPassword = async () => {
+    if (!user || !user.id) return;
+    
+    setResetPasswordStatus({
+      loading: true,
+      success: false,
+      error: "",
+    });
+    
+    try {
+      const response = await fetch('/api/admin/users/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setResetPasswordStatus({
+          loading: false,
+          success: true,
+          error: "",
+        });
+        
+        // Limpiar el mensaje de éxito después de 5 segundos
+        setTimeout(() => {
+          setResetPasswordStatus(prev => ({
+            ...prev,
+            success: false
+          }));
+        }, 5000);
+      } else {
+        setResetPasswordStatus({
+          loading: false,
+          success: false,
+          error: data.error || "Ha ocurrido un error al enviar el correo",
+        });
+      }
+    } catch (error) {
+      console.error("Error al solicitar reseteo de contraseña:", error);
+      setResetPasswordStatus({
+        loading: false,
+        success: false,
+        error: "Error de conexión al servidor",
+      });
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -313,6 +377,18 @@ export default function UserViewPage({ params }: PageProps) {
                           <p className="text-sm text-muted-foreground">Última actualización</p>
                           <p className="font-medium">{new Date(user.updatedAt).toLocaleString()}</p>
                         </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Biografía</p>
+                          <p className="font-medium">{user.bio || "No establecida"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Mostrar actividad</p>
+                          <p className="font-medium">{user.showActivity ? "Sí" : "No"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Mostrar favoritos</p>
+                          <p className="font-medium">{user.showFavorites ? "Sí" : "No"}</p>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -341,15 +417,38 @@ export default function UserViewPage({ params }: PageProps) {
                         
                         <button 
                           className="flex items-center p-3 rounded-lg border border-input hover:bg-destructive/10 transition-colors text-left"
+                          onClick={handleResetPassword}
+                          disabled={resetPasswordStatus.loading}
                         >
                           <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30 mr-3">
-                            <Shield className="w-4 h-4 text-red-600 dark:text-red-400" />
+                            {resetPasswordStatus.loading ? (
+                              <Loader2 className="w-4 h-4 text-red-600 dark:text-red-400 animate-spin" />
+                            ) : (
+                              <Shield className="w-4 h-4 text-red-600 dark:text-red-400" />
+                            )}
                           </div>
                           <div>
                             <p className="font-medium">Restablecer contraseña</p>
                             <p className="text-sm text-muted-foreground">Enviar email para resetear contraseña</p>
                           </div>
                         </button>
+                        
+                        {resetPasswordStatus.success && (
+                          <Alert className="mt-4 border-green-500 text-green-500">
+                            <AlertDescription>
+                              Se ha enviado un correo con instrucciones para restablecer la contraseña.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        
+                        {resetPasswordStatus.error && (
+                          <Alert variant="destructive" className="mt-4">
+                            <AlertCircle className="h-4 w-4 mr-2" />
+                            <AlertDescription>
+                              {resetPasswordStatus.error}
+                            </AlertDescription>
+                          </Alert>
+                        )}
                       </div>
                     </CardContent>
                     <CardFooter className="flex justify-between border-t pt-4">

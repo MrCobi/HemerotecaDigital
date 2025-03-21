@@ -107,6 +107,8 @@ export async function PATCH(
         image: body.image,
         role: body.role,
         bio: body.bio,
+        showActivity: body.showActivity,
+        showFavorites: body.showFavorites,
       },
     });
 

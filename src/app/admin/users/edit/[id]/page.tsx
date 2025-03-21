@@ -23,6 +23,9 @@ type User = {
   createdAt: Date;
   updatedAt: Date;
   emailVerified: Date | null;
+  bio: string | null;
+  showActivity: boolean;
+  showFavorites: boolean;
 };
 
 export default function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,7 +36,10 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
     username: "",
     email: "", 
     password: "", 
-    role: ""
+    role: "",
+    bio: "",
+    showActivity: true,
+    showFavorites: true
   });
   const [userInfo, setUserInfo] = useState<User | null>(null);
   const [preview, setPreview] = useState("/placeholders/user.png");
@@ -81,7 +87,10 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
           username: data.username || "",
           email: data.email, 
           password: "", 
-          role: data.role 
+          role: data.role,
+          bio: data.bio || "",
+          showActivity: data.showActivity !== undefined ? data.showActivity : true,
+          showFavorites: data.showFavorites !== undefined ? data.showFavorites : true 
         });
         setUserInfo(data);
         if (data.image) setPreview(data.image);
@@ -102,6 +111,10 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
 
   const handleRoleChange = (value: string) => {
     setForm({ ...form, role: value });
+  };
+
+  const handleToggleChange = (name: string, value: boolean) => {
+    setForm({ ...form, [name]: value });
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -266,6 +279,7 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                         value={form.username}
                         onChange={handleChange}
                         className="mt-1"
+                        required
                       />
                     </div>
 
@@ -280,6 +294,41 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                         className="mt-1"
                         required
                       />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="bio">Biografía</Label>
+                      <Input
+                        id="bio"
+                        type="text"
+                        name="bio"
+                        value={form.bio}
+                        onChange={handleChange}
+                        className="mt-1"
+                        placeholder="Biografía del usuario (opcional)"
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="showActivity"
+                        checked={form.showActivity}
+                        onChange={(e) => handleToggleChange("showActivity", e.target.checked)}
+                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <Label htmlFor="showActivity">Mostrar actividad públicamente</Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="showFavorites"
+                        checked={form.showFavorites}
+                        onChange={(e) => handleToggleChange("showFavorites", e.target.checked)}
+                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <Label htmlFor="showFavorites">Mostrar favoritos públicamente</Label>
                     </div>
                   </CardContent>
                 </Card>
