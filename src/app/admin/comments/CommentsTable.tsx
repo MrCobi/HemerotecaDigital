@@ -95,7 +95,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
     setIsDeleting(true);
     
     try {
-      const response = await fetch(`/api/admin/comments/${commentId}`, {
+      const response = await fetch(`/api/admin/comments/${commentId}?deleteReplies=true`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -108,16 +108,35 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
         throw new Error(data.error || 'Error al eliminar el comentario');
       }
 
-      // Actualizar el estado local para reflejar la eliminación
-      setComments(prevComments => 
-        prevComments.map(comment => 
-          comment.id === commentId 
-            ? { ...comment, isDeleted: true } 
-            : comment
-        )
-      );
-      
-      toast.success('Comentario eliminado correctamente');
+      // Si el servidor devuelve los IDs de los comentarios eliminados (incluyendo respuestas),
+      // actualizamos todos ellos en el estado local
+      if (data.deletedIds && Array.isArray(data.deletedIds)) {
+        setComments(prevComments => 
+          prevComments.map(comment => 
+            data.deletedIds.includes(comment.id)
+              ? { ...comment, isDeleted: true } 
+              : comment
+          )
+        );
+        
+        // Si hay respuestas eliminadas, mostrar mensaje más específico
+        if (data.deletedIds.length > 1) {
+          toast.success(`Comentario eliminado junto con ${data.deletedIds.length - 1} respuestas`);
+        } else {
+          toast.success('Comentario eliminado correctamente');
+        }
+      } else {
+        // Comportamiento anterior como fallback
+        setComments(prevComments => 
+          prevComments.map(comment => 
+            comment.id === commentId 
+              ? { ...comment, isDeleted: true } 
+              : comment
+          )
+        );
+        
+        toast.success('Comentario eliminado correctamente');
+      }
       
       // También hacemos un refresh para actualizar los datos del servidor
       router.refresh();

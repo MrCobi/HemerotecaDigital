@@ -138,7 +138,7 @@ export async function PATCH(
   }
 }
 
-// DELETE: Eliminar un comentario (o marcarlo como eliminado)
+// DELETE: Eliminar un comentario físicamente
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -150,7 +150,8 @@ export async function DELETE(
   try {
     const { id: commentId } = await params;
     const searchParams = new URL(req.url).searchParams;
-    const softDelete = searchParams.get('soft') === 'true';
+    // Parámetro para eliminar también las respuestas
+    const deleteReplies = searchParams.get('deleteReplies') === 'true';
 
     // Verificar que el comentario existe
     const comment = await prisma.comment.findUnique({
@@ -168,28 +169,64 @@ export async function DELETE(
       return NextResponse.json({ error: "Comentario no encontrado" }, { status: 404 });
     }
 
-    // Si tiene respuestas o se solicita borrado suave, marcar como eliminado
-    if (softDelete || comment._count.replies > 0) {
-      await prisma.comment.update({
-        where: { id: commentId },
-        data: { isDeleted: true }
+    // Array para almacenar los IDs de los comentarios eliminados
+    const deletedIds = [commentId];
+    let totalResponsesDeleted = 0;
+
+    // Función recursiva para encontrar y eliminar todas las respuestas anidadas
+    async function findAndDeleteAllReplies(parentId: string) {
+      // Buscar todas las respuestas directas a este comentario
+      const directReplies = await prisma.comment.findMany({
+        where: { parentId },
+        select: { 
+          id: true,
+          _count: {
+            select: {
+              replies: true
+            }
+          }
+        }
       });
       
-      return NextResponse.json({ 
-        message: "Comentario marcado como eliminado",
-        softDeleted: true
-      });
-    } else {
-      // Borrado real si no tiene respuestas
-      await prisma.comment.delete({
-        where: { id: commentId },
-      });
-      
-      return NextResponse.json({ 
-        message: "Comentario eliminado permanentemente",
-        softDeleted: false
-      });
+      // Si hay respuestas directas
+      if (directReplies.length > 0) {
+        // Primero, procesamos recursivamente las respuestas de estas respuestas
+        for (const reply of directReplies) {
+          // Si esta respuesta tiene sus propias respuestas, eliminarlas primero
+          if (reply._count.replies > 0) {
+            await findAndDeleteAllReplies(reply.id);
+          }
+          
+          // Añadir el ID de esta respuesta a los eliminados
+          deletedIds.push(reply.id);
+          totalResponsesDeleted++;
+        }
+        
+        // Después de procesar recursivamente todas las respuestas anidadas,
+        // eliminamos las respuestas directas
+        await prisma.comment.deleteMany({
+          where: { parentId }
+        });
+      }
     }
+
+    // Si se solicita eliminar las respuestas
+    if (deleteReplies && comment._count.replies > 0) {
+      // Iniciar el proceso recursivo de eliminación
+      await findAndDeleteAllReplies(commentId);
+    }
+
+    // Eliminar físicamente el comentario principal
+    await prisma.comment.delete({
+      where: { id: commentId }
+    });
+    
+    return NextResponse.json({ 
+      message: deleteReplies && totalResponsesDeleted > 0 
+        ? `Comentario y ${totalResponsesDeleted} respuestas eliminados permanentemente` 
+        : "Comentario eliminado permanentemente",
+      deletedIds: deletedIds
+    });
   } catch (error) {
     console.error("Error al eliminar comentario:", error);
     return NextResponse.json(

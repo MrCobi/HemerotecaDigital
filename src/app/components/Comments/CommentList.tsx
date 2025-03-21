@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef, memo, useCallback } from "react";
-import { CldImage } from "next-cloudinary";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
+import { es } from "date-fns/locale/es";
 import Image from "next/image";
-import { es } from "date-fns/locale";
 import { useSession } from "next-auth/react";
 import type { Session } from "next-auth";
 import { API_ROUTES } from "@/src/config/api-routes";
@@ -135,57 +134,18 @@ const CommentItem = memo(
             <div className="flex items-start gap-3 md:gap-4 flex-1">
               <div className="relative flex-shrink-0">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-indigo-600/20 rounded-full animate-pulse-slow"></div>
-                {comment.user.image &&
-                comment.user.image.includes("cloudinary") ? (
-                  // Si la imagen es una URL completa de Cloudinary
-                  <CldImage
-                    src={comment.user.image}
-                    alt={comment.user.username}
-                    width={40}
-                    height={40}
-                    crop="fill"
-                    gravity="face"
-                    className="rounded-full border-2 border-gray-100 dark:border-gray-700 object-cover z-10 relative"
-                    priority
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = "/images/AvatarPredeterminado.webp";
-                    }}
-                  />
-                ) : comment.user.image &&
-                  !comment.user.image.startsWith("/") &&
-                  !comment.user.image.startsWith("http") ? (
-                  // Si la imagen es un public_id de Cloudinary (sin 'https://' ni '/')
-                  <CldImage
-                    src={comment.user.image}
-                    alt={comment.user.username}
-                    width={40}
-                    height={40}
-                    crop="fill"
-                    gravity="face"
-                    className="rounded-full border-2 border-gray-100 dark:border-gray-700 object-cover z-10 relative"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = "/images/AvatarPredeterminado.webp";
-                    }}
-                  />
-                ) : (
-                  // Para imágenes locales o si no se tiene imagen, usar next/image
-                  <Image
-                    src={
-                      comment.user.image || "/images/AvatarPredeterminado.webp"
-                    }
-                    alt={comment.user.username}
-                    width={40}
-                    height={40}
-                    className="rounded-full border-2 border-gray-100 dark:border-gray-700 object-cover z-10 relative"
-                    priority
-                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = "/images/AvatarPredeterminado.webp";
-                    }}
-                  />
-                )}
+                <Image
+                  src={comment.user.image || "/images/AvatarPredeterminado.webp"}
+                  alt={comment.user.username}
+                  width={40}
+                  height={40}
+                  className="rounded-full border-2 border-gray-100 dark:border-gray-700 object-cover z-10 relative"
+                  priority
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/AvatarPredeterminado.webp";
+                  }}
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
