@@ -65,13 +65,11 @@ function DeleteUserDialog({ userId, userName, onDelete }: DeleteUserDialogProps)
             Eliminar usuario
           </AlertDialogTitle>
           <AlertDialogDescription>
-            <div className="mb-2">
-              ¿Estás seguro de que deseas eliminar al usuario <span className="font-semibold">{userName || userId}</span>?
-            </div>
-            <div className="text-destructive font-medium">
-              Esta acción no se puede deshacer y eliminará toda la información asociada a este usuario.
-            </div>
+            ¿Estás seguro de que deseas eliminar al usuario <span className="font-semibold">{userName || userId}</span>?
           </AlertDialogDescription>
+          <p className="text-destructive font-medium text-sm mt-2">
+            Esta acción no se puede deshacer y eliminará toda la información asociada a este usuario.
+          </p>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
