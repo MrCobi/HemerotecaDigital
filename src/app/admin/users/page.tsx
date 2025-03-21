@@ -1,127 +1,141 @@
+"use client";
+
 import Link from "next/link";
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import UsersTable from "./UsersTable";
 import type { User, Role } from "./UsersTable";
-import prisma from "@/lib/db";
+import { useEffect, useState } from "react";
 
 // Función auxiliar para convertir roles de Prisma al tipo Role del componente
 const mapPrismaRoleToComponentRole = (prismaRole: string): Role => {
   switch (prismaRole) {
     case "admin":
       return "ADMIN";
-    case "user":
-      return "USER";
-    default:
+    case "moderator":
       return "EDITOR";
+    default:
+      return "USER";
   }
 };
 
-export default async function UsersPage() {
-  const session = await auth();
+export default function UsersPage() {
+  const router = useRouter();
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!session) redirect("/api/auth/signin");
-  if (session.user.role !== "admin") redirect("/acceso-denegado");
-
-  try {
-    // Obtener datos de usuario directamente a través de prisma
-    // para evitar problemas de solicitudes de API desde la página del servidor
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        username: true,
-        email: true,
-        image: true,
-        role: true,
-        createdAt: true,
-        emailVerified: true,
-        _count: {
-          select: {
-            comments: true,
-            ratings: true,
-            favoriteSources: true,
-            sentMessages: true,
-            receivedMessages: true,
-            accounts: true
-          }
+  useEffect(() => {
+    async function loadUsers() {
+      try {
+        // Verificar sesión
+        const sessionRes = await fetch('/api/auth/session');
+        const sessionData = await sessionRes.json();
+        
+        if (!sessionData || !sessionData.user) {
+          router.push("/api/auth/signin");
+          return;
         }
-      },
-      orderBy: { createdAt: "desc" }
-    });
+        
+        if (sessionData.user.role !== "admin") {
+          router.push("/acceso-denegado");
+          return;
+        }
 
-    // Convertir los roles de minúscula (Prisma) a mayúscula (componente) y adaptar la estructura
-    const formattedUsers: User[] = users.map((user: any) => ({
-      id: user.id,
-      name: user.name,
-      username: user.username || undefined,
-      email: user.email,
-      emailVerified: user.emailVerified,
-      image: user.image,
-      role: mapPrismaRoleToComponentRole(user.role),
-      createdAt: user.createdAt
-    }));
+        // Cargar datos de usuarios
+        const res = await fetch('/api/admin/users');
+        
+        if (!res.ok) {
+          throw new Error('Error al cargar usuarios');
+        }
+        
+        const data = await res.json();
+        
+        // Manejo de diferentes formatos de respuesta
+        let usersArray = [];
+        if (Array.isArray(data)) {
+          // Si es un array directamente
+          usersArray = data;
+        } else if (data.users && Array.isArray(data.users)) {
+          // Si tiene una propiedad users que es un array
+          usersArray = data.users;
+        } else if (data.id) {
+          // Si es un solo usuario
+          usersArray = [data];
+        }
+        
+        const formattedUsers: User[] = usersArray.map((user: any) => ({
+          id: user.id,
+          name: user.name,
+          username: user.username || undefined,
+          email: user.email,
+          emailVerified: user.emailVerified,
+          image: user.image,
+          role: mapPrismaRoleToComponentRole(user.role),
+          createdAt: user.createdAt
+        }));
+        
+        setUsers(formattedUsers);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error al cargar usuarios:", err);
+        setError("Error al cargar datos de usuarios");
+        setLoading(false);
+      }
+    }
 
+    loadUsers();
+  }, [router]);
+
+  if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="sm:flex sm:items-center sm:justify-between mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Gestión de Usuarios</h1>
-          <Link
-            href="/admin/users/create"
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors duration-200"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 mr-2"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
-            </svg>
-            Añadir Usuario
-          </Link>
-        </div>
-
-        <div className="bg-card shadow rounded-lg overflow-hidden mt-8">
-          <UsersTable users={formattedUsers} />
-        </div>
+      <div className="flex justify-center items-center h-full p-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
-  } catch (error) {
-    console.error("Error al cargar usuarios:", error);
-    
+  }
+
+  if (error) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="sm:flex sm:items-center sm:justify-between mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Gestión de Usuarios</h1>
-          <Link
-            href="/admin/dashboard"
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-200"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-            </svg>
-            Volver al Dashboard
-          </Link>
-        </div>
-        
-        <div className="bg-card shadow rounded-lg p-6 text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h2 className="mt-4 text-xl font-medium text-foreground">Error al cargar usuarios</h2>
-          <p className="mt-2 text-muted-foreground">Ha ocurrido un error al obtener la lista de usuarios.</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors duration-200"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-            </svg>
-            Intentar de nuevo
-          </button>
+      <div className="p-8">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="sm:flex sm:items-center sm:justify-between mb-8">
+        <h1 className="text-3xl font-bold text-foreground">Gestión de Usuarios</h1>
+        <Link
+          href="/admin/users/create"
+          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors duration-200"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5 mr-2"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+          </svg>
+          Añadir Usuario
+        </Link>
+      </div>
+
+      <div className="bg-card shadow rounded-lg overflow-hidden mt-8">
+        <UsersTable users={users} />
+      </div>
+    </div>
+  );
 }

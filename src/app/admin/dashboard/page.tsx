@@ -1,23 +1,102 @@
+"use client";
+
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import prisma from "@/lib/db";
+import { useEffect, useState } from "react";
 
-export default async function AdminDashboard() {
-  const session = await auth();
+export default function AdminDashboard() {
+  const [session, setSession] = useState<any>(null);
+  const [stats, setStats] = useState<{
+    userCount: number;
+    sourceCount: number;
+    commentCount: number;
+    ratingCount: number;
+    favoriteCount: number;
+    messageCount: number;
+  }>({ 
+    userCount: 0, 
+    sourceCount: 0, 
+    commentCount: 0, 
+    ratingCount: 0, 
+    favoriteCount: 0, 
+    messageCount: 0 
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!session) redirect("/api/auth/signin");
-  if (session.user.role !== "admin") redirect("/acceso-denegado");
+  useEffect(() => {
+    // Fetch session and statistics data
+    const fetchData = async () => {
+      try {
+        // Fetch session (could be moved to a separate API route for client components)
+        const sessionRes = await fetch('/api/auth/session');
+        const sessionData = await sessionRes.json();
+        
+        if (!sessionData || !sessionData.user) {
+          window.location.href = '/api/auth/signin';
+          return;
+        }
+        
+        if (sessionData.user.role !== 'admin') {
+          window.location.href = '/acceso-denegado';
+          return;
+        }
+        
+        setSession(sessionData);
+        
+        // Fetch dashboard stats from an API endpoint
+        const statsRes = await fetch('/api/admin/stats');
+        const statsData = await statsRes.json();
+        
+        // Uso del operador coalescente nulo para proporcionar valores predeterminados
+        // y manejar cualquier formato de respuesta
+        setStats({
+          userCount: statsData?.userCount ?? statsData?.users ?? 0,
+          sourceCount: statsData?.sourceCount ?? statsData?.sources ?? 0,
+          commentCount: statsData?.commentCount ?? statsData?.comments ?? 0,
+          ratingCount: statsData?.ratingCount ?? statsData?.ratings ?? 0,
+          favoriteCount: statsData?.favoriteCount ?? statsData?.favorites ?? 0,
+          messageCount: statsData?.messageCount ?? statsData?.messages ?? 0
+        });
+        setLoading(false);
+      } catch (err) {
+        console.error('Error loading dashboard data:', err);
+        setError('Error al cargar los datos del dashboard');
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
 
-  // Obtener conteos de cada entidad para mostrar estadísticas
-  const [userCount, sourceCount, commentCount, ratingCount, favoriteCount, messageCount] = await Promise.all([
-    prisma.user.count(),
-    prisma.source.count(),
-    prisma.comment.count(),
-    prisma.rating.count(),
-    prisma.favoriteSource.count(),
-    prisma.directMessage.count()
-  ]);
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex justify-center items-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Definir los módulos del panel de administración
   const adminModules = [
@@ -29,7 +108,7 @@ export default async function AdminDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
         </svg>
       ),
-      count: userCount,
+      count: stats.userCount,
       href: "/admin/users",
       color: "bg-blue-500"
     },
@@ -41,7 +120,7 @@ export default async function AdminDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
         </svg>
       ),
-      count: sourceCount,
+      count: stats.sourceCount,
       href: "/admin/sources",
       color: "bg-purple-500"
     },
@@ -53,7 +132,7 @@ export default async function AdminDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
         </svg>
       ),
-      count: commentCount,
+      count: stats.commentCount,
       href: "/admin/comments",
       color: "bg-green-500"
     },
@@ -65,7 +144,7 @@ export default async function AdminDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
         </svg>
       ),
-      count: ratingCount,
+      count: stats.ratingCount,
       href: "/admin/ratings",
       color: "bg-amber-500"
     },
@@ -77,7 +156,7 @@ export default async function AdminDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
         </svg>
       ),
-      count: favoriteCount,
+      count: stats.favoriteCount,
       href: "/admin/favorites",
       color: "bg-red-500"
     },
@@ -89,7 +168,7 @@ export default async function AdminDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
       ),
-      count: messageCount,
+      count: stats.messageCount,
       href: "/admin/messages",
       color: "bg-indigo-500"
     }

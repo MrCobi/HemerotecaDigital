@@ -1,89 +1,104 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
+"use client";
+
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import prisma from "@/lib/db";
 import RatingsTable from "./RatingsTable";
 import ActionButton from "../components/ActionButton";
+import { useEffect, useState } from "react";
 
-export default async function RatingsPage() {
-  const session = await auth();
+export default function RatingsPage() {
+  const router = useRouter();
+  const [ratings, setRatings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!session) redirect("/api/auth/signin");
-  if (session.user.role !== "admin") redirect("/acceso-denegado");
-
-  try {
-    const ratings = await prisma.rating.findMany({
-      select: {
-        id: true,
-        value: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            image: true
-          }
-        },
-        source: {
-          select: {
-            id: true,
-            name: true,
-            imageUrl: true,
-            category: true
-          }
+  useEffect(() => {
+    async function loadRatings() {
+      try {
+        // Verificar sesión
+        const sessionRes = await fetch('/api/auth/session');
+        const sessionData = await sessionRes.json();
+        
+        if (!sessionData || !sessionData.user) {
+          router.push("/api/auth/signin");
+          return;
         }
-      },
-      orderBy: { createdAt: "desc" },
-      take: 50
-    });
+        
+        if (sessionData.user.role !== "admin") {
+          router.push("/acceso-denegado");
+          return;
+        }
 
+        // Cargar datos de valoraciones
+        const res = await fetch('/api/admin/ratings');
+        
+        if (!res.ok) {
+          throw new Error('Error al cargar valoraciones');
+        }
+        
+        const data = await res.json();
+        
+        // Manejo de diferentes formatos de respuesta
+        let ratingsArray = [];
+        if (Array.isArray(data)) {
+          // Si es un array directamente
+          ratingsArray = data;
+        } else if (data.ratings && Array.isArray(data.ratings)) {
+          // Si tiene una propiedad ratings que es un array
+          ratingsArray = data.ratings;
+        } else if (data.id) {
+          // Si es un solo rating
+          ratingsArray = [data];
+        }
+        
+        setRatings(ratingsArray);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error al cargar valoraciones:", err);
+        setError("Error al cargar datos de valoraciones");
+        setLoading(false);
+      }
+    }
+
+    loadRatings();
+  }, [router]);
+
+  if (loading) {
     return (
-      <div className="py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-          <h1 className="text-2xl font-semibold text-gray-900">Gestión de Valoraciones</h1>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-          <div className="py-4">
-            <div className="bg-card dark:bg-card shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <RatingsTable ratings={ratings} />
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="flex justify-center items-center h-full p-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
-  } catch (error) {
-    console.error("Error al cargar valoraciones:", error);
+  }
+
+  if (error) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-card shadow overflow-hidden rounded-lg p-6">
-          <div className="flex items-center justify-center">
-            <div className="text-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-destructive mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <div className="p-8">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
-              <h2 className="text-xl font-semibold text-foreground mb-2">Error al cargar las valoraciones</h2>
-              <p className="text-muted-foreground mb-4">Ocurriu00f3 un error al intentar cargar las valoraciones. Por favor, intente nuevamente mu00e1s tarde.</p>
-              <div className="flex justify-center space-x-4">
-                <Link
-                  href="/admin/dashboard"
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors duration-200"
-                >
-                  Volver al Dashboard
-                </Link>
-                <ActionButton
-                  onClick={() => window.location.reload()}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-foreground bg-background hover:bg-muted transition-colors duration-200"
-                >
-                  Reintentar
-                </ActionButton>
-              </div>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
             </div>
           </div>
         </div>
       </div>
     );
   }
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="sm:flex sm:items-center sm:justify-between mb-8">
+        <h1 className="text-3xl font-bold text-foreground">Gestión de Valoraciones</h1>
+      </div>
+
+      <div className="bg-card shadow rounded-lg overflow-hidden mt-8">
+        <RatingsTable ratings={ratings} />
+      </div>
+    </div>
+  );
 }

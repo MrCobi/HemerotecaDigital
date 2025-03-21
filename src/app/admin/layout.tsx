@@ -1,19 +1,55 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ReactNode } from "react";
 import MobileMenu from "./components/MobileMenu";
 import { CldImage } from "next-cloudinary";
 
-export default async function AdminLayout({
+export default function AdminLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const session = await auth();
+  const router = useRouter();
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!session) redirect("/api/auth/signin");
-  if (session.user.role !== "admin") redirect("/acceso-denegado");
+  useEffect(() => {
+    async function checkSession() {
+      try {
+        const res = await fetch('/api/auth/session');
+        const sessionData = await res.json();
+
+        if (!sessionData || !sessionData.user) {
+          router.push("/api/auth/signin");
+          return;
+        }
+
+        if (sessionData.user.role !== "admin") {
+          router.push("/acceso-denegado");
+          return;
+        }
+
+        setSession(sessionData);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error checking session:", error);
+        router.push("/api/auth/signin");
+      }
+    }
+
+    checkSession();
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-background">
@@ -100,7 +136,13 @@ export default async function AdminLayout({
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {session.user.image ? (
-                <CldImage className="h-10 w-10 rounded-full" src={session.user.image} alt={session.user.name || "Administrator"} />
+                <CldImage 
+                  className="h-10 w-10 rounded-full" 
+                  src={session.user.image} 
+                  alt={session.user.name || "Administrator"}
+                  width={40}
+                  height={40} 
+                />
               ) : (
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="text-primary text-lg font-medium">

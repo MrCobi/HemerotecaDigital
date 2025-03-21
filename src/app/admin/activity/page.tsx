@@ -1,108 +1,109 @@
+"use client";
+
 import { Metadata } from "next";
-import prisma from "@/lib/db";
 import ActivityTable from "./ActivityTable";
 import { ActivityItem, User } from "./types";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-export const metadata: Metadata = {
+// Esta metadata no funciona en client components, pero la dejamos por compatibilidad
+// con futuras migraciones si es necesario
+export const metadata = {
   title: "Actividad de Usuarios | Panel de Administración",
   description: "Monitorea la actividad de usuarios en la Hemeroteca Digital",
 };
 
-export default async function ActivityPage() {
-  // Consultar directamente las actividades desde la base de datos 
-  const activitiesRecords = await prisma.$queryRaw`
-    SELECT id, type, user_id as userId, source_name as sourceName, user_name as targetName, created_at as createdAt
-    FROM activity_history 
-    ORDER BY created_at DESC 
-    LIMIT 100
-  `;
+export default function ActivityPage() {
+  const router = useRouter();
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Obtener información adicional de usuarios
-  const userIds = [...new Set((activitiesRecords as any[]).map(a => a.userId))];
-  const users = await prisma.user.findMany({
-    where: {
-      id: {
-        in: userIds
+  useEffect(() => {
+    async function loadActivities() {
+      try {
+        // Verificar sesión
+        const sessionRes = await fetch('/api/auth/session');
+        const sessionData = await sessionRes.json();
+        
+        if (!sessionData || !sessionData.user) {
+          router.push("/api/auth/signin");
+          return;
+        }
+        
+        if (sessionData.user.role !== "admin") {
+          router.push("/acceso-denegado");
+          return;
+        }
+
+        // Cargar datos de actividad
+        const res = await fetch('/api/admin/activity');
+        
+        if (!res.ok) {
+          throw new Error('Error al cargar actividad');
+        }
+        
+        const data = await res.json();
+        
+        // Manejo de diferentes formatos de respuesta
+        let activitiesArray = [];
+        if (Array.isArray(data)) {
+          // Si es un array directamente
+          activitiesArray = data;
+        } else if (data.activities && Array.isArray(data.activities)) {
+          // Si tiene una propiedad activities que es un array
+          activitiesArray = data.activities;
+        } else if (data.id) {
+          // Si es una sola actividad
+          activitiesArray = [data];
+        }
+        
+        setActivities(activitiesArray);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error al cargar actividad:", err);
+        setError("Error al cargar datos de actividad");
+        setLoading(false);
       }
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true
-    }
-  });
-
-  // Crear un mapa de usuarios para un acceso más fácil
-  const usersMap = new Map<string, User>();
-  users.forEach((user: User) => {
-    usersMap.set(user.id, user);
-  });
-
-  // Transformar los registros en el formato ActivityItem
-  const activities: ActivityItem[] = (activitiesRecords as any[]).map(activity => {
-    const user = usersMap.get(activity.userId);
-    let details: string | null = null;
-    let targetType: 'source' | 'user' | 'comment' = 'source';
-    
-    // Determinar detalles basados en el tipo de actividad
-    switch (activity.type) {
-      case 'comment':
-        details = 'Realizó un comentario';
-        break;
-      case 'comment_reply':
-        details = 'Respondió a un comentario';
-        break;
-      case 'comment_deleted':
-        details = 'Eliminó un comentario';
-        break;
-      case 'rating_added':
-        details = 'Valoró con estrellas';
-        break;
-      case 'rating_removed':
-        details = 'Eliminó su valoración';
-        break;
-      case 'favorite':
-        details = 'Añadió a favoritos';
-        break;
-      case 'follow':
-        details = 'Comenzó a seguir';
-        targetType = 'user';
-        break;
-      case 'unfollow':
-        details = 'Dejó de seguir';
-        targetType = 'user';
-        break;
-      default:
-        details = 'Actividad realizada';
-        break;
     }
 
-    return {
-      id: activity.id || `activity-${Math.random().toString(36).substring(2, 9)}`,
-      type: activity.type || 'unknown',
-      userId: activity.userId || '',
-      userName: user?.name || null,
-      userEmail: user?.email || null,
-      userImage: user?.image || null,
-      targetName: activity.targetName || 'Desconocido',
-      targetId: activity.sourceId || activity.userId || '',
-      targetType: targetType,
-      createdAt: new Date(activity.createdAt),
-      details: details
-    };
-  });
+    loadActivities();
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-full p-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Actividad de Usuarios</h1>
-        <p className="text-muted-foreground">
-          Monitorea la actividad reciente de los usuarios en la plataforma.
-        </p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="sm:flex sm:items-center mb-8">
+        <h1 className="text-3xl font-bold text-foreground">Actividad de Usuarios</h1>
       </div>
 
-      <div className="bg-card rounded-lg shadow">
+      <div className="bg-card shadow rounded-lg overflow-hidden mt-8">
         <ActivityTable activities={activities} />
       </div>
     </div>
