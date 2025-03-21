@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 
 // Función auxiliar para verificar si el usuario es administrador
 async function isAdmin() {
@@ -61,9 +62,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     // Validar datos requeridos
-    if (!body.email || !body.password) {
+    if (!body.email || !body.password || !body.username || !body.name) {
       return NextResponse.json(
-        { error: "Email y contraseña son requeridos" },
+        { error: "Nombre, nombre de usuario, email y contraseña son requeridos" },
         { status: 400 }
       );
     }
@@ -80,19 +81,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verificar si el username ya existe (si se proporciona)
-    if (body.username) {
-      const usernameExists = await prisma.user.findUnique({
-        where: { username: body.username },
-      });
+    // Verificar si el username ya existe
+    const usernameExists = await prisma.user.findUnique({
+      where: { username: body.username },
+    });
 
-      if (usernameExists) {
-        return NextResponse.json(
-          { error: "El nombre de usuario ya está en uso" },
-          { status: 400 }
-        );
-      }
+    if (usernameExists) {
+      return NextResponse.json(
+        { error: "El nombre de usuario ya está en uso" },
+        { status: 400 }
+      );
     }
+
+    // Hashear la contraseña
+    const hashedPassword = await bcrypt.hash(body.password, 10);
 
     // Crear el nuevo usuario
     const newUser = await prisma.user.create({
@@ -100,7 +102,7 @@ export async function POST(req: NextRequest) {
         name: body.name,
         username: body.username,
         email: body.email,
-        password: body.password, // Nota: Debería estar hasheada antes de llegar aquí
+        password: hashedPassword,
         image: body.image,
         role: body.role || "user",
         bio: body.bio,
