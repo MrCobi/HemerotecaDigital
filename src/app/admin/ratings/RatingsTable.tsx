@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { CldImage } from "next-cloudinary";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import { useState, useEffect, useMemo } from "react";
@@ -133,7 +134,30 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
   const renderUserImage = (user: Rating['user'], size: number = 32) => {
     if (!user) return null;
 
-    // Usar imagen predeterminada para evitar errores
+    if (user.image) {
+      return (
+        <CldImage
+          src={user.image.includes('https://') ? 
+            // Si es una URL completa, extraer solo el public_id
+            user.image.replace(/.*\/v\d+\//, '') : 
+            // Si no, usar directamente (asumiendo que es un public_id)
+            user.image
+          }
+          alt={user?.name || "Avatar"}
+          width={size}
+          height={size}
+          crop="fill"
+          gravity="face"
+          className="h-8 w-8 rounded-full object-cover"
+          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+            const target = e.target as HTMLImageElement;
+            target.src = "/images/AvatarPredeterminado.webp";
+          }}
+        />
+      );
+    }
+
+    // Usar imagen predeterminada para usuarios sin imagen
     return (
       <Image
         src="/images/AvatarPredeterminado.webp"

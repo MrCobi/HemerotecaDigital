@@ -234,10 +234,14 @@ export default function UserViewPage({ params }: PageProps) {
             <div className="md:w-1/3 bg-primary/10 p-6">
               <div className="text-center">
                 <div className="relative w-32 h-32 mx-auto mb-4">
-                  {user.image && user.image.includes('cloudinary') ? (
-                    // Si la imagen tiene un formato de Cloudinary público (URL completa)
+                  {user.image ? (
                     <CldImage
-                      src={user.image}
+                      src={user.image.includes('https://') ? 
+                        // Si es una URL completa, extraer solo el public_id
+                        user.image.replace(/.*\/v\d+\//, '') : 
+                        // Si no, usar directamente (asumiendo que es un public_id)
+                        user.image
+                      }
                       alt={user.name || "Avatar"}
                       width={128}
                       height={128}
@@ -245,21 +249,6 @@ export default function UserViewPage({ params }: PageProps) {
                       gravity="face"
                       className="rounded-full object-cover border-4 border-primary/30"
                       priority
-                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
-                    />
-                  ) : user.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
-                    // Si la imagen es un public_id de Cloudinary (sin https:// o /)
-                    <CldImage
-                      src={user.image}
-                      alt={user.name || "Avatar"}
-                      width={128}
-                      height={128}
-                      crop="fill"
-                      gravity="face"
-                      className="rounded-full object-cover border-4 border-primary/30"
                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                         const target = e.target as HTMLImageElement;
                         target.src = "/images/AvatarPredeterminado.webp";
@@ -268,16 +257,12 @@ export default function UserViewPage({ params }: PageProps) {
                   ) : (
                     // Para imágenes locales o fallback
                     <Image
-                      src={user.image || "/images/AvatarPredeterminado.webp"}
+                      src="/images/AvatarPredeterminado.webp"
                       alt={user.name || "Avatar"}
                       width={128}
                       height={128}
                       className="rounded-full object-cover border-4 border-primary/30"
                       priority
-                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
                     />
                   )}
                   <Badge className={`absolute bottom-0 right-0 ${
