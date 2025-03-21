@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Gestiu00f3n de Fuentes | Panel de Administraciu00f3n",
+  title: "Gestión de Fuentes | Panel de Administración",
   description: "Administra las fuentes documentales en la Hemeroteca Digital",
 };

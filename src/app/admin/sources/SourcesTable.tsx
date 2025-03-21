@@ -1,130 +1,55 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { format } from "date-fns";
 import Link from "next/link";
-import DataTable, { Column } from "../components/DataTable/DataTable";
-import { Button, buttonVariants } from "@/src/app/components/ui/button";
-import { Trash2, Edit, ExternalLink, Star, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/src/app/components/ui/alert-dialog";
+import { Source } from "@/src/interface/source";
+import DataTable, { Column } from "../components/DataTable/DataTable";
+import { ExternalLink, Edit, Star } from "lucide-react";
 import { toast } from "sonner";
-import Image from "next/image";
+import { format } from "date-fns";
+import DeleteDialog from "@/src/components/ui/DeleteDialog";
+import SafeImage from "@/src/components/ui/SafeImage";
 
-// Componente para el diálogo de confirmación de eliminación
-interface DeleteSourceDialogProps {
-  _sourceId: string;
-  sourceName: string;
-  onDelete: () => Promise<void>;
-}
-
-function DeleteSourceDialog({ _sourceId, sourceName, onDelete }: DeleteSourceDialogProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  
-  async function handleDelete() {
-    try {
-      setIsDeleting(true);
-      await onDelete();
-      setIsOpen(false);
-      toast.success("Fuente eliminada correctamente");
-    } catch (error) {
-      console.error("Error al eliminar fuente:", error);
-      toast.error("Error al eliminar fuente");
-    } finally {
-      setIsDeleting(false);
+interface SourcesTableProps {
+  sources: Array<Source & {
+    _count?: {
+      comments?: number;
+      favoriteSources?: number;
+      ratings?: number;
     }
-  }
-  
-  return (
-    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="destructive"
-          size="icon"
-          className="h-8 w-8"
-          title="Eliminar fuente"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            Eliminar fuente
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            ¿Estás seguro de que deseas eliminar la fuente <span className="font-semibold">{sourceName}</span>?
-          </AlertDialogDescription>
-          <p className="text-destructive font-medium text-sm mt-2">
-            Esta acción no se puede deshacer y eliminará toda la información asociada a esta fuente.
-          </p>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={(e: React.MouseEvent) => {
-              e.preventDefault();
-              handleDelete();
-            }}
-            disabled={isDeleting}
-            className={buttonVariants({ variant: "destructive" })}
-          >
-            {isDeleting ? (
-              <>
-                <span className="animate-pulse">Eliminando...</span>
-              </>
-            ) : (
-              "Eliminar fuente"
-            )}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
+  }>;
 }
 
-// Definimos el tipo Source basado en el modelo Prisma
-export interface Source {
-  id: string;
-  name: string;
-  description: string;
-  url: string;
-  imageUrl: string | null;
-  category: string;
-  language: string;
-  country: string;
-  createdAt: Date;
-  updatedAt: Date;
-  avgRating?: number;
-  ratingCount?: number;
-  _count?: {
-    comments: number;
-    favoriteSources: number;
-    ratings: number;
+// Función para determinar la clase del badge de categoría
+const getCategoryBadgeClass = (category: string) => {
+  switch (category.toLowerCase()) {
+    case "general":
+      return "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+    case "business":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    case "entertainment":
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+    case "health":
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    case "science":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+    case "sports":
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    case "technology":
+      return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300";
+    default:
+      return "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
   }
-}
-
-type SourcesTableProps = {
-  sources: Source[];
 };
 
-export default function SourcesTable({ sources }: SourcesTableProps) {
+export default function SourcesTable({ sources: initialSources }: SourcesTableProps) {
+  const [sources, setSources] = useState(initialSources);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterValue, setFilterValue] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
   // Obtener categorías únicas para el filtro
@@ -140,17 +65,20 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
   };
 
   const filteredSources = useMemo(() => {
+    // Si no hay filtros activos, devolver todas las fuentes
     if (!filterValue && categoryFilter === null) return sources;
 
     return sources.filter((source) => {
+      // Filtro de texto (nombre, descripción, URL)
       const matchesFilter =
         !filterValue ||
         source.name.toLowerCase().includes(filterValue.toLowerCase()) ||
         source.description.toLowerCase().includes(filterValue.toLowerCase()) ||
         source.url.toLowerCase().includes(filterValue.toLowerCase());
 
+      // Filtro de categoría
       const matchesCategory =
-        !categoryFilter ||
+        categoryFilter === null || // Explícitamente verificar si es null para "Todas las categorías"
         source.category === categoryFilter;
 
       return matchesFilter && matchesCategory;
@@ -165,60 +93,57 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
   );
 
   // Función para manejar la eliminación de una fuente
-  const handleDeleteSource = async (sourceId: string) => {
+  const handleDeleteSource = async (sourceId: string): Promise<void> => {
+    if (isDeleting) return; // Prevenir múltiples clicks
+    
+    setIsDeleting(true);
+    
     try {
       const response = await fetch(`/api/admin/sources/${sourceId}`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
-      
+
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Error desconocido');
+        throw new Error(data.error || 'Error al eliminar la fuente');
       }
+
+      // Actualizar el estado local para reflejar la eliminación inmediatamente
+      setSources(prevSources => prevSources.filter(source => source.id !== sourceId));
       
-      // Recargar la página para actualizar la lista
+      toast.success('Fuente eliminada correctamente');
+      
+      // Aún hacemos un refresh para actualizar todos los datos del servidor
       router.refresh();
     } catch (error) {
-      console.error("Error al eliminar fuente:", error);
-      throw error;
+      console.error('Error al eliminar la fuente:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar la fuente');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  // Funciones de ayuda para obtener clases CSS según la categoría
-  const getCategoryBadgeClass = (category: string) => {
-    const categories: Record<string, string> = {
-      'general': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-      'business': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-      'technology': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-      'entertainment': 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300',
-      'sports': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
-      'science': 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
-      'health': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-    };
-    
-    return categories[category.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
-  };
-
-  const columns: Column<Source>[] = useMemo(
+  const columns: Column<Source & { _count?: { comments?: number; favoriteSources?: number; ratings?: number } }>[] = useMemo(
     () => [
       {
         header: "Fuente",
         accessorKey: "source",
-        cell: (source: Source) => (
+        cell: (source) => (
           <div className="flex items-center">
             <div className="h-10 w-10 flex-shrink-0 rounded-md bg-muted flex items-center justify-center mr-3">
               {source.imageUrl ? (
-                <Image
+                <SafeImage
                   src={source.imageUrl}
                   alt={source.name}
                   width={40}
                   height={40}
                   className="h-10 w-10 rounded-md object-cover"
                   priority
-                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/images/placeholder.webp";
-                  }}
+                  fallbackSrc="/images/placeholder.webp"
                 />
               ) : (
                 <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold">
@@ -239,7 +164,7 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
       {
         header: "Categoría",
         accessorKey: "category",
-        cell: (source: Source) => (
+        cell: (source) => (
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryBadgeClass(source.category)}`}>
             {source.category}
           </span>
@@ -262,7 +187,7 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
       {
         header: "Estadísticas",
         id: "stats",
-        cell: (source: Source) => (
+        cell: (source) => (
           <div className="space-y-1">
             <div className="flex items-center text-amber-500">
               <Star className="h-4 w-4 mr-1" />
@@ -284,7 +209,7 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
       {
         header: "Ubicación",
         accessorKey: "location",
-        cell: (source: Source) => (
+        cell: (source) => (
           <div>
             <div className="text-sm font-medium">
               {source.country}
@@ -298,11 +223,13 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
       {
         header: "Creado",
         accessorKey: "createdAt",
-        cell: (source: Source) => {
-          const date = new Date(source.createdAt);
+        cell: (source) => {
           return (
-            <div className="text-sm text-muted-foreground">
-              {format(date, "dd MMM yyyy")}
+            <div className="text-sm">
+              {format(new Date(source.createdAt), 'dd/MM/yyyy')}
+              <div className="text-xs text-muted-foreground">
+                {format(new Date(source.createdAt), 'HH:mm')}
+              </div>
             </div>
           );
         }
@@ -310,11 +237,12 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
       {
         header: "Acciones",
         accessorKey: "actions",
-        cell: (source: Source) => (
+        cell: (source) => (
           <div className="flex space-x-2">
             <Link
-              href={`/admin/sources/view/${source.id}`}
+              href={`/sources/${source.id}`}
               className="inline-flex items-center text-primary hover:text-primary/80 font-medium transition-colors text-sm bg-primary/10 hover:bg-primary/20 px-2 py-1 rounded-md"
+              target="_blank"
             >
               <ExternalLink className="w-4 h-4 mr-1" />
               Ver
@@ -326,21 +254,23 @@ export default function SourcesTable({ sources }: SourcesTableProps) {
               <Edit className="w-4 h-4 mr-1" />
               Editar
             </Link>
-            <DeleteSourceDialog
-              _sourceId={source.id}
-              sourceName={source.name}
+            <DeleteDialog
+              entityId={source.id}
+              entityName={source.name}
+              entityType="la fuente"
               onDelete={() => handleDeleteSource(source.id)}
+              consequenceText="Todos los comentarios, valoraciones y favoritos asociados a esta fuente también serán eliminados."
             />
           </div>
         )
       }
     ],
-    []
+    [categoryFilter, uniqueCategories]
   );
 
   return (
     <div className="space-y-4">
-      <DataTable<Source>
+      <DataTable<Source & { _count?: { comments?: number; favoriteSources?: number; ratings?: number } }>
         data={paginatedSources}
         columns={columns}
         currentPage={currentPage}

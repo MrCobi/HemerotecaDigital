@@ -104,7 +104,7 @@ model FavoriteSource {
   sourceId  String   @map("source_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  source    Source   @relation(fields: [sourceId], references: [id])
+  source    Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, sourceId])
@@ -119,7 +119,7 @@ model Rating {
   value     Int
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  source    Source   @relation(fields: [sourceId], references: [id])
+  source    Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, sourceId])
@@ -140,7 +140,7 @@ model Comment {
   updatedAt DateTime  @updatedAt @map("updated_at")
   parent    Comment?  @relation("CommentHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   replies   Comment[] @relation("CommentHierarchy")
-  source    Source    @relation(fields: [sourceId], references: [id])
+  source    Source    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])

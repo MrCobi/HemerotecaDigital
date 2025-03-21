@@ -94,7 +94,7 @@ export default function SourcesPage() {
       <div className="sm:flex sm:items-center sm:justify-between mb-8">
         <h1 className="text-3xl font-bold text-foreground">Gestión de Fuentes</h1>
         <Link 
-          href="/admin/sources/create" 
+          href="/admin/sources/new" 
           className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200"
         >
           <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">

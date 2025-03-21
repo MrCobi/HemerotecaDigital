@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ReactNode } from "react";
 import MobileMenu from "./components/MobileMenu";
-import { CldImage } from "next-cloudinary";
+import SafeImage from "@/src/components/ui/SafeImage";
 
 export default function AdminLayout({
   children,
@@ -136,17 +136,18 @@ export default function AdminLayout({
           <div className="flex items-center">
             <div className="flex-shrink-0">
               {session.user.image ? (
-                <CldImage 
+                <SafeImage 
                   className="h-10 w-10 rounded-full" 
                   src={session.user.image} 
                   alt={session.user.name || "Administrator"}
                   width={40}
-                  height={40} 
+                  height={40}
+                  fallbackSrc="/images/AvatarPredeterminado.webp"
                 />
               ) : (
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-primary text-lg font-medium">
-                    {session.user.name?.charAt(0).toUpperCase() || "A"}
+                <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
+                  <span className="text-white font-semibold text-sm">
+                    {session.user.name ? session.user.name.charAt(0).toUpperCase() : "A"}
                   </span>
                 </div>
               )}

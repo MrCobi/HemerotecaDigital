@@ -4,24 +4,14 @@ import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { CldImage } from "next-cloudinary";
+import { useRouter } from "next/navigation";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button, buttonVariants } from "@/src/app/components/ui/button";
 import { Badge } from "@/src/app/components/ui/badge";
 import { Trash2, ExternalLink, AlertTriangle, MessageSquare } from "lucide-react";
-
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/src/app/components/ui/alert-dialog";
+import { toast } from "sonner";
+import SafeImage from "@/src/components/ui/SafeImage";
+import DeleteDialog from "@/src/components/ui/DeleteDialog";
 
 type Comment = {
   id: string;
@@ -52,13 +42,14 @@ type CommentsTableProps = {
   comments: Comment[];
 };
 
-export default function CommentsTable({ comments }: CommentsTableProps) {
+export default function CommentsTable({ comments: initialComments }: CommentsTableProps) {
+  const [comments, setComments] = useState(initialComments);
   const [filterValue, setFilterValue] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>("all");
+  const router = useRouter();
 
   // Filtro para comentarios
   const filteredComments = useMemo(() => {
@@ -97,11 +88,46 @@ export default function CommentsTable({ comments }: CommentsTableProps) {
     setCurrentPage(page);
   };
 
-  const handleDelete = (id: string) => {
-    // Implementar lógica de eliminación
-    console.log(`Eliminar comentario ${id}`);
-    setIsDeleteDialogOpen(false);
-    setCommentToDelete(null);
+  // Función para manejar la eliminación de un comentario
+  const handleDeleteComment = async (commentId: string): Promise<void> => {
+    if (isDeleting) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      const response = await fetch(`/api/admin/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al eliminar el comentario');
+      }
+
+      // Actualizar el estado local para reflejar la eliminación
+      setComments(prevComments => 
+        prevComments.map(comment => 
+          comment.id === commentId 
+            ? { ...comment, isDeleted: true } 
+            : comment
+        )
+      );
+      
+      toast.success('Comentario eliminado correctamente');
+      
+      // También hacemos un refresh para actualizar los datos del servidor
+      router.refresh();
+    } catch (error) {
+      console.error('Error al eliminar el comentario:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar el comentario');
+      throw error;
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const columns: Column<Comment>[] = useMemo(
@@ -176,45 +202,22 @@ export default function CommentsTable({ comments }: CommentsTableProps) {
           return (
             <div className="flex items-center">
               <div className="flex-shrink-0 h-8 w-8">
-                {user?.image && user?.image.includes('cloudinary') ? (
-                  <CldImage
+                {user?.image ? (
+                  <SafeImage
                     src={user.image}
                     alt={user?.name || "Avatar"}
                     width={32}
                     height={32}
-                    crop="fill"
-                    gravity="face"
                     className="h-8 w-8 rounded-full object-cover"
-                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = "/images/AvatarPredeterminado.webp";
-                    }}
-                  />
-                ) : user?.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
-                  <CldImage
-                    src={user.image}
-                    alt={user?.name || "Avatar"}
-                    width={32}
-                    height={32}
-                    crop="fill"
-                    gravity="face"
-                    className="h-8 w-8 rounded-full object-cover"
-                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = "/images/AvatarPredeterminado.webp";
-                    }}
+                    fallbackSrc="/images/AvatarPredeterminado.webp"
                   />
                 ) : (
-                  <Image
-                    src={user?.image || "/images/AvatarPredeterminado.webp"}
+                  <SafeImage
+                    src="/images/AvatarPredeterminado.webp"
                     alt={user?.name || "Avatar"}
                     width={32}
                     height={32}
                     className="h-8 w-8 rounded-full object-cover"
-                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = "/images/AvatarPredeterminado.webp";
-                    }}
                   />
                 )}
               </div>
@@ -260,36 +263,27 @@ export default function CommentsTable({ comments }: CommentsTableProps) {
                 Ver
               </Link>
               {!comment.isDeleted && (
-                <AlertDialog open={isDeleteDialogOpen && commentToDelete === comment.id} onOpenChange={setIsDeleteDialogOpen}>
-                  <AlertDialogTrigger asChild>
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
-                      onClick={() => setCommentToDelete(comment.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta acción eliminará el comentario y no se puede deshacer.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel onClick={() => setCommentToDelete(null)}>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDelete(comment.id)}>Eliminar</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <DeleteDialog 
+                  entityId={comment.id}
+                  entityName={comment.content.substring(0, 30) + (comment.content.length > 30 ? '...' : '')}
+                  entityType="el comentario"
+                  onDelete={() => handleDeleteComment(comment.id)}
+                  consequenceText="Esta acción no eliminará físicamente el comentario, sino que lo marcará como eliminado."
+                >
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </DeleteDialog>
               )}
             </div>
           );
         },
       },
     ],
-    [isDeleteDialogOpen, commentToDelete]
+    [isDeleting]
   );
 
   return (
