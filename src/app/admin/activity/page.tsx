@@ -1,26 +1,15 @@
 import { Metadata } from "next";
 import prisma from "@/lib/db";
 import ActivityTable from "./ActivityTable";
+import { ActivityItem } from "./types";
 
 export const metadata: Metadata = {
   title: "Actividad de Usuarios | Panel de Administración",
   description: "Monitorea la actividad de usuarios en la Hemeroteca Digital",
 };
 
-// Creamos un tipo para representar una actividad genérica
-type Activity = {
-  id: string;
-  type: 'comment' | 'rating' | 'favorite' | 'login';
-  userId: string;
-  userName: string | null;
-  userEmail: string | null;
-  userImage: string | null;
-  targetName: string;
-  targetId: string;
-  targetType: string;
-  createdAt: Date;
-  details: string | null;
-};
+// Transformamos ActivityItem a Activity para uso interno
+type Activity = ActivityItem;
 
 export default async function ActivityPage() {
   // Obtener comentarios recientes
@@ -98,8 +87,34 @@ export default async function ActivityPage() {
     },
   });
 
+  // Obtener seguimientos recientes
+  const follows = await prisma.follow.findMany({
+    take: 50,
+    orderBy: {
+      createdAt: 'desc',
+    },
+    include: {
+      follower: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+        },
+      },
+      following: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+        },
+      },
+    },
+  });
+
   // Transformar comentarios a actividades
-  const commentActivities: Activity[] = comments.map(comment => ({
+  const commentActivities: ActivityItem[] = comments.map((comment: any) => ({
     id: comment.id,
     type: 'comment',
     userId: comment.userId,
@@ -114,7 +129,7 @@ export default async function ActivityPage() {
   }));
 
   // Transformar valoraciones a actividades
-  const ratingActivities: Activity[] = ratings.map(rating => ({
+  const ratingActivities: ActivityItem[] = ratings.map((rating: any) => ({
     id: rating.id,
     type: 'rating',
     userId: rating.userId,
@@ -129,7 +144,7 @@ export default async function ActivityPage() {
   }));
 
   // Transformar favoritos a actividades
-  const favoriteActivities: Activity[] = favorites.map(favorite => {
+  const favoriteActivities: ActivityItem[] = favorites.map((favorite: any) => {
     // Creamos un ID único para el favorito usando las claves compuestas
     const favoriteId = `fav_${favorite.userId}_${favorite.sourceId}`;
     
@@ -148,8 +163,28 @@ export default async function ActivityPage() {
     };
   });
 
+  // Transformar seguimientos a actividades
+  const followActivities: ActivityItem[] = follows.map((follow: any) => {
+    const followId = follow.id;
+    const targetName = follow.following.name || "Usuario sin nombre";
+    
+    return {
+      id: followId,
+      type: 'follow',
+      userId: follow.followerId,
+      userName: follow.follower.name,
+      userEmail: follow.follower.email,
+      userImage: follow.follower.image,
+      targetName: targetName,
+      targetId: follow.followingId,
+      targetType: 'user',
+      createdAt: follow.createdAt,
+      details: `Empezó a seguir a ${targetName}`,
+    };
+  });
+
   // Combinar todas las actividades y ordenarlas por fecha (más recientes primero)
-  const allActivities = [...commentActivities, ...ratingActivities, ...favoriteActivities]
+  const allActivities = [...commentActivities, ...ratingActivities, ...favoriteActivities, ...followActivities]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 100); // Mostrar las 100 actividades más recientes
 

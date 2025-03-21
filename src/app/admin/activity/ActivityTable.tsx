@@ -8,7 +8,7 @@ import { CldImage } from "next-cloudinary";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { ActivityItem } from ".";
 import { Badge } from "@/src/app/components/ui/badge";
-import { MessageSquare, Star, Heart, LogIn } from "lucide-react";
+import { MessageSquare, Star, Heart, LogIn, UserPlus } from "lucide-react";
 
 type ActivityTableProps = {
   activities: ActivityItem[];
@@ -81,6 +81,11 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
             className = "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
             Icon = LogIn;
             break;
+          case 'follow':
+            type = "Seguimiento";
+            className = "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300";
+            Icon = UserPlus;
+            break;
           default:
             type = "Desconocido";
             className = "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
@@ -99,13 +104,14 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
           value={typeFilter || "all"}
           onChange={handleTypeFilterChange}
         >
-          <option value="all">Todos</option>
+          <option value="all">Todos los tipos</option>
           <option value="comment">Comentarios</option>
           <option value="rating">Valoraciones</option>
           <option value="favorite">Favoritos</option>
           <option value="login">Inicios de sesión</option>
+          <option value="follow">Seguimientos</option>
         </select>
-      )
+      ),
     },
     {
       accessorKey: "user",

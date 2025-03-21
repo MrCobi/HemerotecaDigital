@@ -43,7 +43,7 @@ export interface FavoriteWithDetails {
 
 export type ActivityItem = {
   id: string;
-  type: 'comment' | 'rating' | 'favorite' | 'login';
+  type: 'comment' | 'rating' | 'favorite' | 'login' | 'follow';
   userId: string;
   userName: string | null;
   userEmail: string | null;
