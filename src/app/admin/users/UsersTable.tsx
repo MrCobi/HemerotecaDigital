@@ -4,6 +4,9 @@ import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { DataTable, Column } from "../components/DataTable";
+import { Button } from "@/src/app/components/ui/button";
+import { Trash2, Edit, User } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // Definimos el tipo Role explícitamente
 export type Role = "ADMIN" | "EDITOR" | "USER";
@@ -17,6 +20,7 @@ export interface User {
   role: Role;
   createdAt: Date;
   emailVerified: Date | null;
+  username?: string; // Añadimos username para poder redirigir al perfil del usuario
 }
 
 type UsersTableProps = {
@@ -28,6 +32,7 @@ export default function UsersTable({ users }: UsersTableProps) {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterValue, setFilterValue] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | null>(null);
+  const router = useRouter();
 
   const handleRoleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value as Role | "all";
@@ -58,6 +63,29 @@ export default function UsersTable({ users }: UsersTableProps) {
     (currentPage - 1) * rowsPerPage,
     currentPage * rowsPerPage
   );
+
+  // Función para manejar la eliminación de un usuario
+  const handleDeleteUser = async (userId: string) => {
+    if (confirm("¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.")) {
+      try {
+        const response = await fetch(`/api/admin/users/${userId}`, {
+          method: 'DELETE',
+        });
+        
+        if (response.ok) {
+          alert("Usuario eliminado correctamente");
+          // Recargar la página para actualizar la lista
+          router.refresh();
+        } else {
+          const data = await response.json();
+          alert(`Error al eliminar usuario: ${data.error || 'Error desconocido'}`);
+        }
+      } catch (error) {
+        console.error("Error al eliminar usuario:", error);
+        alert("Error al eliminar usuario. Consulta la consola para más detalles.");
+      }
+    }
+  };
 
   const columns: Column<User>[] = [
     {
@@ -90,7 +118,7 @@ export default function UsersTable({ users }: UsersTableProps) {
       header: "Rol",
       cell: (user: User) => {
         let roleLabel, className;
-        
+
         switch (user.role) {
           case "ADMIN":
             roleLabel = "Administrador";
@@ -105,7 +133,7 @@ export default function UsersTable({ users }: UsersTableProps) {
             roleLabel = "Usuario";
             className = "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
         }
-        
+
         return (
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${className}`}>
             {roleLabel}
@@ -131,11 +159,10 @@ export default function UsersTable({ users }: UsersTableProps) {
       cell: (user: User) => (
         <div className="flex items-center">
           <div
-            className={`w-2.5 h-2.5 rounded-full mr-2 ${
-              user.emailVerified
+            className={`w-2.5 h-2.5 rounded-full mr-2 ${user.emailVerified
                 ? "bg-green-500"
                 : "bg-amber-500"
-            }`}
+              }`}
           ></div>
           <span className="text-sm">
             {user.emailVerified ? "Verificado" : "Pendiente"}
@@ -161,11 +188,31 @@ export default function UsersTable({ users }: UsersTableProps) {
       cell: (user: User) => (
         <div className="flex space-x-2">
           <Link
-            href={`/admin/users/${user.id}`}
-            className="text-primary hover:text-primary/80 font-medium transition-colors text-sm"
+            href={`/admin/users/view/${user.id}`}
+            className="inline-flex items-center text-primary hover:text-primary/80 font-medium transition-colors text-sm bg-primary/10 hover:bg-primary/20 px-2 py-1 rounded-md"
           >
-            Detalles
+            <User className="w-4 h-4 mr-1" />
+            Perfil
           </Link>
+          <Link
+            href={`/admin/users/edit/${user.id}`}
+            className="inline-flex items-center text-amber-600 hover:text-amber-700 font-medium transition-colors text-sm bg-amber-100 hover:bg-amber-200 px-2 py-1 rounded-md dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-800/50"
+          >
+            <Edit className="w-4 h-4 mr-1" />
+            Editar
+          </Link>
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteUser(user.id);
+            }}
+            className="inline-flex items-center text-red-600 hover:text-red-700 font-medium transition-colors text-sm bg-red-100 hover:bg-red-200 px-2 py-1 rounded-md dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-800/50"
+            variant="ghost"
+            size="sm"
+          >
+            <Trash2 className="w-4 h-4 mr-1" />
+            Eliminar
+          </Button>
         </div>
       )
     }

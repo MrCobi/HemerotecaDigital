@@ -1,12 +1,26 @@
-import { redirect } from 'next/navigation';
-import { auth } from '@/auth';
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 
-export default async function UserRedirectPage({ params }: { params: { id: string } }) {
+type PageProps = {
+  params: {
+    id: string;
+  };
+};
+
+export default async function UserRedirectPage({ params }: PageProps) {
+  // Await the params before using its properties
+  const resolvedParams = await Promise.resolve(params);
+  const id = resolvedParams.id;
+  
   const session = await auth();
 
-  if (!session) redirect("/api/auth/signin");
-  if (session.user.role !== "admin") redirect("/acceso-denegado");
+  if (!session) {
+    redirect("/api/auth/signin");
+  }
+  if (session.user.role !== "admin") {
+    redirect("/acceso-denegado");
+  }
   
-  // Redirect to the view page for this user
-  redirect(`/admin/users/view/${params.id}`);
+  // Now that params is properly awaited, we can safely use it
+  redirect(`/admin/users/view/${id}`);
 }

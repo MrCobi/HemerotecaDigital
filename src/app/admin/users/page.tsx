@@ -51,6 +51,7 @@ export default async function UsersPage() {
       select: {
         id: true,
         name: true,
+        username: true,
         email: true,
         image: true,
         role: true,
@@ -74,6 +75,7 @@ export default async function UsersPage() {
     const formattedUsers: User[] = users.map(user => ({
       id: user.id,
       name: user.name,
+      username: user.username || undefined,
       email: user.email,
       emailVerified: user.emailVerified,
       image: user.image,
