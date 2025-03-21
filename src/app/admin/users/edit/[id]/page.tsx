@@ -25,9 +25,9 @@ type User = {
   emailVerified: Date | null;
 };
 
-export default function EditUserPage({ params }: { params: { id: string } }) {
-  const id = params.id;
+export default function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
+  const [id, setId] = useState<string | null>(null);
   const [form, setForm] = useState({ 
     name: "", 
     username: "",
@@ -47,7 +47,25 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
+  // Obtener el ID de los parámetros (que ahora son una Promise)
   useEffect(() => {
+    async function getParamId() {
+      try {
+        const parameters = await params;
+        setId(parameters.id);
+      } catch (err) {
+        console.error("Error al obtener ID de parámetros:", err);
+        setError("Error al cargar la página");
+        setIsLoading(false);
+      }
+    }
+    
+    getParamId();
+  }, [params]);
+
+  useEffect(() => {
+    if (!id) return;
+    
     async function fetchUser() {
       try {
         setIsLoading(true);
@@ -75,9 +93,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       }
     }
     
-    if (id) {
-      fetchUser();
-    }
+    fetchUser();
   }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
