@@ -1199,7 +1199,7 @@ export default function HomePage() {
                                     crop="fill"
                                     gravity="face"
                                     className="h-10 w-10 rounded-full"
-                                    onError={(e) => {
+                                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                                       const target = e.target as HTMLImageElement;
                                       target.src = "/images/AvatarPredeterminado.webp";
                                     }}
