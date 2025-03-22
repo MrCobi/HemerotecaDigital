@@ -1,22 +1,25 @@
 "use client";
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from 'next-auth/react';
-import { ChatWindow } from "@/src/app/components/Chat/ChatWindow";
-import { MessageCircle, Search } from "lucide-react";
-import { Avatar } from "@/src/app/components/ui/avatar";
-import { Input } from '@/src/app/components/ui/input';
+import {  MessageType } from "@/src/hooks/useSocket";
+import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
+import { API_ROUTES } from "@/src/config/api-routes";
+import { ChatWindowContent } from "@/src/app/components/Chat/ChatWindowContent";
+import { MessageCircle, Search, MessageSquare, ArrowLeft, MessageSquarePlus } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/src/app/components/ui/avatar";
+import { Button } from "@/src/app/components/ui/button";
+import { Input } from "@/src/app/components/ui/input";
 import Image from "next/image";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
-import useSocket, { MessageType } from "@/src/hooks/useSocket";
-import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 import { CldImage } from "next-cloudinary";
-import { API_ROUTES } from "@/src/config/api-routes";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
 
 interface User {
   id: string;
   username: string | null;
   image: string | null;
+  name?: string;
 }
 
 export interface Message {
@@ -49,6 +52,7 @@ export interface Conversation {
   };
   unreadCount?: number;
   lastInteraction?: Date;
+  isEmpty?: boolean;
 }
 
 interface CombinedItem {
@@ -84,6 +88,9 @@ export default function MessagesPage() {
   const [generalSearchTerm, setGeneralSearchTerm] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState(false);
+  const [showNewMessageModal, setShowNewMessageModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [creatingConversation, setCreatingConversation] = useState(false);
 
   const CONVERSATIONS_PER_PAGE = 15;
 
@@ -94,7 +101,8 @@ export default function MessagesPage() {
     }
     
     try {
-      const data = await convRes.json();
+      const rawData = await convRes.json();
+      console.log('Raw API response for conversations:', rawData);
       
       // Verificar si la respuesta es un array (formato nuevo) o un objeto (formato antiguo)
       interface Conversation {
@@ -119,20 +127,42 @@ export default function MessagesPage() {
       
       let conversations: Conversation[] = [];
       
-      if (Array.isArray(data)) {
-        conversations = data;
-      } else if (data && typeof data === 'object' && Array.isArray(data.conversations)) {
-        conversations = data.conversations;
-      } else {
-        console.warn('Formato de respuesta inesperado:', data);
-        return []; // Devolver array vacío en caso de formato desconocido
+      // Manejar diferentes formatos de respuesta de API
+      if (Array.isArray(rawData)) {
+        console.log('API response is an array');
+        conversations = rawData;
+      } else if (rawData && typeof rawData === 'object') {
+        if (Array.isArray(rawData.conversations)) {
+          console.log('API response has conversations array');
+          conversations = rawData.conversations;
+        } else if (rawData.data && Array.isArray(rawData.data)) {
+          console.log('API response has data array');
+          conversations = rawData.data;
+        } else if (rawData.data && typeof rawData.data === 'object' && Array.isArray(rawData.data.conversations)) {
+          console.log('API response has nested data.conversations array');
+          conversations = rawData.data.conversations;
+        } else {
+          // Intentar extraer una sola conversación si es un objeto
+          if (rawData.id && rawData.receiver) {
+            console.log('API response is a single conversation object');
+            conversations = [rawData];
+          } else if (rawData.conversation && typeof rawData.conversation === 'object' && rawData.conversation.id) {
+            console.log('API response has a single conversation property');
+            conversations = [rawData.conversation];
+          }
+        }
       }
       
-      console.log(`Loaded ${conversations.length} conversations`);
-
+      if (conversations.length === 0) {
+        console.warn('No se encontraron conversaciones en la respuesta:', rawData);
+      } else {
+        console.log(`Se encontraron ${conversations.length} conversaciones`);
+      }
+      
       return conversations
         .filter(conv => {
           // Validar que cada conversación tenga los campos necesarios
+          // Solo necesitamos ID y receptor para mostrar la conversación, sin requerir lastMessage
           const isValid = conv && typeof conv === 'object' && conv.id && conv.receiver;
           if (!isValid) {
             console.warn('Conversación inválida encontrada:', conv);
@@ -149,6 +179,7 @@ export default function MessagesPage() {
         }) => ({
           id: conv.id,
           otherUser: conv.receiver,
+          // Permitir que lastMessage sea null pero mantener la conversación
           lastMessage: conv.lastMessage ? {
             ...conv.lastMessage,
             createdAt: typeof conv.lastMessage.createdAt === 'string' ? 
@@ -156,7 +187,8 @@ export default function MessagesPage() {
               conv.lastMessage.createdAt,
           } : null,
           createdAt: conv.createdAt,
-          updatedAt: conv.updatedAt || new Date().toISOString(),
+          // Usar updatedAt si existe, o createdAt, o la fecha actual como último recurso
+          updatedAt: conv.updatedAt || conv.createdAt || new Date().toISOString(),
           senderId: session?.user?.id || '',
           receiverId: conv.receiver.id,
           sender: {
@@ -165,7 +197,9 @@ export default function MessagesPage() {
             image: session?.user?.image || null,
           },
           receiver: conv.receiver,
-          unreadCount: conv.unreadCount,
+          unreadCount: conv.unreadCount || 0, // Asegurar que unreadCount no sea undefined
+          // Añadir un indicador para conversaciones vacías
+          isEmpty: !conv.lastMessage,
         }));
     } catch (error) {
       console.error('Error parsing conversation response:', error);
@@ -221,238 +255,197 @@ export default function MessagesPage() {
 
     if (status === "authenticated") {
       let isMounted = true;
+      
+      // Control de tiempo para evitar cargas repetidas
+      const lastLoadTime = sessionStorage.getItem('initial_data_load_time');
+      const currentTime = Date.now();
+      
+      // Solo cargar si no se ha cargado o han pasado al menos 5 minutos
+      if (!lastLoadTime || (currentTime - parseInt(lastLoadTime)) > 300000) {
+        sessionStorage.setItem('initial_data_load_time', currentTime.toString());
+        
+        const loadData = async () => {
+          try {
+            // Usar un AbortController para cancelar las peticiones si el componente se desmonta
+            const controller = new AbortController();
+            const signal = controller.signal;
+            
+            console.log('Fetching conversations from API...');
+            
+            const [convRes, mutualRes] = await Promise.all([
+              fetch(`${API_ROUTES.messages.conversations}?page=1&limit=${CONVERSATIONS_PER_PAGE}`, { 
+                signal,
+                headers: { 'Content-Type': 'application/json' }
+              }),
+              fetch(API_ROUTES.relationships.mutual, { 
+                signal,
+                headers: { 'Content-Type': 'application/json' }
+              })
+            ]);
 
-      const loadData = async () => {
-        try {
-          const [convRes, mutualRes] = await Promise.all([
-            fetch(`${API_ROUTES.messages.conversations}?page=1&limit=${CONVERSATIONS_PER_PAGE}`),
-            fetch(API_ROUTES.relationships.mutual)
-          ]);
+            if (isMounted) {
+              console.log('API response status:', convRes.status, convRes.statusText);
+              
+              // Clonar la respuesta para ver su contenido sin consumirla
+              const convResClone = convRes.clone();
+              try {
+                const rawData = await convResClone.json();
+                console.log('Raw conversation API response:', rawData);
+              } catch (e) {
+                console.error('Error parsing cloned response:', e);
+              }
+              
+              const conversations = await processConvResponse(convRes);
+              const mutuals = await processMutualResponse(mutualRes);
 
-          if (isMounted) {
-            const conversations = await processConvResponse(convRes);
-            const mutuals = await processMutualResponse(mutualRes);
+              console.log('Parsed conversations:', conversations);
+              console.log('Mutual followers:', mutuals);
 
-            setConversations(prev => mergeAndSort(prev, conversations));
-            setMutualFollowers(mutuals);
+              if (conversations.length === 0) {
+                console.warn('No conversations were parsed from the API response');
+                
+                // Intentar crear una conversación de prueba si no hay ninguna
+                if (process.env.NODE_ENV === 'development') {
+                  const dummyUserId = mutuals.length > 0 ? mutuals[0].id : 'unknown-user';
+                  console.log('Creating a dummy conversation for development');
+                  
+                  const dummyConversation: Conversation = {
+                    id: `dummy-${Date.now()}`,
+                    otherUser: {
+                      id: dummyUserId,
+                      username: mutuals.length > 0 ? mutuals[0].username : 'Usuario de prueba',
+                      image: null
+                    },
+                    lastMessage: null,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    senderId: session?.user?.id || '',
+                    receiverId: dummyUserId,
+                    sender: {
+                      id: session?.user?.id || '',
+                      username: session?.user?.username || null,
+                      image: session?.user?.image || null,
+                    },
+                    receiver: {
+                      id: dummyUserId,
+                      username: mutuals.length > 0 ? mutuals[0].username : 'Usuario de prueba',
+                      image: null
+                    },
+                    unreadCount: 0,
+                    isEmpty: true
+                  };
+                  
+                  setConversations([dummyConversation]);
+                }
+              } else {
+                setConversations(prev => mergeAndSort(prev, conversations));
+              }
+              
+              setMutualFollowers(mutuals);
+            }
+          } catch (error) {
+            // Ignorar errores de abortados
+            if ((error as Error).name !== 'AbortError') {
+              console.error("Error loading data:", error);
+            }
+          } finally {
+            if (isMounted) setLoading(false);
           }
-        } catch (error) {
-          console.error("Error loading data:", error);
-        } finally {
-          if (isMounted) setLoading(false);
-        }
-      };
+        };
+        
+        // Fetch immediately, sin retraso para que cargue más rápido
+        const fetchConversations = async () => {
+          try {
+            // Usar un AbortController para cancelar las peticiones si el componente se desmonta
+            const controller = new AbortController();
+            const signal = controller.signal;
+            
+            console.log('Fetching conversations from API...');
+            
+            const res = await fetch(`${API_ROUTES.messages.conversations}?t=${Date.now()}`, { 
+              signal,
+              headers: { 'Content-Type': 'application/json' }
+            });
 
-      loadData();
-      return () => { isMounted = false; };
+            if (!res.ok) return;
+            
+            const newConversations = await processConvResponse(res);
+
+            console.log('Parsed conversations:', newConversations);
+
+            if (Array.isArray(newConversations) && newConversations.length > 0) {
+              setConversations(prev => {
+                const existingMap = new Map(prev.map(c => [c.id, c]));
+                
+                // Actualizar conversaciones existentes con nueva información
+                newConversations.forEach(conv => {
+                  if (existingMap.has(conv.id)) {
+                    // Preservar mensajes no leídos si no cambiaron
+                    const existing = existingMap.get(conv.id)!;
+                    existingMap.set(conv.id, {
+                      ...conv,
+                      // Mantener count más alto para evitar que se pierdan mensajes no leídos
+                      unreadCount: Math.max(conv.unreadCount || 0, existing.unreadCount || 0)
+                    });
+                  } else {
+                    // Agregar nueva conversación
+                    existingMap.set(conv.id, conv);
+                  }
+                });
+                
+                // Convertir el Map de nuevo a array y ordenar por updatedAt
+                const result = Array.from(existingMap.values())
+                  .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+                
+                console.log(`Actualizadas ${result.length} conversaciones (${newConversations.length} recibidas)`);
+                
+                // Asegurarnos de mantener la selección actual si ya existía una selección
+                if (selectedConversation) {
+                  // Verificar si la conversación seleccionada todavía existe
+                  const selectedStillExists = result.some(conv => conv.id === selectedConversation);
+                  
+                  if (!selectedStillExists) {
+                    console.warn('La conversación seleccionada ya no existe en la lista actualizada');
+                  }
+                  
+                  // Restaurar la selección después de que las conversaciones se actualizan
+                  // No lo hacemos en este punto para evitar ciclos, lo hacemos con un timeout
+                  if (selectedStillExists) {
+                    setTimeout(() => {
+                      // Verificar una vez más que el componente esté montado y que no haya cambiado la selección
+                      if (isMounted && selectedConversation === selectedConversation) {
+                        console.log('Manteniendo selección de conversación actual:', selectedConversation);
+                      }
+                    }, 0);
+                  }
+                }
+                
+                return result;
+              });
+            }
+          } catch (error) {
+            console.error('Error refreshing conversations:', error);
+          }
+        };
+        
+        // Fetch immediately, sin retraso para que cargue más rápido
+        fetchConversations(); // Carga inmediata
+        
+        // Then set up interval for periodic refresh - menos frecuente
+        const intervalId = setInterval(fetchConversations, 60000); // Mantener en 60 segundos
+        
+        return () => { 
+          isMounted = false; 
+          clearInterval(intervalId);
+        };
+        
+      } else {
+        console.log('Usando datos cargados anteriormente');
+        // Si ya se cargaron datos recientemente, solo actualizar el estado de carga
+        setLoading(false);
+      }
     }
   }, [status, processConvResponse, processMutualResponse, mergeAndSort, router, session]);
-
-  useEffect(() => {
-    const combineLists = () => {
-      if (!Array.isArray(conversations)) {
-        console.error("Conversations is not an array", conversations);
-        setCombinedList([]);
-        return;
-      }
-      
-      // Debug output
-      console.log(`Combining lists: ${conversations.length} conversations and ${mutualFollowers.length} mutual followers`);
-      
-      // Filter out invalid conversations
-      const validConversations = conversations.filter(
-        conv => conv && typeof conv === 'object' && conv.otherUser && conv.otherUser.id
-      );
-      
-      // Safely create a set of existing user IDs
-      const existingUserIds = new Set(
-        validConversations
-          .filter(c => c?.otherUser?.id) // Make sure otherUser.id exists
-          .map(c => c.otherUser.id)
-      );
-
-      // Debug which users we're filtering out
-      console.log('Existing user IDs in conversations:', Array.from(existingUserIds));
-
-      // Filter out undefined users
-      const validMutualFollowers = Array.isArray(mutualFollowers) ? 
-        mutualFollowers.filter(user => user && typeof user === 'object' && user.id) : 
-        [];
-
-      // Create combined list with conversations first
-      const newCombined: CombinedItem[] = [
-        ...validConversations.map(conv => ({
-          id: conv.id,
-          isConversation: true,
-          data: conv,
-          lastInteraction: new Date(conv.lastMessage?.createdAt || conv.createdAt || Date.now())
-        })),
-        // Then add mutual followers who don't already have a conversation
-        ...validMutualFollowers
-          .filter(user => !existingUserIds.has(user.id))
-          .map(user => ({
-            id: user.id,
-            isConversation: false,
-            data: user,
-            lastInteraction: new Date(0) // Put these at the end
-          }))
-      ];
-      
-      // Sort combined list by last interaction date
-      const sortedCombined = [...newCombined].sort(
-        (a, b) => (b.lastInteraction?.getTime() || 0) - (a.lastInteraction?.getTime() || 0)
-      );
-      
-      console.log(`Final combined list has ${sortedCombined.length} items`);
-      setCombinedList(sortedCombined);
-    };
-    
-    combineLists();
-  }, [conversations, mutualFollowers, session?.user?.id]);
-
-  // Auto-refresh conversations list periodically to ensure it stays updated
-  useEffect(() => {
-    if (!session?.user?.id) return;
-    
-    const fetchConversations = async () => {
-      try {
-        const res = await fetch(`${API_ROUTES.messages.conversations}?t=${Date.now()}`);
-        if (res.ok) {
-          const newConversations = await processConvResponse(res);
-          
-          // Solo actualizar si tenemos conversaciones válidas
-          if (Array.isArray(newConversations) && newConversations.length > 0) {
-            setConversations(prev => {
-              // Combinar y preservar las conversaciones existentes
-              const existingMap = new Map(prev.map(c => [c.id, c]));
-              
-              // Actualizar conversaciones existentes con nueva información
-              newConversations.forEach(conv => {
-                if (existingMap.has(conv.id)) {
-                  // Preservar mensajes no leídos si no cambiaron
-                  const existing = existingMap.get(conv.id)!;
-                  existingMap.set(conv.id, {
-                    ...conv,
-                    // Mantener count más alto para evitar que se pierdan mensajes no leídos
-                    unreadCount: Math.max(conv.unreadCount || 0, existing.unreadCount || 0)
-                  });
-                } else {
-                  // Agregar nueva conversación
-                  existingMap.set(conv.id, conv);
-                }
-              });
-              
-              // Convertir el Map de nuevo a array y ordenar por updatedAt
-              const result = Array.from(existingMap.values())
-                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-              
-              console.log(`Actualizadas ${result.length} conversaciones (${newConversations.length} recibidas)`);
-              return result;
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error refreshing conversations:', error);
-      }
-    };
-    
-    // Fetch immediately
-    fetchConversations();
-    
-    // Then set up interval for periodic refresh - más frecuente
-    const intervalId = setInterval(fetchConversations, 15000); // Cada 15 segundos
-    
-    return () => clearInterval(intervalId);
-  }, [session?.user?.id, processConvResponse]);
-
-  // Estado para seguimiento de la conexión de Socket.io
-  const [socketStatus, setSocketStatus] = useState<'connecting' | 'connected' | 'error' | 'disconnected'>('disconnected');
-
-  // Conexión a Socket.io para mensajes globales
-  const {
-    connected: _connected,
-    error: _socketError,
-    onlineUsers: _onlineUsers,
-    sendMessage: _sendMessage,
-    markMessageAsRead: _markMessageAsRead
-  } = useSocket({
-    userId: session?.user?.id || '',
-    username: session?.user?.name || session?.user?.username || 'Usuario',
-    onNewMessage: (message: MessageType) => {
-      if (!message.senderId || !message.content) return;
-      
-      // Siempre actualizar el contador de mensajes no leídos cuando recibimos un mensaje nuevo
-      if (message.senderId !== session?.user?.id) {
-        unreadMessagesContext?.updateUnreadCount();
-      }
-      
-      // Actualizar conversaciones usando updater function
-      setConversations(prev => {
-        // Performance optimization: utilizar Map para búsqueda rápida
-        const conversationMap = new Map(prev.map(c => [c.id, c]));
-        
-        // Determinar a qué conversación pertenece este mensaje
-        const conversationId = message.conversationId || 
-          prev.find(c => 
-            (c.senderId === message.senderId && c.receiverId === message.receiverId) || 
-            (c.senderId === message.receiverId && c.receiverId === message.senderId)
-          )?.id;
-        
-        if (conversationId && conversationMap.has(conversationId)) {
-          // Actualizar conversación existente
-          const currentConv = conversationMap.get(conversationId);
-          
-          // Actualizar lastMessage solo si el mensaje es más reciente
-          if (
-            !currentConv?.lastMessage ||
-            new Date(message.createdAt as string) > new Date(currentConv.lastMessage.createdAt)
-          ) {
-            // Actualizar la conversación existente
-            conversationMap.set(conversationId, {
-              ...currentConv!,
-              lastMessage: {
-                id: message.id || '',
-                content: message.content,
-                senderId: message.senderId,
-                receiverId: message.receiverId || '',
-                createdAt: typeof message.createdAt === 'string' ? message.createdAt : message.createdAt.toISOString(),
-                read: message.read || false,
-                tempId: message.tempId
-              },
-              updatedAt: typeof message.createdAt === 'string' ? message.createdAt : message.createdAt.toISOString(),
-              unreadCount: message.senderId !== session?.user?.id 
-                ? (currentConv!.unreadCount || 0) + 1 
-                : currentConv!.unreadCount || 0
-            });
-          }
-          
-          // Convertir el Map de nuevo a array y ordenar por updatedAt
-          return Array.from(conversationMap.values())
-            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        }
-        
-        // Si es una nueva conversación, la añadiremos cuando se recargue la lista
-        return prev;
-      });
-
-      // Actualizar contador de mensajes no leídos
-      if (message.senderId !== session?.user?.id) {
-        unreadMessagesContext?.updateUnreadCount();
-      }
-    },
-    onConnect: () => {
-      console.log('Socket.io conectado exitosamente');
-      setSocketStatus('connected');
-    },
-    onDisconnect: () => {
-      console.log('Socket.io desconectado');
-      setSocketStatus('disconnected');
-    },
-    onError: (error: unknown) => {
-      console.error('Error de conexión Socket.io:', error);
-      setSocketStatus('error');
-    }
-  });
 
   useEffect(() => {
     const handleResize = () => setMobileView(window.innerWidth < 768);
@@ -462,28 +455,223 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => {
-    if (status === "unauthenticated") router.push("/api/auth/signin");
-    if (status === "authenticated") {
-      const conversationIdParam = searchParams.get("conversationWith");
-      if (conversationIdParam) {
-        // Add null checks to prevent accessing properties of undefined
-        const targetConv = conversations.find(conv =>
-          (conv?.otherUser?.id === conversationIdParam) ||
-          (conv?.senderId === conversationIdParam)
+    const updateCombinedList = () => {
+      // Solo actualizar si realmente hay cambios para evitar re-renders innecesarios
+      const newCombinedList: CombinedItem[] = [
+        ...conversations.map(conv => ({
+          id: conv.id,
+          isConversation: true,
+          data: conv,
+          lastInteraction: conv.lastInteraction,
+        })),
+        ...mutualFollowers.filter(user => 
+          // Evitar duplicados - no mostrar usuarios que ya tienen una conversación
+          !conversations.some(conv => conv.otherUser?.id === user.id)
+        ).map(user => ({
+          id: user.id,
+          isConversation: false,
+          data: user,
+        })),
+      ];
+
+      // Comparar si realmente hay cambios para evitar actualizaciones innecesarias
+      const hasChanges = 
+        newCombinedList.length !== combinedList.length || 
+        newCombinedList.some((item, index) => 
+          combinedList[index]?.id !== item.id || 
+          combinedList[index]?.isConversation !== item.isConversation
         );
-        if (targetConv) {
-          setSelectedConversation(targetConv.id);
-        }
+
+      if (hasChanges) {
+        setCombinedList(newCombinedList);
       }
+    };
+
+    updateCombinedList();
+  }, [conversations, mutualFollowers, combinedList]);
+
+  useEffect(() => {
+    // Auto-refresh conversations list periodically to ensure it stays updated
+    if (!session?.user?.id) return;
+    
+    // Variable para controlar si el componente está montado
+    let isMounted = true;
+    
+    const fetchConversations = async () => {
+      // Evitar múltiples peticiones si no está montado
+      if (!isMounted) return;
+      
+      // Guardar la conversación seleccionada actual antes de la actualización
+      const currentSelectedId = selectedConversation;
+      
+      // Usar una variable para evitar actualizar el estado si se desmonta el componente
+      let shouldUpdate = true;
+      
+      // Control de tiempo - evitar múltiples peticiones en un período corto
+      const lastFetchTime = sessionStorage.getItem('last_conversations_fetch');
+      const currentTime = Date.now();
+      
+      // Si la última petición fue hace menos de 10 segundos, no hacer otra
+      if (lastFetchTime && (currentTime - parseInt(lastFetchTime)) < 10000) {
+        console.log('Evitando petición repetida, esperar al menos 10 segundos entre solicitudes');
+        return;
+      }
+      
+      // Marcar el tiempo de la petición antes de realizarla
+      sessionStorage.setItem('last_conversations_fetch', currentTime.toString());
+      
+      try {
+        const res = await fetch(`${API_ROUTES.messages.conversations}?t=${currentTime}`);
+        if (!res.ok || !shouldUpdate) return;
+        
+        const newConversations = await processConvResponse(res);
+        
+        // Solo actualizar si tenemos conversaciones válidas y el componente sigue montado
+        if (Array.isArray(newConversations) && newConversations.length > 0 && shouldUpdate) {
+          setConversations(prev => {
+            // Check if conversation already exists to avoid duplicates
+            const existingMap = new Map(prev.map(c => [c.id, c]));
+            
+            // Actualizar conversaciones existentes con nueva información
+            newConversations.forEach(conv => {
+              if (existingMap.has(conv.id)) {
+                // Preservar mensajes no leídos si no cambiaron
+                const existing = existingMap.get(conv.id)!;
+                existingMap.set(conv.id, {
+                  ...conv,
+                  // Mantener count más alto para evitar que se pierdan mensajes no leídos
+                  unreadCount: Math.max(conv.unreadCount || 0, existing.unreadCount || 0)
+                });
+              } else {
+                // Agregar nueva conversación
+                existingMap.set(conv.id, conv);
+              }
+            });
+            
+            // Convertir el Map de nuevo a array y ordenar por updatedAt
+            const result = Array.from(existingMap.values())
+              .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+            
+            console.log(`Actualizadas ${result.length} conversaciones (${newConversations.length} recibidas)`);
+            
+            // Asegurarnos de mantener la selección actual si ya existía una selección
+            if (currentSelectedId) {
+              // Verificar si la conversación seleccionada todavía existe
+              const selectedStillExists = result.some(conv => conv.id === currentSelectedId);
+              
+              if (!selectedStillExists) {
+                console.warn('La conversación seleccionada ya no existe en la lista actualizada');
+              }
+              
+              // Restaurar la selección después de que las conversaciones se actualizan
+              // No lo hacemos en este punto para evitar ciclos, lo hacemos con un timeout
+              if (shouldUpdate && isMounted && selectedStillExists) {
+                setTimeout(() => {
+                  // Verificar una vez más que el componente esté montado y que no haya cambiado la selección
+                  if (isMounted && selectedConversation === currentSelectedId) {
+                    console.log('Manteniendo selección de conversación actual:', currentSelectedId);
+                  }
+                }, 0);
+              }
+            }
+            
+            return result;
+          });
+        }
+      } catch (error) {
+        console.error('Error refreshing conversations:', error);
+      }
+    };
+    
+    // Fetch immediately, sin retraso para que cargue más rápido
+    fetchConversations(); // Carga inmediata
+    
+    // Then set up interval for periodic refresh - menos frecuente
+    const intervalId = setInterval(fetchConversations, 60000); // Mantener en 60 segundos
+    
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [session?.user?.id, processConvResponse, selectedConversation]); // Añadir selectedConversation a las dependencias
+
+  const isProcessingUrlRef = useRef(false);
+  const renderCountRef = useRef(0);
+
+  useEffect(() => {
+    renderCountRef.current++;
+    console.log(`Render #${renderCountRef.current}, selectedConversation: ${selectedConversation}`);
+    
+    if (status === "unauthenticated") {
+      router.push("/api/auth/signin");
+      return;
     }
-  }, [status, router, searchParams, conversations]);
+    
+    if (status !== "authenticated") return;
+    
+    const conversationIdParam = searchParams.get("conversationWith");
+    console.log(`URL param: ${conversationIdParam}, procesando: ${isProcessingUrlRef.current}`);
+    
+    if (isProcessingUrlRef.current) return;
+    
+    isProcessingUrlRef.current = true;
+    
+    const processUrl = async () => {
+      try {
+        if (conversationIdParam) {
+          if (conversations.length === 0) {
+            setTimeout(() => {
+              isProcessingUrlRef.current = false;
+            }, 500);
+            return;
+          }
+          
+          const targetConv = conversations.find(conv =>
+            (conv?.otherUser?.id === conversationIdParam) ||
+            (conv?.receiverId === conversationIdParam) ||
+            (conv?.senderId === conversationIdParam)
+          );
+          
+          if (targetConv) {
+            console.log(`Encontrada conversación con ID: ${targetConv.id}`);
+            
+            if (selectedConversation !== targetConv.id) {
+              console.log(`Seleccionando conversación: ${targetConv.id}`);
+              setSelectedConversation(targetConv.id);
+            }
+          } 
+          else if (!selectedConversation && mutualFollowers.length > 0) {
+            const isValidUser = mutualFollowers.some(user => user.id === conversationIdParam);
+            
+            if (isValidUser) {
+              console.log(`Creando nueva conversación con: ${conversationIdParam}`);
+              await startNewConversation(conversationIdParam);
+            } else {
+              console.warn(`Usuario no encontrado: ${conversationIdParam}`);
+              router.push("/messages");
+            }
+          }
+        } 
+        else if (selectedConversation) {
+          console.log(`No hay parámetro URL pero hay conversación seleccionada: ${selectedConversation}`);
+        }
+      } catch (error) {
+        console.error("Error procesando URL:", error);
+      } finally {
+        setTimeout(() => {
+          isProcessingUrlRef.current = false;
+        }, 300);
+      }
+    };
+    
+    processUrl();
+  }, [searchParams, status]);
 
   const filteredCombinedList = useMemo(() => {
     return combinedList.filter((item) => {
-      // Mantener logs para depuración
       if (item.isConversation) {
-        const conv = item.data as Conversation;
-        const username = conv.otherUser?.username?.toLowerCase() || "";
+        const conversation = item.data as Conversation;
+        const username = conversation.otherUser?.username?.toLowerCase() || "";
         const searchTerm = generalSearchTerm.toLowerCase();
         return searchTerm.trim() === "" || username.includes(searchTerm);
       } else {
@@ -521,7 +709,6 @@ export default function MessagesPage() {
       
       const { conversation: newConversation } = await res.json();
       
-      // Verify that we received a valid conversation object
       if (!newConversation || typeof newConversation !== 'object' || !newConversation.id) {
         console.error("Received invalid conversation object", newConversation);
         return;
@@ -529,16 +716,13 @@ export default function MessagesPage() {
 
       console.log("New conversation created:", newConversation);
 
-      // Add the new conversation to the top of the list
       setConversations(prev => {
-        // Check if conversation already exists to avoid duplicates
         const existingConvIndex = prev.findIndex(c => 
           c.id === newConversation.id || 
           (c.otherUser?.id === newConversation.otherUser?.id)
         );
         
         if (existingConvIndex >= 0) {
-          // Just update the existing conversation
           const updatedConversations = [...prev];
           updatedConversations[existingConvIndex] = {
             ...newConversation,
@@ -547,7 +731,6 @@ export default function MessagesPage() {
           };
           return updatedConversations;
         } else {
-          // Add as a new conversation
           return [
             { 
               ...newConversation, 
@@ -559,7 +742,6 @@ export default function MessagesPage() {
         }
       });
 
-      // Update the URL and selected conversation
       router.push(`/messages?conversationWith=${userId}`);
       setSelectedConversation(newConversation.id);
     } catch (error) {
@@ -582,8 +764,45 @@ export default function MessagesPage() {
   };
 
   const handleBackToList = () => {
+    console.log("Cerrando conversación por solicitud explícita del usuario");
     setSelectedConversation(null);
-    if (mobileView) router.push("/messages");
+    if (mobileView) {
+      router.push("/messages", { scroll: false });
+    }
+  };
+
+  const selectedConversationData = conversations.find(
+    (conv) => conv.id === selectedConversation
+  );
+  const otherUser = selectedConversationData
+    ? selectedConversationData.otherUser
+    : null;
+
+  const memoizedOtherUser = useMemo(() => otherUser, [otherUser?.id]);
+
+  const renderConversationMessage = (conversation: Conversation) => {
+    if (conversation.isEmpty) {
+      return (
+        <p className="text-sm text-gray-500 truncate">
+          No hay mensajes aún. ¡Envía el primero!
+        </p>
+      );
+    }
+    
+    if (!conversation.lastMessage) {
+      return (
+        <p className="text-sm text-gray-500 truncate">
+          No hay mensajes aún. ¡Envía el primero!
+        </p>
+      );
+    }
+    
+    const isCurrentUserSender = conversation.lastMessage.senderId === session?.user?.id;
+    return (
+      <p className="text-sm text-gray-500 truncate">
+        {isCurrentUserSender ? "Tú: " : ""}{conversation.lastMessage.content}
+      </p>
+    );
   };
 
   if (loading) {
@@ -594,286 +813,311 @@ export default function MessagesPage() {
     );
   }
 
-  const selectedConversationData = conversations.find(
-    (conv) => conv.id === selectedConversation
-  );
-  const otherUser = selectedConversationData
-    ? selectedConversationData.otherUser
-    : null;
-
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      {(!mobileView || !selectedConversation) && (
-        <div className="w-full md:w-96 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <h1 className="text-xl font-semibold">Mensajes</h1>
-            
-            {/* Indicador de estado de conexión */}
-            <div className="flex items-center text-xs">
-              {socketStatus === 'connected' ? (
-                <span className="text-green-500 flex items-center" title="Conexión establecida">
-                  <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-                  Conectado
-                </span>
-              ) : socketStatus === 'connecting' ? (
-                <span className="text-amber-500 flex items-center" title="Estableciendo conexión...">
-                  <span className="w-2 h-2 bg-amber-500 rounded-full mr-1 animate-pulse"></span>
-                  Conectando...
-                </span>
-              ) : (
-                <span className="text-red-500 flex items-center cursor-pointer" 
-                      title="Error de conexión. Haz clic para reconectar"
-                      onClick={() => window.location.reload()}>
-                  <span className="w-2 h-2 bg-red-500 rounded-full mr-1"></span>
-                  Reconectar
-                </span>
-              )}
+    <>
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 dark:bg-gray-900">
+      {/* Panel izquierdo - Lista de conversaciones y seguidores mutuos */}
+      <div className={`w-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col ${mobileView && selectedConversation ? "hidden md:flex" : "flex"}`}>
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+          <h1 className="text-xl font-semibold">Mensajes</h1>
+          
+          <div className="flex items-center text-xs">
+            {/* Socket status indicator */}
+          </div>
+        </div>
+          
+        <div className="p-2">
+          <Input
+            type="text"
+            placeholder="Buscar..."
+            value={generalSearchTerm}
+            onChange={(e) => setGeneralSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
+          
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <LoadingSpinner className="w-8 h-8 animate-spin mx-auto text-gray-500" />
+              <p className="mt-2 text-sm text-gray-500">Cargando conversaciones...</p>
             </div>
           </div>
-
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Buscar conversaciones..."
-                className="pl-10 rounded-xl bg-gray-100 dark:bg-gray-700 border-0 focus-visible:ring-2 ring-blue-500"
-                value={generalSearchTerm}
-                onChange={(e) => setGeneralSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="overflow-y-auto h-[calc(100vh-160px)] px-2 pb-4">
-            {loading ? (
-              <div className="flex justify-center items-center h-32">
-                <LoadingSpinner />
-              </div>
-            ) : filteredCombinedList.length === 0 ? (
-              <div className="text-center py-10 text-gray-500 dark:text-gray-400">
-                <MessageCircle className="h-12 w-12 mx-auto text-blue-500 dark:text-blue-400 mb-4" />
-                <p>No hay conversaciones disponibles</p>
-                <p className="text-sm mt-2">
-                  {generalSearchTerm ? (
-                    <>
-                      No se encontraron resultados para &quot;{generalSearchTerm}&quot;
-                      <button
-                        className="ml-2 text-blue-500 hover:underline"
-                        onClick={() => setGeneralSearchTerm("")}
+        ) : (
+          <div className="flex-1 overflow-y-auto">
+            {/* Tabs */}
+            {filteredCombinedList.length > 0 && filteredCombinedList.some(item => item.isConversation) ? (
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredCombinedList
+                  .filter(item => item.isConversation)
+                  .map((item) => {
+                    const conversation = item.data as Conversation;
+                    const isSelected = selectedConversation === conversation.id;
+                      
+                    return (
+                      <div
+                        key={conversation.id}
+                        className={`p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer flex items-start space-x-3 ${isSelected && "bg-blue-50 dark:bg-gray-700"}`}
+                        onClick={() => handleConversationSelect(conversation.id)}
                       >
-                        Mostrar todos
-                      </button>
-                    </>
-                  ) : (
-                    "Sigue a otros usuarios para poder empezar a chatear"
-                  )}
-                </p>
-              </div>
-            ) : (
-              filteredCombinedList.map((item) => {
-                if (item.isConversation) {
-                  const conversation = item.data as Conversation;
-                  if (!conversation?.otherUser) {
-                    console.error('Conversation missing otherUser:', conversation);
-                    return null;
-                  }
-                  
-                  const currentOtherUser = conversation.otherUser;
-                  return (
-                    <div
-                      key={`conv-${conversation.id}`}
-                      className={`group flex items-center p-3 gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer rounded-xl m-2 ${
-                        selectedConversation === conversation.id
-                          ? "bg-blue-50 dark:bg-blue-900/20 shadow-sm"
-                          : ""}`}
-                      onClick={() => handleConversationSelect(conversation.id)}
-                    >
-                      <Avatar className="h-14 w-14 border-2 border-blue-200 dark:border-blue-800 group-hover:border-blue-500">
-                        {currentOtherUser?.image && currentOtherUser.image.includes("cloudinary") ? (
-                          <CldImage
-                            src={(() => {
-                              // Extraer el public_id limpio, manejando diferentes formatos
-                              let publicId = currentOtherUser.image;
+                        <Avatar className="h-12 w-12 border-2 border-gray-200 dark:border-gray-700">
+                          {conversation.otherUser?.image && conversation.otherUser.image.includes("cloudinary") ? (
+                            <CldImage
+                              src={(() => {
+                                let publicId = conversation.otherUser.image;
 
-                              // Si es una URL completa de Cloudinary
-                              if (currentOtherUser.image.includes('cloudinary.com')) {
-                                // Extraer el public_id eliminando la parte de la URL
-                                // Buscamos 'hemeroteca_digital' como punto de referencia seguro
-                                const match = currentOtherUser.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
-                                if (match && match[1]) {
-                                  publicId = `hemeroteca_digital/${match[1]}`;
-                                } else {
-                                  // Si no encontramos el patrón específico, intentamos una extracción más general
-                                  publicId = currentOtherUser.image.replace(/.*\/v\d+\//, '').split('?')[0];
+                                if (conversation.otherUser.image.includes('cloudinary.com')) {
+                                  const match = conversation.otherUser.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                                  if (match && match[1]) {
+                                    publicId = `hemeroteca_digital/${match[1]}`;
+                                  } else {
+                                    publicId = conversation.otherUser.image.replace(/.*\/v\d+\//, '').split('?')[0];
+                                  }
                                 }
-                              }
 
-                              // Verificar que el ID no esté duplicado o anidado
-                              if (publicId.includes('https://')) {
-                                console.warn('ID público contiene URL completa en mensajes:', publicId);
-                                publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
-                              }
+                                console.log('Public ID extraído en mensajes:', publicId);
+                                return publicId;
+                              })()}
+                              width={48}
+                              height={48}
+                              alt={conversation.otherUser?.username || "Usuario"}
+                              className="h-12 w-12 rounded-full object-cover"
+                            />
+                          ) : conversation.otherUser?.image ? (
+                            conversation.otherUser.image.includes("http") &&
+                            !conversation.otherUser.image.startsWith("http") ? (
+                            <CldImage
+                              src={(() => {
+                                let publicId = conversation.otherUser.image;
 
-                              console.log('Public ID extraído en mensajes:', publicId);
-                              return publicId;
-                            })()}
-                            alt={currentOtherUser?.username || "Usuario"}
-                            width={56}
-                            height={56}
-                            crop="fill"
-                            gravity="face"
-                            className="rounded-full object-cover"
-                            priority
-                            onError={(e) => {
-                              console.error('Error cargando imagen en mensajes:', currentOtherUser.image);
-                              const target = e.target as HTMLImageElement;
-                              target.src = "/images/AvatarPredeterminado.webp";
-                            }}
-                          />
-                        ) : currentOtherUser?.image &&
-                          !currentOtherUser.image.startsWith("/") &&
-                          !currentOtherUser.image.startsWith("http") ? (
-                          <CldImage
-                            src={(() => {
-                              // Extraer el public_id limpio, manejando diferentes formatos
-                              let publicId = currentOtherUser.image;
+                                if (publicId.includes('https://')) {
+                                  console.warn('ID público contiene URL completa en mensajes (2):', publicId);
+                                  publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                                }
 
-                              // Verificar que el ID no esté duplicado o anidado
-                              if (publicId.includes('https://')) {
-                                console.warn('ID público contiene URL completa en mensajes (2):', publicId);
-                                publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
-                              }
-
-                              console.log('Public ID extraído en mensajes (2):', publicId);
-                              return publicId;
-                            })()}
-                            alt={currentOtherUser?.username || "Usuario"}
-                            width={56}
-                            height={56}
-                            crop="fill"
-                            gravity="face"
-                            className="rounded-full object-cover"
-                            onError={(e) => {
-                              console.error('Error cargando imagen en mensajes (2):', currentOtherUser.image);
-                              const target = e.target as HTMLImageElement;
-                              target.src = "/images/AvatarPredeterminado.webp";
-                            }}
-                          />
+                                return publicId;
+                              })()}
+                              width={48}
+                              height={48}
+                              alt={conversation.otherUser?.username || "Usuario"}
+                              className="h-12 w-12 rounded-full object-cover"
+                            />
+                          ) : (
+                            <CldImage
+                              src={conversation.otherUser?.image || "placeholder_avatar"}
+                              width={48}
+                              height={48}
+                              alt={conversation.otherUser?.username || "Usuario"}
+                              className="h-12 w-12 rounded-full object-cover"
+                            />
+                          )
                         ) : (
-                          <Image
-                            src={currentOtherUser?.image || "/images/AvatarPredeterminado.webp"}
-                            alt={currentOtherUser?.username || "Usuario"}
-                            width={56}
-                            height={56}
-                            className="rounded-full object-cover"
-                            priority
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = "/images/AvatarPredeterminado.webp";
-                            }}
-                          />
+                          <AvatarFallback>
+                            {conversation.otherUser?.username?.charAt(0).toUpperCase() || "U"}
+                          </AvatarFallback>
                         )}
-                      </Avatar>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-center mb-1 gap-2">
-                          <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate">
-                            {currentOtherUser?.username || "Usuario desconocido"}
-                          </h3>
-                          {conversation.lastMessage && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                              {new Date(conversation.lastMessage.createdAt).toLocaleTimeString([], {
+                        </Avatar>
+                          
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start">
+                            <h3 className="font-medium truncate">
+                              {conversation.otherUser?.username || "Usuario desconocido"}
+                            </h3>
+                            <span className="text-xs text-gray-500">
+                              {conversation.updatedAt && new Date(conversation.updatedAt).toLocaleTimeString([], {
                                 hour: "2-digit",
                                 minute: "2-digit",
                               })}
                             </span>
-                          )}
+                          </div>
+                          {renderConversationMessage(conversation)}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                            {conversation.lastMessage
-                              ? conversation.lastMessage.content
-                              : "Comienza una conversación..."}
-                          </p>
-                          {(conversation.unreadCount ?? 0) > 0 && (
-                            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs text-white">
-                              {conversation.unreadCount}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                } else {
-                  const user = item.data as User;
-                  return (
-                    <div
-                      key={`user-${user.id}`}
-                      className="group flex items-center gap-3 p-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer rounded-xl m-2"
-                      onClick={() => startNewConversation(user.id)}
-                    >
-                      <Avatar className="h-14 w-14 border-2 border-gray-200 dark:border-gray-700 group-hover:border-green-500">
-                        {/* Avatar rendering... */}
-                        {user?.image ? (
-                          <Image
-                            src={user.image}
-                            alt={user?.username || "Usuario"}
-                            width={56}
-                            height={56}
-                            className="rounded-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = "/images/AvatarPredeterminado.webp";
-                            }}
-                          />
-                        ) : (
-                          <div className="h-full w-full bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center text-xl font-semibold text-gray-600 dark:text-gray-300">
-                            {user?.username?.[0] || "U"}
+                        {(conversation.unreadCount ?? 0) > 0 && (
+                          <div className="flex-shrink-0 ml-2">
+                            <div className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                              {(conversation.unreadCount ?? 0) > 9 ? "9+" : (conversation.unreadCount ?? 0)}
+                            </div>
                           </div>
                         )}
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-center gap-2">
-                          <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate">
-                            {user?.username || "Usuario desconocido"}
-                          </h3>
-                        </div>
-                        <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
-                          <MessageCircle className="h-3.5 w-3.5" />
-                          Iniciar conversación
-                        </p>
                       </div>
-                    </div>
-                  );
-                }
-              })
+                    );
+                  })}
+              </div>
+            ) : (
+              <div className="p-4 text-center text-gray-500">
+                {generalSearchTerm ? "No se encontraron resultados" : "No tienes conversaciones"}
+              </div>
             )}
           </div>
+        )}
+        
+        {/* Nuevo botón para crear conversaciones */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <Button
+            onClick={() => setShowNewMessageModal(true)}
+            className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium rounded-lg"
+          >
+            <MessageSquarePlus className="h-5 w-5 mr-2" />
+            Nuevo mensaje
+          </Button>
         </div>
-      )}
+      </div>
 
-      <div className="flex-1 flex flex-col">
-        {selectedConversation && otherUser ? (
-          <ChatWindow
-            otherUser={otherUser}
-            initialMessages={[]} // Se cargarán mediante WebSocket
-            conversationId={selectedConversation}
-            isOpen={true}
-           onClose={handleBackToList}
-          />
+      {/* Panel derecho - Contenido de la conversación seleccionada */}
+      <div className={`w-full md:w-2/3 lg:w-3/4 bg-white dark:bg-gray-800 flex flex-col ${!mobileView || (mobileView && selectedConversation) ? "flex" : "hidden md:flex"}`}>
+        {selectedConversation && memoizedOtherUser ? (
+          // Contenido de la conversación
+          <div className="h-full flex flex-col">
+            {/* Cabecera de la conversación */}
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <div className="flex items-center space-x-3">
+                {mobileView && (
+                  <Button variant="ghost" size="icon" onClick={handleBackToList}>
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                )}
+                <Avatar className="h-10 w-10">
+                  {memoizedOtherUser.image ? (
+                    <AvatarImage src={memoizedOtherUser.image} alt={memoizedOtherUser.username || "Usuario"} />
+                  ) : (
+                    <AvatarFallback>{memoizedOtherUser.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                  )}
+                </Avatar>
+                <h2 className="font-medium">{memoizedOtherUser.username || "Usuario"}</h2>
+              </div>
+            </div>
+            
+            {/* Contenido de la conversación integrado directamente */}
+            <ChatWindowContent 
+              conversationId={selectedConversation}
+              otherUser={memoizedOtherUser}
+              key={`chat-content-${selectedConversation}`}
+            />
+          </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800">
-            <div className="text-center p-8">
-              <MessageCircle className="h-12 w-12 mx-auto text-blue-500 dark:text-blue-400 mb-4" />
-              <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">
-                Selecciona una conversación
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Elige una conversación existente o inicia una nueva
+          // Panel de bienvenida cuando no hay conversación seleccionada
+          <div className="h-full flex flex-col items-center justify-center p-4">
+            <div className="text-center max-w-md">
+              <MessageSquare className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Tus mensajes</h2>
+              <p className="text-gray-500 mb-6">
+                Selecciona una conversación de la lista o inicia una nueva para comenzar a chatear.
               </p>
             </div>
           </div>
         )}
       </div>
     </div>
+
+    {/* Modal para crear una nueva conversación */}
+    <Dialog open={showNewMessageModal} onOpenChange={setShowNewMessageModal}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Nuevo mensaje</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Selecciona un usuario para iniciar una conversación
+          </div>
+          {mutualFollowers.length === 0 ? (
+            <div className="text-center p-4 text-gray-500 dark:text-gray-400">
+              No tienes seguidores mutuos para iniciar una conversación.
+              <div className="mt-2 text-sm">
+                Para poder enviar mensajes, necesitas seguir a usuarios y que ellos te sigan de vuelta.
+              </div>
+            </div>
+          ) : (
+            <div className="max-h-[50vh] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-800">
+              {mutualFollowers.map((user) => (
+                <div
+                  key={user.id}
+                  className={`flex items-center p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors rounded-lg ${
+                    selectedUser?.id === user.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                  }`}
+                  onClick={() => setSelectedUser(user)}
+                >
+                  <Avatar className="h-10 w-10 mr-3">
+                    <AvatarImage src={user.image || ''} />
+                    <AvatarFallback>{user.username?.substring(0, 2).toUpperCase() || 'US'}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="font-medium">{user.name}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">@{user.username}</div>
+                  </div>
+                  {selectedUser?.id === user.id && (
+                    <div className="h-4 w-4 rounded-full bg-blue-500"></div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" onClick={() => setShowNewMessageModal(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!selectedUser || creatingConversation || mutualFollowers.length === 0}
+              onClick={async () => {
+                if (!selectedUser) return;
+                
+                setCreatingConversation(true);
+                try {
+                  const response = await fetch('/api/messages/conversations', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      receiverId: selectedUser.id
+                    })
+                  });
+                  
+                  if (!response.ok) {
+                    throw new Error('Error al crear la conversación');
+                  }
+                  
+                  const conversation = await response.json();
+                  console.log('Conversación creada:', conversation);
+                  
+                  // Añadir la nueva conversación a la lista
+                  if (conversation && conversation.id) {
+                    setConversations(prev => {
+                      // Evitar duplicados
+                      if (prev.some(c => c.id === conversation.id)) {
+                        return prev;
+                      }
+                      
+                      const newConversation = {
+                        ...conversation,
+                        // Asegurarse de que tenga la propiedad isEmpty si no tiene mensajes
+                        isEmpty: !conversation.lastMessage
+                      };
+                      
+                      return [newConversation, ...prev]
+                        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+                    });
+                    
+                    // Seleccionar la nueva conversación
+                    setSelectedConversation(conversation.id);
+                  }
+                  
+                  setShowNewMessageModal(false);
+                  setSelectedUser(null);
+                } catch (error) {
+                  console.error('Error al crear conversación:', error);
+                  alert('Ha ocurrido un error al crear la conversación');
+                } finally {
+                  setCreatingConversation(false);
+                }
+              }}
+              className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white"
+            >
+              {creatingConversation ? 'Creando...' : 'Crear conversación'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

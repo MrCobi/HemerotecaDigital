@@ -318,8 +318,33 @@ export default function UserProfilePage() {
                               const data = await res.json();
                               
                               if (data.isMutualFollow) {
-                                // Redirigir a la página de mensajes
-                                window.location.href = "/messages";
+                                // Crear conversación si no existe
+                                try {
+                                  const createConvRes = await fetch('/api/messages/conversations', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                      receiverId: user.id
+                                    })
+                                  });
+                                  
+                                  const convData = await createConvRes.json();
+                                  console.log('Conversación creada o recuperada:', convData);
+                                  
+                                  // Redirigir a la página de mensajes con el ID de conversación
+                                  if (convData.id) {
+                                    window.location.href = `/messages?convId=${convData.id}`;
+                                  } else {
+                                    // Si no hay ID, simplemente redirigir a mensajes
+                                    window.location.href = "/messages";
+                                  }
+                                } catch (error) {
+                                  console.error("Error al crear conversación:", error);
+                                  // Redirigir a mensajes de todos modos
+                                  window.location.href = "/messages";
+                                }
                               } else {
                                 // Mostrar una alerta si no hay seguimiento mutuo
                                 alert("Esta acción requiere que ambos usuarios se sigan mutuamente.");
@@ -549,7 +574,7 @@ export default function UserProfilePage() {
                                   `Eliminaste la valoración de ${activity.sourceName || "una fuente"
                                   }.`}
                                 {activity.type === "follow" &&
-                                  `Comenzaste a seguir a ${activity.user.name || "un usuario"
+                                  `Comenzaste a seguir a ${activity.user?.name || "un usuario"
                                   }.`}
                                 {activity.type === "comment_reply" &&
                                   `Respondiste a un comentario en ${activity.sourceName || "una fuente"
@@ -558,17 +583,17 @@ export default function UserProfilePage() {
                                   `Eliminaste un comentario en ${activity.sourceName || "una fuente"
                                   }.`}
                                 {activity.type === "unfollow" &&
-                                  `Dejaste de seguir a ${activity.user.name || "un usuario"
+                                  `Dejaste de seguir a ${activity.user?.name || "un usuario"
                                   }.`}
                                 {activity.type === "favorite" &&
-                                  `${activity.user.name || "un usuario"} marcó como favorito a ${activity.sourceName || "una fuente"
+                                  `${activity.user?.name || "un usuario"} marcó como favorito a ${activity.sourceName || "una fuente"
                                   }.`}
                                 {/* Texto de fallback para tipos no reconocidos */}
                                 {!["favorite_added", "favorite_removed", "comment", "rating_added",
                                   "rating_removed", "follow", "comment_reply", "comment_deleted",
                                   "unfollow", "favorite"].includes(activity.type) &&
                                   `Actividad: ${activity.type || "desconocida"} ${activity.sourceName ? `en ${activity.sourceName}` :
-                                    activity.user.name ? `con ${activity.user.name}` :
+                                    activity.user?.name ? `con ${activity.user?.name}` :
                                       ""
                                   }`}
                               </p>

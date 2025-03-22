@@ -59,249 +59,201 @@ export default function useSocket(options: UseSocketOptions) {
   const [error, setError] = useState<Error | unknown>(null);
   const [onlineUsers, setOnlineUsers] = useState<UserType[]>([]);
   
+  // Use a properly typed ref for the socket
   const socketRef = useRef<Socket | null>(null);
   
-  // Inicializar conexión de Socket.io
+  // Initialize Socket.io connection
   useEffect(() => {
-    if (!userId) return;
+    // Don't initialize without a userId
+    if (!userId) {
+      console.warn('No se puede inicializar socket sin userId');
+      return;
+    }
     
-    // Crear instancia de Socket.io si no existe
-    if (!socketRef.current) {
+    console.log('Inicializando conexión de Socket.io con userId:', userId);
+    
+    // Cleanup function to properly disconnect the socket
+    const cleanup = () => {
+      if (socketRef.current) {
+        console.log('Desconectando socket existente');
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+    
+    // Create a new Socket.io instance
+    try {
+      // Always clean up previous socket if it exists
+      cleanup();
+      
+      // Create the new socket
       socketRef.current = io(SOCKET_SERVER_URL, {
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
         autoConnect: true,
         transports: ['websocket', 'polling'],
-        withCredentials: true,
-        extraHeaders: {
-          'Access-Control-Allow-Origin': window.location.origin
+        auth: { userId, username },
+        query: { userId, username }
+      });
+      
+      const socket = socketRef.current;
+      
+      console.log('Socket.io instanciado correctamente');
+      
+      // Connection events
+      socket.on('connect', () => {
+        console.log('Socket.io conectado exitosamente con ID:', socket.id);
+        setConnected(true);
+        
+        // Enviar información del usuario al conectarse
+        socket.emit('user_connected', { userId, username });
+        
+        if (onConnect) onConnect();
+      });
+      
+      socket.on('connect_error', (err) => {
+        console.error('Error de conexión Socket.io:', err);
+        setConnected(false);
+        setError(err);
+        
+        if (onError) onError(err);
+      });
+      
+      socket.on('reconnect_attempt', (attemptNumber) => {
+        console.log(`Intento de reconexión Socket.io #${attemptNumber}`);
+      });
+      
+      socket.on('reconnect_error', (e) => {
+        console.error('Error de reconexión Socket.io:', e);
+        
+        // Intentar cambiar a transport polling después de errores
+        try {
+          socket.io.opts.transports = ['polling', 'websocket'];
+        } catch (e) {
+          console.error('Error al cambiar transporte:', e);
+        }
+        
+        if (onError) onError(error);
+      });
+      
+      socket.on('disconnect', (reason) => {
+        console.log('Socket.io desconectado:', reason);
+        setConnected(false);
+        
+        if (onDisconnect) onDisconnect();
+      });
+      
+      // Message events
+      socket.on('new_message', (message: MessageType) => {
+        console.log('Recibido nuevo mensaje en useSocket:', message);
+        
+        // Ensure message has a valid creation date
+        if (!message.createdAt) {
+          console.warn('Mensaje recibido sin fecha de creación, añadiendo fecha actual');
+          message.createdAt = new Date().toISOString();
+        } else if (typeof message.createdAt === 'object' && message.createdAt instanceof Date) {
+          // Convert Date object to ISO string for consistency
+          message.createdAt = message.createdAt.toISOString();
+        } else if (typeof message.createdAt === 'string') {
+          // Validate that the date is a valid ISO format
+          try {
+            const fecha = new Date(message.createdAt);
+            if (isNaN(fecha.getTime())) throw new Error('Fecha inválida');
+            message.createdAt = fecha.toISOString(); // Normalize format
+          } catch {
+            console.warn('Fecha de mensaje inválida, usando fecha actual');
+            message.createdAt = new Date().toISOString();
+          }
+        }
+        
+        // Ensure message has a tempId for tracking
+        if (!message.id && !message.tempId) {
+          console.warn('Mensaje sin ID temporal, generando uno');
+          message.tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        }
+        
+        // Detailed log for debugging
+        console.log('Mensaje antes de procesarlo:', JSON.stringify(message, null, 2));
+        
+        if (onNewMessage) {
+          console.log('Enviando mensaje a callback onNewMessage');
+          onNewMessage(message);
+        } else {
+          console.error('No hay manejador onNewMessage definido, el mensaje no será mostrado en la UI');
         }
       });
-    }
-    
-    const socket = socketRef.current;
-    
-    // Eventos de conexión
-    socket.on('connect', () => {
-      console.log('Socket.io conectado exitosamente con ID:', socket.id);
-      setConnected(true);
-      setError(null);
       
-      // Identificar al usuario
-      if (userId && username) {
-        console.log(`Identificando usuario: ${username} (${userId})`);
-        socket.emit('identify', { userId, username });
-      } else {
-        console.error('No se puede identificar al usuario, falta ID o nombre');
-      }
-      
-      if (onConnect) onConnect();
-    });
-    
-    socket.on('connect_error', (error) => {
-      console.error('Error de conexión Socket.io:', error);
-      setConnected(false);
-      setError(error);
-      
-      // Intentar reconectar con WebSocket solamente
-      try {
-        console.log('Cambiando a transporte WebSocket sólo');
-        // Cerrar la conexión actual
-        socket.disconnect();
+      socket.on('message_status', (data: { messageId: string, status: string }) => {
+        console.log('Estado de mensaje actualizado:', data);
         
-        // Reconectar con websocket solamente
-        setTimeout(() => {
-          socket.io.opts = {
-            ...socket.io.opts,
-            transports: ['websocket']
-          };
-          socket.connect();
-        }, 1000);
-      } catch (e) {
-        console.error('Error al cambiar transporte:', e);
-      }
-      
-      if (onError) onError(error);
-    });
-    
-    socket.on('disconnect', (reason) => {
-      console.log('Socket.io desconectado:', reason);
-      setConnected(false);
-      
-      if (onDisconnect) onDisconnect();
-    });
-    
-    // Eventos de mensajería
-    socket.on('new_message', (message: MessageType) => {
-      console.log('Recibido nuevo mensaje en useSocket:', message);
-      
-      // Asegurarse de que el mensaje tenga una fecha de creación válida
-      if (!message.createdAt) {
-        console.warn('Mensaje recibido sin fecha de creación, añadiendo fecha actual');
-        message.createdAt = new Date().toISOString();
-      } else if (typeof message.createdAt === 'object' && message.createdAt instanceof Date) {
-        // Convertir objeto Date a string ISO para consistencia
-        message.createdAt = message.createdAt.toISOString();
-      } else if (typeof message.createdAt === 'string') {
-        // Validar que la fecha sea un formato ISO válido
-        try {
-          const fecha = new Date(message.createdAt);
-          if (isNaN(fecha.getTime())) throw new Error('Fecha inválida');
-          message.createdAt = fecha.toISOString(); // Normalizar formato
-        } catch {
-          console.warn(`Fecha inválida en mensaje: ${message.createdAt}, reemplazando con fecha actual`);
-          message.createdAt = new Date().toISOString();
+        if (onMessageStatus) {
+          onMessageStatus(data);
+        } else {
+          console.warn('No hay manejador onMessageStatus definido');
         }
-      }
+      });
       
-      // Validar que el mensaje tenga un remitente y contenido
-      if (!message.senderId) {
-        console.error('Mensaje recibido sin ID de remitente, ignorando');
-        return;
-      }
+      socket.on('message_read', (data: { messageId: string; conversationId: string }) => {
+        if (onMessageRead) onMessageRead(data);
+      });
       
-      if (!message.content) {
-        console.error('Mensaje recibido sin contenido, ignorando');
-        return;
-      }
+      socket.on('typing_status', (status: TypingStatusType) => {
+        if (onTypingStatus) onTypingStatus(status);
+      });
       
-      // Asegurar que el mensaje tenga un ID, sea temporal o real
-      if (!message.id && !message.tempId) {
-        console.warn('Mensaje sin ID ni tempId, generando uno temporal');
-        message.tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      }
+      socket.on('users_online', (users: UserType[]) => {
+        console.log('Usuarios online:', users);
+        setOnlineUsers(users);
+        if (onUserOnline) onUserOnline(users);
+      });
       
-      // Log detallado para depuración
-      console.log('Mensaje antes de procesarlo:', JSON.stringify(message, null, 2));
-      
-      if (onNewMessage) {
-        console.log('Enviando mensaje a callback onNewMessage');
-        onNewMessage(message);
-      } else {
-        console.error('No hay manejador onNewMessage definido, el mensaje no será mostrado en la UI');
-      }
-    });
-    
-    socket.on('message_status', (data: { messageId: string, status: string }) => {
-      console.log('Estado de mensaje actualizado:', data);
-      
-      if (onMessageStatus) {
-        onMessageStatus(data);
-      } else {
-        console.warn('No hay manejador onMessageStatus definido');
-      }
-    });
-    
-    socket.on('message_updated', (data: { tempId: string, realId: string, status: string }) => {
-      console.log('Mensaje actualizado con ID real de base de datos:', data);
-      
-      // Emitir evento de actualización de estado del mensaje
-      if (onMessageStatus) {
-        onMessageStatus({
-          messageId: data.tempId,
-          status: data.status
-        });
-      } else {
-        console.warn('No hay manejador onMessageStatus definido');
-      }
-    });
-    
-    socket.on('users_online', (users: UserType[]) => {
-      console.log('Usuarios online:', users);
-      setOnlineUsers(users);
-      if (onUserOnline) onUserOnline(users);
-    });
-    
-    socket.on('typing_status', (status: TypingStatusType) => {
-      if (onTypingStatus) onTypingStatus(status);
-    });
-    
-    socket.on('message_read', (data: { messageId: string; conversationId: string }) => {
-      if (onMessageRead) onMessageRead(data);
-    });
-    
-    socket.on('message_read_confirmed', (data: { messageId: string; conversationId: string }) => {
-      console.log('Confirmación de lectura de mensaje:', data);
-      // Puedes manejar la confirmación de lectura si es necesario
-    });
-    
-    // Handle socket errors
-    socket.on('error', (error) => {
-      console.error('Socket.io error:', error);
-      setError(error);
-      if (onError) onError(error);
-    });
-
-    // Handle socket disconnect
-    socket.on('disconnect', () => {
-      console.log('Socket.io disconnected');
-      setConnected(false);
-      if (onDisconnect) onDisconnect();
-    });
-
-    // Handle connection error (this is different from regular errors)
-    socket.on('connect_error', (error) => {
-      console.error('Socket.io connection error:', error);
-      setError(error);
-      if (onError) onError(error);
-    });
-    
-    // Conectar si no está conectado
-    if (!socket.connected) {
-      socket.connect();
+    } catch (err) {
+      console.error('Error al crear instancia de Socket.io:', err);
+      setError(err);
+      if (onError) onError(err);
     }
     
-    // Limpieza al desmontar el componente
-    return () => {
-      socket.off('connect');
-      socket.off('connect_error');
-      socket.off('disconnect');
-      socket.off('new_message');
-      socket.off('message_status');
-      socket.off('message_updated');
-      socket.off('users_online');
-      socket.off('typing_status');
-      socket.off('message_read');
-      socket.off('message_read_confirmed');
-      socket.off('error');
-    };
+    // Cleanup on unmount or when dependencies change
+    return cleanup;
   }, [userId, username, onNewMessage, onUserOnline, onTypingStatus, onMessageStatus, onMessageRead, onConnect, onDisconnect, onError]);
   
-  // Funciones para interactuar con Socket.io
-  const sendMessage = (message: Omit<MessageType, 'status' | 'createdAt'>) => {
-    if (!socketRef.current || !socketRef.current.connected) {
-      console.error('No hay conexión con el servidor de chat. Estado del socket:', socketRef.current ? 'Instanciado' : 'Nulo');
-      setError(new Error('No hay conexión con el servidor de chat'));
-      return false;
-    }
-    
+  // Functions to interact with Socket.io
+  const sendMessage = (message: MessageType) => {
     try {
-      // Asegurarse que el mensaje tenga toda la información necesaria
-      if (!message.content) {
-        console.error('Intento de enviar mensaje sin contenido');
+      if (!socketRef.current) {
+        console.error('No hay conexión con el servidor de chat. Socket es nulo.');
+        setError(new Error('Socket no inicializado'));
+        if (onMessageStatus && message.tempId) {
+          onMessageStatus({
+            messageId: message.tempId,
+            status: 'error'
+          });
+        }
         return false;
       }
       
-      if (!message.senderId || !message.receiverId) {
-        console.error('Intento de enviar mensaje sin emisor o receptor:', message);
+      if (!socketRef.current.connected) {
+        console.error('Socket no conectado. Intentando reconectar...');
+        socketRef.current.connect();
+        
+        if (onMessageStatus && message.tempId) {
+          onMessageStatus({
+            messageId: message.tempId,
+            status: 'error'
+          });
+        }
         return false;
       }
       
-      // Generar un ID temporal único si no existe
-      const tempId = message.tempId || `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      
-      // Crear mensaje mejorado con todos los campos necesarios
+      const tempId = message.tempId || `temp-${Date.now()}`;
       const enhancedMessage = {
         ...message,
-        tempId,
-        id: message.id, // Mantener ID original si existe
-        createdAt: new Date().toISOString(), // Usar string ISO para evitar problemas de serialización
-        status: 'sending' as const
+        tempId
       };
       
       console.log('Enviando mensaje via Socket.io:', JSON.stringify(enhancedMessage, null, 2));
       
-      // Primero emitir un evento para el propio remitente para actualizar UI inmediatamente
+      // First emit an event for the sender to update UI immediately
       if (onNewMessage) {
         console.log('Notificando localmente el mensaje enviado (UI inmediata)');
         onNewMessage({
@@ -310,16 +262,15 @@ export default function useSocket(options: UseSocketOptions) {
         });
       }
       
-      // Luego enviar al servidor
+      // Then send to server
       socketRef.current.emit('send_message', enhancedMessage);
       
-      // Verificar estado del socket después de enviar
+      // Check socket status after sending
       setTimeout(() => {
         if (socketRef.current && socketRef.current.connected) {
           console.log('Socket sigue conectado después de enviar mensaje');
           
-          // Actualizar estado a 'sent' después de un breve retraso
-          // ya que es muy probable que el mensaje se haya enviado correctamente
+          // Update status to 'sent' after a brief delay
           if (onMessageStatus) {
             onMessageStatus({
               messageId: tempId,
@@ -328,7 +279,7 @@ export default function useSocket(options: UseSocketOptions) {
           }
         } else {
           console.error('Socket desconectado después de enviar mensaje');
-          // Notificar error de envío
+          // Notify of sending error
           if (onMessageStatus) {
             onMessageStatus({
               messageId: tempId,
@@ -364,6 +315,16 @@ export default function useSocket(options: UseSocketOptions) {
     }
   };
   
+  const reconnect = () => {
+    if (!socketRef.current) {
+      console.error('No se puede reconectar, socket no inicializado');
+      return;
+    }
+    
+    console.log('Intentando reconectar socket...');
+    socketRef.current.connect();
+  };
+  
   return {
     socket: socketRef.current,
     connected,
@@ -372,6 +333,7 @@ export default function useSocket(options: UseSocketOptions) {
     sendMessage,
     setTypingStatus,
     markMessageAsRead,
-    disconnect
+    disconnect,
+    reconnect
   };
 }

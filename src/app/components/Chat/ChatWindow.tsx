@@ -130,6 +130,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     if (!otherUser?.id || !currentUserId || !isOpen) return;
     
     const checkMutualFollow = async () => {
+      // Evitar verificaciones repetidas usando sessionStorage
+      const relationshipKey = `mutual_follow_${currentUserId}_${otherUser.id}`;
+      const cachedRelationship = sessionStorage.getItem(relationshipKey);
+      
+      if (cachedRelationship) {
+        console.log('Usando relación de seguimiento en caché');
+        setCanSendMessages(cachedRelationship === 'true');
+        return;
+      }
+      
       try {
         setIsCheckingRelationship(true);
         const response = await fetch(`/api/relationships/check?targetUserId=${otherUser.id}`);
@@ -138,6 +148,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           const data = await response.json();
           // Solo permitir enviar mensajes si ambos usuarios se siguen mutuamente
           setCanSendMessages(data.isMutualFollow);
+          
+          // Guardar en sessionStorage para evitar peticiones repetidas
+          sessionStorage.setItem(relationshipKey, data.isMutualFollow ? 'true' : 'false');
         } else {
           console.error('Error al verificar relación de seguimiento');
           setCanSendMessages(false);
@@ -756,13 +769,41 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   // Cargar mensajes históricos cuando se abre la conversación
   useEffect(() => {
     if (isOpen && otherUser?.id && currentUserId && !messagesLoaded) {
-      loadHistoricalMessages();
+      // Usamos una variable para tracking que evite múltiples cargas simultáneas
+      let isCurrentlyMounted = true;
+      
+      // Usamos sessionStorage para recordar si ya hemos cargado esta conversación
+      // en esta sesión y evitar cargas duplicadas
+      const conversationKey = `conversation_loaded_${otherUser.id}`;
+      const alreadyLoaded = sessionStorage.getItem(conversationKey);
+      
+      if (!alreadyLoaded) {
+        console.log(`Iniciando carga de mensajes para conversación con ${otherUser.id}`);
+        
+        // Marcar inmediatamente como cargada para evitar carreras
+        sessionStorage.setItem(conversationKey, 'true');
+        
+        // Agregar un pequeño retraso para evitar múltiples llamadas a la API
+        const loadTimeout = setTimeout(() => {
+          if (isCurrentlyMounted) {
+            loadHistoricalMessages();
+          }
+        }, 300);
+        
+        return () => {
+          isCurrentlyMounted = false;
+          clearTimeout(loadTimeout);
+        };
+      } else {
+        console.log(`Evitando recarga de conversación con ${otherUser.id} (ya cargada en esta sesión)`);
+        setMessagesLoaded(true);
+      }
     }
   }, [isOpen, otherUser?.id, currentUserId, messagesLoaded, loadHistoricalMessages]);
   
   // Inicializar con mensajes iniciales solo al abrir la conversación
   useEffect(() => {
-    if (isOpen && otherUser && initialMessages.length > 0) {
+    if (isOpen && otherUser && initialMessages.length > 0 && !messagesLoaded) {
       console.log('Inicializando con mensajes iniciales al abrir la conversación', initialMessages.length);
       
       // Procesamos los mensajes iniciales para evitar duplicados
@@ -777,65 +818,115 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       setMessages(processedMessages);
       setMessagesLoaded(true);
     }
-  }, [isOpen, otherUser, initialMessages]);
+  }, [isOpen, otherUser, initialMessages, messagesLoaded]);
 
   // Cargar mensajes de la conversación cuando cambia la conversación o se abre la ventana
-  useEffect(() => {
-    if (isOpen && otherUser?.id && currentUserId && !messagesLoaded) {
-      const loadMessages = async () => {
-        setIsLoadingMessages(true);
-        
-        try {
-          console.log(`Cargando mensajes entre ${currentUserId} y ${otherUser.id}`);
-          const response = await fetch(`/api/messages?otherUserId=${otherUser.id}`);
-          
-          if (!response.ok) {
-            console.error('Error al cargar mensajes:', response.status);
-            return;
-          }
-          
-          const data = await response.json();
-          
-          if (data && Array.isArray(data.messages)) {
-            console.log(`Recibidos ${data.messages.length} mensajes de la API`);
-            
-            // Procesar mensajes para evitar duplicados
-            const uniqueMessages = data.messages.filter((msg: Message, index: number, self: Message[]) => {
-              // Filtrar mensajes duplicados por ID o contenido+tiempo
-              return self.findIndex((m: Message) => 
-                (m.id && m.id === msg.id) || 
-                (m.content === msg.content && 
-                 m.senderId === msg.senderId && 
-                 m.receiverId === msg.receiverId &&
-                 Math.abs(new Date(m.createdAt).getTime() - new Date(msg.createdAt).getTime()) < 5000)
-              ) === index;
-            });
-            
-            // Reemplazar mensajes en lugar de añadirlos
-            setMessages(uniqueMessages);
-            
-            // Marcar los mensajes no leídos como leídos
-            const unreadMessages = uniqueMessages.filter(
-              (msg: Message) => !msg.read && msg.senderId === otherUser.id
-            );
-            
-            for (const msg of unreadMessages) {
-              if (msg.id) {
-                markMessageAsRead(msg.id, conversationId || '');
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error al cargar mensajes:', error);
-        } finally {
-          setIsLoadingMessages(false);
-          setMessagesLoaded(true);
-        }
-      };
+  // Usamos useCallback para evitar recrear esta función y causar efectos secundarios
+  const loadConversationMessages = useCallback(async () => {
+    if (!otherUser?.id || !currentUserId) return;
+    
+    setIsLoadingMessages(true);
+    
+    try {
+      console.log(`Cargando mensajes entre ${currentUserId} y ${otherUser.id}`);
+      const response = await fetch(`/api/messages?otherUserId=${otherUser.id}`);
       
-      loadMessages();
+      if (!response.ok) {
+        console.error('Error al cargar mensajes:', response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data && Array.isArray(data.messages)) {
+        console.log(`Recibidos ${data.messages.length} mensajes de la API`);
+        
+        // Procesar mensajes para evitar duplicados
+        const uniqueMessages = data.messages.filter((msg: Message, index: number, self: Message[]) => {
+          // Filtrar mensajes duplicados por ID o contenido+tiempo
+          return self.findIndex((m: Message) => 
+            (m.id && m.id === msg.id) || 
+            (m.content === msg.content && 
+             m.senderId === msg.senderId && 
+             m.receiverId === msg.receiverId &&
+             Math.abs(new Date(m.createdAt).getTime() - new Date(msg.createdAt).getTime()) < 5000)
+          ) === index;
+        });
+        
+        // Reemplazar mensajes en lugar de añadirlos
+        setMessages(uniqueMessages);
+        
+        // Marcar los mensajes no leídos como leídos
+        const unreadMessages = uniqueMessages.filter(
+          (msg: Message) => !msg.read && msg.senderId === otherUser.id
+        );
+        
+        for (const msg of unreadMessages) {
+          if (msg.id) {
+            markMessageAsRead(msg.id, conversationId || '');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error al cargar mensajes:', error);
+    } finally {
+      setIsLoadingMessages(false);
+      setMessagesLoaded(true);
     }
-  }, [isOpen, otherUser?.id, currentUserId, messagesLoaded, conversationId, markMessageAsRead]);
+  }, [otherUser?.id, currentUserId, conversationId, markMessageAsRead]);
+
+  // IMPORTANTE: Este efecto está causando múltiples cargas, lo reemplazamos
+  // por el efecto mejorado arriba que usa sessionStorage
+  /* useEffect(() => {
+    if (isOpen && !messagesLoaded && otherUser?.id && currentUserId && initialMessages.length < 5) {
+      const loadTimeout = setTimeout(() => {
+        loadConversationMessages();
+      }, 300);
+      
+      return () => clearTimeout(loadTimeout);
+    }
+  }, [isOpen, messagesLoaded, otherUser?.id, currentUserId, initialMessages.length, loadConversationMessages]); */
+
+  // Verificar si los usuarios se siguen mutuamente
+  useEffect(() => {
+    if (!otherUser?.id || !currentUserId || !isOpen) return;
+    
+    const checkMutualFollow = async () => {
+      // Evitar verificaciones repetidas usando sessionStorage
+      const relationshipKey = `mutual_follow_${currentUserId}_${otherUser.id}`;
+      const cachedRelationship = sessionStorage.getItem(relationshipKey);
+      
+      if (cachedRelationship) {
+        console.log('Usando relación de seguimiento en caché');
+        setCanSendMessages(cachedRelationship === 'true');
+        return;
+      }
+      
+      try {
+        setIsCheckingRelationship(true);
+        const response = await fetch(`/api/relationships/check?targetUserId=${otherUser.id}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          // Solo permitir enviar mensajes si ambos usuarios se siguen mutuamente
+          setCanSendMessages(data.isMutualFollow);
+          
+          // Guardar en sessionStorage para evitar peticiones repetidas
+          sessionStorage.setItem(relationshipKey, data.isMutualFollow ? 'true' : 'false');
+        } else {
+          console.error('Error al verificar relación de seguimiento');
+          setCanSendMessages(false);
+        }
+      } catch (error) {
+        console.error('Error al verificar relación de seguimiento:', error);
+        setCanSendMessages(false);
+      } finally {
+        setIsCheckingRelationship(false);
+      }
+    };
+    
+    checkMutualFollow();
+  }, [otherUser?.id, currentUserId, isOpen]);
 
   // Limpiar estado de mensajes al cerrar la ventana o cambiar de conversación
   useEffect(() => {
@@ -846,6 +937,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         if (!isOpen) {
           console.log('Limpiando estado de mensajes al cambiar de conversación');
           setMessagesLoaded(false);
+          // También reiniciar otros estados para evitar comportamientos extraños
+          setCanSendMessages(null);
         }
       };
     }
