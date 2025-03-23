@@ -296,28 +296,29 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   };
 
   // Enviar notificación de escritura
-  const sendTypingNotification = useCallback(() => {
-    if (!currentUserId || !otherUser?.id || !socket || !socketInitialized) return;
-    
-    // Si el usuario ya está marcado como escribiendo, no hacer nada
-    if (!isTyping) {
+  const sendTypingNotification = useCallback((newMessage: string) => {
+    if (newMessage.trim().length > 0 && !isTyping && socket && socketInitialized) {
       setIsTyping(true);
-      socket.setTypingStatus(otherUser.id, true);
-    }
-    
-    // Limpiar el timeout anterior si existe
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    
-    // Crear un nuevo timeout
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false);
-      if (socket && socketInitialized) {
-        socket.setTypingStatus(otherUser.id, false);
+      
+      // Enviar estado de "escribiendo" al receptor
+      if (otherUser?.id) {
+        socket.sendTyping(otherUser.id, true);
       }
-    }, 2000);
-  }, [currentUserId, isTyping, otherUser?.id, socket, socketInitialized]);
+      
+      // Limpiar timeout anterior si existe
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Establecer nuevo timeout para detener estado de "escribiendo" después de 3 segundos de inactividad
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+        if (socket && socketInitialized && otherUser?.id) {
+          socket.sendTyping(otherUser.id, false);
+        }
+      }, 3000);
+    }
+  }, [isTyping, socket, socketInitialized, otherUser?.id]);
 
   // Enviar un mensaje
   const sendMessage = async () => {
@@ -351,7 +352,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       if (isTyping) {
         setIsTyping(false);
         if (socket && socketInitialized) {
-          socket.setTypingStatus(otherUser.id, false);
+          socket.sendTyping(otherUser.id, false);
         }
         if (typingTimeoutRef.current) {
           clearTimeout(typingTimeoutRef.current);
@@ -492,7 +493,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     if (!otherUser?.id || !socket || !socketInitialized) return;
     
     if (isTyping) {
-      socket.setTypingStatus(otherUser.id, true);
+      socket.sendTyping(otherUser.id, true);
       
       // Limpiar timeout anterior si existe
       if (typingTimeoutRef.current) {
@@ -503,7 +504,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
         if (socket && socketInitialized) {
-          socket.setTypingStatus(otherUser.id, false);
+          socket.sendTyping(otherUser.id, false);
         }
       }, 3000);
     }
@@ -565,7 +566,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
               
               return (
                 <div
-                  key={message.id || message.tempId || index}
+                  key={`${message.id || message.tempId || 'msg'}-${index}`}
                   className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} items-end gap-2`}
                 >
                   {!isCurrentUser && showAvatar && (
@@ -670,7 +671,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
               value={newMessage}
               onChange={(e) => {
                 setNewMessage(e.target.value);
-                sendTypingNotification();
+                sendTypingNotification(e.target.value);
               }}
               onKeyDown={handleKeyDown}
               placeholder="Escribe un mensaje..."

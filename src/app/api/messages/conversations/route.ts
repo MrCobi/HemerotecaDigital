@@ -25,6 +25,7 @@ interface ConversationResponse {
   };
   unreadCount: number;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export async function GET(request: NextRequest) {
@@ -37,84 +38,99 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 1. Obtener conversaciones únicas con tipo explícito
-    const uniqueConversations = await prisma.$queryRaw<ConversationPair[]>`
+    // 1. Obtener TODAS las conversaciones en las que el usuario es participante
+    const userConversations = await prisma.$queryRaw`
       SELECT 
-        LEAST(sender_id, receiver_id) as user1,
-        GREATEST(sender_id, receiver_id) as user2,
-        MAX(created_at) as lastMessageDate
-      FROM direct_messages
-      WHERE sender_id = ${session.user.id} 
-        OR receiver_id = ${session.user.id}
-      GROUP BY user1, user2
-      ORDER BY lastMessageDate DESC
+        c.id as conversationId,
+        c.created_at as createdAt, 
+        c.updated_at as updatedAt
+      FROM conversations c
+      JOIN conversation_participants cp ON c.id = cp.conversation_id
+      WHERE cp.user_id = ${session.user.id}
+      AND c.is_group = false
     `;
 
-    // 2. Obtener IDs de los últimos mensajes con tipo seguro
-    const conversationPairs = uniqueConversations.map(conv => ({
-      user1: conv.user1,
-      user2: conv.user2
-    }));
+    if (!Array.isArray(userConversations) || userConversations.length === 0) {
+      // No hay conversaciones
+      return NextResponse.json([]);
+    }
 
-    const lastMessages = await prisma.directMessage.findMany({
-      where: {
-        OR: conversationPairs.map(pair => ({
-          AND: [
-            { OR: [{ senderId: pair.user1 }, { senderId: pair.user2 }] },
-            { OR: [{ receiverId: pair.user1 }, { receiverId: pair.user2 }] }
-          ]
-        }))
-      },
-      orderBy: { createdAt: "desc" },
-      distinct: ['senderId', 'receiverId'],
-      include: {
-        sender: true,
-        receiver: true
-      }
-    });
+    // 2. Para cada conversación, obtener al otro participante
+    const conversationsWithParticipants = await Promise.all(
+      (userConversations as any[]).map(async (conv) => {
+        // Obtener al otro participante
+        const otherParticipant = await prisma.$queryRaw`
+          SELECT 
+            u.id, 
+            u.username, 
+            u.name, 
+            u.image
+          FROM conversation_participants cp
+          JOIN users u ON cp.user_id = u.id
+          WHERE cp.conversation_id = ${conv.conversationId}
+          AND cp.user_id != ${session.user.id}
+          LIMIT 1
+        `;
 
-    // 3. Obtener mensajes no leídos
-    const unreadCounts = await prisma.directMessage.groupBy({
-      by: ["senderId"],
-      where: {
-        receiverId: session.user.id,
-        read: false
-      },
-      _count: { _all: true }
-    });
+        // Asegurar que otherParticipant tiene el formato correcto
+        const otherUser = Array.isArray(otherParticipant) && otherParticipant.length > 0 
+          ? {
+              id: otherParticipant[0].id as string,
+              username: otherParticipant[0].username as string | null,
+              name: otherParticipant[0].name as string | null,
+              image: otherParticipant[0].image as string | null
+            }
+          : {
+              id: "", 
+              username: null, 
+              name: null, 
+              image: null
+            };
 
-    // 4. Construir respuesta final
-    const formattedConversations: ConversationResponse[] = lastMessages.map(message => {
-      const otherUser = message.senderId === session.user.id ? message.receiver : message.sender;
-      const conversationId = [message.senderId, message.receiverId]
-        .sort()
-        .join('-');
+        // Obtener el último mensaje (si existe)
+        const lastMessage = await prisma.directMessage.findFirst({
+          where: {
+            OR: [
+              { senderId: session.user.id, receiverId: otherUser.id },
+              { senderId: otherUser.id, receiverId: session.user.id }
+            ]
+          },
+          orderBy: { createdAt: 'desc' }
+        });
 
-      return {
-        id: conversationId,
-        receiver: {
-          id: otherUser?.id || "",
-          username: otherUser?.username,
-          name: otherUser?.name,
-          image: otherUser?.image
-        },
-        lastMessage: {
-          content: message.content,
-          createdAt: message.createdAt,
-          read: message.read,
-        },
-        unreadCount: unreadCounts.find(u => u.senderId === otherUser?.id)?._count._all || 0,
-        createdAt: message.createdAt
-      };
-    });
+        // Obtener número de mensajes no leídos
+        const unreadCount = await prisma.directMessage.count({
+          where: {
+            senderId: otherUser.id,
+            receiverId: session.user.id,
+            read: false
+          }
+        });
 
-    // Eliminar duplicados y ordenar
-    const uniqueConversationsMap = new Map(
-      formattedConversations.map(conv => [conv.id, conv])
+        return {
+          id: conv.conversationId,
+          receiver: {
+            id: otherUser.id,
+            username: otherUser.username,
+            name: otherUser.name,
+            image: otherUser.image
+          },
+          lastMessage: lastMessage ? {
+            content: lastMessage.content,
+            createdAt: lastMessage.createdAt,
+            read: lastMessage.read,
+          } : undefined,
+          unreadCount,
+          createdAt: conv.createdAt,
+          updatedAt: conv.updatedAt || conv.createdAt
+        };
+      })
     );
 
-    const sortedConversations = Array.from(uniqueConversationsMap.values())
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    // 3. Ordenar por fecha de actualización (más reciente primero)
+    const sortedConversations = conversationsWithParticipants.sort((a, b) => 
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
 
     return NextResponse.json(sortedConversations);
 

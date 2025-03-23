@@ -861,61 +861,23 @@ export default function MessagesPage() {
                         onClick={() => handleConversationSelect(conversation.id)}
                       >
                         <Avatar className="h-12 w-12 border-2 border-gray-200 dark:border-gray-700">
-                          {conversation.otherUser?.image && conversation.otherUser.image.includes("cloudinary") ? (
-                            <CldImage
-                              src={(() => {
-                                let publicId = conversation.otherUser.image;
-
-                                if (conversation.otherUser.image.includes('cloudinary.com')) {
-                                  const match = conversation.otherUser.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
-                                  if (match && match[1]) {
-                                    publicId = `hemeroteca_digital/${match[1]}`;
-                                  } else {
-                                    publicId = conversation.otherUser.image.replace(/.*\/v\d+\//, '').split('?')[0];
-                                  }
-                                }
-
-                                console.log('Public ID extraído en mensajes:', publicId);
-                                return publicId;
-                              })()}
+                          {conversation.otherUser?.image ? (
+                            <Image
+                              src="/images/AvatarPredeterminado.webp"
                               width={48}
                               height={48}
                               alt={conversation.otherUser?.username || "Usuario"}
                               className="h-12 w-12 rounded-full object-cover"
-                            />
-                          ) : conversation.otherUser?.image ? (
-                            conversation.otherUser.image.includes("http") &&
-                            !conversation.otherUser.image.startsWith("http") ? (
-                            <CldImage
-                              src={(() => {
-                                let publicId = conversation.otherUser.image;
-
-                                if (publicId.includes('https://')) {
-                                  console.warn('ID público contiene URL completa en mensajes (2):', publicId);
-                                  publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
-                                }
-
-                                return publicId;
-                              })()}
-                              width={48}
-                              height={48}
-                              alt={conversation.otherUser?.username || "Usuario"}
-                              className="h-12 w-12 rounded-full object-cover"
+                              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = "/images/AvatarPredeterminado.webp";
+                              }}
                             />
                           ) : (
-                            <CldImage
-                              src={conversation.otherUser?.image || "placeholder_avatar"}
-                              width={48}
-                              height={48}
-                              alt={conversation.otherUser?.username || "Usuario"}
-                              className="h-12 w-12 rounded-full object-cover"
-                            />
-                          )
-                        ) : (
-                          <AvatarFallback>
-                            {conversation.otherUser?.username?.charAt(0).toUpperCase() || "U"}
-                          </AvatarFallback>
-                        )}
+                            <AvatarFallback>
+                              {conversation.otherUser?.username?.charAt(0).toUpperCase() || "U"}
+                            </AvatarFallback>
+                          )}
                         </Avatar>
                           
                         <div className="flex-1 min-w-0">
@@ -978,9 +940,21 @@ export default function MessagesPage() {
                 )}
                 <Avatar className="h-10 w-10">
                   {memoizedOtherUser.image ? (
-                    <AvatarImage src={memoizedOtherUser.image} alt={memoizedOtherUser.username || "Usuario"} />
+                    <Image
+                      src="/images/AvatarPredeterminado.webp"
+                      width={48}
+                      height={48}
+                      alt={memoizedOtherUser.username || "Usuario"}
+                      className="h-10 w-10 rounded-full object-cover"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
                   ) : (
-                    <AvatarFallback>{memoizedOtherUser.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                    <AvatarFallback>
+                      {memoizedOtherUser.username?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
                   )}
                 </Avatar>
                 <h2 className="font-medium">{memoizedOtherUser.username || "Usuario"}</h2>
@@ -1037,8 +1011,21 @@ export default function MessagesPage() {
                   onClick={() => setSelectedUser(user)}
                 >
                   <Avatar className="h-10 w-10 mr-3">
-                    <AvatarImage src={user.image || ''} />
-                    <AvatarFallback>{user.username?.substring(0, 2).toUpperCase() || 'US'}</AvatarFallback>
+                    {user.image ? (
+                      <Image
+                        src="/images/AvatarPredeterminado.webp"
+                        width={48}
+                        height={48}
+                        alt={user.username || "Usuario"}
+                        className="h-10 w-10 rounded-full object-cover"
+                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
+                      />
+                    ) : (
+                      <AvatarFallback>{user.username?.substring(0, 2).toUpperCase() || 'US'}</AvatarFallback>
+                    )}
                   </Avatar>
                   <div className="flex-1">
                     <div className="font-medium">{user.name}</div>
