@@ -499,155 +499,141 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
   }
 });
 
-export const GET = withAuth(async (request: Request, { userId }: { userId: string }) => {
-  const url = new URL(request.url);
-  const conversationWith = url.searchParams.get('with');
-  const limit = parseInt(url.searchParams.get('limit') || '50');
-  const before = url.searchParams.get('before');
-  
-  // Si no hay parámetro "with", devolvemos todas las conversaciones del usuario
-  if (!conversationWith) {
-    try {
-      // Obtener las últimas conversaciones del usuario
-      const conversations = await prisma.directMessage.findMany({
-        where: {
-          OR: [
-            { senderId: userId },
-            { receiverId: userId }
-          ]
-        },
-        orderBy: { createdAt: 'desc' },
-        distinct: ['senderId', 'receiverId'],
-        take: limit,
-        include: {
-          sender: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-              username: true
-            }
-          },
-          receiver: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-              username: true
-            }
-          }
-        }
-      });
-
-      // Agrupar mensajes por conversación
-      const conversationMap = new Map();
-      
-      for (const message of conversations) {
-        const otherUserId = message.senderId === userId ? message.receiverId : message.senderId;
-        
-        if (!conversationMap.has(otherUserId)) {
-          conversationMap.set(otherUserId, {
-            userId: otherUserId,
-            lastMessage: {
-              ...message,
-              createdAt: message.createdAt.toISOString()
-            },
-            userInfo: message.senderId === userId ? message.receiver : message.sender
-          });
-        }
-      }
-      
-      return new Response(JSON.stringify(Array.from(conversationMap.values())), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    } catch (error) {
-      console.error("Error obteniendo conversaciones:", error);
-      return new Response(JSON.stringify({ 
-        error: 'Error al obtener conversaciones',
-        details: error instanceof Error ? error.message : String(error)
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-  }
-  
+// Implementación correcta de GET usando withAuth como wrapper
+export const GET = withAuth(async (req: Request, { userId }: { userId: string }) => {
   try {
-    // Construir condiciones de búsqueda
-    const whereCondition: {
-      OR: [
-        { senderId: string; receiverId: string; },
-        { senderId: string; receiverId: string; }
-      ];
-      createdAt?: { lt: Date };
-    } = {
-      OR: [
-        { senderId: userId, receiverId: conversationWith },
-        { senderId: conversationWith, receiverId: userId }
-      ]
-    };
+    const url = new URL(req.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '20');
+    const conversationId = url.searchParams.get('with');
     
-    // Añadir condición de paginación si se proporciona 'before'
-    if (before) {
-      whereCondition.createdAt = { lt: new Date(before) };
+    // Calculamos el número de mensajes a omitir (skip)
+    const skip = (page - 1) * limit;
+    
+    console.log(`GET /api/messages - userId: ${userId}, conversationId: ${conversationId}, page: ${page}, limit: ${limit}`);
+    
+    // Validar que tenemos el ID de conversación
+    if (!conversationId || conversationId.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Se requiere un parámetro de conversación válido',
+          messages: []
+        }),
+        { status: 400 }
+      );
     }
     
-    // Buscar mensajes
-    const messages = await prisma.directMessage.findMany({
-      where: whereCondition,
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      include: {
-        sender: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-            username: true
-          }
-        },
-        receiver: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-            username: true
-          }
-        }
+    // Verificar si el usuario es participante de esta conversación
+    const isParticipant = await prisma.conversationParticipant.findFirst({
+      where: {
+        userId: userId,
+        conversationId: conversationId
       }
     });
     
-    // Marcar como leídos los mensajes recibidos
-    if (messages.some((msg: { senderId: string; read: boolean }) => msg.senderId === conversationWith && !msg.read)) {
-      await prisma.directMessage.updateMany({
+    if (!isParticipant) {
+      console.log(`Usuario ${userId} no es participante de la conversación ${conversationId}`);
+      // En lugar de retornar un error, verifica si la conversationId es un userId
+      // Esto permite manejar tanto conversaciones por ID como por par de usuarios
+      
+      // Si no es participante, quizás el conversationId es realmente un userId
+      // Buscamos la conversación entre los dos usuarios
+      const existingConversation = await prisma.conversation.findFirst({
         where: {
-          senderId: conversationWith,
-          receiverId: userId,
-          read: false
-        },
-        data: { read: true }
+          AND: [
+            { isGroup: false },
+            {
+              participants: {
+                some: {
+                  userId: userId
+                }
+              }
+            },
+            {
+              participants: {
+                some: {
+                  userId: conversationId
+                }
+              }
+            }
+          ]
+        }
       });
+      
+      if (existingConversation) {
+        console.log(`Encontrada conversación existente: ${existingConversation.id}`);
+        // Ahora usamos el conversationId real
+        const messages = await fetchMessagesByConversationId(existingConversation.id, skip, limit);
+        return new Response(
+          JSON.stringify({ messages }),
+          { status: 200 }
+        );
+      } else {
+        // No hay conversación entre estos usuarios aún
+        console.log(`No hay conversación entre ${userId} y ${conversationId}`);
+        return new Response(
+          JSON.stringify({ messages: [] }),
+          { status: 200 }
+        );
+      }
     }
     
-    // Serializar las fechas para JSON
-    const serializedMessages = messages.map((msg: any) => ({
-      ...msg,
-      createdAt: msg.createdAt.toISOString()
-    }));
+    // Si es participante, usa el conversationId directamente
+    const messages = await fetchMessagesByConversationId(conversationId, skip, limit);
     
-    return new Response(JSON.stringify(serializedMessages), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return new Response(
+      JSON.stringify({ messages }),
+      { status: 200 }
+    );
+    
   } catch (error) {
-    console.error("Error fetching messages:", error);
-    return new Response(JSON.stringify({
-      error: 'Error al obtener mensajes',
-      details: error instanceof Error ? error.message : String(error)
-    }), { 
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error('Error al obtener mensajes:', error);
+    return new Response(
+      JSON.stringify({ error: 'Error al obtener mensajes' }),
+      { status: 500 }
+    );
   }
 });
+
+// Función auxiliar para obtener mensajes por conversationId
+async function fetchMessagesByConversationId(conversationId: string, skip: number, limit: number) {
+  const messages = await prisma.directMessage.findMany({
+    where: {
+      conversationId: conversationId
+    },
+    include: {
+      sender: {
+        select: {
+          id: true,
+          username: true,
+          image: true,
+          name: true
+        }
+      },
+      receiver: {
+        select: {
+          id: true,
+          username: true,
+          image: true,
+          name: true
+        }
+      }
+    },
+    orderBy: {
+      createdAt: 'desc'
+    },
+    skip,
+    take: limit
+  });
+  
+  console.log(`Se encontraron ${messages.length} mensajes para la conversación ${conversationId}`);
+  
+  // Las fechas en formato ISO para que se serialicen correctamente
+  const serializedMessages = messages.map((msg: any) => ({
+    ...msg,
+    createdAt: msg.createdAt instanceof Date ? msg.createdAt.toISOString() : msg.createdAt
+  }));
+  
+  // Devolver en orden cronológico (más antiguos primero)
+  return serializedMessages.reverse();
+}

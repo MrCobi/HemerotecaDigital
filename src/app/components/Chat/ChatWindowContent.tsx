@@ -411,8 +411,11 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   
   // Al principio del componente, asegurar que conversationId siempre sea string
-  const safeConversationId = conversationId || '';
-
+  const safeConversationId = conversationId || (otherUser?.id || '');
+  
+  // Nuevo estado para almacenar el ID de conversación real después de obtenerlo
+  const [actualConversationId, setActualConversationId] = useState<string | null>(conversationId || null);
+  
   // Socket.io
   const { 
     socketInstance,
@@ -634,8 +637,11 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           throw new Error('Faltan datos necesarios para cargar mensajes');
         }
         
+        // Parámetro 'with' es el ID de conversación o el ID del otro usuario
+        const withParam = actualConversationId || safeConversationId;
+        
         const response = await fetch(
-          `${API_ROUTES.messages.list}?with=${safeConversationId}&page=${pageNum}&limit=${pageSize}`
+          `${API_ROUTES.messages.list}?with=${withParam}&page=${pageNum}&limit=${pageSize}`
         );
         
         if (!response.ok) {
@@ -650,6 +656,20 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         
         const data = await response.json();
         const fetchedMessages = Array.isArray(data.messages) ? data.messages : [];
+        
+        // Si hay mensajes, verificar si tienen un conversationId y guardarlo
+        if (fetchedMessages.length > 0 && fetchedMessages[0].conversationId) {
+          const msgConversationId = fetchedMessages[0].conversationId;
+          if (msgConversationId && !actualConversationId) {
+            console.log('Actualizando conversationId real:', msgConversationId);
+            setActualConversationId(msgConversationId);
+            
+            // Guardar en localStorage para recordar este conversationId
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`chat_conv_${otherUser?.id}`, msgConversationId);
+            }
+          }
+        }
         
         // Procesar y combinar mensajes evitando duplicados
         const combinedMessages = [...existingMsgs, ...fetchedMessages];
@@ -693,7 +713,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     try {
       const nextPage = page + 1;
       const response = await fetch(
-        `${API_ROUTES.messages.list}?with=${safeConversationId}&page=${nextPage}&limit=${pageSize}`
+        `${API_ROUTES.messages.list}?with=${actualConversationId || safeConversationId}&page=${nextPage}&limit=${pageSize}`
       );
       
       if (!response.ok) {
@@ -825,7 +845,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         receiverId: otherUser.id,
         createdAt: new Date(),
         status: 'sending',
-        conversationId: safeConversationId,
+        conversationId: actualConversationId || undefined,
       };
       
       // Añadir mensaje al estado local usando la función de procesamiento
@@ -892,7 +912,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         receiverId: otherUser.id,
         createdAt: new Date(),
         status: 'sending',
-        conversationId: conversationId || '',
+        conversationId: actualConversationId || undefined,
       };
       
       // Añadir mensaje al estado local usando la función de procesamiento
@@ -931,7 +951,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       const requestBody = {
         content: message.content,
         receiverId: otherUser.id,
-        conversationId: safeConversationId || undefined,
+        conversationId: actualConversationId || undefined,
         mediaUrl: message.mediaUrl,
         messageType: message.messageType || 'text',
         tempId
@@ -1107,6 +1127,21 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       joinConversation(safeConversationId);
     }
   }, [socketInitialized, safeConversationId, joinConversation]);
+
+  // Añadir efecto para cargar el conversationId desde localStorage al inicio
+  useEffect(() => {
+    if (otherUser?.id && !actualConversationId && !conversationId) {
+      // Intentar cargar de localStorage
+      const savedConversationId = typeof window !== 'undefined' 
+        ? localStorage.getItem(`chat_conv_${otherUser.id}`)
+        : null;
+      
+      if (savedConversationId) {
+        console.log('Cargando conversationId desde localStorage:', savedConversationId);
+        setActualConversationId(savedConversationId);
+      }
+    }
+  }, [otherUser?.id, actualConversationId, conversationId]);
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
