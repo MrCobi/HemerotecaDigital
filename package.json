@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "periodico_web_arreglo",
   "version": "0.1.0",
   "private": true,
@@ -42,6 +43,7 @@
     "@radix-ui/react-toast": "^1.2.6",
     "@radix-ui/react-toggle-group": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
+    "@types/chalk": "^0.4.31",
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/lodash": "^4.17.16",
@@ -49,6 +51,7 @@
     "@types/ws": "^8.18.0",
     "bcryptjs": "^2.4.3",
     "bootstrap-icons": "^1.11.3",
+    "chalk": "^5.4.1",
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.6.0",
     "clsx": "^2.1.1",

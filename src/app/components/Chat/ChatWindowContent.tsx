@@ -104,7 +104,10 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           // Si el mensaje es del otro usuario, marcarlo como leído
           if (message.senderId === otherUser?.id && message.id) {
             if (socket && socketInitialized) {
-              socket.markMessageAsRead(message.id, message.conversationId || conversationId || '');
+              socket.markMessageAsRead({
+                messageId: message.id,
+                conversationId: message.conversationId || conversationId || ''
+              });
             } else {
               console.warn('Socket no disponible, no se puede marcar mensaje como leído');
             }
@@ -302,7 +305,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       
       // Enviar estado de "escribiendo" al receptor
       if (otherUser?.id) {
-        socket.sendTyping(otherUser.id, true);
+        socket.updateTypingStatus({ conversationId, isTyping: true });
       }
       
       // Limpiar timeout anterior si existe
@@ -314,7 +317,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
         if (socket && socketInitialized && otherUser?.id) {
-          socket.sendTyping(otherUser.id, false);
+          socket.updateTypingStatus({ conversationId, isTyping: false });
         }
       }, 3000);
     }
@@ -352,7 +355,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       if (isTyping) {
         setIsTyping(false);
         if (socket && socketInitialized) {
-          socket.sendTyping(otherUser.id, false);
+          socket.updateTypingStatus({ conversationId, isTyping: false });
         }
         if (typingTimeoutRef.current) {
           clearTimeout(typingTimeoutRef.current);
@@ -448,7 +451,10 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     }
     
     console.log(`Marcando mensaje ${messageId} como leído`);
-    socket.markMessageAsRead(messageId, conversationId);
+    socket.markMessageAsRead({
+      messageId: messageId,
+      conversationId: conversationId
+    });
   };
 
   // Actualizar estado de un mensaje
@@ -493,7 +499,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     if (!otherUser?.id || !socket || !socketInitialized) return;
     
     if (isTyping) {
-      socket.sendTyping(otherUser.id, true);
+      socket.updateTypingStatus({ conversationId, isTyping: true });
       
       // Limpiar timeout anterior si existe
       if (typingTimeoutRef.current) {
@@ -504,7 +510,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
         if (socket && socketInitialized) {
-          socket.sendTyping(otherUser.id, false);
+          socket.updateTypingStatus({ conversationId, isTyping: false });
         }
       }, 3000);
     }

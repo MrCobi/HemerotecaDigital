@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import io, { Socket } from 'socket.io-client';
 
 // El puerto debe coincidir con el del servidor Socket.io
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+
+// Variable global para mantener una única instancia del socket
+let globalSocket: Socket | null = null;
+let globalSocketUserId: string | null = null;
+let connectionAttemptInProgress = false;
+let socketInitCount = 0;
 
 export type MessageType = {
   id?: string;
@@ -77,297 +83,343 @@ export default function useSocket(options: UseSocketOptions) {
   const [error, setError] = useState<Error | unknown>(null);
   const [onlineUsers, setOnlineUsers] = useState<UserType[]>([]);
   
-  // Use a properly typed ref for the socket
+  // Use a properly typed ref for the socket that points to the global instance
   const socketRef = useRef<Socket | null>(null);
+  const instanceId = useRef<number>(++socketInitCount);
+  const callbacksRef = useRef({
+    onNewMessage,
+    onUserOnline,
+    onTypingStatus,
+    onMessageStatus,
+    onMessageRead,
+    onConnect,
+    onDisconnect,
+    onError
+  });
   
-  // Initialize Socket.io connection
+  // Actualizar callbacks cuando cambien
   useEffect(() => {
-    // Don't initialize without a userId
-    if (!userId) {
-      console.warn('No se puede inicializar socket sin userId');
+    callbacksRef.current = {
+      onNewMessage,
+      onUserOnline,
+      onTypingStatus,
+      onMessageStatus,
+      onMessageRead,
+      onConnect,
+      onDisconnect,
+      onError
+    };
+  }, [
+    onNewMessage,
+    onUserOnline,
+    onTypingStatus,
+    onMessageStatus,
+    onMessageRead,
+    onConnect,
+    onDisconnect,
+    onError
+  ]);
+  
+  const inactivityTimeout = useRef<NodeJS.Timeout>();
+
+  const resetInactivityTimer = () => {
+    clearTimeout(inactivityTimeout.current!);
+    inactivityTimeout.current = setTimeout(() => {
+      socketRef.current?.emit('user_inactive');
+      socketRef.current?.disconnect();
+    }, 1800000); // 30 minutos
+  };
+
+  // Handler for identifying user to the server
+  const identifyUser = useCallback(() => {
+    if (socketRef.current && userId && username) {
+      console.log(`[Socket ${instanceId.current}] Identificando usuario al servidor:`, userId, username);
+      socketRef.current.emit('identify', { userId, username });
+    }
+  }, [userId, username]);
+  
+  // Setup event handlers for the socket
+  const setupEventHandlers = useCallback(() => {
+    if (!socketRef.current) return;
+    
+    const socket = socketRef.current;
+    
+    // Limpiar manejadores previos para evitar duplicación
+    socket.off('connect');
+    socket.off('disconnect');
+    socket.off('connect_error');
+    socket.off('reconnect_attempt');
+    socket.off('reconnect_error');
+    socket.off('users_online');
+    socket.off('new_message');
+    socket.off('message_status');
+    socket.off('message_updated');
+    socket.off('typing_status');
+    socket.off('message_read');
+    socket.off('force_disconnect');
+    socket.off('pong');
+    socket.off('reidentify');
+    
+    // Connection events
+    socket.on('connect', () => {
+      console.log(`[Socket ${instanceId.current}] Socket.io conectado exitosamente con ID:`, socket.id);
+      setConnected(true);
+      
+      // Identificar usuario automáticamente al conectar
+      identifyUser();
+      
+      if (callbacksRef.current.onConnect) callbacksRef.current.onConnect();
+    });
+    
+    socket.on('disconnect', (reason) => {
+      console.log(`[Socket ${instanceId.current}] Socket.io desconectado:`, reason);
+      setConnected(false);
+      
+      if (callbacksRef.current.onDisconnect) callbacksRef.current.onDisconnect();
+    });
+    
+    socket.on('connect_error', (err) => {
+      console.error(`[Socket ${instanceId.current}] Error de conexión Socket.io:`, err);
+      setConnected(false);
+      setError(err);
+      
+      if (callbacksRef.current.onError) callbacksRef.current.onError(err);
+    });
+    
+    socket.on('reconnect_attempt', (attemptNumber) => {
+      console.log(`[Socket ${instanceId.current}] Intento de reconexión Socket.io #${attemptNumber}`);
+    });
+    
+    socket.on('reconnect_error', (e) => {
+      console.error(`[Socket ${instanceId.current}] Error de reconexión Socket.io:`, e);
+      
+      // Intentar cambiar a transport polling después de errores
+      try {
+        socket.io.opts.transports = ['polling', 'websocket'];
+      } catch (e) {
+        console.error('Error al cambiar transporte:', e);
+      }
+      
+      if (callbacksRef.current.onError) callbacksRef.current.onError(e);
+    });
+    
+    // El servidor notifica que este socket será desconectado porque hay uno nuevo
+    socket.on('force_disconnect', (data) => {
+      console.log(`[Socket ${instanceId.current}] Socket forzado a desconectar. Razón: ${data.reason}`);
+      // No hacemos nada más, el evento disconnect se disparará después
+    });
+    
+    // Servidor solicita reidentificación
+    socket.on('reidentify', () => {
+      console.log(`[Socket ${instanceId.current}] Servidor solicitó reidentificación`);
+      identifyUser();
+    });
+    
+    // Respuesta a ping para mantener la conexión
+    socket.on('pong', ({ timestamp }) => {
+      const latency = Date.now() - timestamp;
+      console.log(`[Socket ${instanceId.current}] Pong recibido. Latencia: ${latency}ms`);
+    });
+    
+    // Application events
+    socket.on('users_online', (users: UserType[]) => {
+      setOnlineUsers(users);
+      
+      if (callbacksRef.current.onUserOnline) callbacksRef.current.onUserOnline(users);
+    });
+    
+    socket.on('new_message', (message: MessageType) => {
+      console.log(`[Socket ${instanceId.current}] Recibido nuevo mensaje:`, message);
+      
+      // Ensure message has a valid creation date
+      if (!message.createdAt) {
+        console.warn('Mensaje recibido sin fecha de creación, añadiendo fecha actual');
+        message.createdAt = new Date().toISOString();
+      } else if (typeof message.createdAt === 'object' && message.createdAt instanceof Date) {
+        message.createdAt = message.createdAt.toISOString();
+      }
+      
+      if (callbacksRef.current.onNewMessage) callbacksRef.current.onNewMessage(message);
+    });
+    
+    socket.on('message_status', (update: { messageId: string; status: string }) => {
+      console.log(`[Socket ${instanceId.current}] Estado de mensaje actualizado:`, update);
+      
+      if (callbacksRef.current.onMessageStatus) callbacksRef.current.onMessageStatus(update);
+    });
+    
+    socket.on('message_updated', (message: MessageType) => {
+      console.log(`[Socket ${instanceId.current}] Mensaje actualizado:`, message);
+    });
+    
+    socket.on('typing_status', (status: TypingStatusType) => {
+      if (callbacksRef.current.onTypingStatus) callbacksRef.current.onTypingStatus(status);
+    });
+    
+    socket.on('message_read', (data: { messageId: string; conversationId?: string; readBy?: string }) => {
+      console.log(`[Socket ${instanceId.current}] Mensaje marcado como leído:`, data);
+      
+      if (callbacksRef.current.onMessageRead) callbacksRef.current.onMessageRead(data);
+    });
+    
+    console.log(`[Socket ${instanceId.current}] Eventos de socket configurados`);
+  }, [identifyUser]);
+
+  // Initialize socket connection
+  useEffect(() => {
+    // Si no hay userId, no intentamos conectar
+    if (!userId) return;
+    
+    // Si ya hay una conexión global con el mismo userId, la reutilizamos
+    if (globalSocket && globalSocketUserId === userId) {
+      console.log(`[Socket ${instanceId.current}] Reutilizando conexión global existente`);
+      socketRef.current = globalSocket;
+      setupEventHandlers();
       return;
     }
     
-    console.log('Inicializando conexión de Socket.io con userId:', userId);
-    
-    // Cleanup function to properly disconnect the socket
-    const cleanup = () => {
-      if (socketRef.current) {
-        console.log('Desconectando socket existente');
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-    };
-    
-    // Create a new Socket.io instance
-    try {
-      // Always clean up previous socket if it exists
-      cleanup();
-      
-      // Create the new socket
-      socketRef.current = io(SOCKET_SERVER_URL, {
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        autoConnect: true,
-        transports: ['websocket', 'polling'],
-        auth: { userId, username },
-        query: { userId, username }
-      });
-      
-      const socket = socketRef.current;
-      
-      console.log('Socket.io instanciado correctamente');
-      
-      // Connection events
-      socket.on('connect', () => {
-        console.log('Socket.io conectado exitosamente con ID:', socket.id);
-        setConnected(true);
-        
-        // Enviar información del usuario al conectarse
-        socket.emit('identify', { userId, username });
-        
-        if (onConnect) onConnect();
-      });
-      
-      socket.on('connect_error', (err) => {
-        console.error('Error de conexión Socket.io:', err);
-        setConnected(false);
-        setError(err);
-        
-        if (onError) onError(err);
-      });
-      
-      socket.on('reconnect_attempt', (attemptNumber) => {
-        console.log(`Intento de reconexión Socket.io #${attemptNumber}`);
-      });
-      
-      socket.on('reconnect_error', (e) => {
-        console.error('Error de reconexión Socket.io:', e);
-        
-        // Intentar cambiar a transport polling después de errores
-        try {
-          socket.io.opts.transports = ['polling', 'websocket'];
-        } catch (e) {
-          console.error('Error al cambiar transporte:', e);
+    // Prevenir conexiones simultáneas
+    if (connectionAttemptInProgress) {
+      console.log(`[Socket ${instanceId.current}] Conexión en progreso, esperando...`);
+      const checkInterval = setInterval(() => {
+        if (!connectionAttemptInProgress && globalSocket && globalSocketUserId === userId) {
+          clearInterval(checkInterval);
+          console.log(`[Socket ${instanceId.current}] Usando conexión recién establecida`);
+          socketRef.current = globalSocket;
+          setupEventHandlers();
         }
-        
-        if (onError) onError(error);
-      });
+      }, 100);
       
-      socket.on('disconnect', (reason) => {
-        console.log('Socket.io desconectado:', reason);
-        setConnected(false);
-        
-        if (onDisconnect) onDisconnect();
-      });
+      // Tiempo máximo de espera de 3 segundos
+      setTimeout(() => {
+        clearInterval(checkInterval);
+      }, 3000);
       
-      // Message events
-      socket.on('new_message', (message: MessageType) => {
-        console.log('Recibido nuevo mensaje en useSocket:', message);
-        
-        // Ensure message has a valid creation date
-        if (!message.createdAt) {
-          console.warn('Mensaje recibido sin fecha de creación, añadiendo fecha actual');
-          message.createdAt = new Date().toISOString();
-        } else if (typeof message.createdAt === 'object' && message.createdAt instanceof Date) {
-          // Convert Date object to ISO string for consistency
-          message.createdAt = message.createdAt.toISOString();
-        } else if (typeof message.createdAt === 'string') {
-          // Validate that the date is a valid ISO format
-          try {
-            const fecha = new Date(message.createdAt);
-            if (isNaN(fecha.getTime())) throw new Error('Fecha inválida');
-            message.createdAt = fecha.toISOString(); // Normalize format
-          } catch {
-            console.warn('Fecha de mensaje inválida, usando fecha actual');
-            message.createdAt = new Date().toISOString();
-          }
-        }
-        
-        // Ensure message has a tempId for tracking
-        if (!message.id && !message.tempId) {
-          console.warn('Mensaje sin ID temporal, generando uno');
-          message.tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-        }
-        
-        // Detailed log for debugging
-        console.log('Mensaje antes de procesarlo:', JSON.stringify(message, null, 2));
-        
-        if (onNewMessage) {
-          console.log('Enviando mensaje a callback onNewMessage');
-          onNewMessage(message);
-        } else {
-          console.error('No hay manejador onNewMessage definido, el mensaje no será mostrado en la UI');
-        }
-      });
-      
-      socket.on('message_status', (data: { messageId: string, status: string }) => {
-        console.log('Estado de mensaje actualizado:', data);
-        
-        if (onMessageStatus) {
-          onMessageStatus(data);
-        } else {
-          console.warn('No hay manejador onMessageStatus definido');
-        }
-      });
-      
-      socket.on('message_read', (data: { messageId: string; conversationId?: string; readBy?: string }) => {
-        console.log('Mensaje marcado como leído:', data);
-        if (onMessageRead) onMessageRead(data);
-      });
-      
-      socket.on('typing_status', (status: TypingStatusType) => {
-        console.log('Estado de escritura actualizado:', status);
-        if (onTypingStatus) onTypingStatus(status);
-      });
-      
-      socket.on('users_online', (users: UserType[]) => {
-        console.log('Lista de usuarios online actualizada:', users);
-        setOnlineUsers(users);
-        
-        if (onUserOnline) onUserOnline(users);
-      });
-      
-      socket.on('message_updated', (update: { tempId: string; realId: string; status: string }) => {
-        console.log('Actualización de ID de mensaje:', update);
-        // Este evento sólo lo maneja internamente el componente de chat
-      });
-    } catch (e) {
-      console.error('Error al inicializar Socket.io:', e);
-      setError(e);
-      
-      if (onError) onError(e);
+      return;
     }
+    
+    // Si hay una conexión global con otro userId, la desconectamos
+    if (globalSocket && globalSocketUserId !== userId) {
+      console.log(`[Socket ${instanceId.current}] Desconectando socket de usuario anterior:`, globalSocketUserId);
+      globalSocket.disconnect();
+      globalSocket = null;
+      globalSocketUserId = null;
+    }
+    
+    connectionAttemptInProgress = true;
+    console.log(`[Socket ${instanceId.current}] Iniciando nueva conexión socket para usuario:`, userId);
+    
+    // Create new socket connection
+    const newSocket = io(SOCKET_SERVER_URL, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 10000,
+      auth: {
+        userId: userId
+      }
+    });
+    
+    // Update refs and globals
+    socketRef.current = newSocket;
+    globalSocket = newSocket;
+    globalSocketUserId = userId;
+    
+    // Set up socket event handlers
+    setupEventHandlers();
+    
+    // Start inactivity timer
+    resetInactivityTimer();
+    
+    connectionAttemptInProgress = false;
     
     // Cleanup on unmount
-    return cleanup;
-  }, [userId, username, onConnect, onDisconnect, onError, onMessageRead, onMessageStatus, onNewMessage, onTypingStatus, onUserOnline]);
+    return () => {
+      console.log(`[Socket ${instanceId.current}] Componente desmontado, manteniendo conexión global`);
+      
+      // Note: we don't disconnect because we want to keep
+      // the global socket alive for other components
+      
+      // Clear inactivity timeout
+      if (inactivityTimeout.current) {
+        clearTimeout(inactivityTimeout.current);
+      }
+    };
+  }, [userId, setupEventHandlers]);
   
-  // Function to send a message
-  const sendMessage = (message: Omit<MessageType, 'createdAt' | 'status'>) => {
+  // Functions to interact with the socket
+  const sendMessage = useCallback((message: Omit<MessageType, 'createdAt'>) => {
     if (!socketRef.current || !connected) {
-      console.error('No se puede enviar mensaje: Socket no conectado');
+      console.error(`[Socket ${instanceId.current}] No se puede enviar mensaje: socket no conectado`);
       return false;
     }
     
-    try {
-      // Generate tempId if not provided
-      const finalMessage = {
-        ...message,
-        tempId: message.tempId || `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        status: 'sending',
-        createdAt: new Date(),
-      };
-      
-      console.log('Enviando mensaje:', finalMessage);
-      socketRef.current.emit('send_message', finalMessage);
-      
-      return finalMessage.tempId;
-    } catch (e) {
-      console.error('Error al enviar mensaje:', e);
-      return false;
-    }
-  };
+    resetInactivityTimer();
+    console.log(`[Socket ${instanceId.current}] Enviando mensaje:`, message);
+    socketRef.current.emit('send_message', message);
+    return true;
+  }, [connected]);
   
-  // Function to send a voice message
-  const sendVoiceMessage = (message: {
-    senderId: string;
-    conversationId: string;
-    mediaUrl: string;
-    content?: string;
-    tempId?: string;
-  }) => {
+  const updateTypingStatus = useCallback(({ conversationId, isTyping }: { conversationId?: string; isTyping: boolean }) => {
     if (!socketRef.current || !connected) {
-      console.error('No se puede enviar mensaje de voz: Socket no conectado');
       return false;
     }
     
-    try {
-      const voiceMessage = {
-        ...message,
-        messageType: 'voice' as const,
-        tempId: message.tempId || `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      };
-      
-      console.log('Enviando mensaje de voz:', {
-        ...voiceMessage, 
-        mediaUrl: voiceMessage.mediaUrl.substring(0, 50) + '...'
-      });
-      
-      socketRef.current.emit('send_voice_message', voiceMessage);
-      
-      return voiceMessage.tempId;
-    } catch (e) {
-      console.error('Error al enviar mensaje de voz:', e);
+    resetInactivityTimer();
+    socketRef.current.emit('typing', { conversationId, isTyping });
+    return true;
+  }, [connected]);
+  
+  const markMessageAsRead = useCallback(({ messageId, conversationId }: { messageId: string, conversationId?: string }) => {
+    if (!socketRef.current || !connected) {
+      console.error(`[Socket ${instanceId.current}] No se puede marcar mensaje como leído: socket no conectado`);
       return false;
     }
-  };
+    
+    resetInactivityTimer();
+    console.log(`[Socket ${instanceId.current}] Marcando mensaje como leído:`, messageId);
+    socketRef.current.emit('mark_read', { messageId, conversationId });
+    return true;
+  }, [connected]);
   
-  // Function to indicate user is typing
-  const sendTyping = (conversationId: string, isTyping: boolean) => {
-    if (!socketRef.current || !connected || !userId) {
-      return;
+  const joinConversation = useCallback((conversationId: string) => {
+    if (!socketRef.current || !connected) {
+      console.error(`[Socket ${instanceId.current}] No se puede unir a la conversación: socket no conectado`);
+      return false;
     }
     
-    try {
-      socketRef.current.emit('typing', { userId, conversationId, isTyping });
-    } catch (e) {
-      console.error('Error al enviar estado de escritura:', e);
-    }
-  };
+    resetInactivityTimer();
+    console.log(`[Socket ${instanceId.current}] Uniéndose a la conversación:`, conversationId);
+    socketRef.current.emit('join_conversation', { conversationId });
+    return true;
+  }, [connected]);
   
-  // Function to mark a message as read
-  const markMessageAsRead = (messageId: string, conversationId: string) => {
-    if (!socketRef.current || !connected || !userId) {
-      return;
+  const leaveConversation = useCallback((conversationId: string) => {
+    if (!socketRef.current || !connected) {
+      return false;
     }
     
-    try {
-      socketRef.current.emit('mark_read', { messageId, conversationId, userId });
-    } catch (e) {
-      console.error('Error al marcar mensaje como leído:', e);
-    }
-  };
+    resetInactivityTimer();
+    socketRef.current.emit('leave_conversation', { conversationId });
+    return true;
+  }, [connected]);
   
-  // Function to join a conversation
-  const joinConversation = (conversationId: string) => {
-    if (!socketRef.current || !connected || !userId) {
-      console.error('No se puede unir a la conversación: Socket no conectado');
-      return;
-    }
-    
-    try {
-      socketRef.current.emit('join_conversation', { userId, conversationId });
-      console.log(`Unido a la conversación: ${conversationId}`);
-    } catch (e) {
-      console.error('Error al unirse a la conversación:', e);
-    }
-  };
+  // Expose functions to reset inactivity timer when user performs actions
+  const resetTimeout = useCallback(() => {
+    resetInactivityTimer();
+  }, []);
   
-  // Function to leave a conversation
-  const leaveConversation = (conversationId: string) => {
-    if (!socketRef.current || !connected || !userId) {
-      return;
-    }
-    
-    try {
-      socketRef.current.emit('leave_conversation', { userId, conversationId });
-      console.log(`Abandonada la conversación: ${conversationId}`);
-    } catch (e) {
-      console.error('Error al abandonar la conversación:', e);
-    }
-  };
-  
+  // Export the socket and associated functions
   return {
+    socket: socketRef.current,
     connected,
     error,
     onlineUsers,
-    socket: socketRef.current,
     sendMessage,
-    sendVoiceMessage,
-    sendTyping,
+    updateTypingStatus,
     markMessageAsRead,
     joinConversation,
-    leaveConversation
+    leaveConversation,
+    resetTimeout,
   };
 }
