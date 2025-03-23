@@ -176,7 +176,7 @@ io.on('connection', (socket) => {
   socket.on('send_message', async (message) => {
     try {
       console.log('Recibido mensaje para enviar:', message);
-      const savedMessage = await prisma.message.create({
+      const savedMessage = await prisma.directMessage.create({
         data: {
           content: message.content,
           senderId: message.senderId,
@@ -194,8 +194,15 @@ io.on('connection', (socket) => {
       socket.emit('new_message', savedMessage);
       console.log(`Mensaje emitido al remitente (${savedMessage.senderId})`);
 
-      // Emitir al receptor si es un mensaje directo
-      if (savedMessage.receiverId) {
+      // Para el resto de usuarios, usar un enfoque de sala que evita duplicados
+      if (savedMessage.conversationId) {
+        const roomName = `conversation-${savedMessage.conversationId}`;
+        console.log(`Emitiendo mensaje a la sala ${roomName} (excluyendo remitente)`);
+        // Emit to conversation room, excluding the sender
+        socket.to(roomName).emit('new_message', savedMessage);
+      } 
+      // Si no hay conversationId pero existe un receptor directo
+      else if (savedMessage.receiverId) {
         const receiverSocket = userSocketMap.get(savedMessage.receiverId);
         if (receiverSocket) {
           console.log(`Enviando mensaje a receptor ${savedMessage.receiverId} en socket ${receiverSocket}`);
@@ -203,13 +210,6 @@ io.on('connection', (socket) => {
         } else {
           console.log(`Receptor ${savedMessage.receiverId} no está conectado`);
         }
-      }
-
-      // Emitir a todos los miembros de la conversación
-      if (savedMessage.conversationId) {
-        const roomName = `conversation-${savedMessage.conversationId}`;
-        console.log(`Emitiendo mensaje a la sala ${roomName}`);
-        io.to(roomName).emit('new_message', savedMessage);
       }
     } catch (error) {
       console.error('Error al enviar mensaje:', error);

@@ -4,13 +4,14 @@ import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { Send, X } from 'lucide-react';
+import { Send, X, Mic, Play, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { flushSync } from 'react-dom';
 import useSocket, { MessageType } from '@/src/hooks/useSocket';
 import { API_ROUTES } from '@/src/config/api-routes';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
+import VoiceMessageRecorder from './VoiceMessageRecorder';
 
 type User = {
   id: string;
@@ -29,6 +30,8 @@ type Message = {
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error';
   conversationId?: string;
   read?: boolean;
+  mediaUrl?: string;
+  messageType?: 'text' | 'image' | 'voice' | 'file' | 'video';
 };
 
 type ChatWindowContentProps = {
@@ -49,6 +52,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isVoiceRecorderVisible, setIsVoiceRecorderVisible] = useState(false);
   const [canSendMessages, setCanSendMessages] = useState<boolean | null>(null);
   const [isCheckingRelationship, setIsCheckingRelationship] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -381,53 +385,137 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
 
   // Enviar un mensaje
   const sendMessage = async () => {
-    if (!newMessage.trim() || !otherUser?.id || !currentUserId || isSending) return;
+    if (!newMessage.trim() || isSending || !otherUser || !canSendMessages) return;
     
     const tempId = `temp-${Date.now()}`;
-    const messageToSend = {
-      tempId,
-      content: newMessage.trim(),
-      senderId: currentUserId,
-      receiverId: otherUser.id,
-      createdAt: new Date(),
-      status: 'sending' as MessageStatus,
-      conversationId: safeConversationId,
-    };
-    
-    // Añadir el mensaje a la UI inmediatamente
-    setMessages(prev => [...prev, messageToSend]);
+    const messageContent = newMessage.trim();
     setNewMessage('');
     setIsSending(true);
     
-    // Asegurarse de que el chat se desplaza hacia abajo
-    setTimeout(() => {
-      if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 100);
+    // Crear objeto de mensaje temporal
+    const messageToSend: Message = {
+      tempId,
+      content: messageContent,
+      senderId: currentUserId as string,
+      receiverId: otherUser.id,
+      createdAt: new Date(),
+      status: 'sending',
+      conversationId: safeConversationId,
+    };
+    
+    // Añadir el mensaje a la lista local
+    flushSync(() => {
+      setMessages([...messages, messageToSend]);
+    });
+    
+    await sendMessageToServer(messageToSend, tempId);
+  };
+
+  // Nueva función para enviar mensaje de voz
+  const handleVoiceMessageSend = async (audioBlob: Blob) => {
+    if (isSending || !otherUser || !canSendMessages) return;
+    
+    setIsSending(true);
     
     try {
-      // Emitir evento de "no está escribiendo"
-      if (isTyping) {
-        setIsTyping(false);
-        if (socketInstance && socketInitialized) {
-          socketUpdateTypingStatus({ conversationId: safeConversationId, isTyping: false });
+      console.log("Preparando para enviar mensaje de voz...");
+      
+      // Crear un FormData para subir el archivo
+      const formData = new FormData();
+      
+      // Crear un nuevo archivo con extensión más compatible
+      const audioFile = new File([audioBlob], `voice_message_${Date.now()}.webm`, { 
+        type: audioBlob.type 
+      });
+      
+      console.log('Subiendo archivo de audio:', audioFile.name, audioFile.type, audioFile.size);
+      
+      formData.append('file', audioFile);
+      formData.append('fileType', 'audio');
+      
+      // Subir a la API
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.user?.email || ''}`,
+        },
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('Error al subir el audio', errorText);
+        alert("Error al subir el audio: " + errorText);
+        return;
+      }
+
+      const data = await uploadResponse.json();
+      // Usar la URL completa devuelta por la API
+      const audioUrl = data.url;
+      console.log('Audio subido correctamente, URL:', audioUrl);
+      
+      // Crear mensaje temporal
+      const tempId = `voice-${Date.now()}`;
+      const messageToSend: Message = {
+        tempId,
+        content: '',
+        mediaUrl: audioUrl,
+        messageType: 'voice',
+        senderId: currentUserId as string,
+        receiverId: otherUser.id,
+        createdAt: new Date(),
+        status: 'sending',
+        conversationId: conversationId || '',
+      };
+      
+      // Añadir el mensaje a la lista local
+      flushSync(() => {
+        setMessages([...messages, messageToSend]);
+      });
+      
+      // Ocultar el grabador de voz DESPUÉS de enviar el mensaje
+      // setIsVoiceRecorderVisible(false);
+      
+      // Enviar mensaje al servidor
+      await sendMessageToServer(messageToSend, tempId);
+
+    } catch (error) {
+      console.error('Error enviando mensaje de voz:', error);
+      alert("Error al enviar mensaje de voz");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Función para enviar mensajes al servidor
+  const sendMessageToServer = async (message: Message, tempId: string) => {
+    try {
+      // Asegurarse de que el chat se desplaza hacia abajo
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
-        if (typingTimeoutRef.current) {
-          clearTimeout(typingTimeoutRef.current);
-        }
+      }, 100);
+      
+      // Verificar que otherUser no sea nulo
+      if (!otherUser) {
+        throw new Error('Usuario receptor no especificado');
       }
       
       // Enviar el mensaje a través de la API
-      const response = await fetch(API_ROUTES.messages.send, {
+      const response = await fetch('/api/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.user?.email || ''}`,
         },
         body: JSON.stringify({
           receiverId: otherUser.id,
-          content: messageToSend.content,
+          content: message.content,
           tempId,
+          mediaUrl: message.mediaUrl,
+          messageType: message.messageType,
+          conversationId: message.conversationId || conversationId
         }),
       });
       
@@ -450,20 +538,18 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
               ? {
                   ...msg,
                   id: messageData.id,
-                  status: 'sent' as MessageStatus,
-                  conversationId: messageData.conversationId || safeConversationId,
+                  status: 'sent',
+                  conversationId: messageData.conversationId || conversationId,
                 }
               : msg
           )
         );
         
-        // Emitir evento de mensaje enviado a través de socket.io
-        if (socketInstance && socketInitialized) {
-          socketSendMessage({
-            ...messageData,
-            tempId,
-          });
-        }
+        // No es necesario emitir el evento por socket.io, ya que la API notifica al servidor socket
+        // y esto causa duplicación de mensajes
+        
+        // Borrar el comentario siguiente para depuración si es necesario
+        // console.log('Mensaje enviado al servidor, esperando notificación bidireccional vía socket');
       } else {
         console.error('Respuesta de API inválida:', data);
         // Marcar el mensaje como error
@@ -472,7 +558,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
             msg.tempId === tempId
               ? {
                   ...msg,
-                  status: 'error' as MessageStatus,
+                  status: 'error',
                 }
               : msg
           )
@@ -486,14 +572,12 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       setMessages(prev =>
         prev.map((msg: Message) =>
           msg.tempId === tempId
-            ? { ...msg, status: 'error' as MessageStatus }
+            ? { ...msg, status: 'error' }
             : msg
         )
       );
       
       alert('No se pudo enviar el mensaje. Inténtalo de nuevo.');
-    } finally {
-      setIsSending(false);
     }
   };
 
@@ -672,13 +756,31 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
                   <div className={`flex flex-col ${!isCurrentUser && showAvatar ? 'ml-0' : !isCurrentUser ? 'ml-10' : ''}`}>
                     <div
                       className={cn(
-                        'max-w-xs md:max-w-md px-4 py-2 rounded-lg text-sm break-words',
+                        'max-w-xs md:max-w-md p-3 rounded-lg',
                         isCurrentUser
                           ? 'bg-blue-500 text-white rounded-br-none'
                           : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'
                       )}
                     >
-                      {message.content}
+                      {/* Mostrar reproductor de audio si es un mensaje de voz */}
+                      {message.messageType === 'voice' && message.mediaUrl ? (
+                        <div className="flex flex-col space-y-2">
+                          <span className={`text-xs ${isCurrentUser ? 'text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>
+                            Mensaje de voz
+                          </span>
+                          <audio 
+                            controls 
+                            src={message.mediaUrl} 
+                            className={`max-w-full rounded-md ${isCurrentUser ? 'audio-player-light' : 'audio-player-dark'}`}
+                            controlsList="nodownload"
+                            preload="metadata"
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-sm break-words whitespace-pre-wrap">
+                          {message.content}
+                        </div>
+                      )}
                     </div>
                     
                     <div className={`flex items-center mt-1 text-xs text-gray-500 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
@@ -767,17 +869,53 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
               rows={1}
               disabled={isSending || !canSendMessages}
             />
-            <Button
-              size="icon"
-              onClick={sendMessage}
-              disabled={!newMessage.trim() || isSending || !canSendMessages}
-              className="h-10 w-10 rounded-full bg-blue-500 hover:bg-blue-600"
-            >
-              <Send className="h-5 w-5 text-white" />
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="icon"
+                onClick={() => setIsVoiceRecorderVisible(true)}
+                disabled={isSending || !canSendMessages}
+                className="h-10 w-10 rounded-full bg-green-500 hover:bg-green-600"
+                title="Grabar mensaje de voz"
+              >
+                <Mic className="h-5 w-5 text-white" />
+              </Button>
+              <Button
+                size="icon"
+                onClick={sendMessage}
+                disabled={!newMessage.trim() || isSending || !canSendMessages}
+                className="h-10 w-10 rounded-full bg-blue-500 hover:bg-blue-600"
+                title="Enviar mensaje"
+              >
+                <Send className="h-5 w-5 text-white" />
+              </Button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Componente de grabación de voz */}
+      {isVoiceRecorderVisible && (
+        <VoiceMessageRecorder
+          onSend={handleVoiceMessageSend}
+          onCancel={() => setIsVoiceRecorderVisible(false)}
+          isVisible={isVoiceRecorderVisible}
+          senderId={currentUserId || ''}
+          receiverId={otherUser?.id || ''}
+          session={session}
+          onClose={() => {
+            console.log("onClose llamado desde VoiceMessageRecorder");
+            // Solo cerrar el modal cuando se complete el envío
+            setIsVoiceRecorderVisible(false);
+          }}
+          setUploadStatus={(status) => {
+            console.log("Estado de carga actualizado:", status);
+            if (status === 'error') {
+              alert("Error al enviar mensaje de voz");
+            }
+            setIsSending(status === 'success' ? false : true);
+          }}
+        />
+      )}
 
       {/* Estilos para el indicador de escritura */}
       <style jsx global>{`
@@ -815,6 +953,33 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         
         .dark .dot {
           background-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .audio-player-light {
+          background-color: #f0f0f0;
+          border: 1px solid #ddd;
+        }
+        
+        .audio-player-dark {
+          background-color: #333;
+          border: 1px solid #444;
+        }
+        
+        .audio-player-light::-webkit-media-controls-panel {
+          background-color: #f0f2f5;
+        }
+        
+        .audio-player-dark::-webkit-media-controls-panel {
+          background-color: #333;
+        }
+        
+        @keyframes progressAnim {
+          from {
+            width: 0%;
+          }
+          to {
+            width: 100%;
+          }
         }
       `}</style>
     </div>

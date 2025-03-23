@@ -38,19 +38,28 @@ async function notifySocketServer(message: any) {
 
 export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: User }) => {
   try {
-    const { receiverId, content, priority, tempId } = await request.json();
+    // Validación del cuerpo de la solicitud
+    const { content, receiverId, conversationId: existingConversationId, messageType = 'text', mediaUrl, priority, tempId } = await request.json();
     
-    // Validar contenido del mensaje
-    if (!content || content.trim() === '') {
-      return new Response(JSON.stringify({ error: 'Contenido del mensaje no puede estar vacío' }), { 
+    // Validar que se proporciona un destinatario
+    if (!receiverId && !existingConversationId) {
+      return new Response(JSON.stringify({ error: 'Se debe proporcionar un ID de receptor o conversación' }), { 
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
     
-    // Validar ID del receptor
-    if (!receiverId) {
-      return new Response(JSON.stringify({ error: 'ID del receptor es requerido' }), { 
+    // Validar que hay contenido, excepto para mensajes con multimedia
+    if ((!content || content.trim() === '') && messageType === 'text') {
+      return new Response(JSON.stringify({ error: 'El contenido del mensaje no puede estar vacío' }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Validar URL de multimedia para mensajes tipo 'voice', 'image', etc.
+    if (['voice', 'image', 'video', 'file'].includes(messageType) && !mediaUrl) {
+      return new Response(JSON.stringify({ error: `URL de medios requerida para mensajes tipo ${messageType}` }), { 
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -163,6 +172,8 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
       isTemp: true,
       priority: priority || 'normal',
       tempId: messageId, // Incluir el ID temporal para reconciliación posterior
+      messageType,
+      mediaUrl,
       sender: {
         id: userId,
         username: user.username || null,
@@ -293,6 +304,8 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
             senderId: userId,
             receiverId,
             tempId,
+            messageType,
+            mediaUrl,
             conversationId: conversationId
           },
           select: {
@@ -303,6 +316,8 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
             senderId: true,
             receiverId: true,
             tempId: true,
+            messageType: true,
+            mediaUrl: true,
             conversationId: true
           }
         });
