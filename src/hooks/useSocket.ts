@@ -11,8 +11,11 @@ export type MessageType = {
   senderId: string;
   receiverId?: string;
   conversationId?: string;
+  mediaUrl?: string;
+  messageType?: 'text' | 'image' | 'voice' | 'file' | 'video';
   createdAt: Date | string;
   read?: boolean;
+  readBy?: string[];
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error';
 };
 
@@ -25,7 +28,22 @@ export type UserType = {
 
 export type TypingStatusType = {
   userId: string;
+  conversationId?: string;
   isTyping: boolean;
+};
+
+export type ConversationType = {
+  id: string;
+  name?: string;
+  isGroup: boolean;
+  imageUrl?: string;
+  participants: {
+    userId: string;
+    username?: string;
+    image?: string;
+    isAdmin?: boolean;
+  }[];
+  lastMessage?: MessageType;
 };
 
 interface UseSocketOptions {
@@ -35,7 +53,7 @@ interface UseSocketOptions {
   onUserOnline?: (users: UserType[]) => void;
   onTypingStatus?: (status: TypingStatusType) => void;
   onMessageStatus?: (status: { messageId: string; status: string }) => void;
-  onMessageRead?: (data: { messageId: string; conversationId: string }) => void;
+  onMessageRead?: (data: { messageId: string; conversationId?: string; readBy?: string }) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error | unknown) => void;
@@ -106,7 +124,7 @@ export default function useSocket(options: UseSocketOptions) {
         setConnected(true);
         
         // Enviar información del usuario al conectarse
-        socket.emit('user_connected', { userId, username });
+        socket.emit('identify', { userId, username });
         
         if (onConnect) onConnect();
       });
@@ -193,147 +211,163 @@ export default function useSocket(options: UseSocketOptions) {
         }
       });
       
-      socket.on('message_read', (data: { messageId: string; conversationId: string }) => {
+      socket.on('message_read', (data: { messageId: string; conversationId?: string; readBy?: string }) => {
+        console.log('Mensaje marcado como leído:', data);
         if (onMessageRead) onMessageRead(data);
       });
       
       socket.on('typing_status', (status: TypingStatusType) => {
+        console.log('Estado de escritura actualizado:', status);
         if (onTypingStatus) onTypingStatus(status);
       });
       
       socket.on('users_online', (users: UserType[]) => {
-        console.log('Usuarios online:', users);
+        console.log('Lista de usuarios online actualizada:', users);
         setOnlineUsers(users);
+        
         if (onUserOnline) onUserOnline(users);
       });
       
-    } catch (err) {
-      console.error('Error al crear instancia de Socket.io:', err);
-      setError(err);
-      if (onError) onError(err);
+      socket.on('message_updated', (update: { tempId: string; realId: string; status: string }) => {
+        console.log('Actualización de ID de mensaje:', update);
+        // Este evento sólo lo maneja internamente el componente de chat
+      });
+    } catch (e) {
+      console.error('Error al inicializar Socket.io:', e);
+      setError(e);
+      
+      if (onError) onError(e);
     }
     
-    // Cleanup on unmount or when dependencies change
+    // Cleanup on unmount
     return cleanup;
-  }, [userId, username, onNewMessage, onUserOnline, onTypingStatus, onMessageStatus, onMessageRead, onConnect, onDisconnect, onError]);
+  }, [userId, username, onConnect, onDisconnect, onError, onMessageRead, onMessageStatus, onNewMessage, onTypingStatus, onUserOnline]);
   
-  // Functions to interact with Socket.io
-  const sendMessage = (message: MessageType) => {
+  // Function to send a message
+  const sendMessage = (message: Omit<MessageType, 'createdAt' | 'status'>) => {
+    if (!socketRef.current || !connected) {
+      console.error('No se puede enviar mensaje: Socket no conectado');
+      return false;
+    }
+    
     try {
-      if (!socketRef.current) {
-        console.error('No hay conexión con el servidor de chat. Socket es nulo.');
-        setError(new Error('Socket no inicializado'));
-        if (onMessageStatus && message.tempId) {
-          onMessageStatus({
-            messageId: message.tempId,
-            status: 'error'
-          });
-        }
-        return false;
-      }
-      
-      if (!socketRef.current.connected) {
-        console.error('Socket no conectado. Intentando reconectar...');
-        socketRef.current.connect();
-        
-        if (onMessageStatus && message.tempId) {
-          onMessageStatus({
-            messageId: message.tempId,
-            status: 'error'
-          });
-        }
-        return false;
-      }
-      
-      const tempId = message.tempId || `temp-${Date.now()}`;
-      const enhancedMessage = {
+      // Generate tempId if not provided
+      const finalMessage = {
         ...message,
-        tempId
+        tempId: message.tempId || `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        status: 'sending',
+        createdAt: new Date(),
       };
       
-      console.log('Enviando mensaje via Socket.io:', JSON.stringify(enhancedMessage, null, 2));
+      console.log('Enviando mensaje:', finalMessage);
+      socketRef.current.emit('send_message', finalMessage);
       
-      // First emit an event for the sender to update UI immediately
-      if (onNewMessage) {
-        console.log('Notificando localmente el mensaje enviado (UI inmediata)');
-        onNewMessage({
-          ...enhancedMessage,
-          status: 'sending'
-        });
-      }
-      
-      // Then send to server
-      socketRef.current.emit('send_message', enhancedMessage);
-      
-      // Check socket status after sending
-      setTimeout(() => {
-        if (socketRef.current && socketRef.current.connected) {
-          console.log('Socket sigue conectado después de enviar mensaje');
-          
-          // Update status to 'sent' after a brief delay
-          if (onMessageStatus) {
-            onMessageStatus({
-              messageId: tempId,
-              status: 'sent'
-            });
-          }
-        } else {
-          console.error('Socket desconectado después de enviar mensaje');
-          // Notify of sending error
-          if (onMessageStatus) {
-            onMessageStatus({
-              messageId: tempId,
-              status: 'error'
-            });
-          }
-        }
-      }, 500);
-      
-      return true;
-    } catch (err) {
-      console.error('Error al enviar mensaje:', err);
-      setError(err);
+      return finalMessage.tempId;
+    } catch (e) {
+      console.error('Error al enviar mensaje:', e);
       return false;
     }
   };
   
-  const setTypingStatus = (receiverId: string, isTyping: boolean) => {
-    if (!socketRef.current || !userId) return;
+  // Function to send a voice message
+  const sendVoiceMessage = (message: {
+    senderId: string;
+    conversationId: string;
+    mediaUrl: string;
+    content?: string;
+    tempId?: string;
+  }) => {
+    if (!socketRef.current || !connected) {
+      console.error('No se puede enviar mensaje de voz: Socket no conectado');
+      return false;
+    }
     
-    socketRef.current.emit('typing', { userId, receiverId, isTyping });
-  };
-  
-  const markMessageAsRead = (messageId: string, conversationId: string) => {
-    if (!socketRef.current || !userId) return;
-    
-    socketRef.current.emit('mark_read', { messageId, conversationId });
-  };
-  
-  const disconnect = () => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
+    try {
+      const voiceMessage = {
+        ...message,
+        messageType: 'voice' as const,
+        tempId: message.tempId || `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      };
+      
+      console.log('Enviando mensaje de voz:', {
+        ...voiceMessage, 
+        mediaUrl: voiceMessage.mediaUrl.substring(0, 50) + '...'
+      });
+      
+      socketRef.current.emit('send_voice_message', voiceMessage);
+      
+      return voiceMessage.tempId;
+    } catch (e) {
+      console.error('Error al enviar mensaje de voz:', e);
+      return false;
     }
   };
   
-  const reconnect = () => {
-    if (!socketRef.current) {
-      console.error('No se puede reconectar, socket no inicializado');
+  // Function to indicate user is typing
+  const sendTyping = (conversationId: string, isTyping: boolean) => {
+    if (!socketRef.current || !connected || !userId) {
       return;
     }
     
-    console.log('Intentando reconectar socket...');
-    socketRef.current.connect();
+    try {
+      socketRef.current.emit('typing', { userId, conversationId, isTyping });
+    } catch (e) {
+      console.error('Error al enviar estado de escritura:', e);
+    }
+  };
+  
+  // Function to mark a message as read
+  const markMessageAsRead = (messageId: string, conversationId: string) => {
+    if (!socketRef.current || !connected || !userId) {
+      return;
+    }
+    
+    try {
+      socketRef.current.emit('mark_read', { messageId, conversationId, userId });
+    } catch (e) {
+      console.error('Error al marcar mensaje como leído:', e);
+    }
+  };
+  
+  // Function to join a conversation
+  const joinConversation = (conversationId: string) => {
+    if (!socketRef.current || !connected || !userId) {
+      console.error('No se puede unir a la conversación: Socket no conectado');
+      return;
+    }
+    
+    try {
+      socketRef.current.emit('join_conversation', { userId, conversationId });
+      console.log(`Unido a la conversación: ${conversationId}`);
+    } catch (e) {
+      console.error('Error al unirse a la conversación:', e);
+    }
+  };
+  
+  // Function to leave a conversation
+  const leaveConversation = (conversationId: string) => {
+    if (!socketRef.current || !connected || !userId) {
+      return;
+    }
+    
+    try {
+      socketRef.current.emit('leave_conversation', { userId, conversationId });
+      console.log(`Abandonada la conversación: ${conversationId}`);
+    } catch (e) {
+      console.error('Error al abandonar la conversación:', e);
+    }
   };
   
   return {
-    socket: socketRef.current,
     connected,
     error,
     onlineUsers,
+    socket: socketRef.current,
     sendMessage,
-    setTypingStatus,
+    sendVoiceMessage,
+    sendTyping,
     markMessageAsRead,
-    disconnect,
-    reconnect
+    joinConversation,
+    leaveConversation
   };
 }

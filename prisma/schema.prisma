@@ -30,6 +30,7 @@ model User {
   ratings             Rating[]
   sentMessages        DirectMessage[]      @relation("SentMessages")
   receivedMessages    DirectMessage[]      @relation("ReceivedMessages")
+  conversations       ConversationParticipant[]
   passwordResetTokens PasswordResetToken[]
 
   @@index([emailVerified]) // Si haces queries de usuarios verificados
@@ -185,24 +186,65 @@ model ActivityHistory {
 }
 
 model DirectMessage {
-  id         String   @id @default(cuid())
-  content    String   @db.Text
-  senderId   String   @map("sender_id")
-  receiverId String   @map("receiver_id")
-  read       Boolean  @default(false)
-  createdAt  DateTime @default(now()) @map("created_at")
-  tempId     String?  @map("temp_id")
-  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  content        String?       @db.Text
+  mediaUrl       String?       @map("media_url") @db.VarChar(512)
+  messageType    MessageType   @default(text) @map("message_type")
+  senderId       String        @map("sender_id")
+  receiverId     String?       @map("receiver_id")
+  conversationId String        @map("conversation_id")
+  read           Boolean       @default(false)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  tempId         String?       @map("temp_id")
+  sender         User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver       User?         @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: SetNull)
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([senderId, receiverId])
   @@index([createdAt])
   @@index([senderId, receiverId, createdAt], map: "sender_receiver_created_idx")
   @@index([tempId])
-  @@map("direct_messages") // Nombre real de la tabla en MySQL
+  @@index([conversationId])
+  @@map("direct_messages")
+}
+
+model Conversation {
+  id             String                    @id @default(cuid())
+  name           String?                   // Name for group conversations
+  isGroup        Boolean                   @default(false) @map("is_group")
+  createdAt      DateTime                  @default(now()) @map("created_at")
+  updatedAt      DateTime                  @updatedAt @map("updated_at")
+  imageUrl       String?                   @map("image_url") @db.VarChar(512)
+  messages       DirectMessage[]
+  participants   ConversationParticipant[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  userId         String       @map("user_id")
+  conversationId String       @map("conversation_id")
+  isAdmin        Boolean      @default(false) @map("is_admin")
+  joinedAt       DateTime     @default(now()) @map("joined_at")
+  lastReadAt     DateTime?    @map("last_read_at")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([userId])
+  @@map("conversation_participants")
 }
 
 enum Role {
   user
   admin
+}
+
+enum MessageType {
+  text
+  image
+  voice
+  file
+  video
 }

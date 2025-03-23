@@ -308,66 +308,54 @@ export default function UserProfilePage() {
                         }}
                       />
                       
-                      {/* Botón de Enviar Mensaje (solo visible si hay seguimiento mutuo) */}
-                      {isFollowing && (
-                        <Button
-                          onClick={async () => {
-                            // Verificar si hay seguimiento mutuo
-                            try {
-                              const res = await fetch(API_ROUTES.relationships.checkFollowing(user.id));
-                              const data = await res.json();
-                              
-                              if (data.isMutualFollow) {
-                                // Crear conversación si no existe
-                                try {
-                                  const createConvRes = await fetch('/api/messages/conversations', {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify({
-                                      receiverId: user.id
-                                    })
-                                  });
-                                  
-                                  const convData = await createConvRes.json();
-                                  console.log('Conversación creada o recuperada:', convData);
-                                  
-                                  // Redirigir a la página de mensajes con el ID de conversación
-                                  if (convData.id) {
-                                    window.location.href = `/messages?convId=${convData.id}`;
-                                  } else {
-                                    // Si no hay ID, simplemente redirigir a mensajes
-                                    window.location.href = "/messages";
-                                  }
-                                } catch (error) {
-                                  console.error("Error al crear conversación:", error);
-                                  // Redirigir a mensajes de todos modos
-                                  window.location.href = "/messages";
-                                }
-                              } else {
-                                // Mostrar una alerta si no hay seguimiento mutuo
-                                alert("Esta acción requiere que ambos usuarios se sigan mutuamente.");
-                              }
-                            } catch (error) {
-                              console.error("Error al verificar relación:", error);
-                              alert("Ha ocurrido un error al verificar la relación entre usuarios.");
+                      {/* Botón de Enviar Mensaje */}
+                      <Button
+                        onClick={async () => {
+                          // Llamar a la API para iniciar o recuperar una conversación
+                          try {
+                            const createConvRes = await fetch('/api/messages/conversations', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json'
+                              },
+                              body: JSON.stringify({
+                                receiverId: user.id
+                              })
+                            });
+                            
+                            if (!createConvRes.ok) {
+                              const errorData = await createConvRes.json();
+                              throw new Error(errorData.error || "Error al iniciar conversación");
                             }
-                          }}
-                          className="w-full flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-500 to-teal-400 text-white rounded-lg shadow hover:from-blue-600 hover:to-teal-500 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all"
+                            
+                            const convData = await createConvRes.json();
+                            console.log('Conversación creada o recuperada:', convData);
+                            
+                            // Redirigir a la página de mensajes con el ID de conversación
+                            router.push(`/messages?convId=${convData.id}`);
+                          } catch (error) {
+                            console.error("Error al crear conversación:", error);
+                            alert("Ha ocurrido un error al iniciar la conversación");
+                          }
+                        }}
+                        className="w-full flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-500 to-teal-400 text-white rounded-lg shadow hover:from-blue-600 hover:to-teal-500 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5 mr-2"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 mr-2"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V7a2 2 0 012-2h7z" />
-                            <path d="M12 8v2m0 4h.01M5 6a1 1 0 00-1 1v2a1 1 0 110 2H9v-2H6a1 1 0 00-1-1z" />
-                          </svg>
-                          Enviar mensaje
-                        </Button>
-                      )}
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+                          />
+                        </svg>
+                        Enviar mensaje
+                      </Button>
                     </div>
                   )}
                   {/* Stats Grid */}
