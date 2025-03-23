@@ -2,7 +2,39 @@
 import prisma from "@/lib/db";
 import { messageEvents } from "./sse-messages/message-event-manager";
 import { withAuth } from "../../../lib/auth-utils";
-import { User } from "@prisma/client";
+import fetch from 'node-fetch';
+
+// Define User type that matches the structure needed
+interface User {
+  id: string;
+  username?: string | null;
+  image?: string | null;
+  email?: string | null;
+  // Add other fields as needed
+}
+
+// Function to notify socket server about new messages
+async function notifySocketServer(message: any) {
+  try {
+    const socketUrl = 'http://localhost:3001/webhook/new-message';
+    const response = await fetch(socketUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Socket-Internal-Auth-00123'
+      },
+      body: JSON.stringify(message)
+    });
+    
+    if (!response.ok) {
+      console.error(`Error notifying socket server: ${response.status} ${response.statusText}`);
+    } else {
+      console.log('Socket server notified successfully about new message');
+    }
+  } catch (error) {
+    console.error('Failed to notify socket server:', error);
+  }
+}
 
 export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: User }) => {
   try {
@@ -25,42 +57,93 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
     }
 
     // Verificar si los usuarios se siguen mutuamente
-    try {
-      const mutualFollow = await prisma.follow.findMany({
+    const checkFollows = async (): Promise<boolean> => {
+      try {
+        // Verificar que el remitente sigue al receptor
+        const senderFollowsReceiver = await prisma.follow.findUnique({
+          where: {
+            followerId_followingId: {
+              followerId: userId,
+              followingId: receiverId,
+            },
+          }
+        });
+
+        // Verificar que el receptor sigue al remitente
+        const receiverFollowsSender = await prisma.follow.findUnique({
+          where: {
+            followerId_followingId: {
+              followerId: receiverId,
+              followingId: userId,
+            },
+          }
+        });
+
+        const checksPassed = !!(senderFollowsReceiver && receiverFollowsSender);
+        if (!checksPassed) {
+          console.log(`Verificación de seguidores fallida: senderFollows=${!!senderFollowsReceiver}, receiverFollows=${!!receiverFollowsSender}`);
+        }
+        return checksPassed;
+      } catch (error) {
+        console.error("Error verificando follows mutuos:", error);
+        return false;
+      }
+    };
+
+    // Obtener o crear conversación entre usuarios
+    const getOrCreateConversation = async (follow: boolean): Promise<string> => {
+      console.log(`Buscando conversación entre ${userId} y ${receiverId}`);
+      return await getOrCreateConversationBetweenUsers(userId, receiverId, follow);
+    };
+
+    // Verificar si ya existe una conversación entre ambos usuarios
+    const getOrCreateConversationBetweenUsers = async (user1Id: string, user2Id: string, follow: boolean): Promise<string> => {
+      // Buscar una conversación existente entre los dos usuarios
+      const existingConversation = await prisma.conversation.findFirst({
         where: {
-          OR: [
+          AND: [
+            { isGroup: false },
             {
-              AND: [
-                { followerId: userId },
-                { followingId: receiverId }
-              ]
+              participants: {
+                some: {
+                  userId: user1Id
+                }
+              }
             },
             {
-              AND: [
-                { followerId: receiverId },
-                { followingId: userId }
-              ]
+              participants: {
+                some: {
+                  userId: user2Id
+                }
+              }
             }
           ]
         }
       });
-
-      // Verificar que ambos usuarios se sigan mutuamente
-      const userFollowsReceiver = mutualFollow.some(follow => 
-        follow.followerId === userId && follow.followingId === receiverId
-      );
-      const receiverFollowsUser = mutualFollow.some(follow => 
-        follow.followerId === receiverId && follow.followingId === userId
-      );
-
-      // Solo advertir, no bloquear el envío del mensaje por ahora mientras se soluciona el error
-      if (!userFollowsReceiver || !receiverFollowsUser) {
-        console.warn(`Advertencia: Los usuarios ${userId} y ${receiverId} no se siguen mutuamente, pero se permitirá el mensaje`);
-        // Ya no devolvemos el error 403, permitimos el envío de mensajes temporalmente
+      
+      if (existingConversation) {
+        return existingConversation.id;
+      } else {
+        // Si no existe, crear una nueva conversación
+        const newConversation = await prisma.conversation.create({
+          data: {
+            isGroup: false,
+            participants: {
+              create: [
+                { userId: user1Id },
+                { userId: user2Id }
+              ]
+            }
+          }
+        });
+        return newConversation.id;
       }
-    } catch (followCheckError) {
-      console.error("Error al verificar si los usuarios se siguen mutuamente:", followCheckError);
-      // Permitir continuar en caso de error en esta verificación
+    };
+
+    const mutualFollow = await checkFollows();
+    if (!mutualFollow) {
+      console.warn(`Advertencia: Los usuarios ${userId} y ${receiverId} no se siguen mutuamente, pero se permitirá el mensaje`);
+      // Ya no devolvemos el error 403, permitimos el envío de mensajes temporalmente
     }
     
     // Generar ID temporal único si no se proporciona
@@ -288,6 +371,9 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
         } catch (sseError) {
           console.warn('SSE notification failed for final message, relying on Socket.io:', sseError);
         }
+        
+        // Notificar al servidor de socket
+        notifySocketServer(finalMessage);
       }).catch(error => {
         console.error('Error al guardar mensaje en base de datos:', error);
         // Notificar al cliente del error
@@ -345,6 +431,9 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
       } catch (sseError) {
         console.warn('SSE notification failed for final message, relying on Socket.io for delivery:', sseError);
       }
+      
+      // Notificar al servidor de socket
+      notifySocketServer(finalMessage);
       
       // Responder con el mensaje completo
       return new Response(JSON.stringify(finalMessage), { 
@@ -515,7 +604,7 @@ export const GET = withAuth(async (request: Request, { userId }: { userId: strin
     });
     
     // Marcar como leídos los mensajes recibidos
-    if (messages.some(msg => msg.senderId === conversationWith && !msg.read)) {
+    if (messages.some((msg: { senderId: string; read: boolean }) => msg.senderId === conversationWith && !msg.read)) {
       await prisma.directMessage.updateMany({
         where: {
           senderId: conversationWith,
@@ -527,7 +616,7 @@ export const GET = withAuth(async (request: Request, { userId }: { userId: strin
     }
     
     // Serializar las fechas para JSON
-    const serializedMessages = messages.map(msg => ({
+    const serializedMessages = messages.map((msg: any) => ({
       ...msg,
       createdAt: msg.createdAt.toISOString()
     }));

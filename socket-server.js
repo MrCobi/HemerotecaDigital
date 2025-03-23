@@ -5,6 +5,20 @@ import chalk from 'chalk';
 import fetch from 'node-fetch';
 import path from 'path';
 import fs from 'fs';
+import express from 'express';
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+// Express server para webhooks y API interna
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+
+// Configuración de puerto y URL del socket
+const SOCKET_PORT = process.env.SOCKET_PORT || 3001;
 
 // Definir las rutas API para uso del servidor socket
 const API_BASE_URL = 'http://localhost:3000';
@@ -15,11 +29,8 @@ const API_ROUTES = {
   }
 };
 
-// Configuración de puerto y URL del socket
-const SOCKET_PORT = process.env.SOCKET_PORT || 3001;
-
 // Crear servidor HTTP y Socket.io
-const server = createServer();
+const server = createServer(app); // Use Express app with the HTTP server
 const io = new Server(server, {
   cors: {
     origin: '*', // Permitir cualquier origen para desarrollo
@@ -35,6 +46,48 @@ const onlineUsers = new Map();
 const userSocketMap = new Map();
 // Mantener registro de usuarios en conversaciones activas
 const activeConversations = new Map();
+
+// Webhook endpoint para recibir notificaciones de nuevos mensajes desde la API
+app.post('/webhook/new-message', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader !== 'Socket-Internal-Auth-00123') {
+    console.error('Acceso no autorizado al webhook');
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+
+  try {
+    const message = req.body;
+    console.log('Webhook recibió nuevo mensaje:', message);
+
+    // Emitir mensaje al remitente
+    const senderSocket = userSocketMap.get(message.senderId);
+    if (senderSocket) {
+      console.log(`Enviando mensaje a remitente ${message.senderId} en socket ${senderSocket}`);
+      io.to(senderSocket).emit('new_message', message);
+    }
+
+    // Emitir mensaje al receptor
+    if (message.receiverId) {
+      const receiverSocket = userSocketMap.get(message.receiverId);
+      if (receiverSocket) {
+        console.log(`Enviando mensaje a receptor ${message.receiverId} en socket ${receiverSocket}`);
+        io.to(receiverSocket).emit('new_message', message);
+      }
+    }
+
+    // Emitir a la sala de conversación si existe
+    if (message.conversationId) {
+      const roomName = `conversation-${message.conversationId}`;
+      console.log(`Emitiendo mensaje a la sala ${roomName}`);
+      io.to(roomName).emit('new_message', message);
+    }
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error procesando webhook:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
 
 const PING_INTERVAL = 25000;
 const PONG_TIMEOUT = 10000;
@@ -121,169 +174,45 @@ io.on('connection', (socket) => {
 
   // Evento: Enviar mensaje
   socket.on('send_message', async (message) => {
-    console.log(`MENSAJE RECIBIDO DE SOCKET ${socket.id}:`);
-    console.log(JSON.stringify(message, null, 2));
-    
-    // Normalizar el mensaje para asegurar un formato consistente
-    const enhancedMessage = {
-      ...message,
-      timestamp: new Date(),
-      status: 'sent',
-      id: message.id || message.tempId || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-    };
-    
-    // Si es mensaje de conversación, enviarlo a todos los participantes
-    if (message.conversationId) {
-      const roomName = `conversation-${message.conversationId}`;
-      
-      // IMPORTANTE: También enviar el mensaje de vuelta al remitente para que lo vea en su chat
-      socket.emit('new_message', {
-        ...enhancedMessage,
-        createdAt: enhancedMessage.timestamp || new Date(),
-        status: 'sent'
+    try {
+      console.log('Recibido mensaje para enviar:', message);
+      const savedMessage = await prisma.message.create({
+        data: {
+          content: message.content,
+          senderId: message.senderId,
+          receiverId: message.receiverId,
+          conversationId: message.conversationId,
+          messageType: message.messageType || 'text',
+          mediaUrl: message.mediaUrl || null
+        },
+        include: { sender: true }
       });
+
+      console.log('Mensaje guardado en la BD:', savedMessage);
       
-      // Enviar a todos los demás participantes de la conversación
-      socket.to(roomName).emit('new_message', {
-        ...enhancedMessage,
-        createdAt: enhancedMessage.timestamp || new Date(),
-        status: 'delivered'
-      });
-      
-      console.log(`Mensaje enviado a la conversación ${message.conversationId}`);
-      
-      // IMPORTANTE: Guardar el mensaje en la base de datos
-      try {
-        // Hacer una petición a la API para guardar el mensaje
-        const response = await fetch(API_ROUTES.messages.socket, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Socket-Internal-Auth-00123' // Clave especial para autenticar peticiones desde el servidor socket
-          },
-          body: JSON.stringify({
-            content: message.content,
-            mediaUrl: message.mediaUrl || null,
-            messageType: message.messageType || 'text',
-            receiverId: message.receiverId,
-            senderId: message.senderId || (message.sender && message.sender.id),
-            conversationId: message.conversationId,
-            tempId: message.tempId || message.id
-          }),
-        });
-        
-        if (!response.ok) {
-          console.error('Error al guardar mensaje en DB vía API:', await response.text());
-          
-          // Notificar error al remitente
-          socket.emit('message_status', {
-            messageId: message.id || message.tempId,
-            status: 'error'
-          });
+      // Emitir al remitente
+      socket.emit('new_message', savedMessage);
+      console.log(`Mensaje emitido al remitente (${savedMessage.senderId})`);
+
+      // Emitir al receptor si es un mensaje directo
+      if (savedMessage.receiverId) {
+        const receiverSocket = userSocketMap.get(savedMessage.receiverId);
+        if (receiverSocket) {
+          console.log(`Enviando mensaje a receptor ${savedMessage.receiverId} en socket ${receiverSocket}`);
+          io.to(receiverSocket).emit('new_message', savedMessage);
         } else {
-          console.log('Mensaje guardado correctamente en base de datos');
-          const savedMessage = await response.json();
-          
-          // Notificar actualización con el ID real de la base de datos a todos los participantes
-          if (savedMessage && savedMessage.id) {
-            io.to(roomName).emit('message_updated', {
-              tempId: message.tempId || message.id,
-              realId: savedMessage.id,
-              status: 'saved'
-            });
-          }
+          console.log(`Receptor ${savedMessage.receiverId} no está conectado`);
         }
-      } catch (error) {
-        console.error('Error al guardar mensaje en base de datos:', error);
-        // Notificar error al remitente
-        socket.emit('message_status', {
-          messageId: message.id || message.tempId,
-          status: 'error'
-        });
       }
-    } 
-    // Para compatibilidad con el sistema de mensajes directos anterior
-    else if (message.receiverId) {
-      // Encontrar el socket del destinatario por userId usando el mapa más eficiente
-      const receiverSocketId = userSocketMap.get(message.receiverId);
-      
-      console.log(`Buscando socket para usuario con ID ${message.receiverId}...`);
-      console.log(`Socket encontrado: ${receiverSocketId ? receiverSocketId : 'No encontrado'}`);
-      
-      // IMPORTANTE: Asegurar que el mensaje tenga una estructura consistente
-      const finalMessage = {
-        ...enhancedMessage,
-        createdAt: enhancedMessage.timestamp || new Date(),
-        status: 'sent'
-      };
-      
-      // Enviar mensaje a remitente para que vea su propio mensaje
-      socket.emit('new_message', {
-        ...finalMessage,
-        status: 'sent'
-      });
-      
-      // Enviar mensaje al destinatario si está conectado
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('new_message', {
-          ...finalMessage,
-          status: 'delivered'
-        });
+
+      // Emitir a todos los miembros de la conversación
+      if (savedMessage.conversationId) {
+        const roomName = `conversation-${savedMessage.conversationId}`;
+        console.log(`Emitiendo mensaje a la sala ${roomName}`);
+        io.to(roomName).emit('new_message', savedMessage);
       }
-      
-      // IMPORTANTE: Guardar el mensaje en la base de datos independientemente
-      // de si el destinatario está conectado o no
-      try {
-        const response = await fetch(API_ROUTES.messages.socket, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Socket-Internal-Auth-00123'
-          },
-          body: JSON.stringify({
-            content: message.content,
-            mediaUrl: message.mediaUrl || null,
-            messageType: message.messageType || 'text',
-            receiverId: message.receiverId,
-            senderId: message.senderId || (message.sender && message.sender.id),
-            conversationId: message.conversationId,
-            tempId: message.tempId || message.id
-          }),
-        });
-        
-        if (!response.ok) {
-          console.error('Error al guardar mensaje directo en DB:', await response.text());
-          socket.emit('message_status', {
-            messageId: message.id || message.tempId,
-            status: 'error'
-          });
-        } else {
-          console.log('Mensaje directo guardado en base de datos');
-          const savedMessage = await response.json();
-          
-          if (savedMessage && savedMessage.id) {
-            socket.emit('message_updated', {
-              tempId: message.tempId || message.id,
-              realId: savedMessage.id,
-              status: 'saved'
-            });
-            
-            if (receiverSocketId) {
-              io.to(receiverSocketId).emit('message_updated', {
-                tempId: message.tempId || message.id,
-                realId: savedMessage.id,
-                status: 'saved'
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error al guardar mensaje directo:', error);
-        socket.emit('message_status', {
-          messageId: message.id || message.tempId,
-          status: 'error'
-        });
-      }
+    } catch (error) {
+      console.error('Error al enviar mensaje:', error);
     }
   });
 
@@ -350,5 +279,6 @@ io.on('connection', (socket) => {
 
 // Iniciar servidor
 server.listen(SOCKET_PORT, () => {
+  const timestamp = new Date().toISOString();
   console.log(`Servidor Socket.io escuchando en puerto ${SOCKET_PORT}`);
 });

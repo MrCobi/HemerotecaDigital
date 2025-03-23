@@ -78,43 +78,84 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   
   // Estado para el socket
   const [socketInitialized, setSocketInitialized] = useState(false);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   
+  // Al principio del componente, asegurar que conversationId siempre sea string
+  const safeConversationId = conversationId || '';
+
   // Socket.io
-  const socket = useSocket({
+  const { 
+    socketInstance,
+    connected,
+    sendMessage: socketSendMessage,
+    updateTypingStatus: socketUpdateTypingStatus,
+    markMessageAsRead: socketMarkMessageAsRead,
+    joinConversation,
+    leaveConversation
+  } = useSocket({
     userId: currentUserId,
     username: session?.user?.name || session?.user?.username || undefined,
     onConnect: () => {
-      console.log('Socket conectado correctamente');
+      if (!connected) {
+        console.log('Socket conectado pero aún no listo');
+        return;
+      }
+      console.log(`Socket conectado en ChatWindow (${conversationId})`);
       setSocketInitialized(true);
+      
+      // Al conectar, unirse a la conversación si hay un ID válido
+      if (safeConversationId) {
+        joinConversation(safeConversationId);
+        
+        // Marcar mensajes como leídos
+        if (messages && messages.length > 0 && messages[messages.length - 1].id) {
+          socketMarkMessageAsRead({
+            conversationId: safeConversationId,
+            messageId: messages[messages.length - 1].id as string
+          });
+        }
+      }
     },
     onDisconnect: () => {
-      console.log('Socket desconectado');
+      console.log('Socket desconectado en ChatWindow');
       setSocketInitialized(false);
     },
-    onNewMessage: (message: MessageType) => {
-      if (message.conversationId === conversationId || 
+    onNewMessage: (message) => {
+      console.log('Nuevo mensaje recibido en ChatWindow:', message);
+      
+      // Si el mensaje pertenece a esta conversación, añadirlo
+      if (message.conversationId === safeConversationId || 
           (message.senderId === otherUser?.id && message.receiverId === currentUserId) ||
           (message.senderId === currentUserId && message.receiverId === otherUser?.id)) {
-        // Evitar duplicados
-        const messageExists = messages.some(m => m.id === message.id || m.tempId === message.id);
-        
-        if (!messageExists) {
-          console.log('Mensaje recibido:', message);
-          setMessages(prev => [...prev, message]);
-          // Si el mensaje es del otro usuario, marcarlo como leído
-          if (message.senderId === otherUser?.id && message.id) {
-            if (socket && socketInitialized) {
-              socket.markMessageAsRead({
-                messageId: message.id,
-                conversationId: message.conversationId || conversationId || ''
-              });
-            } else {
-              console.warn('Socket no disponible, no se puede marcar mensaje como leído');
-            }
+            
+        // Actualizar el estado de los mensajes
+        setMessages(prevMessages => {
+          // Evitar duplicados con mismo id o tempId
+          const exists = prevMessages.some(m => 
+            m.id === message.id || 
+            m.tempId === message.tempId ||
+            (m.tempId && message.tempId && m.tempId === message.tempId)
+          );
+          
+          if (exists) {
+            return prevMessages.map(m => {
+              if (m.tempId === message.tempId || m.id === message.id) {
+                return { ...m, ...message };
+              }
+              return m;
+            });
+          } else {
+            return [...prevMessages, message];
           }
+        });
+        
+        // Marcar automáticamente como leídos los mensajes recibidos
+        if (message.senderId !== currentUserId && message.id) {
+          socketMarkMessageAsRead({
+            conversationId: message.conversationId || safeConversationId,
+            messageId: message.id
+          });
         }
-      } else {
-        console.log('Mensaje ignorado por no pertenecer a esta conversación');
       }
     },
     onTypingStatus: (status) => {
@@ -181,7 +222,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
 
   // Cargar mensajes
   useEffect(() => {
-    if (!conversationId || !currentUserId || isFetchingRef.current) return;
+    if (!safeConversationId || !currentUserId || isFetchingRef.current) return;
     
     const fetchMessages = async () => {
       if (isFetchingRef.current) return;
@@ -191,7 +232,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       
       try {
         const response = await fetch(
-          `${API_ROUTES.messages.list}?with=${conversationId}&page=${page}&limit=${pageSize}`
+          `${API_ROUTES.messages.list}?with=${safeConversationId}&page=${page}&limit=${pageSize}`
         );
         
         if (!response.ok) {
@@ -209,7 +250,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         
         if (unreadMessages.length > 0) {
           unreadMessages.forEach((msg: Message) => {
-            markMessageAsRead(msg.id, conversationId);
+            markMessageAsRead(msg.id, safeConversationId);
           });
         }
         
@@ -226,11 +267,11 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     };
     
     fetchMessages();
-  }, [conversationId, currentUserId, otherUser?.id]);
+  }, [safeConversationId, currentUserId, otherUser?.id]);
 
   // Cargar más mensajes
   const loadMoreMessages = async () => {
-    if (!conversationId || isLoadingMore || !hasMore || isFetchingRef.current) return;
+    if (!safeConversationId || isLoadingMore || !hasMore || isFetchingRef.current) return;
     
     // Guardar la posición de scroll actual
     if (chatContainerRef.current) {
@@ -245,7 +286,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     try {
       const nextPage = page + 1;
       const response = await fetch(
-        `${API_ROUTES.messages.list}?with=${conversationId}&page=${nextPage}&limit=${pageSize}`
+        `${API_ROUTES.messages.list}?with=${safeConversationId}&page=${nextPage}&limit=${pageSize}`
       );
       
       if (!response.ok) {
@@ -279,33 +320,48 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
 
   // Manejar scroll automático
   useEffect(() => {
-    if (!isLoadingMessages && messagesEndRef.current && isAtBottom) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, isLoadingMessages, isAtBottom]);
+    const handleNewMessage = (message: MessageType) => {
+      if (message.conversationId === safeConversationId) {
+        setMessages(prev => {
+          const exists = prev.some(m => m.id === message.id || m.tempId === message.tempId);
+          return exists ? prev : [...prev, message];
+        });
 
-  // Detectar si el usuario está en el fondo del chat
-  const handleScroll = () => {
-    if (chatContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-      const isAtBottomNow = scrollHeight - scrollTop - clientHeight < 50;
-      setIsAtBottom(isAtBottomNow);
-      
-      // Cargar más mensajes si se llega arriba del todo
-      if (scrollTop === 0 && hasMore && !isLoadingMore) {
-        loadMoreMessages();
+        if (autoScrollEnabled) {
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'nearest'
+            });
+          }, 50);
+        }
       }
+    };
+
+    socketInstance?.on('new_message', handleNewMessage);
+    return () => {
+      socketInstance?.off('new_message', handleNewMessage);
+    };
+  }, [socketInstance, safeConversationId, autoScrollEnabled]);
+
+  // Detectar posición del scroll
+  const handleScroll = () => {
+    const element = chatContainerRef.current;
+    if (element) {
+      const isNearBottom = 
+        element.scrollHeight - element.scrollTop <= element.clientHeight + 100;
+      setAutoScrollEnabled(isNearBottom);
     }
   };
 
   // Enviar notificación de escritura
   const sendTypingNotification = useCallback((newMessage: string) => {
-    if (newMessage.trim().length > 0 && !isTyping && socket && socketInitialized) {
+    if (newMessage.trim().length > 0 && !isTyping && socketInstance && socketInitialized) {
       setIsTyping(true);
       
       // Enviar estado de "escribiendo" al receptor
       if (otherUser?.id) {
-        socket.updateTypingStatus({ conversationId, isTyping: true });
+        socketUpdateTypingStatus({ conversationId: safeConversationId, isTyping: true });
       }
       
       // Limpiar timeout anterior si existe
@@ -316,12 +372,12 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       // Establecer nuevo timeout para detener estado de "escribiendo" después de 3 segundos de inactividad
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
-        if (socket && socketInitialized && otherUser?.id) {
-          socket.updateTypingStatus({ conversationId, isTyping: false });
+        if (socketInstance && socketInitialized && otherUser?.id) {
+          socketUpdateTypingStatus({ conversationId: safeConversationId, isTyping: false });
         }
       }, 3000);
     }
-  }, [isTyping, socket, socketInitialized, otherUser?.id]);
+  }, [isTyping, socketInstance, socketInitialized, otherUser?.id]);
 
   // Enviar un mensaje
   const sendMessage = async () => {
@@ -335,7 +391,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       receiverId: otherUser.id,
       createdAt: new Date(),
       status: 'sending' as MessageStatus,
-      conversationId,
+      conversationId: safeConversationId,
     };
     
     // Añadir el mensaje a la UI inmediatamente
@@ -354,8 +410,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       // Emitir evento de "no está escribiendo"
       if (isTyping) {
         setIsTyping(false);
-        if (socket && socketInitialized) {
-          socket.updateTypingStatus({ conversationId, isTyping: false });
+        if (socketInstance && socketInitialized) {
+          socketUpdateTypingStatus({ conversationId: safeConversationId, isTyping: false });
         }
         if (typingTimeoutRef.current) {
           clearTimeout(typingTimeoutRef.current);
@@ -395,15 +451,15 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
                   ...msg,
                   id: messageData.id,
                   status: 'sent' as MessageStatus,
-                  conversationId: messageData.conversationId || conversationId,
+                  conversationId: messageData.conversationId || safeConversationId,
                 }
               : msg
           )
         );
         
         // Emitir evento de mensaje enviado a través de socket.io
-        if (socket && socketInitialized) {
-          socket.sendMessage({
+        if (socketInstance && socketInitialized) {
+          socketSendMessage({
             ...messageData,
             tempId,
           });
@@ -443,15 +499,15 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
 
   // Marcar mensaje como leído
   const markMessageAsRead = (messageId?: string, conversationId?: string) => {
-    if (!messageId || !conversationId || !socket || !socketInitialized) {
+    if (!messageId || !conversationId || !socketInstance || !socketInitialized) {
       console.warn('No se puede marcar mensaje como leído. Faltan datos o socket no disponible', {
-        messageId, conversationId, socketAvailable: !!socket
+        messageId, conversationId, socketAvailable: !!socketInstance
       });
       return;
     }
     
     console.log(`Marcando mensaje ${messageId} como leído`);
-    socket.markMessageAsRead({
+    socketMarkMessageAsRead({
       messageId: messageId,
       conversationId: conversationId
     });
@@ -478,7 +534,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
 
   // Cuando la conversación cambia, restablecer todo
   useEffect(() => {
-    if (conversationId) {
+    if (safeConversationId) {
       setMessages([]);
       setPage(1);
       setHasMore(true);
@@ -492,14 +548,14 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         messageInputRef.current.focus();
       }
     }
-  }, [conversationId]);
+  }, [safeConversationId]);
 
   // Enviar estado de "escribiendo"
   useEffect(() => {
-    if (!otherUser?.id || !socket || !socketInitialized) return;
+    if (!otherUser?.id || !socketInstance || !socketInitialized) return;
     
     if (isTyping) {
-      socket.updateTypingStatus({ conversationId, isTyping: true });
+      socketUpdateTypingStatus({ conversationId: safeConversationId, isTyping: true });
       
       // Limpiar timeout anterior si existe
       if (typingTimeoutRef.current) {
@@ -509,8 +565,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       // Establecer nuevo timeout para detener estado de "escribiendo" después de 3 segundos de inactividad
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
-        if (socket && socketInitialized) {
-          socket.updateTypingStatus({ conversationId, isTyping: false });
+        if (socketInstance && socketInitialized) {
+          socketUpdateTypingStatus({ conversationId: safeConversationId, isTyping: false });
         }
       }, 3000);
     }
@@ -520,7 +576,33 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         clearTimeout(typingTimeoutRef.current);
       }
     };
-  }, [currentUserId, isTyping, otherUser?.id, socket, socketInitialized]);
+  }, [currentUserId, isTyping, otherUser?.id, socketInstance, socketInitialized]);
+
+  // Unir a conversación cuando el socket esté listo
+  useEffect(() => {
+    if (socketInitialized && safeConversationId) {
+      console.log(`Uniendo a conversación ${safeConversationId}`);
+      joinConversation(safeConversationId);
+    }
+  }, [socketInitialized, safeConversationId, joinConversation]);
+
+  const fetchMessages = useCallback(async (conversationId: string) => {
+    try {
+      const response = await fetch(`/api/messages?conversationId=${conversationId}`);
+      const messages = await response.json();
+      setMessages(messages);
+    } catch (error) {
+      console.error('Error cargando mensajes:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (socketInitialized && safeConversationId) {
+      console.log(`Uniendo a conversación ${safeConversationId}`);
+      joinConversation(safeConversationId);
+      fetchMessages(safeConversationId);
+    }
+  }, [socketInitialized, safeConversationId, joinConversation, fetchMessages]);
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
