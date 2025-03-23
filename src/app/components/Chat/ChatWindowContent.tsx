@@ -6,7 +6,8 @@ import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
 import { Send, X, Mic, Play, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { flushSync } from 'react-dom';
 import useSocket, { MessageType } from '@/src/hooks/useSocket';
 import { API_ROUTES } from '@/src/config/api-routes';
@@ -42,6 +43,326 @@ type ChatWindowContentProps = {
 
 type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'error';
 
+// Componente para mostrar separadores de fecha entre mensajes
+const DateSeparator = ({ date }: { date: Date | string }) => {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  let displayDate;
+  
+  if (isToday(dateObj)) {
+    displayDate = 'Hoy';
+  } else if (isYesterday(dateObj)) {
+    displayDate = 'Ayer';
+  } else {
+    // Formato simple para evitar problemas de compatibilidad
+    const day = dateObj.getDate();
+    const month = dateObj.toLocaleString('es-ES', { month: 'long' });
+    const year = dateObj.getFullYear();
+    displayDate = `${day} ${month} ${year}`;
+  }
+  
+  return (
+    <div className="flex items-center justify-center my-4">
+      <div className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-3 py-1 rounded-full">
+        {displayDate}
+      </div>
+    </div>
+  );
+};
+
+// Componente Message separado para manejar cada mensaje individualmente y evitar problemas de renderizado
+const MessageItem = React.memo(({ 
+  message, 
+  currentUserId,
+  otherUser,
+  showAvatar,
+  showDateSeparator,
+  index,
+  session
+}: { 
+  message: Message, 
+  currentUserId: string,
+  otherUser: User | null,
+  showAvatar: boolean,
+  showDateSeparator: boolean,
+  index: number,
+  session: any
+}) => {
+  const isCurrentUser = message.senderId === currentUserId;
+  
+  return (
+    <>
+      {/* Separador de fecha cuando cambia el día */}
+      {showDateSeparator && (
+        <DateSeparator date={message.createdAt} />
+      )}
+      
+      <div
+        className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} items-end gap-2`}
+      >
+        {!isCurrentUser && showAvatar && (
+          <Avatar className="h-8 w-8 flex-shrink-0">
+            {otherUser?.image ? (
+              <AvatarImage src={otherUser.image} alt={otherUser.username || 'Usuario'} />
+            ) : (
+              <AvatarFallback>
+                {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
+              </AvatarFallback>
+            )}
+          </Avatar>
+        )}
+        
+        <div className={`flex flex-col ${!isCurrentUser && showAvatar ? 'ml-0' : !isCurrentUser ? 'ml-10' : ''}`}>
+          <div
+            className={cn(
+              'max-w-xs md:max-w-md p-3 rounded-lg',
+              isCurrentUser
+                ? 'bg-blue-500 text-white rounded-br-none'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'
+            )}
+          >
+            {/* Mostrar reproductor de audio si es un mensaje de voz */}
+            {message.messageType === 'voice' && message.mediaUrl ? (
+              <div className="flex flex-col space-y-1 w-full">
+                <div className="flex items-center space-x-2">
+                  <VoiceMessagePlayer mediaUrl={message.mediaUrl} isCurrentUser={isCurrentUser} />
+                </div>
+              </div>
+            ) : (
+              <div className="whitespace-pre-wrap break-words">{message.content}</div>
+            )}
+          </div>
+          
+          <div className={`flex items-center mt-1 text-xs text-gray-500 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+            <span>
+              {message.createdAt &&
+                format(
+                  typeof message.createdAt === 'string'
+                    ? new Date(message.createdAt)
+                    : message.createdAt,
+                  'HH:mm'
+                )}
+            </span>
+            
+            {isCurrentUser && message.status && (
+              <span className="ml-2">
+                {message.status === 'sending' && <span>Enviando...</span>}
+                {message.status === 'sent' && <span>Enviado</span>}
+                {message.status === 'delivered' && <span>Entregado</span>}
+                {message.status === 'read' && <span>Leído</span>}
+                {message.status === 'error' && <span className="text-red-500">Error</span>}
+              </span>
+            )}
+          </div>
+        </div>
+        
+        {isCurrentUser && showAvatar && (
+          <Avatar className="h-8 w-8 flex-shrink-0">
+            {session?.user?.image ? (
+              <AvatarImage src={session.user.image} alt={session.user.name || 'Usuario'} />
+            ) : (
+              <AvatarFallback>
+                {session?.user?.name?.charAt(0).toUpperCase() || 'U'}
+              </AvatarFallback>
+            )}
+          </Avatar>
+        )}
+      </div>
+    </>
+  );
+});
+
+MessageItem.displayName = 'MessageItem';
+
+const VoiceMessagePlayer = React.memo(({ 
+  mediaUrl, 
+  isCurrentUser 
+}: { 
+  mediaUrl: string; 
+  isCurrentUser: boolean 
+}) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Cargar los metadatos del audio cuando el componente se monta
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    
+    const audio = new Audio();
+    audio.preload = "metadata";
+    audioRef.current = audio;
+    
+    // Evento para cuando los metadatos están cargados (duración disponible)
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration);
+      setIsLoading(false);
+    };
+    
+    // Evento para actualizar tiempo durante reproducción
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+    
+    // Cuando termina la reproducción
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+    
+    // Manejar errores de carga
+    const handleError = () => {
+      console.error("Error cargando audio:", audio.error);
+      setError("Error al cargar el audio");
+      setIsLoading(false);
+    };
+    
+    // Registrar todos los event listeners
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
+    
+    // Iniciar carga del audio
+    audio.src = mediaUrl;
+    
+    // Limpieza al desmontar
+    return () => {
+      audio.pause();
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
+      audio.src = "";
+    };
+  }, [mediaUrl]);
+  
+  // Alternar reproducción/pausa
+  const togglePlayPause = () => {
+    if (!audioRef.current || isLoading) return;
+    
+    if (error) {
+      // Reintentar reproducción si hubo un error
+      setIsLoading(true);
+      setError(null);
+      if (audioRef.current) {
+        audioRef.current.load();
+        return;
+      }
+    }
+    
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      // Intentar cargar y luego reproducir
+      const playPromise = audioRef.current.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch(error => {
+            console.error("Error reproduciendo audio:", error);
+            setError("Error al reproducir");
+            setIsPlaying(false);
+          });
+      }
+    }
+  };
+  
+  // Formatear segundos a MM:SS
+  const formatTime = (seconds: number) => {
+    // Protección contra valores no válidos
+    if (!seconds || isNaN(seconds) || !isFinite(seconds)) {
+      return "0:00";
+    }
+    
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+  
+  // Generar la forma de onda visual (simplificada para el ejemplo)
+  const renderWaveform = () => {
+    // En un caso real, usarías los datos del audio para generar una forma de onda más precisa
+    const barCount = 20;
+    const bars = [];
+    
+    for (let i = 0; i < barCount; i++) {
+      // Calcula qué tan llena debería estar la barra en función del progreso
+      const isFilled = (currentTime / duration) * barCount > i;
+      
+      // Altura aleatoria para simular una forma de onda (en un caso real, usarías datos del audio)
+      const heightPercentage = 30 + Math.random() * 70;
+      
+      bars.push(
+        <div 
+          key={i} 
+          className={`w-1 mx-[1px] rounded-full ${
+            isFilled 
+              ? isCurrentUser ? 'bg-white/90' : 'bg-gray-800 dark:bg-white/80' 
+              : isCurrentUser ? 'bg-white/30' : 'bg-gray-400 dark:bg-white/30'
+          }`}
+          style={{ height: `${heightPercentage}%` }}
+        />
+      );
+    }
+    
+    return (
+      <div className="flex items-center h-8 flex-1 mx-2">
+        {bars}
+      </div>
+    );
+  };
+  
+  return (
+    <div className="flex items-center space-x-2 w-full min-w-[180px] max-w-[250px]">
+      {/* Botón de reproducción/pausa/carga */}
+      <button 
+        onClick={togglePlayPause}
+        disabled={isLoading}
+        className={`flex-shrink-0 rounded-full p-1.5 ${
+          isCurrentUser 
+            ? 'bg-white/25 hover:bg-white/40' 
+            : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+        } ${isLoading ? 'opacity-50 cursor-wait' : ''}`}
+        aria-label={isPlaying ? "Pausar" : isLoading ? "Cargando" : "Reproducir"}
+      >
+        {isLoading ? (
+          <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ 
+              borderColor: isCurrentUser ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)', 
+              borderTopColor: 'transparent' 
+            }}
+          />
+        ) : isPlaying ? (
+          <Pause size={16} className={isCurrentUser ? "text-white" : "text-gray-800 dark:text-white"} />
+        ) : (
+          <Play size={16} className={isCurrentUser ? "text-white" : "text-gray-800 dark:text-white"} />
+        )}
+      </button>
+      
+      {/* Visualización tipo waveform */}
+      {renderWaveform()}
+      
+      {/* Duración o mensaje de error */}
+      <span className={`text-xs flex-shrink-0 ${
+        isCurrentUser ? 'text-white/80' : 'text-gray-500 dark:text-gray-300'
+      }`}>
+        {error ? "Error" : isLoading ? "..." : duration > 0 ? formatTime(isPlaying ? currentTime : duration) : "0:00"}
+      </span>
+    </div>
+  );
+});
+
+VoiceMessagePlayer.displayName = 'VoiceMessagePlayer';
+
 export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   otherUser,
   conversationId,
@@ -50,13 +371,15 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   const { data: session } = useSession();
   const currentUserId = session?.user?.id;
   const [messages, setMessages] = useState<Message[]>([]);
+  const [processedMessageIds, setProcessedMessageIds] = useState<Set<string>>(new Set());
+  const [messageMap, setMessageMap] = useState<Map<string, Message>>(new Map());
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isVoiceRecorderVisible, setIsVoiceRecorderVisible] = useState(false);
   const [canSendMessages, setCanSendMessages] = useState<boolean | null>(null);
   const [isCheckingRelationship, setIsCheckingRelationship] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
   const [isTyping, setIsTyping] = useState(false);
@@ -79,6 +402,9 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   
   // Para prevenir solicitudes duplicadas
   const isFetchingRef = useRef(false);
+  
+  // Ref para rastrear cambios de conversación
+  const lastConversationIdRef = useRef<string | null>(null);
   
   // Estado para el socket
   const [socketInitialized, setSocketInitialized] = useState(false);
@@ -133,25 +459,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           (message.senderId === currentUserId && message.receiverId === otherUser?.id)) {
             
         // Actualizar el estado de los mensajes
-        setMessages(prevMessages => {
-          // Evitar duplicados con mismo id o tempId
-          const exists = prevMessages.some(m => 
-            m.id === message.id || 
-            m.tempId === message.tempId ||
-            (m.tempId && message.tempId && m.tempId === message.tempId)
-          );
-          
-          if (exists) {
-            return prevMessages.map(m => {
-              if (m.tempId === message.tempId || m.id === message.id) {
-                return { ...m, ...message };
-              }
-              return m;
-            });
-          } else {
-            return [...prevMessages, message];
-          }
-        });
+        processMessages([message], messages);
         
         // Marcar automáticamente como leídos los mensajes recibidos
         if (message.senderId !== currentUserId && message.id) {
@@ -172,16 +480,80 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       updateMessageStatus(status.messageId, status.status as MessageStatus);
     },
     onMessageRead: (data) => {
-      // Actualizar mensaje como leído
-      setMessages(prev => 
-        prev.map((msg: Message) => 
-          (msg.id === data.messageId || msg.tempId === data.messageId) 
-            ? { ...msg, read: true, status: 'read' } 
-            : msg
-        )
-      );
+      // Buscar el mensaje en nuestro estado actual por su ID
+      const foundMessage = messages.find(msg => msg.id === data.messageId);
+      
+      // Solo procesar si encontramos el mensaje
+      if (foundMessage) {
+        // Crear una versión actualizada del mensaje con el estado de lectura
+        const updatedMessage: Message = {
+          ...foundMessage,
+          read: true,
+          status: 'read'
+        };
+        
+        // Actualizar el mensaje utilizando nuestra función de procesamiento
+        processMessages([updatedMessage], messages);
+      }
     }
   });
+
+  // Función para procesar y deduplicar mensajes
+  const processMessages = useCallback((newMessages: Message[], existingMessages: Message[] = []) => {
+    // Evitar procesar mensajes vacíos
+    if (!newMessages || newMessages.length === 0) return existingMessages;
+    
+    // Clonar el mapa actual para trabajar sobre una copia
+    const updatedMap = new Map(messageMap);
+    
+    // Añadir los nuevos mensajes, reemplazando cualquier mensaje temporal con su versión final si tiene ID
+    newMessages.forEach(msg => {
+      const key = msg.id || msg.tempId || `temp-${msg.senderId}-${Date.parse(msg.createdAt as string)}`;
+      
+      // Si es un mensaje con ID real, reemplaza cualquier versión temporal
+      if (msg.id) {
+        // Buscar y reemplazar mensajes temporales relacionados
+        if (msg.tempId) {
+          const tempKey = msg.tempId;
+          if (updatedMap.has(tempKey)) {
+            updatedMap.delete(tempKey);
+          }
+        }
+        updatedMap.set(key, msg);
+      } 
+      // Si no tiene ID pero tiene tempId, solo añadirlo si no existe ya
+      else if (msg.tempId && !updatedMap.has(key)) {
+        updatedMap.set(key, msg);
+      }
+      // Para otros mensajes sin ID ni tempId, añadirlos solo si no existen
+      else if (!updatedMap.has(key)) {
+        updatedMap.set(key, msg);
+      }
+    });
+    
+    // Actualizar el estado del mapa de mensajes
+    setMessageMap(updatedMap);
+    
+    // Convertir el mapa a un array y ordenar por fecha de creación
+    const uniqueMessages = Array.from(updatedMap.values()).sort((a, b) => {
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    return uniqueMessages;
+  }, [messageMap]);
+
+  // Actualizar el estado de mensajes cuando cambia el mapa
+  useEffect(() => {
+    const uniqueMessages = Array.from(messageMap.values()).sort((a, b) => {
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    setMessages(uniqueMessages);
+  }, [messageMap]);
 
   // Verificar si los usuarios se siguen mutuamente
   useEffect(() => {
@@ -224,54 +596,85 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     checkMutualFollow();
   }, [currentUserId, otherUser?.id]);
 
-  // Cargar mensajes
+  // Cargar mensajes cuando cambia la conversación o al iniciar
   useEffect(() => {
-    if (!safeConversationId || !currentUserId || isFetchingRef.current) return;
+    // No hacer nada si no hay ID de conversación o ya se están cargando
+    if (!safeConversationId || isFetchingRef.current) return;
     
-    const fetchMessages = async () => {
+    // Guardar el ID de conversación actual para detectar cambios
+    const currentConversationId = safeConversationId;
+    
+    // Limpiar mensajes si cambia la conversación
+    if (lastConversationIdRef.current !== safeConversationId) {
+      setPage(1);
+      setHasMore(true);
+      setMessages([]);
+      setMessageMap(new Map());
+      lastConversationIdRef.current = safeConversationId;
+    }
+    
+    // Función para obtener mensajes
+    const fetchMessages = async (pageNum = 1, existingMsgs: Message[] = []) => {
+      // Prevenir múltiples peticiones simultáneas
       if (isFetchingRef.current) return;
       isFetchingRef.current = true;
+      
+      // No ejecutar la petición si el ID de conversación ha cambiado mientras se cargaba
+      if (currentConversationId !== safeConversationId) {
+        isFetchingRef.current = false;
+        return;
+      }
+      
       setIsLoadingMessages(true);
-      setErrorLoadingMessages(null);
+      setErrorLoadingMessages('');
       
       try {
+        // Verificar que tenemos los datos necesarios
+        if (!safeConversationId || !currentUserId || !otherUser?.id) {
+          throw new Error('Faltan datos necesarios para cargar mensajes');
+        }
+        
         const response = await fetch(
-          `${API_ROUTES.messages.list}?with=${safeConversationId}&page=${page}&limit=${pageSize}`
+          `${API_ROUTES.messages.list}?with=${safeConversationId}&page=${pageNum}&limit=${pageSize}`
         );
         
         if (!response.ok) {
           throw new Error('Error al cargar los mensajes');
         }
         
-        const data = await response.json();
-        // Garantizar que data.messages siempre es un array, incluso si está vacío
-        const fetchedMessages = Array.isArray(data.messages) ? data.messages : [];
-        
-        // Marcar automáticamente como leídos los mensajes recibidos
-        const unreadMessages = fetchedMessages.filter(
-          (msg: Message) => msg.senderId === otherUser?.id && !msg.read
-        );
-        
-        if (unreadMessages.length > 0) {
-          unreadMessages.forEach((msg: Message) => {
-            markMessageAsRead(msg.id, safeConversationId);
-          });
+        // Verificar nuevamente si el ID de conversación ha cambiado durante la carga
+        if (currentConversationId !== safeConversationId) {
+          isFetchingRef.current = false;
+          return;
         }
         
-        setMessages(fetchedMessages);
+        const data = await response.json();
+        const fetchedMessages = Array.isArray(data.messages) ? data.messages : [];
+        
+        // Procesar y combinar mensajes evitando duplicados
+        const combinedMessages = [...existingMsgs, ...fetchedMessages];
+        const uniqueMessages = processMessages(combinedMessages, []);
+        
+        setMessages(uniqueMessages);
         setHasMore(fetchedMessages.length === pageSize);
+        setPage(pageNum);
         
       } catch (error) {
         console.error('Error al cargar los mensajes:', error);
         setErrorLoadingMessages('No se pudieron cargar los mensajes. Inténtalo de nuevo.');
       } finally {
-        setIsLoadingMessages(false);
+        if (pageNum === 1 || !hasMore) {
+          setIsLoadingMessages(false);
+        }
         isFetchingRef.current = false;
       }
     };
     
     fetchMessages();
-  }, [safeConversationId, currentUserId, otherUser?.id]);
+    
+    // Solo incluir safeConversationId como dependencia para evitar el bucle infinito
+    // Las otras variables las capturamos en el closure
+  }, [safeConversationId, hasMore, pageSize]);
 
   // Cargar más mensajes
   const loadMoreMessages = async () => {
@@ -300,7 +703,9 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       const data = await response.json();
       const oldMessages = Array.isArray(data.messages) ? data.messages : [];
       
-      setMessages(prev => [...oldMessages, ...prev]);
+      // Usar la función processMessages para manejar la deduplicación
+      processMessages(oldMessages, messages);
+      
       setPage(nextPage);
       setHasMore(oldMessages.length === pageSize);
       
@@ -326,11 +731,9 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   useEffect(() => {
     const handleNewMessage = (message: MessageType) => {
       if (message.conversationId === safeConversationId) {
-        setMessages(prev => {
-          const exists = prev.some(m => m.id === message.id || m.tempId === message.tempId);
-          return exists ? prev : [...prev, message];
-        });
-
+        // Procesar el nuevo mensaje con nuestra función de deduplicación
+        processMessages([message], messages);
+        
         if (autoScrollEnabled) {
           setTimeout(() => {
             messagesEndRef.current?.scrollIntoView({
@@ -346,7 +749,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     return () => {
       socketInstance?.off('new_message', handleNewMessage);
     };
-  }, [socketInstance, safeConversationId, autoScrollEnabled]);
+  }, [socketInstance, safeConversationId, autoScrollEnabled, messages, processMessages]);
 
   // Detectar posición del scroll
   const handleScroll = () => {
@@ -408,7 +811,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   const sendMessage = async () => {
     if (!newMessage.trim() || isSending || !otherUser || !canSendMessages) return;
     
-    const tempId = `temp-${Date.now()}`;
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const messageContent = newMessage.trim();
     setNewMessage('');
     setIsSending(true);
@@ -425,10 +828,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         conversationId: safeConversationId,
       };
       
-      // Añadir el mensaje a la lista local
-      flushSync(() => {
-        setMessages([...messages, messageToSend]);
-      });
+      // Añadir mensaje al estado local usando la función de procesamiento
+      processMessages([messageToSend], messages);
       
       await sendMessageToServer(messageToSend, tempId);
     } catch (error) {
@@ -481,7 +882,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       console.log('Audio subido correctamente, URL:', audioUrl);
       
       // Crear mensaje temporal
-      const tempId = `voice-${Date.now()}`;
+      const tempId = `voice-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const messageToSend: Message = {
         tempId,
         content: '',
@@ -494,10 +895,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         conversationId: conversationId || '',
       };
       
-      // Añadir el mensaje a la lista local
-      flushSync(() => {
-        setMessages([...messages, messageToSend]);
-      });
+      // Añadir mensaje al estado local usando la función de procesamiento
+      processMessages([messageToSend], messages);
       
       // Ocultar el grabador de voz DESPUÉS de enviar el mensaje
       // setIsVoiceRecorderVisible(false);
@@ -529,20 +928,22 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
       
       // Enviar el mensaje a través de la API
+      const requestBody = {
+        content: message.content,
+        receiverId: otherUser.id,
+        conversationId: safeConversationId || undefined,
+        mediaUrl: message.mediaUrl,
+        messageType: message.messageType || 'text',
+        tempId
+      };
+      
       const response = await fetch('/api/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.user?.email || ''}`,
         },
-        body: JSON.stringify({
-          receiverId: otherUser.id,
-          content: message.content,
-          tempId,
-          mediaUrl: message.mediaUrl,
-          messageType: message.messageType,
-          conversationId: message.conversationId || conversationId
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       if (!response.ok) {
@@ -551,65 +952,63 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       
       const data = await response.json();
       
-      // Determine if message is at root level or in a nested 'message' property
-      const messageData = data.message || data;
-      
-      // Check if we have valid message data with an ID
-      if (messageData && messageData.id) {
-        console.log('Mensaje enviado con éxito:', messageData);
+      if (response.ok) {
+        const messageData = data.message || data;
         
-        setMessages(prev =>
-          prev.map((msg: Message) =>
-            msg.tempId === tempId
-              ? {
-                  ...msg,
-                  id: messageData.id,
-                  status: 'sent',
-                  conversationId: messageData.conversationId || conversationId,
-                }
-              : msg
-          )
-        );
-        
-        // No es necesario emitir el evento por socket.io, ya que la API notifica al servidor socket
-        // y esto causa duplicación de mensajes
-        
-        // Borrar el comentario siguiente para depuración si es necesario
-        // console.log('Mensaje enviado al servidor, esperando notificación bidireccional vía socket');
+        if (messageData && messageData.id) {
+          console.log('Mensaje enviado con éxito:', messageData);
+          
+          // Actualizar el mensaje con la información del servidor
+          const updatedMessage: Message = { 
+            ...message, 
+            id: messageData.id, 
+            status: 'sent' as MessageStatus,
+          };
+          
+          processMessages([updatedMessage], messages);
+          
+          // No es necesario emitir el evento por socket.io, ya que la API notifica al servidor socket
+          // y esto causa duplicación de mensajes
+          
+          return true;
+        } else {
+          console.error('Respuesta de API inválida:', data);
+          // Marcar el mensaje como error
+          const errorMessage: Message = {
+            ...message,
+            status: 'error' as MessageStatus
+          };
+          
+          processMessages([errorMessage], messages);
+          return false;
+        }
       } else {
-        console.error('Respuesta de API inválida:', data);
-        // Marcar el mensaje como error
-        setMessages(prev =>
-          prev.map((msg: Message) =>
-            msg.tempId === tempId
-              ? {
-                  ...msg,
-                  status: 'error',
-                }
-              : msg
-          )
-        );
+        // Manejar errores HTTP
+        console.error('Error al enviar el mensaje:', data.error || 'Error desconocido');
+        
+        // Actualizar el estado del mensaje a error
+        const errorMessage: Message = {
+          ...message,
+          status: 'error' as MessageStatus
+        };
+        
+        processMessages([errorMessage], messages);
+        return false;
       }
-      
-      // Restablecer el estado de envío después de completar la operación
-      setIsSending(false);
-      
     } catch (error) {
       console.error('Error al enviar el mensaje:', error);
       
       // Actualizar el estado del mensaje a error
-      setMessages(prev =>
-        prev.map((msg: Message) =>
-          msg.tempId === tempId
-            ? { ...msg, status: 'error' }
-            : msg
-        )
-      );
+      const errorMessage: Message = {
+        ...message,
+        status: 'error' as MessageStatus
+      };
+      
+      processMessages([errorMessage], messages);
       
       // Restablecer el estado de envío incluso en caso de error
       setIsSending(false);
-      
-      alert('No se pudo enviar el mensaje. Inténtalo de nuevo.');
+      return false;
     }
   };
 
@@ -630,14 +1029,21 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   };
 
   // Actualizar estado de un mensaje
-  const updateMessageStatus = (messageId: string, status: MessageStatus) => {
-    setMessages(prev =>
-      prev.map((msg: Message) =>
-        (msg.id === messageId || msg.tempId === messageId)
-          ? { ...msg, status }
-          : msg
-      )
-    );
+  const updateMessageStatus = (messageId: string, newStatus: MessageStatus) => {
+    // Buscar el mensaje en nuestro estado para actualizarlo
+    const messageToUpdate = messages.find(msg => msg.id === messageId || msg.tempId === messageId);
+    
+    // Solo actualizar si encontramos el mensaje
+    if (messageToUpdate) {
+      // Crear una versión actualizada del mensaje con el nuevo estado
+      const updatedMessage: Message = {
+        ...messageToUpdate,
+        status: newStatus
+      };
+      
+      // Procesar la actualización
+      processMessages([updatedMessage], messages);
+    }
   };
 
   // Manejar tecla Enter para enviar
@@ -702,24 +1108,6 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     }
   }, [socketInitialized, safeConversationId, joinConversation]);
 
-  const fetchMessages = useCallback(async (conversationId: string) => {
-    try {
-      const response = await fetch(`/api/messages?conversationId=${conversationId}`);
-      const messages = await response.json();
-      setMessages(messages);
-    } catch (error) {
-      console.error('Error cargando mensajes:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (socketInitialized && safeConversationId) {
-      console.log(`Uniendo a conversación ${safeConversationId}`);
-      joinConversation(safeConversationId);
-      fetchMessages(safeConversationId);
-    }
-  }, [socketInitialized, safeConversationId, joinConversation, fetchMessages]);
-
   return (
     <div className={cn("flex flex-col h-full", className)}>
       {/* Contenedor de mensajes */}
@@ -761,114 +1149,64 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
               </div>
             )}
             
-            {/* Lista de mensajes */}
-            {messages.map((message, index) => {
-              const isCurrentUser = message.senderId === currentUserId;
-              const showAvatar = 
-                index === 0 || 
-                messages[index - 1].senderId !== message.senderId;
+            {/* Renderizar cada mensaje con su propia clave única basada en índice */}
+            <div className="space-y-4">
+              {messages.map((message, index) => {
+                const isCurrentUser = message.senderId === currentUserId;
+                const showAvatar = 
+                  index === 0 || 
+                  messages[index - 1].senderId !== message.senderId;
+                
+                // Determinar si necesitamos mostrar un separador de fecha
+                const showDateSeparator = index === 0 || !isSameDay(
+                  new Date(message.createdAt),
+                  new Date(messages[index - 1].createdAt)
+                );
+                
+                // Crear una clave única y garantizada para cada mensaje
+                // Usamos una combinación de índice, id/tempId y timestamp para asegurar unicidad
+                const messageKey = `msg-${index}-${message.id || message.tempId || Date.now()}`;
+                
+                return (
+                  <div key={messageKey}>
+                    <MessageItem
+                      message={message}
+                      currentUserId={currentUserId || ''}
+                      otherUser={otherUser}
+                      showAvatar={showAvatar}
+                      showDateSeparator={showDateSeparator}
+                      index={index}
+                      session={session}
+                    />
+                  </div>
+                );
+              })}
               
-              return (
-                <div
-                  key={`${message.id || message.tempId || 'msg'}-${index}`}
-                  className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} items-end gap-2`}
-                >
-                  {!isCurrentUser && showAvatar && (
-                    <Avatar className="h-8 w-8 flex-shrink-0">
-                      {otherUser?.image ? (
-                        <AvatarImage src={otherUser.image} alt={otherUser.username || 'Usuario'} />
-                      ) : (
-                        <AvatarFallback>
-                          {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                  )}
-                  
-                  <div className={`flex flex-col ${!isCurrentUser && showAvatar ? 'ml-0' : !isCurrentUser ? 'ml-10' : ''}`}>
-                    <div
-                      className={cn(
-                        'max-w-xs md:max-w-md p-3 rounded-lg',
-                        isCurrentUser
-                          ? 'bg-blue-500 text-white rounded-br-none'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'
-                      )}
-                    >
-                      {/* Mostrar reproductor de audio si es un mensaje de voz */}
-                      {message.messageType === 'voice' && message.mediaUrl ? (
-                        <div className="flex flex-col space-y-2">
-                          <span className={`text-xs ${isCurrentUser ? 'text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>
-                            Mensaje de voz
-                          </span>
-                          <audio 
-                            controls 
-                            src={message.mediaUrl} 
-                            className={`max-w-full rounded-md ${isCurrentUser ? 'audio-player-light' : 'audio-player-dark'}`}
-                            controlsList="nodownload"
-                            preload="metadata"
-                          />
-                        </div>
-                      ) : (
-                        <div className="text-sm break-words whitespace-pre-wrap">
-                          {message.content}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className={`flex items-center mt-1 text-xs text-gray-500 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
-                      <span>
-                        {message.createdAt &&
-                          format(
-                            typeof message.createdAt === 'string'
-                              ? new Date(message.createdAt)
-                              : message.createdAt,
-                            'HH:mm'
-                          )}
-                      </span>
-                      
-                      {isCurrentUser && (
-                        <span className="ml-1">
-                          {message.status === 'sending' && 'Enviando...'}
-                          {message.status === 'sent' && '✓'}
-                          {message.status === 'delivered' && '✓✓'}
-                          {message.status === 'read' && (
-                            <span className="text-blue-500">✓✓</span>
-                          )}
-                          {message.status === 'error' && (
-                            <span className="text-red-500">Error</span>
-                          )}
-                        </span>
-                      )}
-                    </div>
+              {/* Indicador de escritura */}
+              {peerIsTyping && (
+                <div className="flex items-end gap-2">
+                  <Avatar className="h-8 w-8">
+                    {otherUser?.image ? (
+                      <AvatarImage src={otherUser.image} alt={otherUser.username || 'Usuario'} />
+                    ) : (
+                      <AvatarFallback>
+                        {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <div className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg text-sm">
+                    <span className="typing-indicator">
+                      <span className="dot"></span>
+                      <span className="dot"></span>
+                      <span className="dot"></span>
+                    </span>
                   </div>
                 </div>
-              );
-            })}
-            
-            {/* Indicador de escritura */}
-            {peerIsTyping && (
-              <div className="flex items-end gap-2">
-                <Avatar className="h-8 w-8">
-                  {otherUser?.image ? (
-                    <AvatarImage src={otherUser.image} alt={otherUser.username || 'Usuario'} />
-                  ) : (
-                    <AvatarFallback>
-                      {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                <div className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg text-sm">
-                  <span className="typing-indicator">
-                    <span className="dot"></span>
-                    <span className="dot"></span>
-                    <span className="dot"></span>
-                  </span>
-                </div>
-              </div>
-            )}
-            
-            {/* Elemento para el scroll automático */}
-            <div ref={messagesEndRef} />
+              )}
+              
+              {/* Elemento para el scroll automático */}
+              <div ref={messagesEndRef} />
+            </div>
           </>
         )}
       </div>
