@@ -383,6 +383,27 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     }
   }, [isTyping, socketInstance, socketInitialized, otherUser?.id]);
 
+  // Monitoreo de estado para evitar que la mensajería quede bloqueada
+  useEffect(() => {
+    // Timeout de seguridad para evitar que isSending quede atascado en true
+    let sendingTimeout: NodeJS.Timeout | null = null;
+    
+    if (isSending) {
+      console.log('Estado de envío activado, configurando timeout de seguridad');
+      // Si después de 10 segundos todavía está en "enviando", lo reseteamos
+      sendingTimeout = setTimeout(() => {
+        console.log('⚠️ Timeout de seguridad activado - reseteando estado de envío');
+        setIsSending(false);
+      }, 10000);
+    }
+    
+    return () => {
+      if (sendingTimeout) {
+        clearTimeout(sendingTimeout);
+      }
+    };
+  }, [isSending]);
+
   // Enviar un mensaje
   const sendMessage = async () => {
     if (!newMessage.trim() || isSending || !otherUser || !canSendMessages) return;
@@ -392,23 +413,28 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     setNewMessage('');
     setIsSending(true);
     
-    // Crear objeto de mensaje temporal
-    const messageToSend: Message = {
-      tempId,
-      content: messageContent,
-      senderId: currentUserId as string,
-      receiverId: otherUser.id,
-      createdAt: new Date(),
-      status: 'sending',
-      conversationId: safeConversationId,
-    };
-    
-    // Añadir el mensaje a la lista local
-    flushSync(() => {
-      setMessages([...messages, messageToSend]);
-    });
-    
-    await sendMessageToServer(messageToSend, tempId);
+    try {
+      // Crear objeto de mensaje temporal
+      const messageToSend: Message = {
+        tempId,
+        content: messageContent,
+        senderId: currentUserId as string,
+        receiverId: otherUser.id,
+        createdAt: new Date(),
+        status: 'sending',
+        conversationId: safeConversationId,
+      };
+      
+      // Añadir el mensaje a la lista local
+      flushSync(() => {
+        setMessages([...messages, messageToSend]);
+      });
+      
+      await sendMessageToServer(messageToSend, tempId);
+    } catch (error) {
+      console.error('Error inesperado al enviar mensaje:', error);
+      setIsSending(false);
+    }
   };
 
   // Nueva función para enviar mensaje de voz
@@ -565,6 +591,9 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         );
       }
       
+      // Restablecer el estado de envío después de completar la operación
+      setIsSending(false);
+      
     } catch (error) {
       console.error('Error al enviar el mensaje:', error);
       
@@ -576,6 +605,9 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
             : msg
         )
       );
+      
+      // Restablecer el estado de envío incluso en caso de error
+      setIsSending(false);
       
       alert('No se pudo enviar el mensaje. Inténtalo de nuevo.');
     }
