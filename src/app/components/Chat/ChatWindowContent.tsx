@@ -511,26 +511,26 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     
     // Añadir los nuevos mensajes, reemplazando cualquier mensaje temporal con su versión final si tiene ID
     newMessages.forEach(msg => {
-      const key = msg.id || msg.tempId || `temp-${msg.senderId}-${Date.parse(msg.createdAt as string)}`;
-      
-      // Si es un mensaje con ID real, reemplaza cualquier versión temporal
+      // Usamos el ID como clave principal si existe
       if (msg.id) {
-        // Buscar y reemplazar mensajes temporales relacionados
-        if (msg.tempId) {
-          const tempKey = msg.tempId;
-          if (updatedMap.has(tempKey)) {
-            updatedMap.delete(tempKey);
-          }
+        // Si el mensaje tiene ID, es un mensaje confirmado por el servidor
+        updatedMap.set(msg.id, msg);
+        
+        // Si este mensaje tenía un tempId, eliminar la versión temporal
+        if (msg.tempId && updatedMap.has(msg.tempId)) {
+          updatedMap.delete(msg.tempId);
         }
-        updatedMap.set(key, msg);
       } 
-      // Si no tiene ID pero tiene tempId, solo añadirlo si no existe ya
-      else if (msg.tempId && !updatedMap.has(key)) {
-        updatedMap.set(key, msg);
+      // Si no tiene ID pero tiene tempId, usamos el tempId como clave
+      else if (msg.tempId) {
+        // Solo añadir si no existe ya o actualizar mensaje temporal existente
+        updatedMap.set(msg.tempId, msg);
       }
-      // Para otros mensajes sin ID ni tempId, añadirlos solo si no existen
-      else if (!updatedMap.has(key)) {
-        updatedMap.set(key, msg);
+      // Para mensajes sin ID ni tempId (caso raro), crear una clave única compuesta
+      else {
+        // Generar una clave única para cada mensaje, incluso si tienen el mismo contenido
+        const uniqueKey = `msg-${msg.senderId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        updatedMap.set(uniqueKey, msg);
       }
     });
     
@@ -723,14 +723,33 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       const data = await response.json();
       const oldMessages = Array.isArray(data.messages) ? data.messages : [];
       
-      // Usar la función processMessages para manejar la deduplicación
-      processMessages(oldMessages, messages);
+      // Añadir cada mensaje con ID único basado en su fecha real y ID para evitar duplicados
+      oldMessages.forEach((msg: any) => {
+        // Asegurar que cada mensaje tenga un ID único incluso si el contenido es idéntico
+        // Si tiene ID del servidor, usamos ese ID directamente
+        if (msg.id) {
+          setMessageMap(prevMap => {
+            const newMap = new Map(prevMap);
+            newMap.set(msg.id, msg);
+            return newMap;
+          });
+        } else {
+          // Si no tiene ID (raro para mensajes antiguos), usar timestamp y random
+          const uniqueKey = `old-${msg.senderId}-${Date.parse(msg.createdAt)}-${Math.random().toString(36).substr(2, 9)}`;
+          setMessageMap(prevMap => {
+            const newMap = new Map(prevMap);
+            newMap.set(uniqueKey, msg);
+            return newMap;
+          });
+        }
+      });
       
       setPage(nextPage);
       setHasMore(oldMessages.length === pageSize);
       
     } catch (error) {
       console.error('Error al cargar más mensajes:', error);
+      setErrorLoadingMessages('Error al cargar mensajes antiguos. Intenta de nuevo.');
     } finally {
       setIsLoadingMore(false);
       isFetchingRef.current = false;
@@ -831,6 +850,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   const sendMessage = async () => {
     if (!newMessage.trim() || isSending || !otherUser || !canSendMessages) return;
     
+    // Generar un ID temporal único garantizado usando timestamp y random para evitar colisiones
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const messageContent = newMessage.trim();
     setNewMessage('');
@@ -849,11 +869,14 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       };
       
       // Añadir mensaje al estado local usando la función de procesamiento
-      processMessages([messageToSend], messages);
+      const updatedMessages = addLocalMessage(messageToSend);
+      setMessages(updatedMessages);
       
       await sendMessageToServer(messageToSend, tempId);
     } catch (error) {
       console.error('Error inesperado al enviar mensaje:', error);
+    } finally {
+      // Asegurar que isSending se restablece siempre, incluso si la operación es exitosa
       setIsSending(false);
     }
   };
@@ -916,7 +939,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       };
       
       // Añadir mensaje al estado local usando la función de procesamiento
-      processMessages([messageToSend], messages);
+      const updatedMessages = addLocalMessage(messageToSend);
+      setMessages(updatedMessages);
       
       // Ocultar el grabador de voz DESPUÉS de enviar el mensaje
       // setIsVoiceRecorderVisible(false);
@@ -972,63 +996,32 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       
       const data = await response.json();
       
-      if (response.ok) {
-        const messageData = data.message || data;
-        
-        if (messageData && messageData.id) {
-          console.log('Mensaje enviado con éxito:', messageData);
-          
-          // Actualizar el mensaje con la información del servidor
-          const updatedMessage: Message = { 
-            ...message, 
-            id: messageData.id, 
-            status: 'sent' as MessageStatus,
-          };
-          
-          processMessages([updatedMessage], messages);
-          
-          // No es necesario emitir el evento por socket.io, ya que la API notifica al servidor socket
-          // y esto causa duplicación de mensajes
-          
-          return true;
-        } else {
-          console.error('Respuesta de API inválida:', data);
-          // Marcar el mensaje como error
-          const errorMessage: Message = {
-            ...message,
-            status: 'error' as MessageStatus
-          };
-          
-          processMessages([errorMessage], messages);
-          return false;
+      // Actualizar el mensaje en el estado local con la información del servidor
+      updateLocalMessage(tempId, {
+        id: data.id,
+        status: 'sent',
+        conversationId: data.conversationId
+      });
+      
+      // Actualizar la conversación si es necesario
+      if (data.conversationId && data.conversationId !== actualConversationId) {
+        console.log(`Actualizado conversationId: ${data.conversationId}`);
+        setActualConversationId(data.conversationId);
+        // Guardar en localStorage
+        if (typeof window !== 'undefined' && otherUser?.id) {
+          localStorage.setItem(`chat_conv_${otherUser.id}`, data.conversationId);
         }
-      } else {
-        // Manejar errores HTTP
-        console.error('Error al enviar el mensaje:', data.error || 'Error desconocido');
-        
-        // Actualizar el estado del mensaje a error
-        const errorMessage: Message = {
-          ...message,
-          status: 'error' as MessageStatus
-        };
-        
-        processMessages([errorMessage], messages);
-        return false;
       }
+      
+      return data;
     } catch (error) {
-      console.error('Error al enviar el mensaje:', error);
+      console.error('Error al enviar mensaje:', error);
+      // Marcar el mensaje como error
+      updateLocalMessage(tempId, {
+        status: 'error'
+      });
       
-      // Actualizar el estado del mensaje a error
-      const errorMessage: Message = {
-        ...message,
-        status: 'error' as MessageStatus
-      };
-      
-      processMessages([errorMessage], messages);
-      
-      // Restablecer el estado de envío incluso en caso de error
-      setIsSending(false);
-      return false;
+      throw error; // Re-lanzar el error para que el catch de nivel superior lo maneje
     }
   };
 
@@ -1142,6 +1135,54 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     }
   }, [otherUser?.id, actualConversationId, conversationId]);
+
+  // Nueva función para añadir mensaje local de manera más eficiente
+  const addLocalMessage = useCallback((message: Message) => {
+    // Añadir el mensaje al mapa directamente
+    setMessageMap(prevMap => {
+      const newMap = new Map(prevMap);
+      if (message.tempId) {
+        newMap.set(message.tempId, message);
+      } else if (message.id) {
+        newMap.set(message.id, message);
+      } else {
+        // Generar una clave única para el mensaje
+        const uniqueKey = `msg-${message.senderId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        newMap.set(uniqueKey, message);
+      }
+      return newMap;
+    });
+    
+    // Devolver mensajes actualizados para uso inmediato
+    return Array.from(messageMap.values())
+      .concat([message])
+      .sort((a, b) => {
+        const dateA = new Date(a.createdAt);
+        const dateB = new Date(b.createdAt);
+        return dateA.getTime() - dateB.getTime();
+      });
+  }, [messageMap]);
+
+  // Función para actualizar mensaje local existente
+  const updateLocalMessage = useCallback((messageId: string, updates: Partial<Message>) => {
+    setMessageMap(prevMap => {
+      const newMap = new Map(prevMap);
+      const existingMessage = newMap.get(messageId);
+      
+      if (existingMessage) {
+        // Actualizar el mensaje existente con los nuevos datos
+        newMap.set(messageId, { ...existingMessage, ...updates });
+        
+        // Si el mensaje ahora tiene un ID permanente, moverlo a esa clave
+        if (updates.id && messageId !== updates.id) {
+          newMap.set(updates.id, { ...existingMessage, ...updates });
+          newMap.delete(messageId);
+        }
+      }
+      
+      return newMap;
+    });
+  }, []);
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
