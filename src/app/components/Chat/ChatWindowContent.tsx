@@ -192,42 +192,44 @@ const VoiceMessagePlayer = React.memo(({
   const sliderRef = useRef<HTMLDivElement>(null);
   
   // Colores según si es mensaje propio o recibido
-  const textColor = isCurrentUser ? 'text-white' : 'text-gray-800 dark:text-white';
-  const primaryColor = isCurrentUser ? 'bg-white/25 hover:bg-white/40' : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500';
-  const secondaryColor = isCurrentUser ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-700';
-  const secondaryActiveColor = isCurrentUser ? 'bg-white/80' : 'bg-blue-500 dark:bg-blue-400';
+  const textColor = isCurrentUser ? 'text-white' : 'text-gray-700 dark:text-gray-200';
+  // Mejor contraste para modo claro y oscuro
+  const primaryBgColor = isCurrentUser 
+    ? 'bg-blue-500/90 hover:bg-blue-500' 
+    : 'bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600';
+  const secondaryColor = isCurrentUser 
+    ? 'bg-white/30' 
+    : 'bg-gray-300 dark:bg-gray-600';
+  const secondaryActiveColor = isCurrentUser 
+    ? 'bg-white' 
+    : 'bg-green-600 dark:bg-green-500';
   
   // Cargar los metadatos del audio cuando el componente se monta
   useEffect(() => {
+    const audio = new Audio(mediaUrl);
+    audioRef.current = audio;
+    
     setIsLoading(true);
     setError(null);
     
-    // Crear un nuevo elemento de audio
-    const audio = new Audio();
-    audio.preload = "metadata";
-    audioRef.current = audio;
-    
-    // Evento para cuando los metadatos están cargados (duración disponible)
     const handleLoadedMetadata = () => {
       setDuration(audio.duration);
       setIsLoading(false);
     };
     
-    // Evento para actualizar tiempo durante reproducción
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
     };
     
-    // Cuando termina la reproducción
     const handleEnded = () => {
       setIsPlaying(false);
       setIsPaused(false);
       setCurrentTime(0);
+      audio.currentTime = 0;
     };
     
-    // Manejar errores de carga
-    const handleError = () => {
-      console.error("Error cargando audio:", audio.error);
+    const handleError = (e: any) => {
+      console.error("Error al cargar el audio:", e);
       setError("Error al cargar el audio");
       setIsLoading(false);
     };
@@ -237,66 +239,30 @@ const VoiceMessagePlayer = React.memo(({
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('error', handleError);
-    audio.addEventListener('pause', () => {
-      if (audio.currentTime < audio.duration) {
-        setIsPaused(true);
-        setIsPlaying(false);
-      }
-    });
     
-    // Iniciar carga del audio
-    audio.src = mediaUrl;
-    
-    // Limpieza al desmontar
     return () => {
-      audio.pause();
+      // Limpiar listeners y detener reproducción al desmontar
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
-      audio.src = "";
+      
+      if (isPlaying) {
+        audio.pause();
+      }
+      audio.src = '';
     };
   }, [mediaUrl]);
   
-  // Controlar reproducción: play, pause, stop
   const togglePlayPause = () => {
     if (!audioRef.current || isLoading) return;
     
-    if (error) {
-      // Reintentar reproducción si hubo un error
-      setIsLoading(true);
-      setError(null);
-      if (audioRef.current) {
-        audioRef.current.src = mediaUrl;
-        audioRef.current.load();
-        return;
-      }
-    }
-    
     if (isPlaying) {
-      // Pausar la reproducción
       audioRef.current.pause();
       setIsPlaying(false);
       setIsPaused(true);
-    } else if (isPaused) {
-      // Reanudar desde donde se pausó
-      const playPromise = audioRef.current.play();
-      
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            setIsPlaying(true);
-            setIsPaused(false);
-          })
-          .catch(error => {
-            console.error("Error reproduciendo audio:", error);
-            setError("Error al reproducir");
-            setIsPlaying(false);
-            setIsPaused(false);
-          });
-      }
     } else {
-      // Iniciar reproducción desde el principio o desde donde se quedó
+      // Play o resume
       const playPromise = audioRef.current.play();
       
       if (playPromise !== undefined) {
@@ -305,69 +271,64 @@ const VoiceMessagePlayer = React.memo(({
             setIsPlaying(true);
             setIsPaused(false);
           })
-          .catch(error => {
-            console.error("Error reproduciendo audio:", error);
-            setError("Error al reproducir");
-            setIsPlaying(false);
-            setIsPaused(false);
+          .catch((error) => {
+            console.error("Error al reproducir:", error);
+            
+            // Muchos navegadores requieren interacción del usuario para reproducir audio
+            if (error.name === 'NotAllowedError') {
+              setError("Necesitas interactuar primero con la página");
+            } else {
+              setError("Error al reproducir");
+            }
           });
       }
     }
   };
   
-  // Avanzar 10 segundos
   const skipForward = () => {
     if (!audioRef.current || isLoading) return;
     
-    const newTime = Math.min(audioRef.current.duration, audioRef.current.currentTime + 10);
+    const newTime = Math.min(audioRef.current.duration, currentTime + 10);
     audioRef.current.currentTime = newTime;
     setCurrentTime(newTime);
   };
   
-  // Retroceder 10 segundos
   const skipBackward = () => {
     if (!audioRef.current || isLoading) return;
     
-    const newTime = Math.max(0, audioRef.current.currentTime - 10);
+    const newTime = Math.max(0, currentTime - 10);
     audioRef.current.currentTime = newTime;
     setCurrentTime(newTime);
   };
   
-  // Cambiar la velocidad de reproducción
   const changePlaybackRate = () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || isLoading) return;
     
-    // Rotar entre velocidades comunes: 1.0 -> 1.5 -> 2.0 -> 0.5 -> 1.0
-    const rates = [1.0, 1.5, 2.0, 0.5];
+    // Ciclo entre velocidades: 1x -> 1.5x -> 2x -> 0.5x -> 1x
+    const rates = [1, 1.5, 2, 0.5];
     const currentIndex = rates.indexOf(playbackRate);
     const nextRate = rates[(currentIndex + 1) % rates.length];
     
+    audioRef.current.playbackRate = nextRate;
     setPlaybackRate(nextRate);
-    if (audioRef.current) {
-      audioRef.current.playbackRate = nextRate;
-    }
   };
   
-  // Actualizar posición de reproducción cuando se arrastra el slider
   const handleSliderChange = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!audioRef.current || isLoading || !sliderRef.current) return;
+    if (!audioRef.current || !sliderRef.current || isLoading) return;
     
-    // Determinar la posición horizontal del clic/toque
-    let clientX: number;
+    const slider = sliderRef.current;
+    const rect = slider.getBoundingClientRect();
+    const sliderWidth = rect.width;
     
+    // Obtener la posición X del clic o toque
+    let clientX;
     if ('touches' in e) {
-      // Es un evento táctil
       clientX = e.touches[0].clientX;
     } else {
-      // Es un evento de ratón
       clientX = e.clientX;
     }
     
-    const rect = sliderRef.current.getBoundingClientRect();
     const offsetX = clientX - rect.left;
-    const sliderWidth = rect.width;
-    
-    // Calcular el porcentaje y aplicarlo al tiempo del audio
     const percentage = Math.max(0, Math.min(1, offsetX / sliderWidth));
     const newTime = percentage * audioRef.current.duration;
     
@@ -390,89 +351,76 @@ const VoiceMessagePlayer = React.memo(({
   // Calcular el progreso para la barra (0-100%)
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
   
+  // Generar puntos de la "visualización de audio" estilo WhatsApp
+  const generateWaveform = () => {
+    const totalBars = 35; // Número de barras en la onda
+    const bars = [];
+    
+    for (let i = 0; i < totalBars; i++) {
+      // Altura aleatoria para simular una onda de audio
+      const height = Math.max(0.3, Math.min(1, 0.2 + Math.sin(i * 0.5) * 0.3 + Math.random() * 0.5));
+      
+      // Determinar si la barra está "activa" basado en el progreso actual
+      const isActive = (i / totalBars) * 100 <= progressPercentage;
+      
+      bars.push(
+        <div 
+          key={i} 
+          className={`h-full w-[2px] mx-[1px] rounded-full ${
+            isActive ? secondaryActiveColor : secondaryColor
+          }`}
+          style={{ height: `${height * 100}%` }}
+        />
+      );
+    }
+    
+    return bars;
+  };
+  
   return (
-    <div className="flex flex-col w-full min-w-[180px] max-w-[250px]">
-      {/* Controles principales */}
-      <div className="flex items-center space-x-2">
-        {/* Velocidad de reproducción */}
-        <button 
-          onClick={changePlaybackRate}
-          disabled={isLoading || !duration}
-          className={`flex-shrink-0 text-xs font-medium px-1.5 py-0.5 rounded ${
-            isCurrentUser ? 'bg-white/20 hover:bg-white/30' : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600'
-          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          aria-label="Cambiar velocidad de reproducción"
+    <div className="flex items-center w-full space-x-2 min-w-[180px] max-w-[300px]">
+      {/* Botón de play/pause */}
+      <button 
+        onClick={togglePlayPause}
+        disabled={isLoading}
+        className={`flex-shrink-0 rounded-full p-2 ${primaryBgColor} ${
+          isLoading ? 'opacity-50 cursor-wait' : ''
+        }`}
+        aria-label={isPlaying ? "Pausar" : "Reproducir"}
+      >
+        {isLoading ? (
+          <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ 
+              borderColor: isCurrentUser ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)', 
+              borderTopColor: 'transparent' 
+            }}
+          />
+        ) : isPlaying ? (
+          <Pause size={18} className={textColor} />
+        ) : (
+          <Play size={18} className={textColor} />
+        )}
+      </button>
+      
+      {/* Visualización de audio + slider */}
+      <div className="flex-1 flex flex-col">
+        {/* Simulación de onda de audio */}
+        <div 
+          className="h-8 flex items-center cursor-pointer"
+          onClick={handleSliderChange}
+          ref={sliderRef}
         >
-          <span className={textColor}>{playbackRate}x</span>
-        </button>
-        
-        {/* Botón para retroceder 10s */}
-        <button 
-          onClick={skipBackward}
-          disabled={isLoading || !duration || currentTime < 1}
-          className={`flex-shrink-0 rounded-full p-1 ${primaryColor} ${
-            (isLoading || !duration || currentTime < 1) ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
-          aria-label="Retroceder 10 segundos"
-        >
-          <SkipBack size={14} className={textColor} />
-        </button>
-        
-        {/* Botón de play/pause */}
-        <button 
-          onClick={togglePlayPause}
-          disabled={isLoading}
-          className={`flex-shrink-0 rounded-full p-1.5 ${primaryColor} ${
-            isLoading ? 'opacity-50 cursor-wait' : ''
-          }`}
-          aria-label={isPlaying ? "Pausar" : isPaused ? "Reanudar" : isLoading ? "Cargando" : "Reproducir"}
-        >
-          {isLoading ? (
-            <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ 
-                borderColor: isCurrentUser ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)', 
-                borderTopColor: 'transparent' 
-              }}
-            />
-          ) : isPlaying ? (
-            <Pause size={14} className={textColor} />
-          ) : (
-            <Play size={16} className={textColor} />
-          )}
-        </button>
-        
-        {/* Botón para avanzar 10s */}
-        <button 
-          onClick={skipForward}
-          disabled={isLoading || !duration || currentTime > duration - 1}
-          className={`flex-shrink-0 rounded-full p-1 ${primaryColor} ${
-            (isLoading || !duration || currentTime > duration - 1) ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
-          aria-label="Avanzar 10 segundos"
-        >
-          <SkipForward size={14} className={textColor} />
-        </button>
-        
-        {/* Tiempo actual / duración */}
-        <span className={`text-xs flex-shrink-0 ${
-          isCurrentUser ? 'text-white/80' : 'text-gray-500 dark:text-gray-300'
-        }`}>
-          {error ? "Error" : isLoading ? "..." : 
-            `${formatTime(currentTime)} / ${formatTime(duration)}`}
-        </span>
+          <div className="flex-1 h-6 flex items-center">
+            {generateWaveform()}
+          </div>
+        </div>
       </div>
       
-      {/* Slider de progreso */}
-      <div 
-        ref={sliderRef}
-        className={`h-1.5 mt-2 rounded-full overflow-hidden cursor-pointer ${secondaryColor}`}
-        onClick={handleSliderChange}
-        onTouchStart={handleSliderChange}
-      >
-        <div 
-          className={`h-full ${secondaryActiveColor}`}
-          style={{ width: `${progressPercentage}%` }}
-        />
+      {/* Tiempo */}
+      <div className={`text-xs flex-shrink-0 ${
+        isCurrentUser ? 'text-white' : 'text-gray-700 dark:text-gray-200'
+      }`}>
+        {error ? "Error" : isLoading ? "..." : formatTime(duration)}
       </div>
     </div>
   );
