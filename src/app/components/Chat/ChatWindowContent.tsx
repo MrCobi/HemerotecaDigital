@@ -585,7 +585,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   // Estado para el socket
   const [socketInitialized, setSocketInitialized] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
-  
+  const [socketAuthenticated, setSocketAuthenticated] = useState(false);
+
   // Al principio del componente, asegurar que conversationId siempre sea string
   const safeConversationId = conversationId || (otherUser?.id || '');
   
@@ -624,36 +625,50 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   // Manejar la unión a salas de conversación en un efecto separado
   useEffect(() => {
     // Solo intentar unirse si el socket está inicializado y tenemos un ID de conversación
-    if (socketInitialized && safeConversationId && currentUserId) {
-      // Si ya estamos en esta conversación, no hacer nada
-      if (joinedConversationRef.current === safeConversationId) {
-        console.log(`Ya estamos unidos a la conversación: ${safeConversationId}`);
-        return;
-      }
+    if (socketInitialized && safeConversationId && currentUserId && connected) {
+      // Primero, asegurarse de que el usuario esté identificado correctamente
+      // Identificar explícitamente al usuario antes de unirse a la conversación
+      socketInstance?.emit('identify', { 
+        userId: currentUserId, 
+        username: session?.user?.name || session?.user?.username || 'Usuario' 
+      });
       
-      // Si estábamos en otra conversación, salir primero
-      if (joinedConversationRef.current && joinedConversationRef.current !== safeConversationId) {
-        console.log(`Saliendo de la conversación anterior: ${joinedConversationRef.current}`);
-        leaveConversation(joinedConversationRef.current);
-      }
-      
-      // Unirse a la nueva conversación
-      console.log(`Uniéndose a la conversación: ${safeConversationId}`);
-      joinConversation(safeConversationId);
-      joinedConversationRef.current = safeConversationId;
+      // Ahora unirse a la conversación después de un pequeño retraso
+      const timer = setTimeout(() => {
+        setSocketAuthenticated(true);
+        
+        // Si ya estamos en esta conversación, no hacer nada
+        if (joinedConversationRef.current === safeConversationId) {
+          console.log(`Ya estamos unidos a la conversación: ${safeConversationId}`);
+          return;
+        }
+        
+        // Si estábamos en otra conversación, salir primero
+        if (joinedConversationRef.current && joinedConversationRef.current !== safeConversationId) {
+          console.log(`Saliendo de la conversación anterior: ${joinedConversationRef.current}`);
+          leaveConversation(joinedConversationRef.current);
+        }
+        
+        // Unirse a la nueva conversación
+        console.log(`Uniéndose a la conversación: ${safeConversationId} con usuario ${currentUserId}`);
+        joinConversation(safeConversationId);
+        joinedConversationRef.current = safeConversationId;
 
-      // Si hay un ID real de conversación, también unirse a esa sala
-      if (actualConversationId && actualConversationId !== safeConversationId) {
-        console.log(`Uniéndose a la conversación real: ${actualConversationId}`);
-        joinConversation(actualConversationId);
-      }
+        // Si hay un ID real de conversación, también unirse a esa sala
+        if (actualConversationId && actualConversationId !== safeConversationId) {
+          console.log(`Uniéndose a la conversación real: ${actualConversationId}`);
+          joinConversation(actualConversationId);
+        }
+      }, 500); // 500ms debería ser suficiente después de la identificación
+      
+      return () => clearTimeout(timer);
     }
     
     // Limpieza al desmontar o cambiar de conversación
     return () => {
       // Solo intentar salir si estamos unidos a una conversación
-      if (socketInitialized && joinedConversationRef.current) {
-        console.log(`Limpieza: saliendo de la conversación: ${joinedConversationRef.current}`);
+      if (socketInitialized && joinedConversationRef.current && currentUserId) {
+        console.log(`Limpieza: saliendo de la conversación: ${joinedConversationRef.current} con usuario ${currentUserId}`);
         leaveConversation(joinedConversationRef.current);
         
         // También salir de la conversación real si existe
@@ -664,8 +679,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         joinedConversationRef.current = null;
       }
     };
-  }, [socketInitialized, safeConversationId, actualConversationId, currentUserId, joinConversation, leaveConversation]);
-
+  }, [socketInitialized, safeConversationId, actualConversationId, currentUserId, joinConversation, leaveConversation, connected, socketInstance, session]);
+  
   // Función para procesar y deduplicar mensajes
   const processMessages = useCallback((newMessages: Message[], existingMessages: Message[] = []) => {
     // Evitar procesar mensajes vacíos
@@ -1082,11 +1097,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       reconnect();
     }
     
-    // Unirse a la sala de la conversación
-    if (safeConversationId && connected && socketInitialized) {
-      joinConversation(safeConversationId);
-    }
-  
+    // Ya no unimos directamente aquí, esto se maneja en el efecto específico arriba
+    
     // Al desmontar el componente, marcar como inactivo
     return () => {
       if (setActive && currentUserId) {
@@ -1094,12 +1106,91 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         setActive(false);
       }
       
-      // Salir de la sala de conversación
-      if (safeConversationId && leaveConversation) {
-        leaveConversation(safeConversationId);
+      // Ya no manejamos la salida de la conversación aquí
+    };
+  }, [socketInitialized, currentUserId, setActive, connected, reconnect]);
+
+  // Manejar los eventos del socket para nuevos mensajes
+  useEffect(() => {
+    // No hacer nada si no hay usuario actual, receptor o ID de conversación o si el socket no está autenticado
+    if (!currentUserId || !otherUser?.id || !safeConversationId || !socketAuthenticated) return;
+    
+    // Callback para manejar nuevos mensajes recibidos por el socket
+    const handleNewMessage = (message: any) => {
+      console.log('Nuevo mensaje recibido por socket:', message);
+      
+      // Solo procesar mensajes relevantes para esta conversación
+      if ((message.conversationId && (message.conversationId === actualConversationId || message.conversationId === safeConversationId)) || 
+          (message.senderId === otherUser.id && message.receiverId === currentUserId) || 
+          (message.senderId === currentUserId && message.receiverId === otherUser.id)) {
+        
+        // Verificar si ya tenemos este mensaje para evitar duplicados
+        setMessageMap(prevMap => {
+          // Si ya tenemos este mensaje con el mismo ID, no hacer nada
+          if (message.id && prevMap.has(message.id)) {
+            return prevMap; // No modificar el mapa
+          }
+          
+          // Si tenemos el mensaje con tempId pero ahora llega con id, actualizar
+          if (message.id && message.tempId && prevMap.has(message.tempId)) {
+            const newMap = new Map(prevMap);
+            newMap.delete(message.tempId);
+            newMap.set(message.id, message);
+            return newMap;
+          }
+          
+          // En otros casos, agregamos el mensaje normalmente
+          const newMap = new Map(prevMap);
+          
+          // Si el mensaje tiene un ID, usar ese como clave
+          if (message.id) {
+            newMap.set(message.id, message);
+          } 
+          // Si no tiene ID pero tiene tempId, usar el tempId como clave
+          else if (message.tempId) {
+            newMap.set(message.tempId, message);
+          }
+          // Para mensajes sin ID ni tempId, crear una clave única
+          else {
+            const uniqueKey = `msg-${message.senderId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            newMap.set(uniqueKey, message);
+          }
+          
+          return newMap;
+        });
+        
+        // Si no somos el remitente, marcar el mensaje como leído automáticamente
+        // Usar una ref para evitar que esto se ejecute en cada renderizado
+        if (message.senderId !== currentUserId && message.id && socketInitialized && !message.read) {
+          socketMarkMessageAsRead({
+            messageId: message.id,
+            conversationId: message.conversationId || safeConversationId
+          });
+        }
+        
+        // Scroll automático a la parte inferior si el usuario está cerca del final
+        if (isAtBottom && messagesEndRef.current) {
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }
       }
     };
-  }, [safeConversationId, connected, socketInitialized, currentUserId, setActive, reconnect]);
+    
+    // Conectarse a los eventos del socket solo si el socket está inicializado
+    if (socketInitialized) {
+      console.log('Registrando handler para new_message en conversación', safeConversationId);
+      // Evitar conectarse múltiples veces
+      socketInstance?.off('new_message', handleNewMessage);
+      socketInstance?.on('new_message', handleNewMessage);
+    }
+    
+    // Limpieza al desmontar
+    return () => {
+      console.log('Eliminando handler para new_message');
+      socketInstance?.off('new_message', handleNewMessage);
+    };
+  }, [currentUserId, otherUser?.id, safeConversationId, actualConversationId, socketInitialized, isAtBottom, socketMarkMessageAsRead, socketInstance, socketAuthenticated]);
   
   // Nueva función para enviar mensaje de voz
   const handleVoiceMessageSend = async (audioBlob: Blob) => {
@@ -1527,86 +1618,6 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     };
   }, [connected, reconnect, currentUserId]);
   
-  // Manejar los eventos del socket
-  useEffect(() => {
-    // No hacer nada si no hay usuario actual, receptor o ID de conversación
-    if (!currentUserId || !otherUser?.id || !safeConversationId) return;
-    
-    // Callback para manejar nuevos mensajes recibidos por el socket
-    const handleNewMessage = (message: any) => {
-      console.log('Nuevo mensaje recibido por socket:', message);
-      
-      // Solo procesar mensajes relevantes para esta conversación
-      if ((message.conversationId && (message.conversationId === actualConversationId || message.conversationId === safeConversationId)) || 
-          (message.senderId === otherUser.id && message.receiverId === currentUserId) || 
-          (message.senderId === currentUserId && message.receiverId === otherUser.id)) {
-        
-        // Verificar si ya tenemos este mensaje para evitar duplicados
-        setMessageMap(prevMap => {
-          // Si ya tenemos este mensaje con el mismo ID, no hacer nada
-          if (message.id && prevMap.has(message.id)) {
-            return prevMap; // No modificar el mapa
-          }
-          
-          // Si tenemos el mensaje con tempId pero ahora llega con id, actualizar
-          if (message.id && message.tempId && prevMap.has(message.tempId)) {
-            const newMap = new Map(prevMap);
-            newMap.delete(message.tempId);
-            newMap.set(message.id, message);
-            return newMap;
-          }
-          
-          // En otros casos, agregamos el mensaje normalmente
-          const newMap = new Map(prevMap);
-          
-          // Si el mensaje tiene un ID, usar ese como clave
-          if (message.id) {
-            newMap.set(message.id, message);
-          } 
-          // Si no tiene ID pero tiene tempId, usar el tempId como clave
-          else if (message.tempId) {
-            newMap.set(message.tempId, message);
-          }
-          // Para mensajes sin ID ni tempId, crear una clave única
-          else {
-            const uniqueKey = `msg-${message.senderId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            newMap.set(uniqueKey, message);
-          }
-          
-          return newMap;
-        });
-        
-        // Si no somos el remitente, marcar el mensaje como leído automáticamente
-        // Usar una ref para evitar que esto se ejecute en cada renderizado
-        if (message.senderId !== currentUserId && message.id && socketInitialized && !message.read) {
-          socketMarkMessageAsRead({
-            messageId: message.id,
-            conversationId: message.conversationId || safeConversationId
-          });
-        }
-        
-        // Scroll automático a la parte inferior si el usuario está cerca del final
-        if (isAtBottom && messagesEndRef.current) {
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-        }
-      }
-    };
-    
-    // Conectarse a los eventos del socket solo si el socket está inicializado
-    if (socketInitialized) {
-      // Evitar conectarse múltiples veces
-      socketInstance?.off('new_message', handleNewMessage);
-      socketInstance?.on('new_message', handleNewMessage);
-    }
-    
-    // Limpieza al desmontar
-    return () => {
-      socketInstance?.off('new_message', handleNewMessage);
-    };
-  }, [currentUserId, otherUser?.id, safeConversationId, actualConversationId, socketInitialized, isAtBottom, socketMarkMessageAsRead, socketInstance]);
-
   return (
     <div className={cn("flex flex-col h-full", className)}>
       {/* Contenedor de mensajes */}

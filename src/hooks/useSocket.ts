@@ -202,7 +202,7 @@ export default function useSocket(options: UseSocketOptions) {
       // Si el usuario está identificado, enviamos datos
       if (userId) {
         console.log(`[Socket] Identificando usuario: ${userId}`);
-        socket.emit('identify_user', { userId, username: username || 'Usuario' });
+        socket.emit('identify', { userId, username: username || 'Usuario' });
         
         // Iniciar heartbeat sin depender de actualizaciones de estado
         if (!heartbeatInterval) {
