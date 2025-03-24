@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { Send, X, Mic, Play, Pause, MessageSquare } from 'lucide-react';
+import { Send, X, Mic, Play, Pause, MessageSquare, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -193,6 +193,7 @@ const VoiceMessagePlayer = React.memo(({
     setIsLoading(true);
     setError(null);
     
+    // Crear un nuevo elemento de audio
     const audio = new Audio();
     audio.preload = "metadata";
     audioRef.current = audio;
@@ -241,8 +242,8 @@ const VoiceMessagePlayer = React.memo(({
     };
   }, [mediaUrl]);
   
-  // Alternar reproducción/pausa
-  const togglePlayPause = () => {
+  // Reproducir o detener audio (sin pausa)
+  const togglePlayStop = () => {
     if (!audioRef.current || isLoading) return;
     
     if (error) {
@@ -250,16 +251,22 @@ const VoiceMessagePlayer = React.memo(({
       setIsLoading(true);
       setError(null);
       if (audioRef.current) {
+        // Recargar completamente el audio
+        audioRef.current.src = mediaUrl;
         audioRef.current.load();
         return;
       }
     }
     
     if (isPlaying) {
+      // Detener completamente la reproducción y volver al inicio
       audioRef.current.pause();
+      audioRef.current.currentTime = 0;
       setIsPlaying(false);
+      setCurrentTime(0);
     } else {
-      // Intentar cargar y luego reproducir
+      // Iniciar reproducción desde el principio
+      audioRef.current.currentTime = 0;
       const playPromise = audioRef.current.play();
       
       if (playPromise !== undefined) {
@@ -271,6 +278,12 @@ const VoiceMessagePlayer = React.memo(({
             console.error("Error reproduciendo audio:", error);
             setError("Error al reproducir");
             setIsPlaying(false);
+            
+            // Intentar recargar si hay error
+            if (audioRef.current) {
+              audioRef.current.src = mediaUrl;
+              audioRef.current.load();
+            }
           });
       }
     }
@@ -323,16 +336,16 @@ const VoiceMessagePlayer = React.memo(({
   
   return (
     <div className="flex items-center space-x-2 w-full min-w-[180px] max-w-[250px]">
-      {/* Botón de reproducción/pausa/carga */}
+      {/* Botón de reproducción/parada/carga */}
       <button 
-        onClick={togglePlayPause}
+        onClick={togglePlayStop}
         disabled={isLoading}
         className={`flex-shrink-0 rounded-full p-1.5 ${
           isCurrentUser 
             ? 'bg-white/25 hover:bg-white/40' 
             : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
         } ${isLoading ? 'opacity-50 cursor-wait' : ''}`}
-        aria-label={isPlaying ? "Pausar" : isLoading ? "Cargando" : "Reproducir"}
+        aria-label={isPlaying ? "Detener" : isLoading ? "Cargando" : "Reproducir"}
       >
         {isLoading ? (
           <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
@@ -342,7 +355,7 @@ const VoiceMessagePlayer = React.memo(({
             }}
           />
         ) : isPlaying ? (
-          <Pause size={16} className={isCurrentUser ? "text-white" : "text-gray-800 dark:text-white"} />
+          <Square size={14} className={isCurrentUser ? "text-white" : "text-gray-800 dark:text-white"} />
         ) : (
           <Play size={16} className={isCurrentUser ? "text-white" : "text-gray-800 dark:text-white"} />
         )}
@@ -756,7 +769,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           });
         } else {
           // Si no tiene ID (raro para mensajes antiguos), usar timestamp y random
-          const uniqueKey = `old-${msg.senderId}-${Date.parse(msg.createdAt)}-${Math.random().toString(36).substr(2, 9)}`;
+          const uniqueKey = `old-${msg.senderId}-${Date.parse(msg.createdAt)}-${Math.random().toString(36).substring(2, 9)}`;
           setMessageMap(prevMap => {
             const newMap = new Map(prevMap);
             newMap.set(uniqueKey, msg);

@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import useAudioRecorder from '../../../hooks/useAudioRecorder';
-import { Send, Mic, Pause, Play, Trash2, X, AlertCircle } from 'lucide-react';
+import { Send, Mic, Trash2, X, AlertCircle } from 'lucide-react';
 import { Session } from 'next-auth';
 
 // Definir ruta API para mensajes
@@ -34,12 +34,9 @@ const VoiceMessageRecorder = React.memo(({
   const { 
     audioURL, 
     isRecording, 
-    isPaused, 
     recordingTime, 
     startRecording, 
     stopRecording, 
-    pauseRecording, 
-    resumeRecording, 
     clearRecording,
     setAudioURL
   } = useAudioRecorder();
@@ -127,11 +124,7 @@ const VoiceMessageRecorder = React.memo(({
 
   // Manejar la pausa/reanudación de grabación de manera optimizada
   const handlePauseResume = () => {
-    if (isRecording) {
-      pauseRecording();
-    } else if (isPaused) {
-      resumeRecording();
-    }
+    // Esta función ya no es necesaria
   };
 
   // Manejar el deslizamiento para cancelar
@@ -222,13 +215,11 @@ const VoiceMessageRecorder = React.memo(({
     return `rounded-full p-3 ${
       isRecording 
         ? 'bg-red-500 text-white animate-pulse' 
-        : isPaused 
-          ? 'bg-amber-500 text-white' 
-          : audioURL 
-            ? 'bg-blue-500 text-white' 
-            : 'bg-blue-500 text-white'
+        : audioURL 
+          ? 'bg-blue-500 text-white' 
+          : 'bg-blue-500 text-white'
     }`;
-  }, [isRecording, isPaused, audioURL]);
+  }, [isRecording, audioURL]);
 
   const slidingText = useMemo(() => {
     return isSliding ? (
@@ -239,7 +230,7 @@ const VoiceMessageRecorder = React.memo(({
   }, [isSliding]);
 
   const recordingControls = useMemo(() => {
-    if (isRecording || isPaused) {
+    if (isRecording) {
       return (
         <div className="flex items-center space-x-4">
           <button
@@ -252,20 +243,11 @@ const VoiceMessageRecorder = React.memo(({
           </button>
           
           <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-300">
-            <div className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-amber-500'}`} />
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             <span>{formattedRecordingTime}</span>
           </div>
           
-          <button
-            type="button"
-            onClick={handlePauseResume}
-            className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-full transition-colors"
-            aria-label={isRecording ? 'Pausar grabación' : 'Reanudar grabación'}
-          >
-            {isRecording ? <Pause size={20} /> : <Play size={20} />}
-          </button>
-          
-          {/* Nuevo botón para detener la grabación */}
+          {/* Botón para detener la grabación */}
           <button
             type="button"
             onClick={handleStopRecording}
@@ -278,7 +260,7 @@ const VoiceMessageRecorder = React.memo(({
       );
     }
     return null;
-  }, [isRecording, isPaused, formattedRecordingTime, handleCancel, handlePauseResume, handleStopRecording]);
+  }, [isRecording, formattedRecordingTime, handleCancel, handleStopRecording]);
 
   const mainActionButton = useMemo(() => {
     if (audioURL) {
@@ -305,7 +287,7 @@ const VoiceMessageRecorder = React.memo(({
       <button
         type="button"
         onClick={handleStartRecording}
-        disabled={!!error || isRecording || isPaused}
+        disabled={!!error || isRecording}
         className={micButtonClasses}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -324,7 +306,6 @@ const VoiceMessageRecorder = React.memo(({
     handleStartRecording, 
     error, 
     isRecording, 
-    isPaused, 
     micButtonClasses, 
     handleTouchStart, 
     handleTouchEnd
@@ -351,11 +332,6 @@ const VoiceMessageRecorder = React.memo(({
     console.log("Estado de isRecording actualizado:", isRecording);
   }, [isRecording]);
 
-  useEffect(() => {
-    // Solo para depuración - registrar cambios en isPaused
-    console.log("Estado de isPaused actualizado:", isPaused);
-  }, [isPaused]);
-
   // Resetear el flag de detención manual cuando comienza una nueva grabación
   useEffect(() => {
     if (isRecording) {
@@ -365,9 +341,9 @@ const VoiceMessageRecorder = React.memo(({
 
   // Asegurarnos de detectar cuando se detiene la grabación
   useEffect(() => {
-    // Si estábamos grabando y ahora no estamos grabando ni pausados, 
+    // Si estábamos grabando y ahora no estamos grabando, 
     // significa que la grabación ha terminado
-    if (wasRecording.current && !isRecording && !isPaused && !manuallyStoppedRef.current) {
+    if (wasRecording.current && !isRecording && !manuallyStoppedRef.current) {
       console.log("Detección automática de fin de grabación");
       // La grabación se detuvo, probablemente por alcanzar el límite de tiempo
       handleStopRecording();
@@ -375,7 +351,7 @@ const VoiceMessageRecorder = React.memo(({
     
     // Actualizar el estado anterior para la próxima comparación
     wasRecording.current = isRecording;
-  }, [isRecording, isPaused, handleStopRecording]);
+  }, [isRecording, handleStopRecording]);
 
   // Manejar la limpieza cuando el componente se desmonta
   useEffect(() => {
@@ -391,11 +367,11 @@ const VoiceMessageRecorder = React.memo(({
       }
       
       // Limpiar grabación si hay una activa
-      if (isRecording || isPaused) {
+      if (isRecording) {
         clearRecording();
       }
     };
-  }, [clearRecording, audioURL, isRecording, isPaused]);
+  }, [clearRecording, audioURL, isRecording]);
 
   // Si el componente no es visible, no renderizar nada
   if (!isVisible) return null;

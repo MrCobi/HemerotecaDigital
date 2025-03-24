@@ -1,16 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-type RecorderState = 'inactive' | 'recording' | 'paused';
+type RecorderState = 'inactive' | 'recording';
 
 interface UseAudioRecorderReturn {
   audioURL: string | null;
   isRecording: boolean;
-  isPaused: boolean;
   recordingTime: number;
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<Blob | null>;
-  pauseRecording: () => void;
-  resumeRecording: () => void;
   clearRecording: () => void;
   setAudioURL: (url: string) => void;
 }
@@ -269,22 +266,7 @@ export default function useAudioRecorder(): UseAudioRecorderReturn {
 
       // Asegurar que el grabador esté en estado activo antes de intentar detenerlo
       try {
-        if (mediaRecorder.state === 'paused') {
-          console.log("Reanudando grabador pausado antes de detener");
-          mediaRecorder.resume();
-          
-          // Pequeña pausa para asegurar que haya datos
-          setTimeout(() => {
-            try {
-              mediaRecorder.stop();
-            } catch (error) {
-              console.error('Error stopping MediaRecorder after pause:', error);
-              cleanupResources();
-              setRecordingState('inactive');
-              resolve(null);
-            }
-          }, 100);
-        } else if (mediaRecorder.state === 'recording') {
+        if (mediaRecorder.state === 'recording') {
           console.log("Deteniendo grabador activo");
           mediaRecorder.stop();
         } else {
@@ -301,43 +283,6 @@ export default function useAudioRecorder(): UseAudioRecorderReturn {
       }
     });
   }, [audioURL, recordingState, recordingTime, cleanupResources, createOptimizedAudioBlob]);
-
-  // Función optimizada para pausar grabación
-  const pauseRecording = useCallback(() => {
-    if (mediaRecorderRef.current && recordingState === 'recording') {
-      try {
-        mediaRecorderRef.current.pause();
-        setRecordingState('paused');
-        
-        // Pausar el temporizador
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-      } catch (error) {
-        console.error('Error pausing recording:', error);
-      }
-    }
-  }, [recordingState]);
-
-  // Función optimizada para reanudar grabación
-  const resumeRecording = useCallback(() => {
-    if (mediaRecorderRef.current && recordingState === 'paused') {
-      try {
-        mediaRecorderRef.current.resume();
-        setRecordingState('recording');
-        
-        // Reanudar el temporizador
-        if (!timerRef.current) {
-          timerRef.current = setInterval(() => {
-            setRecordingTime(prevTime => prevTime + 1);
-          }, 1000);
-        }
-      } catch (error) {
-        console.error('Error resuming recording:', error);
-      }
-    }
-  }, [recordingState]);
 
   // Función optimizada para limpiar grabación
   const clearRecording = useCallback(() => {
@@ -357,18 +302,14 @@ export default function useAudioRecorder(): UseAudioRecorderReturn {
 
   // Valores calculados basados en el estado
   const isRecording = recordingState === 'recording';
-  const isPaused = recordingState === 'paused';
 
   // Exportar valores memoizados para evitar re-renders innecesarios
   return {
     audioURL,
     isRecording,
-    isPaused,
     recordingTime,
     startRecording,
     stopRecording,
-    pauseRecording,
-    resumeRecording,
     clearRecording,
     setAudioURL,
   };
