@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { Send, X, Mic, Play, Pause } from 'lucide-react';
+import { Send, X, Mic, Play, Pause, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -565,7 +565,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     }
     
     // Función para obtener mensajes
-    const fetchMessages = async (pageNum = 1, existingMsgs: Message[] = []) => {
+    const fetchMessages = async (pageNum = 1, existingMessages: Message[] = []) => {
       // Prevenir múltiples peticiones simultáneas
       if (isFetchingRef.current) return;
       isFetchingRef.current = true;
@@ -585,15 +585,64 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           throw new Error('Faltan datos necesarios para cargar mensajes');
         }
         
-        // Parámetro 'with' es el ID de conversación o el ID del otro usuario
-        const withParam = actualConversationId || safeConversationId;
+        // Definir el parámetro 'with'
+        let withParam: string;
+        
+        // Si tenemos un ID de conversación real, añadimos el prefijo 'conv_'
+        // pero solo si no tiene ya el prefijo
+        if (actualConversationId) {
+          // Evitar la duplicación del prefijo
+          withParam = actualConversationId.startsWith('conv_') 
+            ? actualConversationId 
+            : `conv_${actualConversationId}`;
+          console.log(`Consultando mensajes con ID de conversación: ${withParam}`);
+        } 
+        // Si no, usamos el ID del otro usuario directamente
+        else {
+          withParam = safeConversationId;
+          console.log(`Consultando mensajes con ID de usuario: ${withParam}`);
+        }
         
         const response = await fetch(
-          `${API_ROUTES.messages.list}?with=${withParam}&page=${pageNum}&limit=${pageSize}`
+          `${API_ROUTES.messages.list}?with=${withParam}&page=${pageNum}&limit=${pageSize}&t=${Date.now()}`, 
+          { cache: 'no-store' } // Evitar caché para obtener siempre datos frescos
         );
         
+        // Obtener el texto de la respuesta para diagnóstico
+        const responseText = await response.text();
+        
+        // Si la respuesta indica que la conversación no existe (404)
+        if (response.status === 404) {
+          console.log('La conversación ya no existe en la base de datos');
+          
+          // Limpiar la referencia en localStorage
+          if (typeof window !== 'undefined' && otherUser?.id) {
+            const storageKey = `chat_conv_${otherUser.id}`;
+            if (localStorage.getItem(storageKey)) {
+              console.log(`Eliminando referencia a conversación eliminada: ${actualConversationId}`);
+              localStorage.removeItem(storageKey);
+            }
+          }
+          
+          // Liberar recursos del socket si existe una conversación real
+          if (actualConversationId && socketInstance) {
+            console.log(`Saliendo de la sala de conversación: ${actualConversationId}`);
+            leaveConversation(actualConversationId);
+          }
+          
+          // Mostrar mensaje amigable
+          setErrorLoadingMessages('Esta conversación ya no existe. Por favor, vuelve a la lista de mensajes e inicia una nueva conversación.');
+          setMessages([]);
+          
+          isFetchingRef.current = false;
+          setIsLoadingMessages(false);
+          return;
+        }
+        
+        // Para otros errores
         if (!response.ok) {
-          throw new Error('Error al cargar los mensajes');
+          console.error(`Error al cargar mensajes (${response.status}): ${responseText}`);
+          throw new Error(`Error al cargar los mensajes: ${response.status}`);
         }
         
         // Verificar nuevamente si el ID de conversación ha cambiado durante la carga
@@ -602,30 +651,52 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           return;
         }
         
-        const data = await response.json();
-        const fetchedMessages = Array.isArray(data.messages) ? data.messages : [];
-        
-        // Si hay mensajes, verificar si tienen un conversationId y guardarlo
-        if (fetchedMessages.length > 0 && fetchedMessages[0].conversationId) {
-          const msgConversationId = fetchedMessages[0].conversationId;
-          if (msgConversationId && !actualConversationId) {
-            console.log(`Actualizado conversationId: ${msgConversationId}`);
-            setActualConversationId(msgConversationId);
-            
-            // Guardar en localStorage para recordar este conversationId
-            if (typeof window !== 'undefined') {
-              localStorage.setItem(`chat_conv_${otherUser?.id}`, msgConversationId);
-            }
-          }
+        // Convertir la respuesta de texto a JSON
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Error al parsear la respuesta JSON:', parseError, responseText);
+          throw new Error('La respuesta del servidor no es un JSON válido');
         }
         
-        // Procesar y combinar mensajes evitando duplicados
-        const combinedMessages = [...existingMsgs, ...fetchedMessages];
-        const uniqueMessages = processMessages(combinedMessages, []);
+        // Verificar que la estructura de datos es la esperada
+        if (!data) {
+          console.error('Estructura de datos inesperada: respuesta vacía');
+          throw new Error('El servidor devolvió una respuesta vacía');
+        }
         
-        setMessages(uniqueMessages);
-        setHasMore(fetchedMessages.length === pageSize);
-        setPage(pageNum);
+        // Si la respuesta contiene un array de mensajes (vacío o no), procesarlo normalmente
+        if (Array.isArray(data.messages)) {
+          console.log(`Recibidos ${data.messages.length} mensajes para la conversación ${withParam}`);
+          
+          const fetchedMessages = data.messages;
+          
+          // Si hay mensajes, verificar si tienen un conversationId y guardarlo
+          if (fetchedMessages.length > 0 && fetchedMessages[0].conversationId) {
+            const msgConversationId = fetchedMessages[0].conversationId;
+            if (msgConversationId && !actualConversationId) {
+              console.log(`Actualizado conversationId: ${msgConversationId}`);
+              setActualConversationId(msgConversationId);
+              
+              // Guardar en localStorage para recordar este conversationId
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(`chat_conv_${otherUser?.id}`, msgConversationId);
+              }
+            }
+          }
+          
+          // Procesar y combinar mensajes evitando duplicados
+          const combinedMessages = [...messages, ...fetchedMessages];
+          const uniqueMessages = processMessages(combinedMessages, []);
+          
+          setMessages(uniqueMessages);
+          setHasMore(fetchedMessages.length === pageSize);
+          setPage(pageNum);
+        } else {
+          console.error('Estructura de datos inesperada:', data);
+          throw new Error('El servidor devolvió una estructura de datos inesperada');
+        }
         
       } catch (error) {
         console.error('Error al cargar los mensajes:', error);
@@ -1201,13 +1272,18 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           <div className="text-center py-4 text-red-500">
             <p>{errorLoadingMessages}</p>
             <Button 
-              variant="outline" 
-              className="mt-2"
               onClick={() => {
-                setErrorLoadingMessages(null);
+                // Reintentar la carga con los parámetros iniciales
                 setPage(1);
-                isFetchingRef.current = false;
-              }}
+                setMessages([]);
+                setMessageMap(new Map());
+                setIsLoadingMessages(true);
+                setErrorLoadingMessages('');
+                // UseEffect detectará estos cambios y llamará a fetchMessages
+              }} 
+              variant="outline" 
+              className="mt-2 text-sm" 
+              size="sm"
             >
               Reintentar
             </Button>
@@ -1376,6 +1452,45 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           }}
           setUploadStatus={setUploadStatus}
         />
+      )}
+
+      {/* Estado de error */}
+      {errorLoadingMessages && (
+        <div className="flex flex-col items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 rounded-lg mx-auto my-4 max-w-md">
+          <p className="mb-2">{errorLoadingMessages}</p>
+          {!errorLoadingMessages.includes('no existe') && (
+            <Button 
+              onClick={() => {
+                // Reintentar la carga con los parámetros iniciales
+                setPage(1);
+                setMessages([]);
+                setMessageMap(new Map());
+                setIsLoadingMessages(true);
+                setErrorLoadingMessages('');
+                // UseEffect detectará estos cambios y llamará a fetchMessages
+              }} 
+              variant="outline" 
+              className="mt-2 text-sm" 
+              size="sm"
+            >
+              Reintentar
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Mensaje para conversaciones vacías */}
+      {messages.length === 0 && !isLoadingMessages && !errorLoadingMessages && (
+        <div className="flex flex-col items-center justify-center p-6 text-center">
+          <div className="mb-4 text-gray-400">
+            <MessageSquare className="h-12 w-12" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Conversación vacía</h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-4">
+            Aún no hay mensajes en esta conversación.<br />
+            ¡Escribe algo para comenzar a chatear!
+          </p>
+        </div>
       )}
 
       {/* Estilos para el indicador de escritura */}

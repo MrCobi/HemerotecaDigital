@@ -25,54 +25,68 @@ export default function useAudioRecorder(): UseAudioRecorderReturn {
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cleanup function
+  // Cleanup function optimizada con manejo de errores
   useEffect(() => {
     return () => {
-      // Limpiar recursos al desmontar
       cleanupResources();
     };
   }, []);
 
-  // Función centralizada para limpiar recursos
+  // Función centralizada para limpiar recursos con manejo de errores
   const cleanupResources = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    
-    // Detener y liberar el MediaRecorder
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch (e) {
-        console.warn("Error al detener mediaRecorder:", e);
+    try {
+      // Limpiar temporizador
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
-    }
-    mediaRecorderRef.current = null;
-    
-    // Detener y liberar la MediaStream
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => {
-        track.stop();
-        mediaStreamRef.current?.removeTrack(track);
-      });
-      mediaStreamRef.current = null;
-    }
-    
-    // Revocar URLs de objeto creadas
-    if (audioURL) {
-      try {
-        URL.revokeObjectURL(audioURL);
-      } catch (e) {
-        console.warn("Error al revocar URL:", e);
+      
+      // Detener y liberar el MediaRecorder
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch (e) {
+          console.warn("Error al detener mediaRecorder:", e);
+        }
       }
+      mediaRecorderRef.current = null;
+      
+      // Detener y liberar la MediaStream
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => {
+          try {
+            track.stop();
+            mediaStreamRef.current?.removeTrack(track);
+          } catch (e) {
+            console.warn("Error al detener pista de audio:", e);
+          }
+        });
+        mediaStreamRef.current = null;
+      }
+      
+      // Revocar URLs de objeto creadas
+      if (audioURL) {
+        try {
+          URL.revokeObjectURL(audioURL);
+        } catch (e) {
+          console.warn("Error al revocar URL:", e);
+        }
+      }
+      
+      // Limpiar chunks de audio
+      audioChunksRef.current = [];
+    } catch (err) {
+      console.error("Error durante la limpieza de recursos:", err);
     }
-    
-    // Limpiar chunks de audio
-    audioChunksRef.current = [];
   }, [audioURL]);
 
-  // Start recording audio
+  // Función para crear un blob de audio optimizado
+  const createOptimizedAudioBlob = useCallback((chunks: Blob[], mimeType: string): Blob => {
+    // La compresión depende del mime type disponible
+    return new Blob(chunks, { type: mimeType });
+  }, []);
+
+  // Función optimizada para iniciar grabación
   const startRecording = useCallback(async () => {
     try {
       // Asegurar que limpiamos recursos previos
@@ -83,30 +97,46 @@ export default function useAudioRecorder(): UseAudioRecorderReturn {
       setAudioURL(null);
       setRecordingTime(0);
 
+      // Opciones de audio optimizadas para mensajería
+      const audioConstraints = { 
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        // Configuración optimizada para voz
+        channelCount: 1,
+        sampleRate: 22050 // Suficiente para voz humana y reduce el tamaño del archivo
+      };
+
       // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
       mediaStreamRef.current = stream;
 
-      // Create new MediaRecorder with options for broader compatibility
-      const options = { mimeType: 'audio/webm;codecs=opus' };
-      let recorder;
+      // Probar diferentes formatos de codificación en orden de preferencia
+      const mimeTypes = [
+        'audio/webm;codecs=opus', 
+        'audio/webm',
+        'audio/mp4;codecs=mp4a.40.5', // AAC
+        ''  // Formato predeterminado
+      ];
       
-      try {
-        recorder = new MediaRecorder(stream, options);
-      } catch (e) {
-        console.log('MediaRecorder with opus not supported, trying without codec specification');
+      let recorder: MediaRecorder | null = null;
+      
+      // Intentar diferentes formatos hasta encontrar uno compatible
+      for (const mimeType of mimeTypes) {
         try {
-          recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+          if (!mimeType || MediaRecorder.isTypeSupported(mimeType)) {
+            const options = mimeType ? { mimeType } : undefined;
+            recorder = new MediaRecorder(stream, options);
+            console.log(`MediaRecorder iniciado con formato: ${mimeType || 'predeterminado'}`);
+            break;
+          }
         } catch (e) {
-          console.log('MediaRecorder with webm not supported, trying default');
-          recorder = new MediaRecorder(stream);
+          console.log(`Formato ${mimeType} no soportado, probando siguiente...`);
         }
+      }
+      
+      if (!recorder) {
+        throw new Error("No se pudo crear un MediaRecorder compatible");
       }
       
       mediaRecorderRef.current = recorder;
@@ -118,136 +148,169 @@ export default function useAudioRecorder(): UseAudioRecorderReturn {
         }
       };
 
-      // Start recording
-      recorder.start(100); // Collect data every 100ms
+      // Start recording with adjusted timeslice for mejor equilibrio entre rendimiento y calidad
+      recorder.start(250); // Recoger datos cada 250ms para reducir overhead pero mantener chunks manejables
       setRecordingState('recording');
 
-      // Start timer
+      // Start timer with better memory management
       timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setRecordingTime(prevTime => {
+          // Limitar la duración máxima a 5 minutos para evitar problemas de memoria
+          if (prevTime >= 300) {
+            stopRecording().catch(console.error);
+            return prevTime;
+          }
+          return prevTime + 1;
+        });
       }, 1000);
     } catch (error) {
       console.error('Error starting recording:', error);
+      // Asegurar limpieza en caso de error
+      cleanupResources();
+      throw error;
     }
-  }, []);
+  }, [cleanupResources]);
 
-  // Stop recording
+  // Función optimizada para detener grabación
   const stopRecording = useCallback(async (): Promise<Blob | null> => {
     return new Promise((resolve) => {
       if (mediaRecorderRef.current && recordingState !== 'inactive') {
         const mediaRecorder = mediaRecorderRef.current;
 
         mediaRecorder.onstop = () => {
-          console.log('MediaRecorder stopped');
-          // Stop all tracks
-          if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(track => track.stop());
-          }
+          try {
+            // Stop all tracks
+            if (mediaStreamRef.current) {
+              mediaStreamRef.current.getTracks().forEach(track => track.stop());
+            }
 
-          // Create blob from audio chunks
-          // Determine the MIME type based on recorder's mimeType
-          const mimeType = mediaRecorder.mimeType || 'audio/webm';
-          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-          
-          console.log('Audio recorded with MIME type:', mimeType);
-          console.log('Audio duration:', recordingTime, 'seconds');
-          console.log('Audio chunks:', audioChunksRef.current.length, 'Size:', audioBlob.size, 'bytes');
-          
-          if (audioBlob.size > 0) {
-            const url = URL.createObjectURL(audioBlob);
-            console.log('Audio URL created:', url);
-            setAudioURL(url);
-          } else {
-            console.error('Audio blob is empty');
-          }
+            // Stop timer
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
 
-          // Stop timer
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
+            // Verificar si tenemos chunks válidos
+            if (audioChunksRef.current.length > 0) {
+              // Determinar el formato correcto basado en los datos disponibles
+              const mimeType = mediaRecorder.mimeType || 'audio/webm';
+              
+              // Crear blob con compresión optimizada
+              const audioBlob = createOptimizedAudioBlob(audioChunksRef.current, mimeType);
+              
+              console.log(`Audio grabado: ${recordingTime}s, ${audioChunksRef.current.length} chunks, ${audioBlob.size} bytes`);
+              
+              if (audioBlob.size > 0) {
+                // Revocar URL anterior si existe
+                if (audioURL) {
+                  URL.revokeObjectURL(audioURL);
+                }
+                
+                // Crear y almacenar nueva URL
+                const url = URL.createObjectURL(audioBlob);
+                setAudioURL(url);
+                
+                setRecordingState('inactive');
+                resolve(audioBlob);
+                return;
+              }
+            }
+            
+            // Si llegamos aquí, no hay grabación válida
+            setRecordingState('inactive');
+            resolve(null);
+          } catch (error) {
+            console.error('Error processing recording:', error);
+            setRecordingState('inactive');
+            resolve(null);
           }
-
-          setRecordingState('inactive');
-          resolve(audioBlob);
         };
 
-        // Make sure we collect any remaining data
-        mediaRecorder.requestData();
-        
+        // Detener la grabación de manera segura
         try {
-          // Stop the recorder immediately, not after a delay
           mediaRecorder.stop();
-          console.log('Stop command sent to MediaRecorder');
         } catch (error) {
           console.error('Error stopping MediaRecorder:', error);
+          cleanupResources();
           setRecordingState('inactive');
           resolve(null);
         }
       } else {
-        console.log('No active MediaRecorder to stop', { recordingState });
+        // No hay grabación activa
+        setRecordingState('inactive');
         resolve(null);
       }
     });
-  }, [recordingState, recordingTime]);
+  }, [audioURL, recordingState, recordingTime, cleanupResources, createOptimizedAudioBlob]);
 
-  // Pause recording
+  // Función optimizada para pausar grabación
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && recordingState === 'recording') {
-      mediaRecorderRef.current.pause();
-      setRecordingState('paused');
-      
-      // Pause timer
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+      try {
+        mediaRecorderRef.current.pause();
+        setRecordingState('paused');
+        
+        // Pausar el temporizador
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      } catch (error) {
+        console.error('Error pausing recording:', error);
       }
     }
   }, [recordingState]);
 
-  // Resume recording
+  // Función optimizada para reanudar grabación
   const resumeRecording = useCallback(() => {
     if (mediaRecorderRef.current && recordingState === 'paused') {
-      mediaRecorderRef.current.resume();
-      setRecordingState('recording');
-      
-      // Resume timer
-      timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
+      try {
+        mediaRecorderRef.current.resume();
+        setRecordingState('recording');
+        
+        // Reanudar el temporizador
+        if (!timerRef.current) {
+          timerRef.current = setInterval(() => {
+            setRecordingTime(prevTime => prevTime + 1);
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('Error resuming recording:', error);
+      }
     }
   }, [recordingState]);
 
-  // Clear recording
+  // Función optimizada para limpiar grabación
   const clearRecording = useCallback(() => {
-    cleanupResources();
-    setAudioURL(null);
-    setRecordingTime(0);
-    setRecordingState('inactive');
-  }, [cleanupResources]);
-
-  // Set audio URL (for restoring from storage)
-  const setAudioURLState = useCallback((url: string) => {
-    // Si ya hay un URL, revocarlo primero
     if (audioURL) {
       try {
         URL.revokeObjectURL(audioURL);
       } catch (e) {
-        console.warn("Error al revocar URL anterior:", e);
+        console.warn("Error al revocar URL:", e);
       }
+      setAudioURL(null);
     }
-    setAudioURL(url);
+    
+    // Resetear el estado de grabación
+    setRecordingTime(0);
+    audioChunksRef.current = [];
   }, [audioURL]);
 
+  // Valores calculados basados en el estado
+  const isRecording = recordingState === 'recording';
+  const isPaused = recordingState === 'paused';
+
+  // Exportar valores memoizados para evitar re-renders innecesarios
   return {
     audioURL,
-    isRecording: recordingState === 'recording',
-    isPaused: recordingState === 'paused',
+    isRecording,
+    isPaused,
     recordingTime,
     startRecording,
     stopRecording,
     pauseRecording,
     resumeRecording,
     clearRecording,
-    setAudioURL: setAudioURLState
+    setAudioURL,
   };
 }

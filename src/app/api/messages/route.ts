@@ -505,15 +505,15 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
     const url = new URL(req.url);
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '20');
-    const conversationId = url.searchParams.get('with');
+    let conversationParam = url.searchParams.get('with');
     
     // Calculamos el número de mensajes a omitir (skip)
     const skip = (page - 1) * limit;
     
-    console.log(`GET /api/messages - userId: ${userId}, conversationId: ${conversationId}, page: ${page}, limit: ${limit}`);
+    console.log(`GET /api/messages - userId: ${userId}, param with: ${conversationParam}, page: ${page}, limit: ${limit}`);
     
-    // Validar que tenemos el ID de conversación
-    if (!conversationId || conversationId.length === 0) {
+    // Validar que tenemos un parámetro 'with'
+    if (!conversationParam || conversationParam.length === 0) {
       return new Response(
         JSON.stringify({ 
           error: 'Se requiere un parámetro de conversación válido',
@@ -522,6 +522,25 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
         { status: 400 }
       );
     }
+
+    // Procesamos el formato del parámetro 'with' para extraer el ID de conversación
+    let isDirectConversationId = false;
+    let conversationId: string;
+    
+    console.log(`Parámetro 'with' recibido: "${conversationParam}"`);
+    
+    // Si el parámetro comienza con 'conv_', mantenemos el formato tal cual
+    if (conversationParam.startsWith('conv_')) {
+      conversationId = conversationParam; // Mantener el ID completo con prefijo
+      isDirectConversationId = true;
+      console.log(`Identificado como ID de conversación directo: ${conversationId}`);
+    } else {
+      // Si no tiene prefijo, asumimos que es el ID de otro usuario o de conversación directamente
+      conversationId = conversationParam;
+      console.log(`Identificado como posible ID de usuario: ${conversationId}`);
+    }
+    
+    console.log(`Buscando si el usuario ${userId} es participante de la conversación ${conversationId}`);
     
     // Verificar si el usuario es participante de esta conversación
     const isParticipant = await prisma.conversationParticipant.findFirst({
@@ -531,12 +550,68 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
       }
     });
     
+    console.log(`Verificación de participante: usuario ${userId}, conversación ${conversationId}, resultado: ${isParticipant ? 'sí es participante' : 'no es participante'}`);
+    
     if (!isParticipant) {
       console.log(`Usuario ${userId} no es participante de la conversación ${conversationId}`);
-      // En lugar de retornar un error, verifica si la conversationId es un userId
-      // Esto permite manejar tanto conversaciones por ID como por par de usuarios
       
-      // Si no es participante, quizás el conversationId es realmente un userId
+      // Si es una solicitud directa de conversación por ID y el usuario no es participante
+      if (isDirectConversationId) {
+        // Verificar si la conversación existe
+        const conversationExists = await prisma.conversation.findUnique({
+          where: {
+            id: conversationId
+          }
+        });
+        
+        if (!conversationExists) {
+          console.log(`La conversación ${conversationId} no existe en la base de datos`);
+          return new Response(
+            JSON.stringify({ 
+              error: 'La conversación no existe',
+              messages: []
+            }),
+            { status: 404 }
+          );
+        }
+        
+        // La conversación existe pero el usuario no es participante,
+        // lo añadimos automáticamente a la conversación
+        console.log(`Añadiendo al usuario ${userId} como participante de la conversación existente ${conversationId}`);
+        
+        try {
+          // Añadir al usuario actual como participante
+          await prisma.conversationParticipant.create({
+            data: {
+              userId: userId,
+              conversationId: conversationId,
+              isAdmin: false, // No es admin por defecto
+              joinedAt: new Date()
+            }
+          });
+          
+          console.log(`Usuario ${userId} añadido correctamente como participante`);
+          
+          // Ahora podemos obtener los mensajes normalmente
+          const messages = await fetchMessagesByConversationId(conversationId, skip, limit);
+          
+          return new Response(
+            JSON.stringify({ messages: messages || [] }),
+            { status: 200 }
+          );
+        } catch (error) {
+          console.error(`Error al añadir participante:`, error);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Error al añadir al usuario como participante',
+              messages: []
+            }),
+            { status: 500 }
+          );
+        }
+      }
+      
+      // Si no es una petición directa por ID, quizás el conversationId es realmente un userId
       // Buscamos la conversación entre los dos usuarios
       const existingConversation = await prisma.conversation.findFirst({
         where: {
@@ -581,11 +656,21 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
     // Si es participante, usa el conversationId directamente
     const messages = await fetchMessagesByConversationId(conversationId, skip, limit);
     
+    // Si fetchMessagesByConversationId devuelve null, significa que la conversación no existe
+    if (messages === null) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'La conversación no existe',
+          messages: []
+        }),
+        { status: 404 }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ messages }),
       { status: 200 }
     );
-    
   } catch (error) {
     console.error('Error al obtener mensajes:', error);
     return new Response(
@@ -597,43 +682,122 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
 
 // Función auxiliar para obtener mensajes por conversationId
 async function fetchMessagesByConversationId(conversationId: string, skip: number, limit: number) {
-  const messages = await prisma.directMessage.findMany({
-    where: {
-      conversationId: conversationId
-    },
-    include: {
-      sender: {
-        select: {
-          id: true,
-          username: true,
-          image: true,
-          name: true
+  console.log(`DEPURACIÓN: Buscando conversación con ID exacto: "${conversationId}"`);
+  
+  // Primero, verificar que la conversación existe realizando una consulta bruta a la base de datos
+  try {
+    // Para depuración, buscar por coincidencia parcial también
+    const conversationsWithSimilarId = await prisma.$queryRaw`
+      SELECT id FROM conversations 
+      WHERE id LIKE ${`%${conversationId.replace('conv_', '')}%`}
+      LIMIT 5
+    `;
+    
+    console.log(`Conversaciones con ID similar:`, conversationsWithSimilarId);
+    
+    // Buscar la conversación exacta
+    const conversationExists = await prisma.conversation.findUnique({
+      where: {
+        id: conversationId
+      }
+    });
+    
+    console.log(`Resultado de búsqueda de conversación exacta "${conversationId}":`, 
+      conversationExists ? 'Encontrada' : 'No encontrada');
+    
+    if (!conversationExists) {
+      // Para depuración, intentar usar el ID sin el prefijo 'conv_'
+      const idWithoutPrefix = conversationId.startsWith('conv_') 
+        ? conversationId.substring(5) 
+        : conversationId;
+      
+      console.log(`Intentando buscar sin prefijo: "${idWithoutPrefix}"`);
+      
+      const conversationWithoutPrefix = await prisma.conversation.findUnique({
+        where: {
+          id: idWithoutPrefix
+        }
+      });
+      
+      console.log(`¿Se encontró la conversación sin prefijo?:`, 
+        conversationWithoutPrefix ? 'Sí' : 'No');
+      
+      if (conversationWithoutPrefix) {
+        console.log(`LA CONVERSACIÓN EXISTE PERO CON FORMATO DIFERENTE: "${idWithoutPrefix}"`);
+        // Usar este ID para obtener los mensajes
+        return await getMessagesForConversation(idWithoutPrefix, skip, limit);
+      }
+      
+      // Mostrar todas las conversaciones disponibles para depuración
+      const allConversations = await prisma.conversation.findMany({
+        take: 10
+      });
+      
+      console.log(`Todas las conversaciones disponibles:`, 
+        allConversations.map(c => ({ id: c.id, createdAt: c.createdAt })));
+      
+      return null; // Conversación no encontrada
+    }
+    
+    return await getMessagesForConversation(conversationId, skip, limit);
+  } catch (error) {
+    console.error(`Error grave al buscar la conversación:`, error);
+    throw error; // Propagar el error para que se maneje en el endpoint
+  }
+}
+
+// Función auxiliar para obtener mensajes una vez que sabemos que la conversación existe
+async function getMessagesForConversation(conversationId: string, skip: number, limit: number) {
+  try {
+    console.log(`Obteniendo mensajes para conversación "${conversationId}" (skip=${skip}, limit=${limit})`);
+    
+    const messages = await prisma.directMessage.findMany({
+      where: {
+        conversationId: conversationId
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            username: true,
+            image: true,
+            name: true
+          }
+        },
+        receiver: {
+          select: {
+            id: true,
+            username: true,
+            image: true,
+            name: true
+          }
         }
       },
-      receiver: {
-        select: {
-          id: true,
-          username: true,
-          image: true,
-          name: true
-        }
-      }
-    },
-    orderBy: {
-      createdAt: 'desc'
-    },
-    skip,
-    take: limit
-  });
-  
-  console.log(`Se encontraron ${messages.length} mensajes para la conversación ${conversationId}`);
-  
-  // Las fechas en formato ISO para que se serialicen correctamente
-  const serializedMessages = messages.map((msg: any) => ({
-    ...msg,
-    createdAt: msg.createdAt instanceof Date ? msg.createdAt.toISOString() : msg.createdAt
-  }));
-  
-  // Devolver en orden cronológico (más antiguos primero)
-  return serializedMessages.reverse();
+      orderBy: {
+        createdAt: 'desc'
+      },
+      skip,
+      take: limit
+    });
+    
+    console.log(`Se encontraron ${messages.length} mensajes para la conversación ${conversationId}`);
+    
+    // Si no hay mensajes, devolver un array vacío en lugar de null
+    if (messages.length === 0) {
+      console.log(`La conversación ${conversationId} existe pero no tiene mensajes`);
+      return [];
+    }
+    
+    // Las fechas en formato ISO para que se serialicen correctamente
+    const serializedMessages = messages.map((msg: any) => ({
+      ...msg,
+      createdAt: msg.createdAt instanceof Date ? msg.createdAt.toISOString() : msg.createdAt
+    }));
+    
+    // Devolver en orden cronológico (más antiguos primero)
+    return serializedMessages.reverse();
+  } catch (error) {
+    console.error(`Error al obtener mensajes:`, error);
+    throw error;
+  }
 }

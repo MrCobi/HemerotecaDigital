@@ -21,7 +21,8 @@ interface ConversationResponse {
     content: string | null;
     createdAt: Date;
     read: boolean;
-    isInitial?: boolean;
+    senderId: string;
+    messageType: string;
   };
   unreadCount: number;
   createdAt: Date;
@@ -38,6 +39,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log(`Obteniendo conversaciones para usuario: ${session.user.id}`);
+
     // 1. Obtener TODAS las conversaciones en las que el usuario es participante
     const userConversations = await prisma.$queryRaw`
       SELECT 
@@ -47,8 +50,9 @@ export async function GET(request: NextRequest) {
       FROM conversations c
       JOIN conversation_participants cp ON c.id = cp.conversation_id
       WHERE cp.user_id = ${session.user.id}
-      AND c.is_group = false
     `;
+
+    console.log(`Encontradas ${Array.isArray(userConversations) ? userConversations.length : 0} conversaciones`);
 
     if (!Array.isArray(userConversations) || userConversations.length === 0) {
       // No hay conversaciones
@@ -58,77 +62,84 @@ export async function GET(request: NextRequest) {
     // 2. Para cada conversación, obtener al otro participante
     const conversationsWithParticipants = await Promise.all(
       (userConversations as any[]).map(async (conv) => {
-        // Obtener al otro participante
-        const otherParticipant = await prisma.$queryRaw`
-          SELECT 
-            u.id, 
-            u.username, 
-            u.name, 
-            u.image
-          FROM conversation_participants cp
-          JOIN users u ON cp.user_id = u.id
-          WHERE cp.conversation_id = ${conv.conversationId}
-          AND cp.user_id != ${session.user.id}
-          LIMIT 1
-        `;
+        try {
+          // Obtener al otro participante
+          const otherParticipant = await prisma.$queryRaw`
+            SELECT 
+              u.id, 
+              u.username, 
+              u.name, 
+              u.image
+            FROM conversation_participants cp
+            JOIN users u ON cp.user_id = u.id
+            WHERE cp.conversation_id = ${conv.conversationId}
+            AND cp.user_id != ${session.user.id}
+            LIMIT 1
+          `;
 
-        // Asegurar que otherParticipant tiene el formato correcto
-        const otherUser = Array.isArray(otherParticipant) && otherParticipant.length > 0 
-          ? {
-              id: otherParticipant[0].id as string,
-              username: otherParticipant[0].username as string | null,
-              name: otherParticipant[0].name as string | null,
-              image: otherParticipant[0].image as string | null
-            }
-          : {
-              id: "", 
-              username: null, 
-              name: null, 
-              image: null
-            };
-
-        // Obtener el último mensaje (si existe)
-        const lastMessage = await prisma.directMessage.findFirst({
-          where: {
-            OR: [
-              { senderId: session.user.id, receiverId: otherUser.id },
-              { senderId: otherUser.id, receiverId: session.user.id }
-            ]
-          },
-          orderBy: { createdAt: 'desc' }
-        });
-
-        // Obtener número de mensajes no leídos
-        const unreadCount = await prisma.directMessage.count({
-          where: {
-            senderId: otherUser.id,
-            receiverId: session.user.id,
-            read: false
+          // Si no hay otro participante (posible en conversaciones grupales o corruptas)
+          if (!Array.isArray(otherParticipant) || otherParticipant.length === 0) {
+            console.log(`No se encontró otro participante para conversación: ${conv.conversationId}`);
+            return null;
           }
-        });
 
-        return {
-          id: conv.conversationId,
-          receiver: {
-            id: otherUser.id,
-            username: otherUser.username,
-            name: otherUser.name,
-            image: otherUser.image
-          },
-          lastMessage: lastMessage ? {
-            content: lastMessage.content,
-            createdAt: lastMessage.createdAt,
-            read: lastMessage.read,
-          } : undefined,
-          unreadCount,
-          createdAt: conv.createdAt,
-          updatedAt: conv.updatedAt || conv.createdAt
-        };
+          // Asegurar que otherParticipant tiene el formato correcto
+          const otherUser = {
+            id: otherParticipant[0].id as string,
+            username: otherParticipant[0].username as string | null,
+            name: otherParticipant[0].name as string | null,
+            image: otherParticipant[0].image as string | null
+          };
+
+          // Obtener el último mensaje usando conversationId (ajuste clave)
+          const lastMessage = await prisma.directMessage.findFirst({
+            where: {
+              conversationId: conv.conversationId
+            },
+            orderBy: { createdAt: 'desc' }
+          });
+
+          // Obtener número de mensajes no leídos
+          const unreadCount = await prisma.directMessage.count({
+            where: {
+              conversationId: conv.conversationId,
+              senderId: { not: session.user.id },
+              read: false
+            }
+          });
+
+          return {
+            id: conv.conversationId,
+            receiver: {
+              id: otherUser.id,
+              username: otherUser.username,
+              name: otherUser.name,
+              image: otherUser.image
+            },
+            lastMessage: lastMessage ? {
+              content: lastMessage.content,
+              createdAt: lastMessage.createdAt,
+              read: lastMessage.read,
+              senderId: lastMessage.senderId,
+              messageType: lastMessage.messageType
+            } : undefined,
+            unreadCount,
+            createdAt: conv.createdAt,
+            updatedAt: conv.updatedAt || conv.createdAt
+          };
+        } catch (error) {
+          console.error(`Error procesando conversación ${conv.conversationId}:`, error);
+          return null;
+        }
       })
     );
 
-    // 3. Ordenar por fecha de actualización (más reciente primero)
-    const sortedConversations = conversationsWithParticipants.sort((a, b) => 
+    // Filtrar nulos y ordenar por fecha de actualización (más reciente primero)
+    const filteredConversations = conversationsWithParticipants.filter((conv): conv is NonNullable<typeof conv> => conv !== null);
+    
+    console.log(`Procesadas ${filteredConversations.length} conversaciones válidas`);
+    
+    const sortedConversations = filteredConversations.sort((a, b) => 
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
 
