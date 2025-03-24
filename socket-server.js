@@ -146,6 +146,20 @@ io.on('connection', (socket) => {
         onlineUsers.delete(socket.id);
       }
       
+      // Limpiar todas las conversaciones activas de este usuario
+      if (socket._activeConversations) {
+        socket._activeConversations.forEach(convId => {
+          if (activeConversations.has(convId)) {
+            activeConversations.get(convId).delete(userId);
+            
+            // Si la sala queda vacía, eliminarla
+            if (activeConversations.get(convId).size === 0) {
+              activeConversations.delete(convId);
+            }
+          }
+        });
+      }
+      
       // Emitir evento de usuarios conectados actualizado
       const userList = Array.from(onlineUsers.values());
       io.emit('users_online', userList);
@@ -205,54 +219,85 @@ io.on('connection', (socket) => {
   });
 
   // Unirse a una sala de conversación
-  socket.on('join_conversation', ({ conversationId }) => {
+  socket.on('join_conversation', async ({ conversationId }) => {
     // Obtener el userId del socket actual
     const userId = currentUserId || Object.keys(userSocketMap).find(uid => userSocketMap[uid] === socket.id);
     
     if (!conversationId) {
-      console.error('Error: conversationId no especificado al unirse a la conversación');
+      console.error('Se intentó unir a una conversación sin ID');
+      return;
+    }
+    
+    if (!userId) {
+      console.log(`Socket ${socket.id} intentó unirse a conversación ${conversationId} sin estar identificado`);
+      // Almacenar para unirse cuando el usuario se identifique
+      if (!socket._pendingConversations) {
+        socket._pendingConversations = [];
+      }
+      socket._pendingConversations.push(conversationId);
+      return;
+    }
+    
+    // Crear un nombre normalizado para la sala
+    const roomName = `conversation-${conversationId}`;
+    
+    // Verificar si ya está en la sala para evitar uniones duplicadas
+    const rooms = Array.from(socket.rooms || []);
+    if (rooms.includes(roomName)) {
+      console.log(`Usuario ${userId} ya está en la sala ${roomName}`);
+      return;
+    }
+    
+    // Unirse a la sala socket.io
+    socket.join(roomName);
+    
+    // Registrar la participación en la conversación
+    if (!activeConversations.has(conversationId)) {
+      activeConversations.set(conversationId, new Set());
+    }
+    activeConversations.get(conversationId).add(userId);
+    
+    console.log(`Usuario ${userId} se unió a la conversación ${conversationId}`);
+    console.log(`Participantes actuales: ${Array.from(activeConversations.get(conversationId)).join(', ')}`);
+    
+    // Almacenar las conversaciones activas de este socket para limpiarlas al desconectar
+    if (!socket._activeConversations) {
+      socket._activeConversations = new Set();
+    }
+    socket._activeConversations.add(conversationId);
+  });
+  
+  // Salir de una sala de conversación
+  socket.on('leave_conversation', ({ conversationId }) => {
+    // Obtener el userId del socket actual
+    const userId = currentUserId || Object.keys(userSocketMap).find(uid => userSocketMap[uid] === socket.id);
+    
+    if (!conversationId || !userId) {
+      console.error(`Datos incompletos para salir de conversación: userId=${userId}, conversationId=${conversationId}`);
       return;
     }
     
     const roomName = `conversation-${conversationId}`;
     
-    // Unirse a la sala
-    socket.join(roomName);
-    
-    // Registrar en log
-    if (userId) {
-      console.log(`Usuario ${userId} se unió a la conversación ${conversationId}`);
-    } else {
-      // Almacenar la conversación pendiente para unirse cuando el usuario se identifique
-      socket._pendingConversations = socket._pendingConversations || [];
-      if (!socket._pendingConversations.includes(conversationId)) {
-        socket._pendingConversations.push(conversationId);
-      }
-      console.log(`Socket ${socket.id} se unió a la conversación ${conversationId} (usuario no identificado)`);
-    }
-    
-    // Obtener lista de participantes activos en la sala
-    const room = io.sockets.adapter.rooms.get(roomName);
-    const participantCount = room ? room.size : 0;
-    
-    console.log(`Participantes activos en ${roomName}: ${participantCount}`);
-  });
-
-  // Salir de una sala de conversación
-  socket.on('leave_conversation', ({ conversationId }) => {
-    if (!conversationId) return;
-    
-    const roomName = `conversation-${conversationId}`;
+    // Salir de la sala
     socket.leave(roomName);
     
-    // Obtener el userId del socket actual
-    const userId = Object.keys(userSocketMap).find(uid => userSocketMap[uid] === socket.id);
-    
-    if (userId) {
-      console.log(`Usuario ${userId} salió de la conversación ${conversationId}`);
-    } else {
-      console.log(`Socket ${socket.id} salió de la conversación ${conversationId}`);
+    // Eliminar del registro de conversaciones activas
+    if (activeConversations.has(conversationId)) {
+      activeConversations.get(conversationId).delete(userId);
+      
+      // Si la sala queda vacía, eliminarla
+      if (activeConversations.get(conversationId).size === 0) {
+        activeConversations.delete(conversationId);
+      }
     }
+    
+    // Eliminar de las conversaciones activas de este socket
+    if (socket._activeConversations) {
+      socket._activeConversations.delete(conversationId);
+    }
+    
+    console.log(`Usuario ${userId} salió de la conversación ${conversationId}`);
   });
 
   // Evento: Enviar mensaje
@@ -277,7 +322,7 @@ io.on('connection', (socket) => {
       socket.emit('new_message', savedMessage);
       console.log(`Mensaje emitido al remitente (${savedMessage.senderId})`);
 
-      // Para el resto de usuarios, usar un enfoque de sala que evita duplicados
+      // Emitir a todos los miembros de la sala de conversación
       if (savedMessage.conversationId) {
         const roomName = `conversation-${savedMessage.conversationId}`;
         console.log(`Emitiendo mensaje a la sala ${roomName} (excluyendo remitente)`);
@@ -296,6 +341,11 @@ io.on('connection', (socket) => {
       }
     } catch (error) {
       console.error('Error al enviar mensaje:', error);
+      // Notificar al remitente que hubo un error
+      socket.emit('message_error', {
+        tempId: message.tempId,
+        error: 'Error al guardar el mensaje'
+      });
     }
   });
 
@@ -322,19 +372,34 @@ io.on('connection', (socket) => {
     }
     
     try {
+      // Actualizar mensaje como leído en la base de datos
+      await prisma.directMessage.update({
+        where: { id: messageId },
+        data: { read: true }
+      });
+      
       // Emitir evento de lectura a todos los participantes si es una conversación
       if (conversationId) {
         const roomName = `conversation-${conversationId}`;
         io.to(roomName).emit('message_read', { messageId, conversationId, readBy: userId });
       } else {
-        // Buscar el remitente original del mensaje para notificarle
-        // Aquí necesitaríamos consultar la BD para saber quién envió el mensaje
-        console.log(`Mensaje ${messageId} marcado como leído por ${userId}`);
+        // Buscar el remitente original del mensaje
+        const message = await prisma.directMessage.findUnique({
+          where: { id: messageId }
+        });
+        
+        if (message && message.senderId) {
+          const senderSocket = userSocketMap.get(message.senderId);
+          if (senderSocket) {
+            io.to(senderSocket).emit('message_read', { 
+              messageId, 
+              readBy: userId 
+            });
+          }
+        }
       }
       
-      // Actualizar en base de datos
-      // Este código debería ser expandido para hacer una llamada a la API
-      console.log(`Marcando mensaje ${messageId} como leído por ${userId} en BD`);
+      console.log(`Mensaje ${messageId} marcado como leído por ${userId}`);
     } catch (error) {
       console.error('Error al marcar mensaje como leído:', error);
     }

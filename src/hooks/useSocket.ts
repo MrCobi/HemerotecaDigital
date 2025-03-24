@@ -160,212 +160,178 @@ export default function useSocket(options: UseSocketOptions) {
   
   // Función para reiniciar el temporizador de inactividad
   const resetInactivityTimer = useCallback(() => {
-    // Si no hay usuario logueado, no iniciar temporizador
-    if (!userId) return;
-    
-    // Limpiar temporizador existente
+    // Si ya existe un temporizador, lo limpiamos
     if (inactivityTimeout.current) {
       clearTimeout(inactivityTimeout.current);
+      inactivityTimeout.current = null;
     }
     
-    // El usuario está activo
-    setIsActive(true);
-    
-    // Iniciar nuevo temporizador
-    inactivityTimeout.current = setTimeout(() => {
-      setIsActive(false);
-      // No desconectamos automáticamente, solo marcamos como inactivo
-    }, 1800000); // 30 minutos
+    // Solo establecer el temporizador si hay un userId y un socket conectado
+    if (userId && socketRef.current) {
+      inactivityTimeout.current = setTimeout(() => {
+        // Este timer solo se usa para enviar un ping, no para actualizar estados React
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit('user_activity', { userId });
+          // Al terminar, configuramos otro timer sin usar setState
+          resetInactivityTimer();
+        }
+      }, 60000); // 60 segundos
+    }
   }, [userId]);
 
-  // Handler for identifying user to the server
-  const identifyUser = useCallback(() => {
-    if (socketRef.current && userId && username) {
-      console.log(`[Socket ${instanceId.current}] Identificando usuario al servidor:`, userId, username);
-      socketRef.current.emit('identify', { userId, username });
-    }
-  }, [userId, username]);
-
-  // Setup event handlers for the socket
+  // Configurar manejadores de eventos del socket
   const setupEventHandlers = useCallback(() => {
     if (!socketRef.current) return;
-
+    
     const socket = socketRef.current;
-
-    // Limpiar manejadores previos para evitar duplicación
+    
+    // Limpiamos listeners previos para evitar duplicados
     socket.off('connect');
     socket.off('disconnect');
     socket.off('connect_error');
     socket.off('reconnect_error');
-    socket.off('force_disconnect');
-    socket.off('reidentify');
-    socket.off('pong');
-    socket.off('users_online');
     socket.off('new_message');
     socket.off('typing_status');
     socket.off('message_status');
     socket.off('message_read');
-
+    
     socket.on('connect', () => {
-      console.log(`[Socket ${instanceId.current}] Socket.io conectado con ID: ${socket.id}`);
+      console.log(`[Socket] Conectado`);
       setConnected(true);
-      resetInactivityTimer();
-      reconnectAttempts.current = 0; // Resetear intentos de reconexión cuando se conecta
-
-      // Iniciar el heartbeat para mantener la conexión viva
-      startHeartbeat(socket);
       
-      // Identificar al usuario cuando la conexión se establezca
-      identifyUser();
-      
-      if (callbacksRef.current.onConnect) callbacksRef.current.onConnect();
-    });
-
-    socket.on('disconnect', (reason) => {
-      console.log(`[Socket ${instanceId.current}] Socket.io desconectado. Razón: ${reason}`);
-      setConnected(false);
-      stopHeartbeat();
-
-      // Si es el usuario actual, intentar reconectar
-      if (userId === globalSocketUserId) {
-        // Intentar reconectar solo si hay un usuario y el componente está activo
-        if (userId && isActive) {
-          handleReconnect();
+      // Si el usuario está identificado, enviamos datos
+      if (userId) {
+        console.log(`[Socket] Identificando usuario: ${userId}`);
+        socket.emit('identify_user', { userId, username: username || 'Usuario' });
+        
+        // Iniciar heartbeat sin depender de actualizaciones de estado
+        if (!heartbeatInterval) {
+          startHeartbeat(socket);
         }
       }
-
-      if (callbacksRef.current.onDisconnect) callbacksRef.current.onDisconnect();
-    });
-
-    socket.on('connect_error', (e) => {
-      console.error(`[Socket ${instanceId.current}] Error de conexión Socket.io:`, e);
-      setConnected(false);
-      setError(e);
-      stopHeartbeat();
       
-      // Intentar reconectar con retraso incremental si hay un usuario y el componente está activo
-      if (userId && isActive) {
-        handleReconnect();
+      // Llamar al callback sin depender de actualizaciones de estado
+      if (callbacksRef.current.onConnect) {
+        callbacksRef.current.onConnect();
       }
-
-      if (callbacksRef.current.onError) callbacksRef.current.onError(e);
-    });
-
-    // Respuesta a ping para mantener la conexión
-    socket.on('pong', ({ timestamp }) => {
-      const latency = Date.now() - timestamp;
-      console.log(`[Socket ${instanceId.current}] Pong recibido. Latencia: ${latency}ms`);
-      
-      // Reiniciar temporizador de inactividad en cada pong
-      resetInactivityTimer();
     });
     
-    // Respuesta a heartbeat
-    socket.on('heartbeat_ack', () => {
-      // Registro opcional para depuración
-      // console.log(`[Socket ${instanceId.current}] Heartbeat ACK recibido`);
-      resetInactivityTimer();
+    socket.on('disconnect', (reason) => {
+      console.log(`[Socket] Desconectado: ${reason}`);
+      setConnected(false);
+      stopHeartbeat();
+      
+      // Llamar al callback sin depender de actualizaciones de estado
+      if (callbacksRef.current.onDisconnect) {
+        callbacksRef.current.onDisconnect();
+      }
     });
-
-    // Application events
-    socket.on('users_online', (users: UserType[]) => {
-      setOnlineUsers(users);
-      resetInactivityTimer();
-
-      if (callbacksRef.current.onUserOnline) callbacksRef.current.onUserOnline(users);
-    });
-
+    
+    // Evento de mensaje nuevo - sin actualizar estados adicionales
     socket.on('new_message', (message: MessageType) => {
-      const shouldProcess = message.receiverId === userId ||
+      const shouldProcessMessage = message.receiverId === userId || 
         (message.conversationId && activeConversations.current.has(message.conversationId));
       
-      // Reiniciar temporizador al recibir un mensaje
-      resetInactivityTimer();
-
-      if (shouldProcess && callbacksRef.current.onNewMessage) {
+      if (shouldProcessMessage && callbacksRef.current.onNewMessage) {
         callbacksRef.current.onNewMessage(message);
       }
     });
-  }, [identifyUser, userId]);
+    
+    // Resto de manejadores sin actualizar estados adicionales
+    socket.on('typing_status', (status: TypingStatusType) => {
+      if (callbacksRef.current.onTypingStatus) {
+        callbacksRef.current.onTypingStatus(status);
+      }
+    });
+    
+    socket.on('message_status', (status: { messageId: string; status: string }) => {
+      if (callbacksRef.current.onMessageStatus) {
+        callbacksRef.current.onMessageStatus(status);
+      }
+    });
+    
+    socket.on('message_read', (data: { messageId: string; conversationId?: string; readBy?: string }) => {
+      if (callbacksRef.current.onMessageRead) {
+        callbacksRef.current.onMessageRead(data);
+      }
+    });
+  }, [userId, username]);
 
   // Initialize socket connection
   useEffect(() => {
-    // Si no hay userId, no intentamos conectar
     if (!userId) return;
-
-    // Si ya hay una conexión global con el mismo userId, la reutilizamos
-    if (globalSocket && globalSocketUserId === userId) {
-      console.log(`[Socket ${instanceId.current}] Reutilizando conexión global existente`);
-      socketRef.current = globalSocket;
-      setupEventHandlers();
-      return;
-    }
-
-    // Prevenir conexiones simultáneas
-    if (connectionAttemptInProgress) {
-      console.log(`[Socket ${instanceId.current}] Conexión en progreso, esperando...`);
-      const checkInterval = setInterval(() => {
-        if (!connectionAttemptInProgress && globalSocket && globalSocketUserId === userId) {
-          clearInterval(checkInterval);
-          console.log(`[Socket ${instanceId.current}] Usando conexión recién establecida`);
-          socketRef.current = globalSocket;
-          setupEventHandlers();
-        }
-      }, 100);
-
-      // Tiempo máximo de espera de 3 segundos
-      setTimeout(() => {
-        clearInterval(checkInterval);
-      }, 3000);
-
-      return;
-    }
-
-    // Si hay una conexión global con otro userId, la desconectamos
-    if (globalSocket && globalSocketUserId !== userId) {
-      console.log(`[Socket ${instanceId.current}] Desconectando socket de usuario anterior:`, globalSocketUserId);
-      globalSocket.disconnect();
-      globalSocket = null;
-      globalSocketUserId = null;
-    }
-
-    connectionAttemptInProgress = true;
-    console.log(`[Socket ${instanceId.current}] Iniciando nueva conexión socket para usuario:`, userId);
-
-    // Create new socket connection
-    const newSocket = io(SOCKET_SERVER_URL, {
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      timeout: 10000,
-      auth: {
-        userId: userId
+    
+    // Para prevenir inicializaciones múltiples, usamos una bandera
+    let isInitializing = false;
+    
+    const initSocket = () => {
+      // Si ya hay una conexión global con el mismo usuario, reutilizarla
+      if (globalSocket && globalSocketUserId === userId) {
+        console.log('Reutilizando conexión global existente');
+        socketRef.current = globalSocket;
+        setupEventHandlers();
+        return;
       }
-    });
-
-    // Update refs and globals
-    socketRef.current = newSocket;
-    globalSocket = newSocket;
-    globalSocketUserId = userId;
-
-    // Set up socket event handlers
-    setupEventHandlers();
-
-    connectionAttemptInProgress = false;
-
-    // Cleanup on unmount
-    return () => {
-      console.log(`[Socket ${instanceId.current}] Componente desmontado, manteniendo conexión global`);
-
-      // Note: we don't disconnect because we want to keep
-      // the global socket alive for other components
-
-      // Clear inactivity timeout
-      if (inactivityTimeout.current) {
-        clearTimeout(inactivityTimeout.current);
+      
+      // Si ya estamos inicializando, no continuar
+      if (isInitializing) return;
+      isInitializing = true;
+      
+      // Cerrar cualquier conexión previa de otro usuario
+      if (globalSocket && globalSocketUserId !== userId) {
+        console.log('Cerrando conexión de usuario anterior');
+        globalSocket.disconnect();
+        globalSocket = null;
+        globalSocketUserId = null;
+      }
+      
+      console.log('Creando nueva conexión socket');
+      const newSocket = io(SOCKET_SERVER_URL, {
+        transports: ['websocket', 'polling'],
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        timeout: 10000,
+        auth: { userId }
+      });
+      
+      socketRef.current = newSocket;
+      globalSocket = newSocket;
+      globalSocketUserId = userId;
+      
+      setupEventHandlers();
+      isInitializing = false;
+    };
+    
+    initSocket();
+    
+    // Escuchar eventos de actividad para reiniciar timer sin provocar rerenderizados
+    const handleActivity = () => {
+      // No usamos setState aquí, solo reiniciamos el timer si es necesario
+      if (userId && socketRef.current && socketRef.current.connected) {
+        resetInactivityTimer();
       }
     };
-  }, [userId, setupEventHandlers]);
+    
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('click', handleActivity);
+    
+    return () => {
+      // Limpiar listeners de eventos
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('click', handleActivity);
+      
+      // Limpiar timers
+      if (inactivityTimeout.current) {
+        clearTimeout(inactivityTimeout.current);
+        inactivityTimeout.current = null;
+      }
+      
+      // No desconectamos el socket global para mantener la conexión
+      console.log('Componente desmontado, manteniendo conexión global');
+    };
+  }, [userId, setupEventHandlers, resetInactivityTimer]);
 
   // Manejar reconexión con backoff exponencial
   const handleReconnect = useCallback(() => {
@@ -456,6 +422,19 @@ export default function useSocket(options: UseSocketOptions) {
     setupEventHandlers();
 
     connectionAttemptInProgress = false;
+
+    // Cleanup on unmount
+    return () => {
+      console.log(`[Socket ${instanceId.current}] Componente desmontado, manteniendo conexión global`);
+
+      // Note: we don't disconnect because we want to keep
+      // the global socket alive for other components
+
+      // Clear inactivity timeout
+      if (inactivityTimeout.current) {
+        clearTimeout(inactivityTimeout.current);
+      }
+    };
   }, [userId, setupEventHandlers]);
 
   // Actualiza el estado de actividad del usuario
