@@ -476,8 +476,10 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
       // Para mensajes sin ID ni tempId (caso raro), crear una clave única compuesta
       else {
-        // Generar una clave única para cada mensaje, incluso si tienen el mismo contenido
-        const uniqueKey = `msg-${msg.senderId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        // Usar una combinación del senderId, receiverId, contenido y timestamp para generar una clave única
+        // que garantice que no se filtren mensajes duplicados legítimos
+        const now = Date.now();
+        const uniqueKey = `msg-${msg.senderId}-${now}-${Math.random().toString(36).substr(2, 9)}`;
         updatedMap.set(uniqueKey, msg);
       }
     });
@@ -494,7 +496,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     
     return uniqueMessages;
   }, [messageMap]);
-
+  
   // Actualizar el estado de mensajes cuando cambia el mapa
   useEffect(() => {
     const uniqueMessages = Array.from(messageMap.values()).sort((a, b) => {
@@ -505,7 +507,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     
     setMessages(uniqueMessages);
   }, [messageMap]);
-
+  
   // Verificar si los usuarios se siguen mutuamente
   useEffect(() => {
     if (!otherUser?.id || !currentUserId) return;
@@ -546,7 +548,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     
     checkMutualFollow();
   }, [currentUserId, otherUser?.id]);
-
+  
   // Cargar mensajes cuando cambia la conversación o al iniciar
   useEffect(() => {
     // No hacer nada si no hay ID de conversación o ya se están cargando
@@ -714,7 +716,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     // Solo incluir safeConversationId como dependencia para evitar el bucle infinito
     // Las otras variables las capturamos en el closure
   }, [safeConversationId, hasMore, pageSize]);
-
+  
   // Cargar más mensajes
   const loadMoreMessages = async () => {
     if (!safeConversationId || isLoadingMore || !hasMore || isFetchingRef.current) return;
@@ -734,11 +736,11 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       const response = await fetch(
         `${API_ROUTES.messages.list}?with=${actualConversationId || safeConversationId}&page=${nextPage}&limit=${pageSize}`
       );
-
+  
       if (!response.ok) {
         throw new Error('Error al cargar más mensajes');
       }
-
+  
       const data = await response.json();
       const oldMessages = Array.isArray(data.messages) ? data.messages : [];
       
@@ -774,7 +776,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       isFetchingRef.current = false;
     }
   };
-
+  
   // Restaurar posición de scroll después de cargar más mensajes
   useEffect(() => {
     if (preserveScrollPosition && chatContainerRef.current) {
@@ -784,7 +786,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       setPreserveScrollPosition(false);
     }
   }, [preserveScrollPosition, messages]);
-
+  
   // Manejar scroll automático
   useEffect(() => {
     const handleNewMessage = (message: MessageType) => {
@@ -802,13 +804,13 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         }
       }
     };
-
+  
     socketInstance?.on('new_message', handleNewMessage);
     return () => {
       socketInstance?.off('new_message', handleNewMessage);
     };
   }, [socketInstance, safeConversationId, autoScrollEnabled, messages, processMessages]);
-
+  
   // Detectar posición del scroll
   const handleScroll = () => {
     const element = chatContainerRef.current;
@@ -818,7 +820,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       setAutoScrollEnabled(isNearBottom);
     }
   };
-
+  
   // Enviar notificación de escritura
   const sendTypingNotification = useCallback((newMessage: string) => {
     if (newMessage.trim().length > 0 && !isTyping && socketInstance && socketInitialized && currentUserId && otherUser?.id) {
@@ -849,14 +851,14 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }, 3000);
     }
   }, [isTyping, socketInstance, socketInitialized, otherUser?.id, currentUserId]);
-
+  
   // Efecto para mantener activo el socket mientras el usuario está en la pantalla de chat
   useEffect(() => {
     // Marcar al usuario como activo al entrar al componente
     if (setActive && currentUserId) {
       setActive(true);
     }
-
+  
     // Si el socket está desconectado, intentar reconectar
     if (currentUserId && !connected && reconnect) {
       console.log('Socket no conectado, intentando reconectar...');
@@ -867,7 +869,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     if (safeConversationId && connected && socketInitialized) {
       joinConversation(safeConversationId);
     }
-
+  
     // Al desmontar el componente, marcar como inactivo
     return () => {
       if (setActive && currentUserId) {
@@ -881,7 +883,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     };
   }, [safeConversationId, connected, socketInitialized, currentUserId, setActive, reconnect]);
-
+  
   // Nueva función para enviar mensaje de voz
   const handleVoiceMessageSend = async (audioBlob: Blob) => {
     if (isSending || !otherUser || !canSendMessages || !currentUserId) return;
@@ -914,13 +916,13 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         },
         body: formData,
       });
-
+  
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
         console.error('Error al subir el audio', errorText);
         throw new Error("Error al subir el audio: " + errorText);
       }
-
+  
       const data = await uploadResponse.json();
       // Usar la URL completa devuelta por la API
       const audioUrl = data.url;
@@ -946,7 +948,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       
       // Enviar mensaje al servidor
       await sendMessageToServer(messageToSend, tempId);
-
+  
     } catch (error) {
       console.error('Error enviando mensaje de voz:', error);
       alert("Error al enviar mensaje de voz: " + (error instanceof Error ? error.message : String(error)));
@@ -962,7 +964,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     }
   };
-
+  
   // Enviar un mensaje
   const sendMessage = async () => {
     if (!newMessage.trim() || isSending || !otherUser || !canSendMessages) return;
@@ -997,7 +999,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       setIsSending(false);
     }
   };
-
+  
   // Función para enviar mensajes al servidor
   const sendMessageToServer = async (message: Message, tempId: string) => {
     try {
@@ -1066,7 +1068,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       throw error; // Re-lanzar el error para que el catch de nivel superior lo maneje
     }
   };
-
+  
   // Marcar mensaje como leído
   const markMessageAsRead = (messageId?: string, conversationId?: string) => {
     if (!messageId || !conversationId || !socketInstance || !socketInitialized) {
@@ -1082,7 +1084,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       conversationId: conversationId
     });
   };
-
+  
   // Actualizar estado de un mensaje
   const updateMessageStatus = (messageId: string, newStatus: MessageStatus) => {
     // Buscar el mensaje en nuestro estado para actualizarlo
@@ -1100,7 +1102,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       processMessages([updatedMessage], messages);
     }
   };
-
+  
   // Manejar tecla Enter para enviar
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1108,7 +1110,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       sendMessage();
     }
   };
-
+  
   // Cuando la conversación cambia, restablecer todo
   useEffect(() => {
     if (safeConversationId) {
@@ -1126,7 +1128,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     }
   }, [safeConversationId]);
-
+  
   // Enviar estado de "escribiendo"
   useEffect(() => {
     if (!otherUser?.id || !socketInstance || !socketInitialized || !currentUserId) return;
@@ -1162,7 +1164,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     };
   }, [currentUserId, isTyping, otherUser?.id, socketInstance, socketInitialized]);
-
+  
   // Unir a conversación cuando el socket esté listo
   useEffect(() => {
     if (socketInitialized && safeConversationId) {
@@ -1170,7 +1172,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       joinConversation(safeConversationId);
     }
   }, [socketInitialized, safeConversationId, joinConversation]);
-
+  
   // Añadir efecto para cargar el conversationId desde localStorage al inicio
   useEffect(() => {
     if (otherUser?.id && !actualConversationId && !conversationId) {
@@ -1185,7 +1187,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     }
   }, [otherUser?.id, actualConversationId, conversationId]);
-
+  
   // Nueva función para añadir mensaje local de manera más eficiente
   const addLocalMessage = useCallback((message: Message) => {
     // Añadir el mensaje al mapa directamente
@@ -1212,7 +1214,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         return dateA.getTime() - dateB.getTime();
       });
   }, [messageMap]);
-
+  
   // Función para actualizar mensaje local existente
   const updateLocalMessage = useCallback((messageId: string, updates: Partial<Message>) => {
     setMessageMap(prevMap => {
@@ -1233,7 +1235,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       return newMap;
     });
   }, []);
-
+  
   // Efectos para monitorear la actividad y reconectar el socket si es necesario
   useEffect(() => {
     // Escuchar eventos de actividad del usuario
@@ -1255,7 +1257,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       window.removeEventListener('keydown', handleUserActivity);
     };
   }, [connected, reconnect, currentUserId]);
-
+  
   return (
     <div className={cn("flex flex-col h-full", className)}>
       {/* Contenedor de mensajes */}
@@ -1363,7 +1365,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           </>
         )}
       </div>
-
+  
       {/* Input para enviar mensajes */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-700">
         {canSendMessages === false ? (
@@ -1424,7 +1426,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           </div>
         )}
       </div>
-
+  
       {/* Componente de grabación de voz */}
       {isVoiceRecorderVisible && (
         <VoiceMessageRecorder
@@ -1453,7 +1455,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           setUploadStatus={setUploadStatus}
         />
       )}
-
+  
       {/* Estado de error */}
       {errorLoadingMessages && (
         <div className="flex flex-col items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 rounded-lg mx-auto my-4 max-w-md">
@@ -1478,7 +1480,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           )}
         </div>
       )}
-
+  
       {/* Mensaje para conversaciones vacías */}
       {messages.length === 0 && !isLoadingMessages && !errorLoadingMessages && (
         <div className="flex flex-col items-center justify-center p-6 text-center">
@@ -1492,7 +1494,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           </p>
         </div>
       )}
-
+  
       {/* Estilos para el indicador de escritura */}
       <style jsx global>{`
         .typing-indicator {

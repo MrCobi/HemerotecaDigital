@@ -211,17 +211,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
       if (tempId) {
         const existingMessage = await prisma.directMessage.findFirst({
           where: {
-            OR: [
-              { tempId: tempId },
-              { 
-                AND: [
-                  { senderId: userId },
-                  { receiverId: receiverId },
-                  { content: content },
-                  { createdAt: { gt: new Date(Date.now() - 300000) } } // Extendido a 5 minutos para mayor seguridad
-                ]
-              }
-            ]
+            tempId: tempId // Solo comprobar si existe un mensaje con el mismo tempId
           }
         });
 
@@ -230,14 +220,15 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
           return existingMessage;
         }
       } else {
-        // Si no hay tempId, verificar igualmente si existe un mensaje similar reciente
+        // Si no hay tempId, verificar si existe un mensaje exactamente igual en un corto período
+        // (esto solo se aplicaría en caso de posibles duplicados por errores de red)
         const existingMessage = await prisma.directMessage.findFirst({
           where: {
             AND: [
               { senderId: userId },
               { receiverId: receiverId },
               { content: content },
-              { createdAt: { gt: new Date(Date.now() - 300000) } } // Últimos 5 minutos
+              { createdAt: { gt: new Date(Date.now() - 10000) } } // Verificar solo en los últimos 10 segundos
             ]
           },
           orderBy: {
@@ -246,7 +237,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
         });
 
         if (existingMessage) {
-          console.log(`Mensaje similar reciente encontrado sin tempId. ID existente: ${existingMessage.id}`);
+          console.log(`Posible duplicado por red detectado. ID existente: ${existingMessage.id}`);
           return existingMessage;
         }
       }
