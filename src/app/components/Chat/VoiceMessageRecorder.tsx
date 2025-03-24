@@ -10,7 +10,7 @@ interface VoiceMessageRecorderProps {
   receiverId: string;
   session: any;
   onClose: () => void;
-  setUploadStatus: (status: string) => void;
+  setUploadStatus: (status: 'idle' | 'uploading' | 'success' | 'error') => void;
 }
 
 // Clave para almacenar el audioUrl en localStorage
@@ -293,7 +293,17 @@ const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
       // Asegurar que todos los estados se restablezcan
       clearRecordingHook();
       setRecordingState('idle');
+      setAudioURLHook(''); // Limpiar explícitamente el audioURL
       
+      // Liberar recursos de media
+      if (audioRef.current) {
+        const audio = audioRef.current;
+        audio.pause();
+        audio.src = '';
+        audio.load();
+      }
+      
+      // Cerrar el componente para que pueda abrirse nuevamente
       onClose();
     } catch (error) {
       console.error('Error al enviar el mensaje de voz:', error);
@@ -306,8 +316,18 @@ const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
   // Función para cancelar grabación
   const handleCancel = () => {
     clearRecordingHook();
+    setAudioURLHook(''); // Limpiar explícitamente el audioURL
     localStorage.removeItem(AUDIO_URL_STORAGE_KEY);
     localStorage.removeItem(RECORDING_STATE_STORAGE_KEY);
+    
+    // Liberar recursos de media
+    if (audioRef.current) {
+      const audio = audioRef.current;
+      audio.pause();
+      audio.src = '';
+      audio.load();
+    }
+    
     onCancel();
   };
 

@@ -89,33 +89,84 @@ app.post('/webhook/new-message', (req, res) => {
   }
 });
 
-const PING_INTERVAL = 25000;
-const PONG_TIMEOUT = 10000;
+const pingClients = () => {
+  const currentTimestamp = Date.now();
+  console.log(`Ping enviando a todos los clientes conectados...`);
+  
+  Object.keys(userSocketMap).forEach(userId => {
+    const socketId = userSocketMap[userId];
+    const socket = io.sockets.sockets.get(socketId);
+    if (socket) {
+      // Solo enviar ping si el socket existe y está conectado
+      if (socket.connected) {
+        // Enviar ping y esperar respuesta
+        socket.emit('ping', { timestamp: currentTimestamp });
+        socket._lastPingTime = currentTimestamp;
+        
+        // Programar verificación de respuesta
+        setTimeout(() => {
+          // Si el socket todavía existe y no ha respondido al ping
+          if (socket && socket.connected && socket._lastPingTime === currentTimestamp) {
+            console.log(`No respuesta de ping para ${socketId} - Desconectando`);
+            socket.disconnect(true);
+          }
+        }, 10000); // Esperar respuesta por 10 segundos en lugar de 5
+      }
+    }
+  });
+};
+
+// Iniciar ping cada 60 segundos en lugar de 30
+const pingInterval = setInterval(pingClients, 60000);
 
 // Manejar conexiones de Socket.io
 io.on('connection', (socket) => {
   let currentUserId = null;
-  let pingTimeout;
   
   console.log(chalk.green(`[${new Date().toISOString()}] Conexión establecida: ${socket.id}`));
   
-  const heartbeat = () => {
-    clearTimeout(pingTimeout);
-    pingTimeout = setTimeout(() => {
-      console.log(chalk.red(`[${new Date().toISOString()}] No respuesta de ping para ${socket.id} - Desconectando`));
-      socket.disconnect();
-    }, PONG_TIMEOUT);
-  };
-
-  socket.on('pong', heartbeat);
-  
-  const pingInterval = setInterval(() => {
-    if (socket.connected) {
-      socket.emit('ping');
-      console.log(chalk.yellow(`[${new Date().toISOString()}] Ping enviado a: ${socket.id}`));
-      heartbeat();
+  // Socket.io event handlers
+  socket.on('disconnect', (reason) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Desconexión: ${socket.id}`);
+    
+    // Encontrar el userId asociado con este socket
+    const userId = Object.keys(userSocketMap).find(uid => userSocketMap[uid] === socket.id);
+    
+    // Eliminar el socket de las listas y mapas
+    if (userId) {
+      console.log(`Usuario ${userId} desconectado correctamente`);
+      
+      // Eliminar de los mapas
+      delete userSocketMap[userId];
+      
+      // Eliminar de los usuarios online
+      const userIndex = Array.from(onlineUsers.values()).findIndex(u => u.userId === userId);
+      if (userIndex !== -1) {
+        onlineUsers.delete(socket.id);
+      }
+      
+      // Emitir evento de usuarios conectados actualizado
+      const userList = Array.from(onlineUsers.values());
+      io.emit('users_online', userList);
     }
-  }, PING_INTERVAL);
+  });
+  
+  // Evento: Respuesta a ping
+  socket.on('pong', ({ timestamp }) => {
+    // Actualizar último tiempo de ping
+    socket._lastPingTime = null;
+    const latency = Date.now() - timestamp;
+    console.log(`Pong recibido de ${socket.id}. Latencia: ${latency}ms`);
+  });
+  
+  // Marcar como activo cuando recibimos un heartbeat
+  socket.on('heartbeat', ({ timestamp }) => {
+    // Responder con confirmación
+    socket.emit('heartbeat_ack');
+    // Actualizar último tiempo de actividad
+    socket._lastActivityTime = Date.now();
+  });
 
   // Evento: Usuario se identifica
   socket.on('identify', ({ userId, username }) => {
@@ -139,37 +190,69 @@ io.on('connection', (socket) => {
     Array.from(onlineUsers.entries()).forEach(([socketId, user]) => {
       console.log(`- Socket: ${socketId}, Usuario: ${user.userId}, Nombre: ${user.username}`);
     });
+    
+    // Unirse a conversaciones pendientes ahora que el usuario está identificado
+    if (socket._pendingConversations && socket._pendingConversations.length > 0) {
+      console.log(`Uniendo usuario ${userId} a ${socket._pendingConversations.length} conversaciones pendientes`);
+      socket._pendingConversations.forEach(convId => {
+        const roomName = `conversation-${convId}`;
+        // Ya estamos unidos, solo actualizamos el registro
+        console.log(`Usuario ${userId} ahora identificado en conversación ${convId}`);
+      });
+      // Limpiar lista de pendientes
+      socket._pendingConversations = [];
+    }
   });
 
-  // Evento: Usuario se une a una conversación
-  socket.on('join_conversation', ({ userId, conversationId }) => {
-    // Unir al usuario a la sala de la conversación
-    socket.join(`conversation-${conversationId}`);
+  // Unirse a una sala de conversación
+  socket.on('join_conversation', ({ conversationId }) => {
+    // Obtener el userId del socket actual
+    const userId = currentUserId || Object.keys(userSocketMap).find(uid => userSocketMap[uid] === socket.id);
     
-    // Registrar en la lista de conversaciones activas
-    if (!activeConversations.has(conversationId)) {
-      activeConversations.set(conversationId, new Set());
+    if (!conversationId) {
+      console.error('Error: conversationId no especificado al unirse a la conversación');
+      return;
     }
-    activeConversations.get(conversationId).add(userId);
     
-    console.log(`Usuario ${userId} se unió a la conversación ${conversationId}`);
-    console.log(`Participantes activos: ${Array.from(activeConversations.get(conversationId)).join(', ')}`);
-  });
-  
-  // Evento: Usuario abandona una conversación
-  socket.on('leave_conversation', ({ userId, conversationId }) => {
-    socket.leave(`conversation-${conversationId}`);
+    const roomName = `conversation-${conversationId}`;
     
-    // Actualizar la lista de conversaciones activas
-    if (activeConversations.has(conversationId)) {
-      activeConversations.get(conversationId).delete(userId);
-      
-      if (activeConversations.get(conversationId).size === 0) {
-        activeConversations.delete(conversationId);
+    // Unirse a la sala
+    socket.join(roomName);
+    
+    // Registrar en log
+    if (userId) {
+      console.log(`Usuario ${userId} se unió a la conversación ${conversationId}`);
+    } else {
+      // Almacenar la conversación pendiente para unirse cuando el usuario se identifique
+      socket._pendingConversations = socket._pendingConversations || [];
+      if (!socket._pendingConversations.includes(conversationId)) {
+        socket._pendingConversations.push(conversationId);
       }
+      console.log(`Socket ${socket.id} se unió a la conversación ${conversationId} (usuario no identificado)`);
     }
     
-    console.log(`Usuario ${userId} abandonó la conversación ${conversationId}`);
+    // Obtener lista de participantes activos en la sala
+    const room = io.sockets.adapter.rooms.get(roomName);
+    const participantCount = room ? room.size : 0;
+    
+    console.log(`Participantes activos en ${roomName}: ${participantCount}`);
+  });
+
+  // Salir de una sala de conversación
+  socket.on('leave_conversation', ({ conversationId }) => {
+    if (!conversationId) return;
+    
+    const roomName = `conversation-${conversationId}`;
+    socket.leave(roomName);
+    
+    // Obtener el userId del socket actual
+    const userId = Object.keys(userSocketMap).find(uid => userSocketMap[uid] === socket.id);
+    
+    if (userId) {
+      console.log(`Usuario ${userId} salió de la conversación ${conversationId}`);
+    } else {
+      console.log(`Socket ${socket.id} salió de la conversación ${conversationId}`);
+    }
   });
 
   // Evento: Enviar mensaje
@@ -254,25 +337,6 @@ io.on('connection', (socket) => {
       console.log(`Marcando mensaje ${messageId} como leído por ${userId} en BD`);
     } catch (error) {
       console.error('Error al marcar mensaje como leído:', error);
-    }
-  });
-  
-  // Evento: Desconexión
-  socket.on('disconnect', () => {
-    clearInterval(pingInterval);
-    clearTimeout(pingTimeout);
-    console.log(chalk.blue(`[${new Date().toISOString()}] Desconexión: ${socket.id}`));
-    
-    if (currentUserId) {
-      onlineUsers.delete(socket.id);
-      userSocketMap.delete(currentUserId);
-      console.log(`Usuario ${currentUserId} desconectado correctamente`);
-      
-      // Emitir lista actualizada
-      const userList = Array.from(onlineUsers.values());
-      io.emit('users_online', userList);
-    } else {
-      console.log(`Socket desconectado: ${socket.id} (Usuario desconocido)`);
     }
   });
 });

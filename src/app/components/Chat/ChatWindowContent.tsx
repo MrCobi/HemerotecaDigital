@@ -386,6 +386,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   const [peerIsTyping, setPeerIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   
   // Estado para controlar la carga de mensajes
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
@@ -424,83 +425,30 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     updateTypingStatus: socketUpdateTypingStatus,
     markMessageAsRead: socketMarkMessageAsRead,
     joinConversation,
-    leaveConversation
+    leaveConversation,
+    setActive, 
+    reconnect  
   } = useSocket({
     userId: currentUserId,
     username: session?.user?.name || session?.user?.username || undefined,
     onConnect: () => {
-      if (!connected) {
-        console.log('Socket conectado pero aún no listo');
-        return;
-      }
-      console.log(`Socket conectado en ChatWindow (${conversationId})`);
+      console.log('Socket conectado en ChatWindow');
       setSocketInitialized(true);
       
-      // Al conectar, unirse a la conversación si hay un ID válido
+      // Cuando el socket se conecta, unirse a la sala de la conversación
       if (safeConversationId) {
         joinConversation(safeConversationId);
-        
-        // Marcar mensajes como leídos
-        if (messages && messages.length > 0 && messages[messages.length - 1].id) {
-          socketMarkMessageAsRead({
-            conversationId: safeConversationId,
-            messageId: messages[messages.length - 1].id as string
-          });
-        }
       }
     },
     onDisconnect: () => {
       console.log('Socket desconectado en ChatWindow');
-      setSocketInitialized(false);
+      // No hacemos setSocketInitialized(false) para evitar problemas con la interfaz
     },
-    onNewMessage: (message) => {
-      console.log('Nuevo mensaje recibido en ChatWindow:', message);
-      
-      // Si el mensaje pertenece a esta conversación, añadirlo
-      if (message.conversationId === safeConversationId || 
-          (message.senderId === otherUser?.id && message.receiverId === currentUserId) ||
-          (message.senderId === currentUserId && message.receiverId === otherUser?.id)) {
-            
-        // Actualizar el estado de los mensajes
-        processMessages([message], messages);
-        
-        // Marcar automáticamente como leídos los mensajes recibidos
-        if (message.senderId !== currentUserId && message.id) {
-          socketMarkMessageAsRead({
-            conversationId: message.conversationId || safeConversationId,
-            messageId: message.id
-          });
-        }
-      }
-    },
-    onTypingStatus: (status) => {
-      if (status.userId === otherUser?.id) {
-        setPeerIsTyping(status.isTyping);
-      }
-    },
-    onMessageStatus: (status: { messageId: string; status: string }) => {
-      console.log(`Actualizando estado del mensaje ${status.messageId} a ${status.status}`);
-      updateMessageStatus(status.messageId, status.status as MessageStatus);
-    },
-    onMessageRead: (data) => {
-      // Buscar el mensaje en nuestro estado actual por su ID
-      const foundMessage = messages.find(msg => msg.id === data.messageId);
-      
-      // Solo procesar si encontramos el mensaje
-      if (foundMessage) {
-        // Crear una versión actualizada del mensaje con el estado de lectura
-        const updatedMessage: Message = {
-          ...foundMessage,
-          read: true,
-          status: 'read'
-        };
-        
-        // Actualizar el mensaje utilizando nuestra función de procesamiento
-        processMessages([updatedMessage], messages);
-      }
+    onError: (error) => {
+      console.error('Error en socket:', error);
     }
   });
-
+  
   // Función para procesar y deduplicar mensajes
   const processMessages = useCallback((newMessages: Message[], existingMessages: Message[] = []) => {
     // Evitar procesar mensajes vacíos
@@ -661,7 +609,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         if (fetchedMessages.length > 0 && fetchedMessages[0].conversationId) {
           const msgConversationId = fetchedMessages[0].conversationId;
           if (msgConversationId && !actualConversationId) {
-            console.log('Actualizando conversationId real:', msgConversationId);
+            console.log(`Actualizado conversationId: ${msgConversationId}`);
             setActualConversationId(msgConversationId);
             
             // Guardar en localStorage para recordar este conversationId
@@ -715,11 +663,11 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       const response = await fetch(
         `${API_ROUTES.messages.list}?with=${actualConversationId || safeConversationId}&page=${nextPage}&limit=${pageSize}`
       );
-      
+
       if (!response.ok) {
         throw new Error('Error al cargar más mensajes');
       }
-      
+
       const data = await response.json();
       const oldMessages = Array.isArray(data.messages) ? data.messages : [];
       
@@ -802,13 +750,15 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
 
   // Enviar notificación de escritura
   const sendTypingNotification = useCallback((newMessage: string) => {
-    if (newMessage.trim().length > 0 && !isTyping && socketInstance && socketInitialized) {
+    if (newMessage.trim().length > 0 && !isTyping && socketInstance && socketInitialized && currentUserId && otherUser?.id) {
       setIsTyping(true);
       
       // Enviar estado de "escribiendo" al receptor
-      if (otherUser?.id) {
-        socketUpdateTypingStatus({ conversationId: safeConversationId, isTyping: true });
-      }
+      socketUpdateTypingStatus({ 
+        userId: currentUserId, 
+        conversationId: safeConversationId, 
+        isTyping: true 
+      });
       
       // Limpiar timeout anterior si existe
       if (typingTimeoutRef.current) {
@@ -818,33 +768,129 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       // Establecer nuevo timeout para detener estado de "escribiendo" después de 3 segundos de inactividad
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
-        if (socketInstance && socketInitialized && otherUser?.id) {
-          socketUpdateTypingStatus({ conversationId: safeConversationId, isTyping: false });
+        if (socketInstance && socketInitialized && currentUserId) {
+          socketUpdateTypingStatus({ 
+            userId: currentUserId, 
+            conversationId: safeConversationId, 
+            isTyping: false 
+          });
         }
       }, 3000);
     }
-  }, [isTyping, socketInstance, socketInitialized, otherUser?.id]);
+  }, [isTyping, socketInstance, socketInitialized, otherUser?.id, currentUserId]);
 
-  // Monitoreo de estado para evitar que la mensajería quede bloqueada
+  // Efecto para mantener activo el socket mientras el usuario está en la pantalla de chat
   useEffect(() => {
-    // Timeout de seguridad para evitar que isSending quede atascado en true
-    let sendingTimeout: NodeJS.Timeout | null = null;
-    
-    if (isSending) {
-      console.log('Estado de envío activado, configurando timeout de seguridad');
-      // Si después de 10 segundos todavía está en "enviando", lo reseteamos
-      sendingTimeout = setTimeout(() => {
-        console.log('⚠️ Timeout de seguridad activado - reseteando estado de envío');
-        setIsSending(false);
-      }, 10000);
+    // Marcar al usuario como activo al entrar al componente
+    if (setActive && currentUserId) {
+      setActive(true);
+    }
+
+    // Si el socket está desconectado, intentar reconectar
+    if (currentUserId && !connected && reconnect) {
+      console.log('Socket no conectado, intentando reconectar...');
+      reconnect();
     }
     
+    // Unirse a la sala de la conversación
+    if (safeConversationId && connected && socketInitialized) {
+      joinConversation(safeConversationId);
+    }
+
+    // Al desmontar el componente, marcar como inactivo
     return () => {
-      if (sendingTimeout) {
-        clearTimeout(sendingTimeout);
+      if (setActive && currentUserId) {
+        // No desconectamos inmediatamente al salir, solo marcamos como inactivo
+        setActive(false);
+      }
+      
+      // Salir de la sala de conversación
+      if (safeConversationId && leaveConversation) {
+        leaveConversation(safeConversationId);
       }
     };
-  }, [isSending]);
+  }, [safeConversationId, connected, socketInitialized, currentUserId, setActive, reconnect]);
+
+  // Nueva función para enviar mensaje de voz
+  const handleVoiceMessageSend = async (audioBlob: Blob) => {
+    if (isSending || !otherUser || !canSendMessages || !currentUserId) return;
+    
+    setIsSending(true);
+    setIsVoiceRecorderVisible(false); // Ocultar grabador inmediatamente al enviar
+    
+    try {
+      console.log("Preparando para enviar mensaje de voz...");
+      setUploadStatus('uploading');
+      
+      // Crear un FormData para subir el archivo
+      const formData = new FormData();
+      
+      // Crear un nuevo archivo con extensión más compatible
+      const audioFile = new File([audioBlob], `voice_message_${Date.now()}.webm`, { 
+        type: audioBlob.type || 'audio/webm' 
+      });
+      
+      console.log('Subiendo archivo de audio:', audioFile.name, audioFile.type, audioFile.size);
+      
+      formData.append('file', audioFile);
+      formData.append('fileType', 'audio');
+      
+      // Subir a la API
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.user?.email || ''}`,
+        },
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('Error al subir el audio', errorText);
+        throw new Error("Error al subir el audio: " + errorText);
+      }
+
+      const data = await uploadResponse.json();
+      // Usar la URL completa devuelta por la API
+      const audioUrl = data.url;
+      console.log('Audio subido correctamente, URL:', audioUrl);
+      
+      // Crear mensaje temporal
+      const tempId = `voice-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const messageToSend: Message = {
+        tempId,
+        content: '',
+        mediaUrl: audioUrl,
+        messageType: 'voice',
+        senderId: currentUserId,
+        receiverId: otherUser.id,
+        createdAt: new Date(),
+        status: 'sending',
+        conversationId: actualConversationId || undefined,
+      };
+      
+      // Añadir mensaje al estado local usando la función de procesamiento
+      const updatedMessages = addLocalMessage(messageToSend);
+      setMessages(updatedMessages);
+      
+      // Enviar mensaje al servidor
+      await sendMessageToServer(messageToSend, tempId);
+
+    } catch (error) {
+      console.error('Error enviando mensaje de voz:', error);
+      alert("Error al enviar mensaje de voz: " + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setIsSending(false);
+      setUploadStatus('idle');
+      // Limpiar cualquier estado relacionado con la grabación en localStorage
+      try {
+        localStorage.removeItem('voice_recorder_audio_url');
+        localStorage.removeItem('voice_recorder_state');
+      } catch (e) {
+        console.error('Error limpiando localStorage:', e);
+      }
+    }
+  };
 
   // Enviar un mensaje
   const sendMessage = async () => {
@@ -877,81 +923,6 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       console.error('Error inesperado al enviar mensaje:', error);
     } finally {
       // Asegurar que isSending se restablece siempre, incluso si la operación es exitosa
-      setIsSending(false);
-    }
-  };
-
-  // Nueva función para enviar mensaje de voz
-  const handleVoiceMessageSend = async (audioBlob: Blob) => {
-    if (isSending || !otherUser || !canSendMessages) return;
-    
-    setIsSending(true);
-    
-    try {
-      console.log("Preparando para enviar mensaje de voz...");
-      
-      // Crear un FormData para subir el archivo
-      const formData = new FormData();
-      
-      // Crear un nuevo archivo con extensión más compatible
-      const audioFile = new File([audioBlob], `voice_message_${Date.now()}.webm`, { 
-        type: audioBlob.type 
-      });
-      
-      console.log('Subiendo archivo de audio:', audioFile.name, audioFile.type, audioFile.size);
-      
-      formData.append('file', audioFile);
-      formData.append('fileType', 'audio');
-      
-      // Subir a la API
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.user?.email || ''}`,
-        },
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        console.error('Error al subir el audio', errorText);
-        alert("Error al subir el audio: " + errorText);
-        return;
-      }
-
-      const data = await uploadResponse.json();
-      // Usar la URL completa devuelta por la API
-      const audioUrl = data.url;
-      console.log('Audio subido correctamente, URL:', audioUrl);
-      
-      // Crear mensaje temporal
-      const tempId = `voice-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      const messageToSend: Message = {
-        tempId,
-        content: '',
-        mediaUrl: audioUrl,
-        messageType: 'voice',
-        senderId: currentUserId as string,
-        receiverId: otherUser.id,
-        createdAt: new Date(),
-        status: 'sending',
-        conversationId: actualConversationId || undefined,
-      };
-      
-      // Añadir mensaje al estado local usando la función de procesamiento
-      const updatedMessages = addLocalMessage(messageToSend);
-      setMessages(updatedMessages);
-      
-      // Ocultar el grabador de voz DESPUÉS de enviar el mensaje
-      // setIsVoiceRecorderVisible(false);
-      
-      // Enviar mensaje al servidor
-      await sendMessageToServer(messageToSend, tempId);
-
-    } catch (error) {
-      console.error('Error enviando mensaje de voz:', error);
-      alert("Error al enviar mensaje de voz");
-    } finally {
       setIsSending(false);
     }
   };
@@ -1087,10 +1058,14 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
 
   // Enviar estado de "escribiendo"
   useEffect(() => {
-    if (!otherUser?.id || !socketInstance || !socketInitialized) return;
+    if (!otherUser?.id || !socketInstance || !socketInitialized || !currentUserId) return;
     
     if (isTyping) {
-      socketUpdateTypingStatus({ conversationId: safeConversationId, isTyping: true });
+      socketUpdateTypingStatus({ 
+        userId: currentUserId, 
+        conversationId: safeConversationId, 
+        isTyping: true 
+      });
       
       // Limpiar timeout anterior si existe
       if (typingTimeoutRef.current) {
@@ -1100,8 +1075,12 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       // Establecer nuevo timeout para detener estado de "escribiendo" después de 3 segundos de inactividad
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
-        if (socketInstance && socketInitialized) {
-          socketUpdateTypingStatus({ conversationId: safeConversationId, isTyping: false });
+        if (socketInstance && socketInitialized && currentUserId) {
+          socketUpdateTypingStatus({ 
+            userId: currentUserId, 
+            conversationId: safeConversationId, 
+            isTyping: false 
+          });
         }
       }, 3000);
     }
@@ -1183,6 +1162,28 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       return newMap;
     });
   }, []);
+
+  // Efectos para monitorear la actividad y reconectar el socket si es necesario
+  useEffect(() => {
+    // Escuchar eventos de actividad del usuario
+    const handleUserActivity = () => {
+      // Si el socket está desconectado, intentar reconectar
+      if (!connected && reconnect && currentUserId) {
+        reconnect();
+      }
+    };
+    
+    // Agregar event listeners para detectar actividad
+    window.addEventListener('focus', handleUserActivity);
+    window.addEventListener('click', handleUserActivity);
+    window.addEventListener('keydown', handleUserActivity);
+    
+    return () => {
+      window.removeEventListener('focus', handleUserActivity);
+      window.removeEventListener('click', handleUserActivity);
+      window.removeEventListener('keydown', handleUserActivity);
+    };
+  }, [connected, reconnect, currentUserId]);
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
@@ -1318,7 +1319,16 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
             <div className="flex gap-2">
               <Button
                 size="icon"
-                onClick={() => setIsVoiceRecorderVisible(true)}
+                onClick={() => {
+                  // Limpiar cualquier estado previo antes de mostrar
+                  try {
+                    localStorage.removeItem('voice_recorder_audio_url');
+                    localStorage.removeItem('voice_recorder_state');
+                  } catch (e) {
+                    console.error('Error limpiando localStorage:', e);
+                  }
+                  setIsVoiceRecorderVisible(true);
+                }}
                 disabled={isSending || !canSendMessages}
                 className="h-10 w-10 rounded-full bg-green-500 hover:bg-green-600"
                 title="Grabar mensaje de voz"
@@ -1343,23 +1353,28 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       {isVoiceRecorderVisible && (
         <VoiceMessageRecorder
           onSend={handleVoiceMessageSend}
-          onCancel={() => setIsVoiceRecorderVisible(false)}
+          onCancel={() => {
+            setIsVoiceRecorderVisible(false);
+            // Limpiar estados
+            setUploadStatus('idle');
+            // Limpiar localStorage
+            try {
+              localStorage.removeItem('voice_recorder_audio_url');
+              localStorage.removeItem('voice_recorder_state');
+            } catch (e) {
+              console.error('Error limpiando localStorage:', e);
+            }
+          }}
           isVisible={isVoiceRecorderVisible}
           senderId={currentUserId || ''}
           receiverId={otherUser?.id || ''}
           session={session}
           onClose={() => {
-            console.log("onClose llamado desde VoiceMessageRecorder");
-            // Solo cerrar el modal cuando se complete el envío
             setIsVoiceRecorderVisible(false);
+            // Asegurar que todos los estados se limpian
+            setUploadStatus('idle');
           }}
-          setUploadStatus={(status) => {
-            console.log("Estado de carga actualizado:", status);
-            if (status === 'error') {
-              alert("Error al enviar mensaje de voz");
-            }
-            setIsSending(status === 'success' ? false : true);
-          }}
+          setUploadStatus={setUploadStatus}
         />
       )}
 

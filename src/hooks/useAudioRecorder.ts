@@ -28,21 +28,56 @@ export default function useAudioRecorder(): UseAudioRecorderReturn {
   // Cleanup function
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-      if (audioURL) {
-        URL.revokeObjectURL(audioURL);
-      }
+      // Limpiar recursos al desmontar
+      cleanupResources();
     };
+  }, []);
+
+  // Función centralizada para limpiar recursos
+  const cleanupResources = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    // Detener y liberar el MediaRecorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {
+        console.warn("Error al detener mediaRecorder:", e);
+      }
+    }
+    mediaRecorderRef.current = null;
+    
+    // Detener y liberar la MediaStream
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        mediaStreamRef.current?.removeTrack(track);
+      });
+      mediaStreamRef.current = null;
+    }
+    
+    // Revocar URLs de objeto creadas
+    if (audioURL) {
+      try {
+        URL.revokeObjectURL(audioURL);
+      } catch (e) {
+        console.warn("Error al revocar URL:", e);
+      }
+    }
+    
+    // Limpiar chunks de audio
+    audioChunksRef.current = [];
   }, [audioURL]);
 
   // Start recording audio
   const startRecording = useCallback(async () => {
     try {
+      // Asegurar que limpiamos recursos previos
+      cleanupResources();
+      
       // Reset previous recording data
       audioChunksRef.current = [];
       setAudioURL(null);
@@ -184,30 +219,21 @@ export default function useAudioRecorder(): UseAudioRecorderReturn {
 
   // Clear recording
   const clearRecording = useCallback(() => {
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
-    }
-
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    if (audioURL) {
-      URL.revokeObjectURL(audioURL);
-    }
-
+    cleanupResources();
     setAudioURL(null);
-    setRecordingState('inactive');
     setRecordingTime(0);
-    audioChunksRef.current = [];
-  }, [audioURL]);
+    setRecordingState('inactive');
+  }, [cleanupResources]);
 
-  // Función para establecer manualmente un audioURL
-  const manuallySetAudioURL = useCallback((url: string) => {
+  // Set audio URL (for restoring from storage)
+  const setAudioURLState = useCallback((url: string) => {
+    // Si ya hay un URL, revocarlo primero
     if (audioURL) {
-      URL.revokeObjectURL(audioURL);
+      try {
+        URL.revokeObjectURL(audioURL);
+      } catch (e) {
+        console.warn("Error al revocar URL anterior:", e);
+      }
     }
     setAudioURL(url);
   }, [audioURL]);
@@ -222,6 +248,6 @@ export default function useAudioRecorder(): UseAudioRecorderReturn {
     pauseRecording,
     resumeRecording,
     clearRecording,
-    setAudioURL: manuallySetAudioURL
+    setAudioURL: setAudioURLState
   };
 }

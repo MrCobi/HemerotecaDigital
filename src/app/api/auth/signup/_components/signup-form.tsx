@@ -404,20 +404,13 @@ export default function SignupForm() {
                           </div>
                         ) : (
                           <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center border-4 border-gray-200 dark:border-gray-700">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-12 w-12 text-gray-500 dark:text-blue-300"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.5}
-                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                              />
-                            </svg>
+                            <Image
+                              src="/images/AvatarPredeterminado.webp"
+                              alt="Avatar predeterminado"
+                              width={96}
+                              height={96}
+                              className="rounded-full object-cover"
+                            />
                           </div>
                         )}
                       </div>
@@ -512,19 +505,19 @@ export default function SignupForm() {
                   xmlns="http://www.w3.org/2000/svg"
                 >
                   <path
-                    d="M22 6.77 14.47 3 7.77 6.76 4.83 4.54 3 7.75 7.75 18.48 18.54 7.75 20.71 4.54 17.25 6.76z"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                     fill="#4285F4"
                   />
                   <path
-                    d="M' 7.75 18.48 14.25 20.78 17.25 17.78 12 10.5l-2.55 2.55L7.75 14.1 5.45 11.84 10.32 7.29"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
                     fill="#34A853"
                   />
                   <path
-                    d="M10.32 7.29 7.75 4.04 4.78 6.26l2.08-2.08C6.13 2.35 8.06 2 10.32 2c2.33 0 3.53 2 2.37 3.65l-2.79-2.79A.996.996 0 0 0 8 3.65 1 1 0 0 0 6 3.73l2 2z"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
                     fill="#FBBC05"
                   />
                   <path
-                    d="M14.53 10.47 16.88 12.84l-1.67 1.67H12v2.34h3.35l-1.67 1.67L11.12 16h2.46l2.13-2.13z"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                     fill="#EA4335"
                   />
                 </svg>
