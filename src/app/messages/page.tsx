@@ -305,7 +305,11 @@ export default function MessagesPage() {
       })),
       ...mutualFollowers.filter(user => 
         // Evitar duplicados - no mostrar usuarios que ya tienen una conversación
-        !conversations.some(conv => conv.otherUser?.id === user.id)
+        !conversations.some(conv => 
+          conv.otherUser?.id === user.id || 
+          conv.receiverId === user.id || 
+          conv.senderId === user.id
+        )
       ).map(user => ({
         id: user.id,
         isConversation: false,
@@ -427,18 +431,35 @@ export default function MessagesPage() {
       }
       
       setCreatingConversation(true);
-      setMutualFollowers(prev => prev.filter(user => user?.id !== userId));
       
-      // Buscar si ya existe una conversación con este usuario
-      const existingConversation = conversations.find(
-        conv => conv.otherUser?.id === userId
-      );
+      // Verificar si el usuario está en los seguidores mutuos
+      const isMutualFollower = mutualFollowers.some(user => user.id === userId);
+      const existingConversation = conversations.some(conv => conv.otherUser?.id === userId);
       
       if (existingConversation) {
-        console.log("Found existing conversation:", existingConversation.id);
-        setSelectedConversation(existingConversation.id);
-        setCreatingConversation(false);
-        return;
+        // Si ya existe una conversación, solo seleccionarla
+        const conversation = conversations.find(conv => conv.otherUser?.id === userId);
+        if (conversation) {
+          setSelectedConversation(conversation.id);
+          router.push(`/messages?conversationWith=${userId}`);
+          setCreatingConversation(false);
+          return;
+        }
+      }
+      
+      if (!isMutualFollower) {
+        // Verificar manualmente si es un seguidor mutuo en caso de que mutualFollowers no esté actualizado
+        const checkMutualResponse = await fetch(`${API_ROUTES.relationships.mutual}?userId=${userId}`);
+        if (!checkMutualResponse.ok) {
+          throw new Error("No es posible crear una conversación con este usuario");
+        }
+        
+        const checkMutualData = await checkMutualResponse.json();
+        const isMutual = checkMutualData.some((u: User) => u.id === userId);
+        
+        if (!isMutual) {
+          throw new Error("Solo puedes enviar mensajes a usuarios que te siguen mutuamente");
+        }
       }
       
       console.log("Creating new conversation with user:", userId);
@@ -451,22 +472,20 @@ export default function MessagesPage() {
       
       const userData = await userResponse.json();
       
-      // Enviar un mensaje vacío para inicializar la conversación si es necesario
-      const response = await fetch('/api/messages', {
+      // Usar el endpoint de conversaciones en lugar de crear a través de mensajes
+      const response = await fetch('/api/messages/conversations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          content: '', // Mensaje vacío que no se mostrará al usuario
-          receiverId: userId,
-          messageType: 'text',
-          createOnly: true // Flag para indicar que solo queremos crear la conversación
+          receiverId: userId
         }),
       });
       
       if (!response.ok) {
-        throw new Error("Failed to create conversation");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create conversation");
       }
       
       const data = await response.json();
@@ -514,8 +533,14 @@ export default function MessagesPage() {
         return updatedConversations;
       });
       
+      // Filtrar al usuario de la lista de seguidores mutuos para que no aparezca más
+      setMutualFollowers(prev => prev.filter(user => user?.id !== userId));
+      
       // Seleccionar la nueva conversación
       setSelectedConversation(newConversation.id);
+      
+      // Actualizar la URL
+      router.push(`/messages?conversationWith=${userId}`);
       
       // Forzar una recarga de conversaciones desde el servidor para asegurarnos de tener datos actualizados
       setTimeout(async () => {
@@ -527,15 +552,40 @@ export default function MessagesPage() {
         }
       }, 1000);
       
-      // Actualizar la URL
-      router.push(`/messages?conversationWith=${userId}`);
     } catch (error) {
       console.error("Error starting conversation:", error);
-      alert("No se pudo iniciar la conversación. Inténtalo de nuevo.");
+      alert(error instanceof Error ? error.message : "No se pudo iniciar la conversación. Inténtalo de nuevo.");
     } finally {
       setCreatingConversation(false);
     }
-  }, [conversations, session?.user?.id, session?.user?.username, session?.user?.image, router, processConvResponse]);
+  }, [conversations, mutualFollowers, session?.user?.id, session?.user?.username, session?.user?.image, router, processConvResponse, CONVERSATIONS_PER_PAGE]);
+
+  // Efecto para cargar datos de seguidores mutuos al abrir el modal
+  useEffect(() => {
+    const fetchMutualFollowers = async () => {
+      if (!showNewMessageModal || !session?.user?.id) return;
+      
+      try {
+        const mutualResponse = await fetch(`${API_ROUTES.relationships.mutual}?t=${Date.now()}`);
+        const mutualData = await processMutualResponse(mutualResponse);
+        
+        // Filtrar usuarios que ya tienen conversaciones existentes
+        const filteredMutuals = mutualData.filter(user => 
+          !conversations.some(conv => 
+            conv.otherUser?.id === user.id || 
+            conv.receiverId === user.id || 
+            conv.senderId === user.id
+          )
+        );
+        
+        setMutualFollowers(filteredMutuals);
+      } catch (error) {
+        console.error("Error fetching mutual followers:", error);
+      }
+    };
+    
+    fetchMutualFollowers();
+  }, [showNewMessageModal, processMutualResponse, session?.user?.id, conversations]);
 
   // Función para seleccionar una conversación - memoizada
   const handleConversationSelect = useCallback((conversationId: string) => {
@@ -783,7 +833,7 @@ export default function MessagesPage() {
           // Panel de bienvenida cuando no hay conversación seleccionada
           <div className="h-full flex flex-col items-center justify-center p-4">
             <div className="text-center max-w-md">
-              <MessageSquare className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+              <MessageSquare className="mx-auto h-16 w-16 text-gray-300 mb-4" />
               <h2 className="text-xl font-semibold mb-2">Tus mensajes</h2>
               <p className="text-gray-500 mb-6">
                 Selecciona una conversación de la lista o inicia una nueva para comenzar a chatear.
@@ -800,121 +850,71 @@ export default function MessagesPage() {
         <DialogHeader>
           <DialogTitle>Nuevo mensaje</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            Selecciona un usuario para iniciar una conversación
-          </div>
-          {mutualFollowers.length === 0 ? (
-            <div className="text-center p-4 text-gray-500 dark:text-gray-400">
-              No tienes seguidores mutuos para iniciar una conversación.
-              <div className="mt-2 text-sm">
-                Para poder enviar mensajes, necesitas seguir a usuarios y que ellos te sigan de vuelta.
-              </div>
+        <div className="space-y-4 p-2">
+          {creatingConversation ? (
+            <div className="flex flex-col items-center py-4">
+              <LoadingSpinner className="h-10 w-10 mb-4" />
+              <p className="text-center text-sm text-gray-500">Creando conversación...</p>
             </div>
           ) : (
-            <div className="max-h-[50vh] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-800">
-              {mutualFollowers.map((user) => (
-                <div
-                  key={user.id}
-                  className={`flex items-center p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors rounded-lg ${
-                    selectedUser?.id === user.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                  }`}
-                  onClick={() => setSelectedUser(user)}
-                >
-                  <Avatar className="h-10 w-10 mr-3">
-                    {user.image ? (
-                      <Image
-                        src="/images/AvatarPredeterminado.webp"
-                        width={48}
-                        height={48}
-                        alt={user.username || "Usuario"}
-                        className="h-10 w-10 rounded-full object-cover"
-                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = "/images/AvatarPredeterminado.webp";
-                        }}
-                      />
-                    ) : (
-                      <AvatarFallback>
-                        {user.username?.charAt(0).toUpperCase() || "U"}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="font-medium">{user.name}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">@{user.username}</div>
-                  </div>
-                  {selectedUser?.id === user.id && (
-                    <div className="h-4 w-4 rounded-full bg-blue-500"></div>
-                  )}
+            <>
+              <Input 
+                placeholder="Buscar usuario..." 
+                value={generalSearchTerm} 
+                onChange={(e) => setGeneralSearchTerm(e.target.value)}
+                className="mb-4"
+              />
+              
+              {filteredCombinedList.filter(item => !item.isConversation).length === 0 ? (
+                <div className="text-center py-4">
+                  <MessageCircle className="mx-auto h-12 w-12 text-gray-300 mb-2" />
+                  <p className="text-gray-500 mb-2">No se encontraron seguidores mutuos.</p>
+                  <p className="text-sm text-gray-400">Solo puedes iniciar conversaciones con usuarios que te siguen mutuamente.</p>
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                  {filteredCombinedList
+                    .filter(item => !item.isConversation)
+                    .map((item) => {
+                      const user = item.data as User;
+                      return (
+                        <div
+                          key={user.id}
+                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+                          onClick={() => {
+                            setShowNewMessageModal(false);
+                            startNewConversation(user.id);
+                          }}
+                        >
+                          <Avatar className="h-10 w-10">
+                            {user.image ? (
+                              <Image 
+                                src="/images/AvatarPredeterminado.webp" 
+                                alt={user.username || "Usuario"} 
+                                width={40} 
+                                height={40}
+                                className="rounded-full object-cover"
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = "/images/AvatarPredeterminado.webp";
+                                }}
+                              />
+                            ) : (
+                              <AvatarFallback>
+                                {user.username?.charAt(0).toUpperCase() || "U"}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                          <div className="flex-1">
+                            <p className="font-medium">{user.username || "Usuario"}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </>
           )}
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="outline" onClick={() => setShowNewMessageModal(false)}>
-              Cancelar
-            </Button>
-            <Button
-              disabled={!selectedUser || creatingConversation || mutualFollowers.length === 0}
-              onClick={async () => {
-                if (!selectedUser) return;
-                
-                setCreatingConversation(true);
-                try {
-                  const response = await fetch('/api/messages/conversations', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                      receiverId: selectedUser.id
-                    })
-                  });
-                  
-                  if (!response.ok) {
-                    throw new Error('Error al crear la conversación');
-                  }
-                  
-                  const conversation = await response.json();
-                  console.log('Conversación creada:', conversation);
-                  
-                  // Añadir la nueva conversación a la lista
-                  if (conversation && conversation.id) {
-                    setConversations(prev => {
-                      // Evitar duplicados
-                      if (prev.some(c => c.id === conversation.id)) {
-                        return prev;
-                      }
-                      
-                      const newConversation = {
-                        ...conversation,
-                        // Asegurarse de que tenga la propiedad isEmpty si no tiene mensajes
-                        isEmpty: !conversation.lastMessage
-                      };
-                      
-                      return [newConversation, ...prev]
-                        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-                    });
-                    
-                    // Seleccionar la nueva conversación
-                    setSelectedConversation(conversation.id);
-                  }
-                  
-                  setShowNewMessageModal(false);
-                  setSelectedUser(null);
-                } catch (error) {
-                  console.error('Error al crear conversación:', error);
-                  alert('Ha ocurrido un error al crear la conversación');
-                } finally {
-                  setCreatingConversation(false);
-                }
-              }}
-              className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white"
-            >
-              {creatingConversation ? 'Creando...' : 'Crear conversación'}
-            </Button>
-          </div>
         </div>
       </DialogContent>
     </Dialog>
