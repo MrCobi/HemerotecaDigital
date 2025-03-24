@@ -1428,7 +1428,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       </div>
   
       {/* Componente de grabación de voz */}
-      {isVoiceRecorderVisible && (
+      {isVoiceRecorderVisible && currentUserId && otherUser && (
         <VoiceMessageRecorder
           onSend={handleVoiceMessageSend}
           onCancel={() => {
@@ -1443,7 +1443,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
               console.error('Error limpiando localStorage:', e);
             }
           }}
-          isVisible={isVoiceRecorderVisible}
+          isVisible={true}
           senderId={currentUserId || ''}
           receiverId={otherUser?.id || ''}
           session={session}

@@ -31,11 +31,6 @@ const VoiceMessageRecorder = React.memo(({
   onClose, 
   setUploadStatus
 }: VoiceMessageRecorderProps) => {
-  const [isSending, setIsSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isSliding, setIsSliding] = useState(false);
-  const cancelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
   const { 
     audioURL, 
     isRecording, 
@@ -48,34 +43,87 @@ const VoiceMessageRecorder = React.memo(({
     clearRecording,
     setAudioURL
   } = useAudioRecorder();
+  
+  const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSliding, setIsSliding] = useState(false);
+  const wasRecording = useRef<boolean>(false);
+  const cancelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const manuallyStoppedRef = useRef(false);
 
-  // Limpiar recursos al desmontar
-  useEffect(() => {
-    return () => {
-      // Limpiar cualquier timeout pendiente
-      if (cancelTimeoutRef.current) {
-        clearTimeout(cancelTimeoutRef.current);
+  // Función para detener y guardar la grabación
+  const handleStopRecording = useCallback(async () => {
+    try {
+      // Marcar que se detuvo manualmente para evitar la detección automática
+      manuallyStoppedRef.current = true;
+      
+      setIsProcessing(true);
+      setError(null);
+      
+      console.log("Iniciando detención manual de la grabación");
+      
+      // Detener la grabación y obtener el blob de audio
+      const audioBlob = await stopRecording();
+      
+      if (audioBlob) {
+        console.log('Audio grabado con éxito, tamaño:', audioBlob.size, 'bytes');
+        // Verificar si el audioURL ha sido establecido por useAudioRecorder
+        // Esperar brevemente para permitir que la actualización de estado ocurra
+        const checkAudioUrl = async () => {
+          if (!audioURL) {
+            // Intentar crear manualmente la URL del audio blob
+            try {
+              const url = URL.createObjectURL(audioBlob);
+              console.log('Creando URL manualmente:', url);
+              setAudioURL(url);
+            } catch (err) {
+              console.error('Error al crear URL manualmente:', err);
+              setError("Error al procesar el audio");
+              setIsProcessing(false);
+              return;
+            }
+          } else {
+            console.log('URL de audio establecida correctamente:', audioURL);
+          }
+        };
+        
+        // Esperar un momento para que el estado se actualice
+        setTimeout(checkAudioUrl, 100);
+      } else {
+        console.error('No se pudo obtener blob de audio');
+        setError('Error al procesar el audio. Intenta grabar de nuevo.');
+        setIsProcessing(false);
+        return;
       }
-    };
-  }, []);
-
-  // Si el componente no es visible, no renderizar nada
-  if (!isVisible) return null;
+      
+      setIsProcessing(false);
+    } catch (err: any) {
+      console.error('Error al detener grabación:', err);
+      setError(err.message || 'Error al procesar el audio');
+      setIsProcessing(false);
+    }
+  }, [stopRecording, audioURL, setAudioURL]);
 
   // Manejar el inicio de grabación de manera optimizada
-  const handleStartRecording = async () => {
+  const handleStartRecording = useCallback(async () => {
+    if (isRecording || isSending || isProcessing) return;
+    
     try {
       setError(null);
+      // Limpiar cualquier grabación anterior
+      clearRecording();
+      // Iniciar nueva grabación
       await startRecording();
     } catch (err: any) {
       const errorMessage = err.name === 'NotAllowedError' 
-        ? 'Permiso para usar el micrófono denegado. Por favor, concede acceso al micrófono.'
-        : 'Error al iniciar la grabación. Por favor, inténtalo de nuevo.';
+        ? 'Permiso para usar el micrófono denegado' 
+        : err.message || 'Error al iniciar grabación';
       
+      console.error('Error al iniciar grabación:', err);
       setError(errorMessage);
-      console.error('Error al iniciar la grabación:', err);
     }
-  };
+  }, [isRecording, isSending, isProcessing, clearRecording, startRecording]);
 
   // Manejar la pausa/reanudación de grabación de manera optimizada
   const handlePauseResume = () => {
@@ -112,39 +160,55 @@ const VoiceMessageRecorder = React.memo(({
   };
 
   // Función para enviar el mensaje de voz
-  const handleSendRecord = async () => {
-    if (!audioURL || !session?.user?.id) {
+  const handleSendRecord = useCallback(async () => {
+    if (!audioURL || !senderId || !session?.user?.id) {
       console.error('No hay audio para enviar o sesión de usuario');
+      setError('No hay audio para enviar');
       return;
     }
 
     try {
       setIsSending(true);
-      setError(null);
-      setUploadStatus('uploading');
-
-      // Convertir audioURL a Blob
+      
+      console.log('Iniciando envío de mensaje de voz con URL:', audioURL);
+      
+      // Fetch el blob desde la URL
       const response = await fetch(audioURL);
+      if (!response.ok) {
+        throw new Error('Error al acceder al audio grabado');
+      }
+      
       const audioBlob = await response.blob();
+      console.log('Blob recuperado de la URL, tamaño:', audioBlob.size);
+      
+      if (audioBlob.size === 0) {
+        throw new Error('El blob de audio está vacío');
+      }
 
-      // Enviar el mensaje de voz utilizando la función de callback proporcionada
+      // Notificar estado de carga
+      setUploadStatus('uploading');
+      
+      // Enviar el audio
       await onSend(audioBlob);
+      
+      console.log('Mensaje de voz enviado con éxito');
+      
+      // Notificar estado de éxito
       setUploadStatus('success');
       
-      // Limpiar grabación después de enviar exitosamente
+      // Limpiar grabación
       clearRecording();
       
-      // Cerrar el componente
+      // Cerrar el grabador
       onClose();
-      
-    } catch (err: any) {
-      console.error('Error al enviar mensaje de voz:', err);
-      setError(err.message || 'Error al enviar el mensaje de voz');
+    } catch (error) {
+      console.error('Error al enviar mensaje de voz:', error);
+      setError('Error al enviar el audio');
       setUploadStatus('error');
     } finally {
       setIsSending(false);
     }
-  };
+  }, [onSend, audioURL, senderId, session, setUploadStatus, clearRecording, onClose]);
 
   // Formatear el tiempo de grabación como MM:SS
   const formattedRecordingTime = useMemo(() => {
@@ -200,11 +264,21 @@ const VoiceMessageRecorder = React.memo(({
           >
             {isRecording ? <Pause size={20} /> : <Play size={20} />}
           </button>
+          
+          {/* Nuevo botón para detener la grabación */}
+          <button
+            type="button"
+            onClick={handleStopRecording}
+            className="p-2 bg-blue-500 text-white hover:bg-blue-600 rounded-full transition-colors"
+            aria-label="Detener grabación"
+          >
+            <Send size={20} />
+          </button>
         </div>
       );
     }
     return null;
-  }, [isRecording, isPaused, formattedRecordingTime, handleCancel, handlePauseResume]);
+  }, [isRecording, isPaused, formattedRecordingTime, handleCancel, handlePauseResume, handleStopRecording]);
 
   const mainActionButton = useMemo(() => {
     if (audioURL) {
@@ -266,6 +340,65 @@ const VoiceMessageRecorder = React.memo(({
       </div>
     );
   }, [error]);
+
+  useEffect(() => {
+    // Solo para depuración - registrar cambios en audioURL
+    console.log("Estado de audioURL actualizado:", audioURL);
+  }, [audioURL]);
+
+  useEffect(() => {
+    // Solo para depuración - registrar cambios en isRecording
+    console.log("Estado de isRecording actualizado:", isRecording);
+  }, [isRecording]);
+
+  useEffect(() => {
+    // Solo para depuración - registrar cambios en isPaused
+    console.log("Estado de isPaused actualizado:", isPaused);
+  }, [isPaused]);
+
+  // Resetear el flag de detención manual cuando comienza una nueva grabación
+  useEffect(() => {
+    if (isRecording) {
+      manuallyStoppedRef.current = false;
+    }
+  }, [isRecording]);
+
+  // Asegurarnos de detectar cuando se detiene la grabación
+  useEffect(() => {
+    // Si estábamos grabando y ahora no estamos grabando ni pausados, 
+    // significa que la grabación ha terminado
+    if (wasRecording.current && !isRecording && !isPaused && !manuallyStoppedRef.current) {
+      console.log("Detección automática de fin de grabación");
+      // La grabación se detuvo, probablemente por alcanzar el límite de tiempo
+      handleStopRecording();
+    }
+    
+    // Actualizar el estado anterior para la próxima comparación
+    wasRecording.current = isRecording;
+  }, [isRecording, isPaused, handleStopRecording]);
+
+  // Manejar la limpieza cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      // Limpiar el timeout de cancelación si existe
+      if (cancelTimeoutRef.current) {
+        clearTimeout(cancelTimeoutRef.current);
+      }
+      
+      // Limpiar cualquier URL de objeto creada
+      if (audioURL) {
+        URL.revokeObjectURL(audioURL);
+      }
+      
+      // Limpiar grabación si hay una activa
+      if (isRecording || isPaused) {
+        clearRecording();
+      }
+    };
+  }, [clearRecording, audioURL, isRecording, isPaused]);
+
+  // Si el componente no es visible, no renderizar nada
+  if (!isVisible) return null;
 
   return (
     <div className="p-2 border-t border-gray-200 dark:border-gray-700 relative">
