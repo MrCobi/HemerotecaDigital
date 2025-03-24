@@ -183,13 +183,13 @@ const VoiceMessagePlayer = React.memo(({
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(0); // Volver a 0 para evitar mostrar valores incorrectos
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [playbackRate, setPlaybackRate] = useState(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number | null>(null);
   
   // Colores según si es mensaje propio o recibido
   const textColor = isCurrentUser ? 'text-white' : 'text-gray-700 dark:text-gray-200';
@@ -206,26 +206,51 @@ const VoiceMessagePlayer = React.memo(({
   
   // Cargar los metadatos del audio cuando el componente se monta
   useEffect(() => {
-    const audio = new Audio(mediaUrl);
+    let audio = new Audio();
+    audio.preload = "metadata";
     audioRef.current = audio;
     
     setIsLoading(true);
+    setCurrentTime(0);
     setError(null);
     
-    const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
+    // Función que se ejecuta cuando el audio está listo
+    const handleCanPlay = () => {
+      if (audio.duration && isFinite(audio.duration) && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
       setIsLoading(false);
     };
     
+    // Función que se ejecuta cuando los metadatos están cargados
+    const handleLoadedMetadata = () => {
+      if (audio.duration && isFinite(audio.duration) && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      } else {
+        console.warn("Duración inválida:", audio.duration);
+        setDuration(0);
+      }
+      setIsLoading(false);
+    };
+    
+    // Función que se ejecuta cuando se actualiza el tiempo de reproducción
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
+      if (isFinite(audio.currentTime) && !isNaN(audio.currentTime)) {
+        setCurrentTime(audio.currentTime);
+      }
+    };
+    
+    const handleDurationChange = () => {
+      if (isFinite(audio.duration) && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
     };
     
     const handleEnded = () => {
       setIsPlaying(false);
       setIsPaused(false);
       setCurrentTime(0);
-      audio.currentTime = 0;
+      if (audio) audio.currentTime = 0;
     };
     
     const handleError = (e: any) => {
@@ -236,16 +261,38 @@ const VoiceMessagePlayer = React.memo(({
     
     // Registrar todos los event listeners
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('loadeddata', handleCanPlay);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('durationchange', handleDurationChange);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('error', handleError);
     
+    // Intentar cargar el audio de manera explícita
+    try {
+      audio.src = mediaUrl;
+      audio.load();
+    } catch (error) {
+      console.error("Error setting audio source:", error);
+      setError("Error al cargar el audio");
+      setIsLoading(false);
+    }
+    
     return () => {
       // Limpiar listeners y detener reproducción al desmontar
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('loadeddata', handleCanPlay);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('durationchange', handleDurationChange);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
+      
+      // Cancelar animation frame si existe
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
       
       if (isPlaying) {
         audio.pause();
@@ -254,34 +301,70 @@ const VoiceMessagePlayer = React.memo(({
     };
   }, [mediaUrl]);
   
+  // Efecto separado para manejar la animación de forma independiente
+  useEffect(() => {
+    // Función para actualizar el tiempo actual de forma fluida
+    const updateTimeAnim = () => {
+      if (isPlaying && audioRef.current) {
+        if (isFinite(audioRef.current.currentTime) && !isNaN(audioRef.current.currentTime)) {
+          setCurrentTime(audioRef.current.currentTime);
+        }
+        animationRef.current = requestAnimationFrame(updateTimeAnim);
+      }
+    };
+    
+    if (isPlaying) {
+      animationRef.current = requestAnimationFrame(updateTimeAnim);
+    } else if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+    };
+  }, [isPlaying]);
+
   const togglePlayPause = () => {
     if (!audioRef.current || isLoading) return;
     
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      setIsPaused(true);
-    } else {
-      // Play o resume
-      const playPromise = audioRef.current.play();
-      
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            setIsPlaying(true);
-            setIsPaused(false);
-          })
-          .catch((error) => {
-            console.error("Error al reproducir:", error);
-            
-            // Muchos navegadores requieren interacción del usuario para reproducir audio
-            if (error.name === 'NotAllowedError') {
-              setError("Necesitas interactuar primero con la página");
-            } else {
-              setError("Error al reproducir");
-            }
-          });
+    try {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+        setIsPaused(true);
+      } else {
+        // Reproducir desde el inicio si ya terminó
+        if (currentTime >= duration && duration > 0) {
+          audioRef.current.currentTime = 0;
+          setCurrentTime(0);
+        }
+        
+        // Iniciar reproducción
+        const playPromise = audioRef.current.play();
+        
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setIsPlaying(true);
+              setIsPaused(false);
+            })
+            .catch(error => {
+              console.error('Error reproduciendo audio:', error);
+              setError('Error al reproducir');
+              setIsPlaying(false);
+            });
+        } else {
+          setIsPlaying(true);
+          setIsPaused(false);
+        }
       }
+    } catch (error) {
+      console.error('Error en togglePlayPause:', error);
+      setError('Error al controlar la reproducción');
     }
   };
   
@@ -306,15 +389,14 @@ const VoiceMessagePlayer = React.memo(({
     
     // Ciclo entre velocidades: 1x -> 1.5x -> 2x -> 0.5x -> 1x
     const rates = [1, 1.5, 2, 0.5];
-    const currentIndex = rates.indexOf(playbackRate);
+    const currentIndex = rates.indexOf(1); // Valor predeterminado
     const nextRate = rates[(currentIndex + 1) % rates.length];
     
     audioRef.current.playbackRate = nextRate;
-    setPlaybackRate(nextRate);
   };
   
   const handleSliderChange = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!audioRef.current || !sliderRef.current || isLoading) return;
+    if (!audioRef.current || !sliderRef.current || isLoading || duration <= 0) return;
     
     const slider = sliderRef.current;
     const rect = slider.getBoundingClientRect();
@@ -329,52 +411,76 @@ const VoiceMessagePlayer = React.memo(({
     }
     
     const offsetX = clientX - rect.left;
+    
+    // Protección para valores inválidos
+    if (sliderWidth <= 0 || !isFinite(sliderWidth)) return;
+    
     const percentage = Math.max(0, Math.min(1, offsetX / sliderWidth));
-    const newTime = percentage * audioRef.current.duration;
     
-    audioRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
-  };
-  
-  // Formatear segundos a MM:SS
-  const formatTime = (seconds: number) => {
-    // Protección contra valores no válidos
-    if (!seconds || isNaN(seconds) || !isFinite(seconds)) {
-      return "0:00";
+    // Verificación adicional de seguridad
+    if (!isFinite(percentage)) return;
+    
+    // Calcular el nuevo tiempo y establecerlo
+    try {
+      const newTime = percentage * duration;
+      
+      // Asegurarse de que el valor sea finito y esté dentro del rango permitido
+      if (isFinite(newTime) && newTime >= 0 && newTime <= duration) {
+        audioRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
+      }
+    } catch (error) {
+      console.error("Error al establecer el tiempo de reproducción:", error);
     }
-    
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
   
   // Calcular el progreso para la barra (0-100%)
-  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const calculateProgress = useCallback(() => {
+    if (duration <= 0) return 0;
+    const progress = (currentTime / duration) * 100;
+    return Math.min(Math.max(progress, 0), 100); // Asegurar que esté entre 0-100
+  }, [currentTime, duration]);
   
-  // Generar puntos de la "visualización de audio" estilo WhatsApp
-  const generateWaveform = () => {
-    const totalBars = 35; // Número de barras en la onda
-    const bars = [];
+  // Generar barras para la visualización de onda
+  const generateWaveform = useCallback(() => {
+    const barCount = 30; // Número de barras a mostrar
+    const progress = calculateProgress();
+    const progressIndex = Math.floor((progress / 100) * barCount);
     
-    for (let i = 0; i < totalBars; i++) {
-      // Altura aleatoria para simular una onda de audio
-      const height = Math.max(0.3, Math.min(1, 0.2 + Math.sin(i * 0.5) * 0.3 + Math.random() * 0.5));
+    return Array.from({ length: barCount }).map((_, i) => {
+      // Altura aleatoria pero consistente para cada posición
+      const randomHeight = 30 + (((i * 13) % 20) + ((i * 5) % 7));
+      const heightPercent = randomHeight / 50;
       
-      // Determinar si la barra está "activa" basado en el progreso actual
-      const isActive = (i / totalBars) * 100 <= progressPercentage;
+      const isActive = i <= progressIndex;
       
-      bars.push(
-        <div 
-          key={i} 
-          className={`h-full w-[2px] mx-[1px] rounded-full ${
+      return (
+        <div
+          key={i}
+          className={`${
             isActive ? secondaryActiveColor : secondaryColor
-          }`}
-          style={{ height: `${height * 100}%` }}
+          } mx-[1px] rounded-full transition-all duration-100 ease-out`}
+          style={{
+            height: `${Math.max(heightPercent * 100, 15)}%`,
+            minHeight: '3px',
+            width: '2px',
+            transform: isActive ? 'scaleY(1.1)' : 'scaleY(1)'
+          }}
         />
       );
-    }
+    });
+  }, [calculateProgress, secondaryActiveColor, secondaryColor]);
+  
+  const formatTime = (seconds: number): string => {
+    if (!isFinite(seconds) || isNaN(seconds)) return '0:00';
     
-    return bars;
+    // Redondear a enteros para evitar valores decimales extraños
+    const roundedSeconds = Math.round(seconds);
+    const minutes = Math.floor(roundedSeconds / 60);
+    const remainingSeconds = roundedSeconds % 60;
+    
+    // Siempre mostrar los segundos con dos dígitos
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
   
   return (
@@ -416,11 +522,15 @@ const VoiceMessagePlayer = React.memo(({
         </div>
       </div>
       
-      {/* Tiempo */}
+      {/* Tiempo actual/total */}
       <div className={`text-xs flex-shrink-0 ${
         isCurrentUser ? 'text-white' : 'text-gray-700 dark:text-gray-200'
       }`}>
-        {error ? "Error" : isLoading ? "..." : formatTime(duration)}
+        {error 
+          ? "Error" 
+          : isLoading 
+            ? "..."  // Mostrar puntos mientras carga en lugar de valores predeterminados
+            : `${formatTime(currentTime)}/${formatTime(duration)}`}
       </div>
     </div>
   );
@@ -1338,22 +1448,24 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         ) : errorLoadingMessages ? (
           <div className="text-center py-4 text-red-500">
             <p>{errorLoadingMessages}</p>
-            <Button 
-              onClick={() => {
-                // Reintentar la carga con los parámetros iniciales
-                setPage(1);
-                setMessages([]);
-                setMessageMap(new Map());
-                setIsLoadingMessages(true);
-                setErrorLoadingMessages('');
-                // UseEffect detectará estos cambios y llamará a fetchMessages
-              }} 
-              variant="outline" 
-              className="mt-2 text-sm" 
-              size="sm"
-            >
-              Reintentar
-            </Button>
+            {!errorLoadingMessages.includes('no existe') && (
+              <Button 
+                onClick={() => {
+                  // Reintentar la carga con los parámetros iniciales
+                  setPage(1);
+                  setMessages([]);
+                  setMessageMap(new Map());
+                  setIsLoadingMessages(true);
+                  setErrorLoadingMessages('');
+                  // UseEffect detectará estos cambios y llamará a fetchMessages
+                }} 
+                variant="outline" 
+                className="mt-2 text-sm" 
+                size="sm"
+              >
+                Reintentar
+              </Button>
+            )}
           </div>
         ) : messages.length === 0 ? (
           <div className="text-center py-10 text-gray-500">
