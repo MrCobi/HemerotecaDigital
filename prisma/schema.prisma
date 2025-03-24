@@ -8,30 +8,33 @@ datasource db {
 }
 
 model User {
-  id                  String               @id @default(cuid())
+  id                  String                    @id @default(cuid())
   name                String?
-  username            String?              @unique
+  username            String?                   @unique
   password            String
-  email               String               @unique
-  emailVerified       DateTime?            @map("email_verified")
+  email               String                    @unique
+  emailVerified       DateTime?                 @map("email_verified")
   image               String?
-  role                Role                 @default(user)
-  createdAt           DateTime             @default(now()) @map("created_at")
-  updatedAt           DateTime             @updatedAt @map("updated_at")
+  role                Role                      @default(user)
+  createdAt           DateTime                  @default(now()) @map("created_at")
+  updatedAt           DateTime                  @updatedAt @map("updated_at")
   bio                 String?
-  showActivity        Boolean              @default(true) @map("show_activity")
-  showFavorites       Boolean              @default(true) @map("show_favorites")
+  showActivity        Boolean                   @default(true) @map("show_activity")
+  showFavorites       Boolean                   @default(true) @map("show_favorites")
   accounts            Account[]
   activityHistory     ActivityHistory[]
   comments            Comment[]
   favoriteSources     FavoriteSource[]
-  followers           Follow[]             @relation("follower")
-  following           Follow[]             @relation("following")
+  followers           Follow[]                  @relation("follower")
+  following           Follow[]                  @relation("following")
   ratings             Rating[]
-  sentMessages        DirectMessage[]      @relation("SentMessages")
-  receivedMessages    DirectMessage[]      @relation("ReceivedMessages")
+  sentMessages        DirectMessage[]           @relation("SentMessages")
+  receivedMessages    DirectMessage[]           @relation("ReceivedMessages")
   conversations       ConversationParticipant[]
   passwordResetTokens PasswordResetToken[]
+  messagesRead        MessageRead[]
+  sentInvitations     GroupInvitation[]         @relation("GroupInvitationSender")
+  receivedInvitations GroupInvitation[]         @relation("GroupInvitationReceiver")
 
   @@index([emailVerified]) // Si haces queries de usuarios verificados
   @@map("users")
@@ -82,20 +85,20 @@ model PasswordResetToken {
 }
 
 model Source {
-  id                 String           @id @default(cuid())
-  name               String
-  description        String
-  url                String           @db.VarChar(512)
-  imageUrl           String?          @map("image_url") @db.VarChar(512)
-  category           String
-  language           String
-  country            String
-  createdAt          DateTime         @default(now()) @map("created_at")
-  updatedAt          DateTime         @updatedAt @map("updated_at")
-  comments           Comment[]
-  favoriteSources    FavoriteSource[]
-  ratings            Rating[]
-  activityHistories  ActivityHistory[] @relation("ActivityToSource")
+  id                String            @id @default(cuid())
+  name              String
+  description       String
+  url               String            @db.VarChar(512)
+  imageUrl          String?           @map("image_url") @db.VarChar(512)
+  category          String
+  language          String
+  country           String
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  comments          Comment[]
+  favoriteSources   FavoriteSource[]
+  ratings           Rating[]
+  activityHistories ActivityHistory[] @relation("ActivityToSource")
 
   @@fulltext([name, description])
   @@map("sources")
@@ -185,55 +188,112 @@ model ActivityHistory {
   @@map("activity_history")
 }
 
+model Conversation {
+  id              String                    @id @default(cuid())
+  name            String? // Name for group conversations
+  isGroup         Boolean                   @default(false) @map("is_group")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  updatedAt       DateTime                  @updatedAt @map("updated_at")
+  imageUrl        String?                   @map("image_url") @db.VarChar(512)
+  description     String?                   @db.Text // Description for group chats
+  creatorId       String?                   @map("creator_id") // User who created the group
+  messages        DirectMessage[]
+  participants    ConversationParticipant[]
+  settings        GroupSettings?
+  GroupInvitation GroupInvitation[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String          @id @default(cuid())
+  userId         String          @map("user_id")
+  conversationId String          @map("conversation_id")
+  isAdmin        Boolean         @default(false) @map("is_admin")
+  joinedAt       DateTime        @default(now()) @map("joined_at")
+  lastReadAt     DateTime?       @map("last_read_at")
+  nickname       String? // Custom nickname for this user in this group
+  isMuted        Boolean         @default(false) @map("is_muted")
+  role           ParticipantRole @default(member) @map("role")
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation   Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([userId])
+  @@map("conversation_participants")
+}
+
+model GroupSettings {
+  id                   String       @id @default(cuid())
+  conversationId       String       @unique @map("conversation_id")
+  onlyAdminsCanInvite  Boolean      @default(false) @map("only_admins_can_invite")
+  onlyAdminsCanMessage Boolean      @default(false) @map("only_admins_can_message")
+  onlyAdminsCanEdit    Boolean      @default(false) @map("only_admins_can_edit")
+  isPrivate            Boolean      @default(false) @map("is_private")
+  maxParticipants      Int?         @map("max_participants") // Null means unlimited 
+  conversation         Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("group_settings")
+}
+
 model DirectMessage {
-  id             String        @id @default(cuid())
-  content        String?       @db.Text
-  mediaUrl       String?       @map("media_url") @db.VarChar(512)
-  messageType    MessageType   @default(text) @map("message_type")
-  senderId       String        @map("sender_id")
-  receiverId     String?       @map("receiver_id")
-  conversationId String        @map("conversation_id")
-  read           Boolean       @default(false)
-  createdAt      DateTime      @default(now()) @map("created_at")
-  tempId         String?       @map("temp_id")
-  sender         User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver       User?         @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: SetNull)
-  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  id             String          @id @default(cuid())
+  content        String?         @db.Text
+  mediaUrl       String?         @map("media_url") @db.VarChar(512)
+  messageType    MessageType     @default(text) @map("message_type")
+  senderId       String          @map("sender_id")
+  receiverId     String?         @map("receiver_id")
+  conversationId String          @map("conversation_id")
+  replyToId      String?         @map("reply_to_id") // For replying to specific messages in groups
+  read           Boolean         @default(false)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  tempId         String?         @map("temp_id")
+  readBy         MessageRead[] // Track who has read a message in a group
+  sender         User            @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver       User?           @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: SetNull)
+  conversation   Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo        DirectMessage?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        DirectMessage[] @relation("MessageReplies")
 
   @@index([senderId, receiverId])
   @@index([createdAt])
   @@index([senderId, receiverId, createdAt], map: "sender_receiver_created_idx")
   @@index([tempId])
   @@index([conversationId])
+  @@index([replyToId])
   @@map("direct_messages")
 }
 
-model Conversation {
-  id             String                    @id @default(cuid())
-  name           String?                   // Name for group conversations
-  isGroup        Boolean                   @default(false) @map("is_group")
-  createdAt      DateTime                  @default(now()) @map("created_at")
-  updatedAt      DateTime                  @updatedAt @map("updated_at")
-  imageUrl       String?                   @map("image_url") @db.VarChar(512)
-  messages       DirectMessage[]
-  participants   ConversationParticipant[]
+model MessageRead {
+  id        String        @id @default(cuid())
+  messageId String        @map("message_id")
+  userId    String        @map("user_id")
+  readAt    DateTime      @default(now()) @map("read_at")
+  message   DirectMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("conversations")
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+  @@map("message_reads")
 }
 
-model ConversationParticipant {
+model GroupInvitation {
   id             String       @id @default(cuid())
-  userId         String       @map("user_id")
   conversationId String       @map("conversation_id")
-  isAdmin        Boolean      @default(false) @map("is_admin")
-  joinedAt       DateTime     @default(now()) @map("joined_at")
-  lastReadAt     DateTime?    @map("last_read_at")
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inviterId      String       @map("inviter_id")
+  inviteeId      String       @map("invitee_id")
+  status         InviteStatus @default(pending)
+  expiresAt      DateTime?    @map("expires_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  inviter        User         @relation("GroupInvitationSender", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee        User         @relation("GroupInvitationReceiver", fields: [inviteeId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
-  @@index([userId])
-  @@map("conversation_participants")
+  @@index([inviterId])
+  @@index([inviteeId])
+  @@map("group_invitations")
 }
 
 enum Role {
@@ -247,4 +307,18 @@ enum MessageType {
   voice
   file
   video
+}
+
+enum ParticipantRole {
+  member
+  admin
+  moderator
+  owner
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  rejected
+  expired
 }
