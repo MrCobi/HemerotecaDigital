@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from 'next-auth/react';
@@ -6,7 +7,8 @@ import { MessageType } from "@/src/hooks/useSocket";
 import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { ChatWindowContent } from "@/src/app/components/Chat/ChatWindowContent";
-import { MessageCircle, Search, MessageSquare, ArrowLeft, MessageSquarePlus } from "lucide-react";
+import GroupChatWindowContent from "@/src/app/components/Chat/GroupChatWindowContent";
+import { MessageCircle, Search, MessageSquare, ArrowLeft, MessageSquarePlus, Users, Plus, X, Check, ImagePlus } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/src/app/components/ui/avatar";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
@@ -56,6 +58,11 @@ export interface Conversation {
   unreadCount?: number;
   lastInteraction?: Date;
   isEmpty?: boolean;
+  isGroup?: boolean;
+  name?: string;
+  imageUrl?: string;
+  description?: string;
+  participants?: User[];
 }
 
 interface CombinedItem {
@@ -78,6 +85,7 @@ export default function MessagesPage() {
   // Estados centralizados
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [mutualFollowers, setMutualFollowers] = useState<User[]>([]);
+  const [mutualFollowersForGroups, setMutualFollowersForGroups] = useState<User[]>([]);
   const [combinedList, setCombinedList] = useState<CombinedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [generalSearchTerm, setGeneralSearchTerm] = useState("");
@@ -86,6 +94,15 @@ export default function MessagesPage() {
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [creatingConversation, setCreatingConversation] = useState(false);
+  
+  // Estados para la creación de grupos
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupDescription, setGroupDescription] = useState("");
+  const [selectedParticipants, setSelectedParticipants] = useState<User[]>([]);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [groupImage, setGroupImage] = useState<File | null>(null);
+  const [groupImagePreview, setGroupImagePreview] = useState<string | null>(null);
   
   // Referencias para controlar ciclos y renderizado
   const isProcessingUrlRef = useRef(false);
@@ -130,8 +147,36 @@ export default function MessagesPage() {
       
       // Filtrar conversaciones válidas y formatearlas correctamente
       const validConversations = conversations
-        .filter(conv => conv && typeof conv === 'object' && conv.id && (conv.receiver || conv.otherUser))
+        .filter(conv => conv && typeof conv === 'object' && conv.id)
         .map((conv) => {
+          // Verificar si es un grupo
+          if (conv.isGroup) {
+            return {
+              id: conv.id,
+              isGroup: true,
+              name: conv.name || "Grupo sin nombre",
+              description: conv.description || "",
+              imageUrl: conv.imageUrl || null,
+              lastMessage: conv.lastMessage ? {
+                ...conv.lastMessage,
+                createdAt: typeof conv.lastMessage.createdAt === 'string' ? 
+                  new Date(conv.lastMessage.createdAt).toISOString() : 
+                  conv.lastMessage.createdAt,
+              } : null,
+              createdAt: conv.createdAt,
+              updatedAt: conv.updatedAt || conv.createdAt || new Date().toISOString(),
+              unreadCount: conv.unreadCount || 0,
+              participants: Array.isArray(conv.participants) ? conv.participants : [],
+              isEmpty: !conv.lastMessage,
+              // Añadir un otherUser ficticio para compatibilidad con la interfaz existente
+              otherUser: {
+                id: conv.id,
+                username: conv.name || "Grupo",
+                image: conv.imageUrl || null
+              }
+            };
+          }
+          
           const otherUser = conv.receiver || conv.otherUser || {};
           
           return {
@@ -165,6 +210,7 @@ export default function MessagesPage() {
             unreadCount: conv.unreadCount || 0,
             lastInteraction: conv.lastInteraction,
             isEmpty: !conv.lastMessage,
+            isGroup: false
           };
         });
       
@@ -497,7 +543,7 @@ export default function MessagesPage() {
         otherUser: {
           id: userId,
           username: userData.username || null,
-          image: userData.image || null,
+          image: userData.image || null
         },
         lastMessage: null,
         updatedAt: new Date().toISOString(),
@@ -562,14 +608,14 @@ export default function MessagesPage() {
 
   // Efecto para cargar datos de seguidores mutuos al abrir el modal
   useEffect(() => {
-    const fetchMutualFollowers = async () => {
+    const fetchMutualFollowersForPrivateMessages = async () => {
       if (!showNewMessageModal || !session?.user?.id) return;
       
       try {
         const mutualResponse = await fetch(`${API_ROUTES.relationships.mutual}?t=${Date.now()}`);
         const mutualData = await processMutualResponse(mutualResponse);
         
-        // Filtrar usuarios que ya tienen conversaciones existentes
+        // Filtrar usuarios que ya tienen conversaciones existentes (solo para mensajes privados)
         const filteredMutuals = mutualData.filter(user => 
           !conversations.some(conv => 
             conv.otherUser?.id === user.id || 
@@ -584,8 +630,27 @@ export default function MessagesPage() {
       }
     };
     
-    fetchMutualFollowers();
+    fetchMutualFollowersForPrivateMessages();
   }, [showNewMessageModal, processMutualResponse, session?.user?.id, conversations]);
+
+  // Efecto para cargar datos de seguidores mutuos para grupos (muestra todos)
+  useEffect(() => {
+    const fetchMutualFollowersForGroups = async () => {
+      if (!showCreateGroupModal || !session?.user?.id) return;
+      
+      try {
+        const mutualResponse = await fetch(`${API_ROUTES.relationships.mutual}?t=${Date.now()}`);
+        const mutualData = await processMutualResponse(mutualResponse);
+        
+        // Para grupos, mostramos TODOS los seguidores mutuos
+        setMutualFollowersForGroups(mutualData);
+      } catch (error) {
+        console.error("Error fetching mutual followers for groups:", error);
+      }
+    };
+    
+    fetchMutualFollowersForGroups();
+  }, [showCreateGroupModal, processMutualResponse, session?.user?.id]);
 
   // Función para seleccionar una conversación - memoizada
   const handleConversationSelect = useCallback((conversationId: string) => {
@@ -620,6 +685,141 @@ export default function MessagesPage() {
     selectedConversationData ? selectedConversationData.otherUser : null,
     [selectedConversationData]
   );
+
+  // Función para crear un grupo nuevo
+  const createGroup = useCallback(async () => {
+    if (!session?.user?.id || !groupName || selectedParticipants.length === 0) {
+      console.error("Datos de grupo incompletos");
+      return;
+    }
+    
+    try {
+      setCreatingGroup(true);
+      
+      // Crear FormData para enviar datos e imagen
+      const formData = new FormData();
+      formData.append('name', groupName);
+      formData.append('description', groupDescription || '');
+      
+      // Añadir participantes como JSON
+      formData.append('participantIds', JSON.stringify(selectedParticipants.map(user => user.id)));
+      
+      // Añadir imagen si existe
+      if (groupImage) {
+        formData.append('image', groupImage);
+      }
+      
+      // Crear el grupo a través del API
+      const response = await fetch('/api/messages/group', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al crear el grupo");
+      }
+      
+      const data = await response.json();
+      console.log("Grupo creado:", data);
+      
+      // Creamos un objeto de grupo temporal para actualizar el estado de la UI inmediatamente
+      const newGroup: Conversation = {
+        id: data.id || `temp-group-${Date.now()}`,
+        isGroup: true,
+        name: groupName,
+        description: groupDescription,
+        imageUrl: data.imageUrl || undefined, // Usamos la URL devuelta por el servidor
+        otherUser: {
+          id: data.id || `temp-group-${Date.now()}`, 
+          username: groupName,
+          image: data.imageUrl || null
+        },
+        lastMessage: null,
+        updatedAt: new Date().toISOString(),
+        participants: [
+          ...selectedParticipants,
+          {
+            id: session.user.id,
+            username: session.user.username || null,
+            image: session.user.image || null
+          }
+        ],
+        unreadCount: 0,
+        isEmpty: true
+      };
+      
+      // Actualizar las conversaciones con el nuevo grupo
+      setConversations(prev => [newGroup, ...prev]);
+      
+      // Seleccionar el nuevo grupo
+      setSelectedConversation(newGroup.id);
+      
+      // Limpiar el formulario de creación de grupo
+      setGroupName("");
+      setGroupDescription("");
+      setSelectedParticipants([]);
+      setGroupImage(null);
+      setGroupImagePreview(null);
+      setShowCreateGroupModal(false);
+      
+      // Recargar las conversaciones desde el servidor después de crear el grupo
+      setTimeout(loadConversationsData, 1000);
+    } catch (error) {
+      console.error("Error creating group:", error);
+      alert(error instanceof Error ? error.message : "No se pudo crear el grupo. Inténtalo de nuevo.");
+    } finally {
+      setCreatingGroup(false);
+    }
+  }, [groupName, groupDescription, selectedParticipants, groupImage, session?.user?.id, session?.user?.username, session?.user?.image, loadConversationsData]);
+
+  // Función para manejar la carga de imágenes
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Comprobar que es una imagen
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor, selecciona un archivo de imagen válido.');
+        return;
+      }
+      
+      // Comprobar tamaño (5MB máx)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('La imagen es demasiado grande. El tamaño máximo es 5MB.');
+        return;
+      }
+      
+      setGroupImage(file);
+      
+      // Crear una URL de vista previa
+      const previewUrl = URL.createObjectURL(file);
+      setGroupImagePreview(previewUrl);
+      
+      // Limpiar URL cuando se desmonte
+      return () => URL.revokeObjectURL(previewUrl);
+    }
+  }, []);
+
+  // Función para eliminar la imagen seleccionada
+  const removeSelectedImage = useCallback(() => {
+    if (groupImagePreview) {
+      URL.revokeObjectURL(groupImagePreview);
+    }
+    setGroupImage(null);
+    setGroupImagePreview(null);
+  }, [groupImagePreview]);
+
+  // Función para agregar/quitar un usuario de los participantes seleccionados
+  const toggleParticipant = useCallback((user: User) => {
+    setSelectedParticipants(prev => {
+      const isSelected = prev.some(p => p.id === user.id);
+      if (isSelected) {
+        return prev.filter(p => p.id !== user.id);
+      } else {
+        return [...prev, user];
+      }
+    });
+  }, []);
 
   // Renderizado de mensajes de conversación - memoizado
   const renderConversationMessage = useCallback((conversation: Conversation) => {
@@ -672,6 +872,17 @@ export default function MessagesPage() {
                 <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
                 <path d="M16 21h5v-5"></path>
               </svg>
+            </Button>
+            {/* Botón para nuevo grupo */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setShowCreateGroupModal(true)}
+              title="Nuevo grupo"
+              aria-label="Nuevo grupo"
+              className="rounded-full"
+            >
+              <Users size={20} />
             </Button>
             {/* Botón para nuevo mensaje */}
             <Button 
@@ -774,14 +985,22 @@ export default function MessagesPage() {
           </div>
         )}
         
-        {/* Nuevo botón para crear conversaciones */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        {/* Nuevos botones para crear conversaciones y grupos */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 grid grid-cols-2 gap-2">
           <Button
             onClick={() => setShowNewMessageModal(true)}
-            className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium rounded-lg"
+            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium rounded-lg"
           >
             <MessageSquarePlus className="h-5 w-5 mr-2" />
             Nuevo mensaje
+          </Button>
+          
+          <Button
+            onClick={() => setShowCreateGroupModal(true)}
+            className="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-medium rounded-lg"
+          >
+            <Users className="h-5 w-5 mr-2" />
+            Nuevo grupo
           </Button>
         </div>
       </div>
@@ -823,11 +1042,18 @@ export default function MessagesPage() {
             </div>
             
             {/* Contenido de la conversación integrado directamente */}
-            <ChatWindowContent 
-              conversationId={selectedConversation}
-              otherUser={otherUser}
-              key={`chat-content-${selectedConversation}`}
-            />
+            {selectedConversation && selectedConversationData?.isGroup ? (
+              <GroupChatWindowContent 
+                conversation={selectedConversationData as any}
+                key={`group-chat-content-${selectedConversation}`}
+              />
+            ) : (
+              <ChatWindowContent 
+                conversationId={selectedConversation}
+                otherUser={otherUser}
+                key={`chat-content-${selectedConversation}`}
+              />
+            )}
           </div>
         ) : (
           // Panel de bienvenida cuando no hay conversación seleccionada
@@ -865,7 +1091,7 @@ export default function MessagesPage() {
                 className="mb-4"
               />
               
-              {filteredCombinedList.filter(item => !item.isConversation).length === 0 ? (
+              {mutualFollowers.length === 0 ? (
                 <div className="text-center py-4">
                   <MessageCircle className="mx-auto h-12 w-12 text-gray-300 mb-2" />
                   <p className="text-gray-500 mb-2">No se encontraron seguidores mutuos.</p>
@@ -873,10 +1099,13 @@ export default function MessagesPage() {
                 </div>
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                  {filteredCombinedList
-                    .filter(item => !item.isConversation)
-                    .map((item) => {
-                      const user = item.data as User;
+                  {mutualFollowers
+                    .filter(user => {
+                      const searchTerm = generalSearchTerm.toLowerCase();
+                      return searchTerm.trim() === "" || 
+                        (user.username && user.username.toLowerCase().includes(searchTerm));
+                    })
+                    .map((user) => {
                       return (
                         <div
                           key={user.id}
@@ -913,6 +1142,186 @@ export default function MessagesPage() {
                     })}
                 </div>
               )}
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+    
+    {/* Modal para crear un nuevo grupo */}
+    <Dialog open={showCreateGroupModal} onOpenChange={setShowCreateGroupModal}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Crear nuevo grupo</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 p-2">
+          {creatingGroup ? (
+            <div className="flex flex-col items-center py-4">
+              <LoadingSpinner className="h-10 w-10 mb-4" />
+              <p className="text-center text-sm text-gray-500">Creando grupo...</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                {/* Sección para subir imagen del grupo */}
+                <div className="flex justify-center">
+                  <div className="relative">
+                    <div className={`h-24 w-24 rounded-full flex items-center justify-center overflow-hidden border-2 ${groupImagePreview ? 'border-blue-500' : 'border-gray-300 border-dashed'}`}>
+                      {groupImagePreview ? (
+                        <img 
+                          src={groupImagePreview} 
+                          alt="Vista previa" 
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="text-gray-400 flex flex-col items-center justify-center">
+                          <ImagePlus size={24} />
+                          <span className="text-xs mt-1">Imagen</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {groupImagePreview && (
+                      <button 
+                        onClick={removeSelectedImage}
+                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                        aria-label="Eliminar imagen"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                    
+                    <input 
+                      type="file" 
+                      id="group-image-upload" 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                    />
+                    <label 
+                      htmlFor="group-image-upload"
+                      className={`absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-1 shadow-md cursor-pointer ${groupImagePreview ? '' : 'animate-pulse'}`}
+                    >
+                      <Plus size={14} />
+                    </label>
+                  </div>
+                </div>
+                
+                <div>
+                  <label htmlFor="groupName" className="block text-sm font-medium mb-1">
+                    Nombre del grupo *
+                  </label>
+                  <Input 
+                    id="groupName"
+                    placeholder="Nombre del grupo" 
+                    value={groupName} 
+                    onChange={(e) => setGroupName(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="groupDescription" className="block text-sm font-medium mb-1">
+                    Descripción (opcional)
+                  </label>
+                  <Input 
+                    id="groupDescription"
+                    placeholder="Describe el propósito del grupo" 
+                    value={groupDescription} 
+                    onChange={(e) => setGroupDescription(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="groupParticipants" className="block text-sm font-medium mb-1">
+                    Participantes *
+                  </label>
+                  <div className="relative">
+                    <Input 
+                      id="groupParticipants"
+                      placeholder="Buscar usuario..." 
+                      value={generalSearchTerm}
+                      onChange={(e) => setGeneralSearchTerm(e.target.value)}
+                      className="w-full"
+                    />
+                    <button className="absolute top-0 right-0 h-full px-3 flex items-center text-gray-400">
+                      <Search size={16} />
+                    </button>
+                  </div>
+                  
+                  <div className="mt-3 max-h-48 overflow-y-auto">
+                    {mutualFollowersForGroups.length > 0 ? (
+                      <ul className="space-y-2">
+                        {mutualFollowersForGroups
+                          .filter(user => {
+                            const searchTerm = generalSearchTerm.toLowerCase();
+                            return searchTerm.trim() === "" || 
+                              (user.username && user.username.toLowerCase().includes(searchTerm));
+                          })
+                          .map(user => (
+                            <li 
+                              key={user.id} 
+                              className={`flex items-center p-2 rounded-md cursor-pointer ${
+                                selectedParticipants.some(p => p.id === user.id) 
+                                  ? 'bg-blue-50 dark:bg-blue-900/30' 
+                                  : 'hover:bg-gray-100 dark:hover:bg-gray-800/60'
+                              }`}
+                              onClick={() => toggleParticipant(user)}
+                            >
+                              <div className="flex items-center flex-1">
+                                <Avatar className="h-8 w-8 mr-2">
+                                  <AvatarImage src={user.image || undefined} alt={user.username || 'Usuario'} />
+                                  <AvatarFallback>{user.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{user.username || 'Usuario sin nombre'}</p>
+                                </div>
+                              </div>
+                              <div className="ml-2">
+                                {selectedParticipants.some(p => p.id === user.id) ? (
+                                  <span className="flex items-center justify-center w-5 h-5 bg-blue-500 text-white rounded-full">
+                                    <Check size={14} />
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center justify-center w-5 h-5 border border-gray-300 rounded-full dark:border-gray-600">
+                                  </span>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                      </ul>
+                    ) : (
+                      <div className="text-center py-4 text-gray-500 text-sm">
+                        <p>No se encontraron seguidores mutuos.</p>
+                        <p className="text-xs mt-1">Solo puedes agregar usuarios que te siguen mutuamente.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2 mt-6">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowCreateGroupModal(false);
+                    setGroupName("");
+                    setGroupDescription("");
+                    setSelectedParticipants([]);
+                    setGroupImage(null);
+                    setGroupImagePreview(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  disabled={!groupName || selectedParticipants.length === 0}
+                  onClick={createGroup}
+                >
+                  Crear grupo
+                </Button>
+              </div>
             </>
           )}
         </div>

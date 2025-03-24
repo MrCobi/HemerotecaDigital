@@ -549,11 +549,29 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
       // Si es una solicitud directa de conversación por ID y el usuario no es participante
       if (isDirectConversationId) {
         // Verificar si la conversación existe
+        console.log(`DEPURACIÓN: Buscando conversación con ID exacto: "${conversationId}"`);
+        
+        // Primero hacemos una búsqueda más permisiva para debuggear
+        const similarConversations = await prisma.conversation.findMany({
+          where: {
+            id: {
+              contains: conversationId.replace('conv_', '')
+            }
+          },
+          select: {
+            id: true
+          }
+        });
+        
+        console.log(`Conversaciones con ID similar:`, similarConversations);
+        
         const conversationExists = await prisma.conversation.findUnique({
           where: {
             id: conversationId
           }
         });
+        
+        console.log(`Resultado de búsqueda de conversación exacta "${conversationId}": ${conversationExists ? 'Encontrada' : 'No encontrada'}`);
         
         if (!conversationExists) {
           console.log(`La conversación ${conversationId} no existe en la base de datos`);
@@ -686,47 +704,15 @@ async function fetchMessagesByConversationId(conversationId: string, skip: numbe
     
     console.log(`Conversaciones con ID similar:`, conversationsWithSimilarId);
     
-    // Buscar la conversación exacta
     const conversationExists = await prisma.conversation.findUnique({
       where: {
         id: conversationId
       }
     });
     
-    console.log(`Resultado de búsqueda de conversación exacta "${conversationId}":`, 
-      conversationExists ? 'Encontrada' : 'No encontrada');
+    console.log(`Resultado de búsqueda de conversación exacta "${conversationId}": ${conversationExists ? 'Encontrada' : 'No encontrada'}`);
     
     if (!conversationExists) {
-      // Para depuración, intentar usar el ID sin el prefijo 'conv_'
-      const idWithoutPrefix = conversationId.startsWith('conv_') 
-        ? conversationId.substring(5) 
-        : conversationId;
-      
-      console.log(`Intentando buscar sin prefijo: "${idWithoutPrefix}"`);
-      
-      const conversationWithoutPrefix = await prisma.conversation.findUnique({
-        where: {
-          id: idWithoutPrefix
-        }
-      });
-      
-      console.log(`¿Se encontró la conversación sin prefijo?:`, 
-        conversationWithoutPrefix ? 'Sí' : 'No');
-      
-      if (conversationWithoutPrefix) {
-        console.log(`LA CONVERSACIÓN EXISTE PERO CON FORMATO DIFERENTE: "${idWithoutPrefix}"`);
-        // Usar este ID para obtener los mensajes
-        return await getMessagesForConversation(idWithoutPrefix, skip, limit);
-      }
-      
-      // Mostrar todas las conversaciones disponibles para depuración
-      const allConversations = await prisma.conversation.findMany({
-        take: 10
-      });
-      
-      console.log(`Todas las conversaciones disponibles:`, 
-        allConversations.map(c => ({ id: c.id, createdAt: c.createdAt })));
-      
       return null; // Conversación no encontrada
     }
     
