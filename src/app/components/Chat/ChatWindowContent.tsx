@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { Send, X, Mic, Play, Pause } from 'lucide-react';
+import { Send, X, Mic, Play, Pause, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -33,6 +33,8 @@ type Message = {
   read?: boolean;
   mediaUrl?: string;
   messageType?: 'text' | 'image' | 'voice' | 'file' | 'video';
+  deleted?: boolean;
+  deletedReason?: 'spam' | 'duplicate' | 'other';
 };
 
 type ChatWindowContentProps = {
@@ -387,6 +389,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [showDeletedNotification, setShowDeletedNotification] = useState<{ message: string, type: string } | null>(null);
   
   // Estado para controlar la carga de mensajes
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
@@ -459,6 +462,38 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     
     // Añadir los nuevos mensajes, reemplazando cualquier mensaje temporal con su versión final si tiene ID
     newMessages.forEach(msg => {
+      // Verificar duplicados exactos (mismo contenido, mismo remitente, en los últimos 30 segundos)
+      const isDuplicate = Array.from(updatedMap.values()).some(existingMsg => {
+        if (existingMsg.senderId === msg.senderId && 
+            existingMsg.content === msg.content && 
+            existingMsg.content.trim() !== '' &&
+            msg.messageType === 'text') {
+          
+          const existingDate = new Date(existingMsg.createdAt);
+          const newDate = new Date(msg.createdAt);
+          const timeDiffSeconds = Math.abs(newDate.getTime() - existingDate.getTime()) / 1000;
+          
+          // Considerar duplicado si el mensaje es igual y enviado en los últimos 30 segundos
+          return timeDiffSeconds < 30;
+        }
+        return false;
+      });
+      
+      // Si es un duplicado, marcar como eliminado y mostrar notificación
+      if (isDuplicate && msg.messageType === 'text' && !msg.id) {
+        msg.deleted = true;
+        msg.deletedReason = 'duplicate';
+        
+        // Mostrar notificación
+        setShowDeletedNotification({
+          message: 'Un mensaje ha sido filtrado por ser duplicado',
+          type: 'duplicate'
+        });
+        
+        // Auto-ocultar la notificación después de 5 segundos
+        setTimeout(() => setShowDeletedNotification(null), 5000);
+      }
+      
       // Usamos el ID como clave principal si existe
       if (msg.id) {
         // Si el mensaje tiene ID, es un mensaje confirmado por el servidor
@@ -1185,6 +1220,16 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     };
   }, [connected, reconnect, currentUserId]);
 
+  // Efecto para desplazarse automáticamente al último mensaje al cargar la conversación
+  useEffect(() => {
+    if (messages.length > 0 && !isLoadingMessages && messagesEndRef.current) {
+      // Pequeño timeout para asegurar que el DOM se ha renderizado completamente
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, [messages.length, isLoadingMessages]);
+
   return (
     <div className={cn("flex flex-col h-full", className)}>
       {/* Contenedor de mensajes */}
@@ -1193,6 +1238,20 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         className="flex-1 overflow-y-auto p-4 space-y-4"
         onScroll={handleScroll}
       >
+        {/* Notificación de mensaje eliminado */}
+        {showDeletedNotification && (
+          <div className="sticky top-2 z-10 w-fit mx-auto flex items-center gap-2 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-100 text-sm py-2 px-3 rounded-lg shadow-md transition-opacity duration-300">
+            <AlertCircle className="h-4 w-4" />
+            <span>{showDeletedNotification.message}</span>
+            <button 
+              className="ml-2 text-amber-600 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-100"
+              onClick={() => setShowDeletedNotification(null)}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        
         {isLoadingMessages ? (
           <div className="flex justify-center items-center h-full">
             <LoadingSpinner className="w-8 h-8 text-blue-500" />
@@ -1243,6 +1302,20 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
                 // Crear una clave única y garantizada para cada mensaje
                 // Usamos una combinación de índice, id/tempId y timestamp para asegurar unicidad
                 const messageKey = `msg-${index}-${message.id || message.tempId || Date.now()}`;
+                
+                // No mostrar mensajes marcados como eliminados por spam o duplicados
+                if (message.deleted) {
+                  return (
+                    <div key={messageKey} className="flex justify-center">
+                      <div className="bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs px-3 py-1 rounded-full flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {message.deletedReason === 'duplicate' ? 
+                          'Mensaje duplicado eliminado' : 
+                          'Mensaje eliminado por seguridad'}
+                      </div>
+                    </div>
+                  );
+                }
                 
                 return (
                   <div key={messageKey}>
