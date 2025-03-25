@@ -182,6 +182,28 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
     setIsSaving(true);
 
     try {
+      // Validar campos requeridos
+      if (!form.name || !form.email || !form.username) {
+        setError("Los campos Nombre, Email y Nombre de usuario son obligatorios");
+        setIsSaving(false);
+        return;
+      }
+
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email)) {
+        setError("El formato del email es inválido");
+        setIsSaving(false);
+        return;
+      }
+
+      // Validar longitud de contraseña si se está cambiando
+      if (form.password && (form.password.length < 6 || form.password.length > 32)) {
+        setError("La contraseña debe tener entre 6 y 32 caracteres");
+        setIsSaving(false);
+        return;
+      }
+      
       let imageUrl = null;
       
       // Si hay un archivo nuevo, subirlo
@@ -199,8 +221,8 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
       
       const updateData = {
         ...form,
-        // Si el password está vacío, no lo enviamos
-        ...(form.password === "" && { password: undefined }),
+        // Para contraseñas, solo enviamos newPassword si hay contraseña
+        ...(form.password === "" ? { password: undefined } : { newPassword: form.password }),
         // Incluir la URL de la imagen
         image: imageUrl
       };

@@ -143,6 +143,21 @@ export default function EditProfilePage() {
     setSuccessMessage("");
     
     try {
+      // Validar campos requeridos
+      if (!formData.name || !formData.username) {
+        setError("Los campos Nombre y Nombre de usuario son obligatorios");
+        setSaving(false);
+        return;
+      }
+
+      // Validar que el nombre de usuario sea válido (solo letras, números y guiones bajos)
+      const usernameRegex = /^[a-zA-Z0-9_]+$/;
+      if (!usernameRegex.test(formData.username)) {
+        setError("El nombre de usuario solo puede contener letras, números y guiones bajos (_)");
+        setSaving(false);
+        return;
+      }
+
       // Validar que las contraseñas coincidan si se intenta cambiar
       if (formData.newPassword && formData.newPassword !== formData.confirmPassword) {
         setError("Las contraseñas no coinciden");
@@ -199,8 +214,13 @@ export default function EditProfilePage() {
       
       // Solo incluir contraseñas si se están cambiando
       if (isChangingPassword) {
+        // Cambiamos los nombres para asegurar compatibilidad con el endpoint
         formDataToUpdate.currentPassword = formData.password;
         formDataToUpdate.newPassword = formData.newPassword;
+        console.log("Enviando datos de cambio de contraseña:", { 
+          currentPassword: "***", 
+          newPassword: "***" 
+        });
       }
       
       console.log("Enviando solicitud de actualización para el usuario:", session?.user?.id);
@@ -243,7 +263,7 @@ export default function EditProfilePage() {
         
         // Esperar un momento y luego cerrar la sesión
         setTimeout(() => {
-          signOut({ callbackUrl: '/login' });
+          signOut({ callbackUrl: '/api/auth/signin' });
         }, 3000);
       } else {
         setSuccessMessage("Perfil actualizado correctamente");
@@ -309,224 +329,226 @@ export default function EditProfilePage() {
         )}
 
         <Card className="shadow-md border-gray-200 dark:border-gray-800">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row items-center justify-between">
-              <div className="text-center sm:text-left mb-4 sm:mb-0">
-                <CardTitle className="text-gray-800 dark:text-white">
-                  Tu información personal
-                </CardTitle>
-                <CardDescription className="text-gray-500 dark:text-gray-400">
-                  Actualiza tus datos y personaliza tu perfil
-                </CardDescription>
-              </div>
-              
-              <div className="text-center relative">
-                <div className="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-md mb-2">
-                  {preview ? (
-                    <Image
-                      src={preview}
-                      alt="Perfil"
-                      fill
-                      className="object-cover"
-                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
-                    />
-                  ) : formData.image && formData.image.includes('cloudinary') ? (
-                    <CldImage
-                      src={formData.image}
-                      alt={formData.name || "Avatar"}
-                      width={96}
-                      height={96}
-                      crop="fill"
-                      gravity="face"
-                      className="object-cover"
-                      priority
-                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
-                    />
-                  ) : formData.image && !formData.image.startsWith('/') && !formData.image.startsWith('http') ? (
-                    <CldImage
-                      src={formData.image}
-                      alt={formData.name || "Avatar"}
-                      width={96}
-                      height={96}
-                      crop="fill"
-                      gravity="face"
-                      className="object-cover"
-                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
-                    />
-                  ) : (
-                    <Image
-                      src={formData.image || "/images/AvatarPredeterminado.webp"}
-                      alt={formData.name || "Avatar"}
-                      width={96}
-                      height={96}
-                      className="object-cover"
-                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
-                    />
-                  )}
+          <form onSubmit={handleSubmit}>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row items-center justify-between">
+                <div className="text-center sm:text-left mb-4 sm:mb-0">
+                  <CardTitle className="text-gray-800 dark:text-white">
+                    Tu información personal
+                  </CardTitle>
+                  <CardDescription className="text-gray-500 dark:text-gray-400">
+                    Actualiza tus datos y personaliza tu perfil
+                  </CardDescription>
                 </div>
-                <label htmlFor="image-upload" className="cursor-pointer flex justify-center">
-                  <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-2 shadow-lg transform translate-x-3 translate-y-3">
-                    <Camera className="w-4 h-4" />
-                  </div>
-                  <input 
-                    id="image-upload" 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden"
-                    onChange={handleImageChange}
-                  />
-                </label>
-                <p className="text-xs text-gray-500 mt-2">
-                  Haz clic en el icono para cambiar tu foto
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6 p-6">
-            <Tabs defaultValue="general" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-8">
-                <TabsTrigger value="general" className="text-sm sm:text-base">Información General</TabsTrigger>
-                <TabsTrigger value="security" className="text-sm sm:text-base">Contraseña</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="general">
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Nombre</Label>
-                      <Input
-                        id="name"
-                        name="name"
-                        placeholder="Tu nombre"
-                        value={formData.name}
-                        onChange={handleChange}
-                        required
+                
+                <div className="text-center relative">
+                  <div className="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-md mb-2">
+                    {preview ? (
+                      <Image
+                        src={preview}
+                        alt="Perfil"
+                        fill
+                        className="object-cover"
+                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
                       />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="username">Nombre de usuario</Label>
-                      <Input
-                        id="username"
-                        name="username"
-                        placeholder="username"
-                        value={formData.username}
-                        onChange={handleChange}
-                        required
+                    ) : formData.image && formData.image.includes('cloudinary') ? (
+                      <CldImage
+                        src={formData.image}
+                        alt={formData.name || "Avatar"}
+                        width={96}
+                        height={96}
+                        crop="fill"
+                        gravity="face"
+                        className="object-cover"
+                        priority
+                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
                       />
-                    </div>
+                    ) : formData.image && !formData.image.startsWith('/') && !formData.image.startsWith('http') ? (
+                      <CldImage
+                        src={formData.image}
+                        alt={formData.name || "Avatar"}
+                        width={96}
+                        height={96}
+                        crop="fill"
+                        gravity="face"
+                        className="object-cover"
+                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
+                      />
+                    ) : (
+                      <Image
+                        src={formData.image || "/images/AvatarPredeterminado.webp"}
+                        alt={formData.name || "Avatar"}
+                        width={96}
+                        height={96}
+                        className="object-cover"
+                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
+                      />
+                    )}
                   </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Correo electrónico</Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="tu.correo@example.com"
-                      value={formData.email}
-                      readOnly
-                      disabled
-                      className="bg-muted"
+                  <label htmlFor="image-upload" className="cursor-pointer flex justify-center">
+                    <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-2 shadow-lg transform translate-x-3 translate-y-3">
+                      <Camera className="w-4 h-4" />
+                    </div>
+                    <input 
+                      id="image-upload" 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden"
+                      onChange={handleImageChange}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      El correo electrónico no se puede modificar.
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="bio">Biografía</Label>
-                    <Textarea
-                      id="bio"
-                      name="bio"
-                      placeholder="Cuéntanos un poco sobre ti..."
-                      value={formData.bio}
-                      onChange={handleChange}
-                      className="min-h-24"
-                    />
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="security">
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Contraseña actual</Label>
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={formData.password}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">Nueva contraseña</Label>
-                      <Input
-                        id="newPassword"
-                        name="newPassword"
-                        type="password"
-                        placeholder="••••••••"
-                        value={formData.newPassword}
-                        onChange={handleChange}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirmar nueva contraseña</Label>
-                      <Input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type="password"
-                        placeholder="••••••••"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-                  
-                  <p className="text-xs text-muted-foreground">
-                    Deja estos campos en blanco si no deseas cambiar tu contraseña
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Haz clic en el icono para cambiar tu foto
                   </p>
                 </div>
-              </TabsContent>
-            </Tabs>
-            
-            <div className="mt-8 flex justify-end">
-              <Button
-                type="submit"
-                className="w-full sm:w-auto flex items-center justify-center gap-2"
-                disabled={saving}
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4" />
-                    Guardar cambios
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6 p-6">
+              <Tabs defaultValue="general" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-8">
+                  <TabsTrigger value="general" className="text-sm sm:text-base">Información General</TabsTrigger>
+                  <TabsTrigger value="security" className="text-sm sm:text-base">Contraseña</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="general">
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Nombre</Label>
+                        <Input
+                          id="name"
+                          name="name"
+                          placeholder="Tu nombre"
+                          value={formData.name}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="username">Nombre de usuario</Label>
+                        <Input
+                          id="username"
+                          name="username"
+                          placeholder="username"
+                          value={formData.username}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Correo electrónico</Label>
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="tu.correo@example.com"
+                        value={formData.email}
+                        readOnly
+                        disabled
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        El correo electrónico no se puede modificar.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="bio">Biografía</Label>
+                      <Textarea
+                        id="bio"
+                        name="bio"
+                        placeholder="Cuéntanos un poco sobre ti..."
+                        value={formData.bio}
+                        onChange={handleChange}
+                        className="min-h-24"
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="security">
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Contraseña actual</Label>
+                      <Input
+                        id="password"
+                        name="password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={formData.password}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="newPassword">Nueva contraseña</Label>
+                        <Input
+                          id="newPassword"
+                          name="newPassword"
+                          type="password"
+                          placeholder="••••••••"
+                          value={formData.newPassword}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmPassword">Confirmar nueva contraseña</Label>
+                        <Input
+                          id="confirmPassword"
+                          name="confirmPassword"
+                          type="password"
+                          placeholder="••••••••"
+                          value={formData.confirmPassword}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground">
+                      Deja estos campos en blanco si no deseas cambiar tu contraseña
+                    </p>
+                  </div>
+                </TabsContent>
+              </Tabs>
+              
+              <div className="mt-8 flex justify-end">
+                <Button
+                  type="submit"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2"
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Guardar cambios
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </form>
         </Card>
       </div>
     </div>

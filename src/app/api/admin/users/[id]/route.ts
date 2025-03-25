@@ -93,8 +93,11 @@ export async function PATCH(
     }
 
     // Manejar cambio de contraseña si se proporciona (los admins pueden cambiar sin verificar la actual)
-    if (body.newPassword) {
-      if (body.newPassword.length < 6 || body.newPassword.length > 32) {
+    if (body.newPassword || body.password) {
+      // Usar cualquiera de los dos (para compatibilidad)
+      const newPasswordValue = body.newPassword || body.password;
+      
+      if (newPasswordValue.length < 6 || newPasswordValue.length > 32) {
         return NextResponse.json(
           { error: "La contraseña debe tener entre 6 y 32 caracteres" },
           { status: 400 }
@@ -102,7 +105,8 @@ export async function PATCH(
       }
       
       console.log("Administrador cambiando contraseña para el usuario:", userId);
-      updateData.password = await bcrypt.hash(body.newPassword, 10);
+      updateData.password = await bcrypt.hash(newPasswordValue, 10);
+      console.log("Hash de contraseña generado correctamente");
     }
 
     // Verificar si el email ya existe (si se está actualizando)
