@@ -1719,7 +1719,7 @@ export default function MessagesPage() {
                         onClick={() => handleConversationSelect(conversation)}
                       >
                         {/* Avatar */}
-                        <Avatar className="h-12 w-12 border-2 border-gray-200 dark:border-gray-700">
+                        <Avatar className="h-12 w-12 border-2 border-gray-200 dark:border-gray-700 overflow-hidden">
                           {isGroup ? (
                             // Avatar para grupos
                             conversation.imageUrl && conversation.imageUrl.includes('cloudinary') ? (
@@ -1730,7 +1730,7 @@ export default function MessagesPage() {
                                 height={48}
                                 crop="fill"
                                 gravity="face"
-                                className="object-cover rounded-full"
+                                className="h-full w-full object-cover"
                                 priority
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
@@ -1745,7 +1745,7 @@ export default function MessagesPage() {
                                 height={48}
                                 crop="fill"
                                 gravity="face"
-                                className="object-cover"
+                                className="h-full w-full object-cover"
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
                                   target.src = "/images/AvatarPredeterminado.webp";
@@ -1757,7 +1757,7 @@ export default function MessagesPage() {
                                 width={48}
                                 height={48}
                                 alt={conversation.name || "Grupo"}
-                                className="rounded-full object-cover"
+                                className="h-full w-full object-cover"
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
                                   target.src = "/images/AvatarPredeterminado.webp";
@@ -1774,7 +1774,7 @@ export default function MessagesPage() {
                                 height={48}
                                 crop="fill"
                                 gravity="face"
-                                className="object-cover"
+                                className="h-full w-full object-cover"
                                 priority
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
@@ -1789,7 +1789,7 @@ export default function MessagesPage() {
                                 height={48}
                                 crop="fill"
                                 gravity="face"
-                                className="object-cover"
+                                className="h-full w-full object-cover"
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
                                   target.src = "/images/AvatarPredeterminado.webp";
@@ -1801,7 +1801,7 @@ export default function MessagesPage() {
                                 alt={conversation.otherUser?.username || "Usuario"} 
                                 width={40} 
                                 height={40}
-                                className="rounded-full object-cover"
+                                className="h-full w-full object-cover"
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
                                   target.src = "/images/AvatarPredeterminado.webp";
@@ -1911,7 +1911,7 @@ export default function MessagesPage() {
                         height={48}
                         crop="fill"
                         gravity="face"
-                        className="object-cover"
+                        className="h-full w-full object-cover"
                         priority
                         onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                           const target = e.target as HTMLImageElement;
@@ -1924,7 +1924,7 @@ export default function MessagesPage() {
                         alt={selectedConversationData?.name || "Grupo"}
                         width={48}
                         height={48}
-                        className="rounded-full object-cover"
+                        className="h-full w-full object-cover"
                         onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                           const target = e.target as HTMLImageElement;
                           target.src = "/images/AvatarPredeterminado.webp";
@@ -1939,7 +1939,7 @@ export default function MessagesPage() {
                       height={48}
                       crop="fill"
                       gravity="face"
-                      className="object-cover"
+                      className="h-full w-full object-cover"
                       priority
                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                         const target = e.target as HTMLImageElement;
@@ -1952,7 +1952,7 @@ export default function MessagesPage() {
                       alt={selectedConversationData.otherUser.username || "Usuario"}
                       width={48}
                       height={48}
-                      className="rounded-full object-cover"
+                      className="h-full w-full object-cover"
                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                         const target = e.target as HTMLImageElement;
                         target.src = "/images/AvatarPredeterminado.webp";
@@ -2096,7 +2096,7 @@ export default function MessagesPage() {
                                 height={48}
                                 crop="fill"
                                 gravity="face"
-                                className="object-cover"
+                                className="h-full w-full object-cover"
                                 priority
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
@@ -2111,7 +2111,7 @@ export default function MessagesPage() {
                                 height={48}
                                 crop="fill"
                                 gravity="face"
-                                className="object-cover"
+                                className="h-full w-full object-cover"
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
                                   target.src = "/images/AvatarPredeterminado.webp";
@@ -2123,7 +2123,7 @@ export default function MessagesPage() {
                                 alt={user.username || 'Usuario'} 
                                 width={40} 
                                 height={40}
-                                className="rounded-full object-cover"
+                                className="h-full w-full object-cover"
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
                                   target.src = "/images/AvatarPredeterminado.webp";
@@ -2276,7 +2276,7 @@ export default function MessagesPage() {
                                       height={48}
                                       crop="fill"
                                       gravity="face"
-                                      className="object-cover"
+                                      className="h-full w-full object-cover"
                                       priority
                                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                         const target = e.target as HTMLImageElement;
@@ -2291,7 +2291,7 @@ export default function MessagesPage() {
                                       height={48}
                                       crop="fill"
                                       gravity="face"
-                                      className="object-cover"
+                                      className="h-full w-full object-cover"
                                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                         const target = e.target as HTMLImageElement;
                                         target.src = "/images/AvatarPredeterminado.webp";
@@ -2303,7 +2303,7 @@ export default function MessagesPage() {
                                       alt={user.username || 'Usuario'} 
                                       width={40} 
                                       height={40}
-                                      className="rounded-full object-cover"
+                                      className="h-full w-full object-cover"
                                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                         const target = e.target as HTMLImageElement;
                                         target.src = "/images/AvatarPredeterminado.webp";
