@@ -7,17 +7,23 @@ import Image from "next/image";
 import { useState, useEffect, useMemo } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
-import { Trash2, Eye, CheckCircle } from "lucide-react";
+import { Trash2, Eye, CheckCircle, Users, MessageSquare } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { Badge } from "@/src/app/components/ui/badge";
+
+type MessageType = "text" | "image" | "voice" | "file" | "video";
 
 type Message = {
   id: string;
-  content: string;
+  content: string | null;
   createdAt: string; // ISO date string
   read: boolean;
   senderId: string;
-  receiverId: string;
+  receiverId: string | null;
+  mediaUrl: string | null;
+  messageType: MessageType;
+  conversationId: string;
   sender: {
     id: string;
     name: string | null;
@@ -30,6 +36,29 @@ type Message = {
     email: string | null;
     image: string | null;
   } | null;
+  conversation: {
+    id: string;
+    name: string | null;
+    isGroup: boolean;
+    imageUrl: string | null;
+    participants?: {
+      user: {
+        id: string;
+        name: string | null;
+        image: string | null;
+      }
+    }[];
+  };
+  readBy?: {
+    id: string;
+    userId: string;
+    readAt: string;
+    user: {
+      id: string;
+      name: string | null;
+      image: string | null;
+    }
+  }[];
 };
 
 type MessagesTableProps = {
@@ -41,7 +70,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterValue, setFilterValue] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "read" | "unread">("all");
+  const [filterType, setFilterType] = useState<"all" | "read" | "unread" | "individual" | "group">("all");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const [localMessages, setLocalMessages] = useState<Message[]>(messages);
@@ -58,17 +87,26 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     setCurrentPage(1);
   }, [filterValue, filterType, rowsPerPage]);
 
-  // Filtra los mensajes por contenido, remitente o destinatario
+  // Filtra los mensajes por contenido, remitente, destinatario o tipo
   const filteredMessages = useMemo(() => {
     if (!filterValue && filterType === "all") return localMessages;
     
     let filtered = [...localMessages];
     
-    // Filtrar por estado (leído/no leído)
-    if (filterType === "read") {
-      filtered = filtered.filter(message => message.read);
-    } else if (filterType === "unread") {
-      filtered = filtered.filter(message => !message.read);
+    // Filtrar por estado o tipo
+    switch (filterType) {
+      case "read":
+        filtered = filtered.filter(message => message.read);
+        break;
+      case "unread":
+        filtered = filtered.filter(message => !message.read);
+        break;
+      case "group":
+        filtered = filtered.filter(message => message.conversation.isGroup);
+        break;
+      case "individual":
+        filtered = filtered.filter(message => !message.conversation.isGroup);
+        break;
     }
     
     // Filtrar por texto si hay un valor
@@ -76,13 +114,16 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       const lowercasedFilter = filterValue.toLowerCase();
       
       filtered = filtered.filter(message => {
-        const contentMatch = message.content.toLowerCase().includes(lowercasedFilter);
+        const contentMatch = message.content?.toLowerCase().includes(lowercasedFilter) || false;
         const senderNameMatch = message.sender?.name?.toLowerCase().includes(lowercasedFilter) || false;
         const senderEmailMatch = message.sender?.email?.toLowerCase().includes(lowercasedFilter) || false;
         const receiverNameMatch = message.receiver?.name?.toLowerCase().includes(lowercasedFilter) || false;
         const receiverEmailMatch = message.receiver?.email?.toLowerCase().includes(lowercasedFilter) || false;
+        const groupNameMatch = message.conversation.isGroup && 
+          message.conversation.name?.toLowerCase().includes(lowercasedFilter) || false;
         
-        return contentMatch || senderNameMatch || senderEmailMatch || receiverNameMatch || receiverEmailMatch;
+        return contentMatch || senderNameMatch || senderEmailMatch || 
+               receiverNameMatch || receiverEmailMatch || groupNameMatch;
       });
     }
     
@@ -198,9 +239,106 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     );
   };
 
-  // Filtro de estado del mensaje
-  const statusFilterElement = (
-    <div className="flex space-x-2">
+  // Función para renderizar la imagen de grupo
+  const renderGroupImage = (conversation: Message['conversation'], size: number = 32) => {
+    if (!conversation.isGroup) return null;
+    
+    const defaultGroupImage = "/images/GroupPredeterminado.webp";
+    
+    return (
+      <div className="h-8 w-8 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
+        {conversation.imageUrl ? (
+          <Image
+            src={conversation.imageUrl}
+            alt={conversation.name || "Grupo"}
+            width={size}
+            height={size}
+            className="h-full w-full object-cover rounded-full"
+            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+              const target = e.target as HTMLImageElement;
+              target.src = defaultGroupImage;
+            }}
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center bg-primary text-white">
+            <Users className="h-5 w-5" />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Función para renderizar el mensaje según su tipo
+  const renderMessageContent = (message: Message) => {
+    if (!message.content && !message.mediaUrl) {
+      return <span className="text-muted-foreground text-sm italic">Sin contenido</span>;
+    }
+
+    let contentPreview = message.content || "";
+    
+    if (message.mediaUrl) {
+      switch (message.messageType) {
+        case "image":
+          return (
+            <div className="flex items-center">
+              <Badge variant="outline" className="mr-2 bg-blue-50 text-blue-700 border-blue-200">
+                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11a2 2 0 100-4 2 2 0 000 4z" />
+                </svg>
+                Imagen
+              </Badge>
+              {contentPreview && <span className="text-sm truncate">{contentPreview}</span>}
+            </div>
+          );
+        case "voice":
+          return (
+            <div className="flex items-center">
+              <Badge variant="outline" className="mr-2 bg-purple-50 text-purple-700 border-purple-200">
+                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+                Audio
+              </Badge>
+              {contentPreview && <span className="text-sm truncate">{contentPreview}</span>}
+            </div>
+          );
+        case "video":
+          return (
+            <div className="flex items-center">
+              <Badge variant="outline" className="mr-2 bg-red-50 text-red-700 border-red-200">
+                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Video
+              </Badge>
+              {contentPreview && <span className="text-sm truncate">{contentPreview}</span>}
+            </div>
+          );
+        case "file":
+          return (
+            <div className="flex items-center">
+              <Badge variant="outline" className="mr-2 bg-green-50 text-green-700 border-green-200">
+                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Archivo
+              </Badge>
+              {contentPreview && <span className="text-sm truncate">{contentPreview}</span>}
+            </div>
+          );
+        default:
+          return <span className="text-sm truncate">{contentPreview}</span>;
+      }
+    }
+    
+    return <span className="text-sm truncate">{contentPreview}</span>;
+  };
+
+  // Filtros para tipo de conversación y estado
+  const filterElement = (
+    <div className="flex flex-wrap gap-2">
       <button 
         onClick={() => setFilterType("all")}
         className={`px-3 py-1 text-sm rounded-md ${
@@ -231,10 +369,60 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       >
         No leídos
       </button>
+      <button 
+        onClick={() => setFilterType("individual")}
+        className={`px-3 py-1 text-sm rounded-md ${
+          filterType === "individual" 
+            ? "bg-primary text-white" 
+            : "bg-card hover:bg-accent/50 text-foreground border border-gray-200 dark:border-gray-700"
+        }`}
+      >
+        <MessageSquare className="h-3.5 w-3.5 mr-1 inline" />
+        Individuales
+      </button>
+      <button 
+        onClick={() => setFilterType("group")}
+        className={`px-3 py-1 text-sm rounded-md ${
+          filterType === "group" 
+            ? "bg-primary text-white" 
+            : "bg-card hover:bg-accent/50 text-foreground border border-gray-200 dark:border-gray-700"
+        }`}
+      >
+        <Users className="h-3.5 w-3.5 mr-1 inline" />
+        Grupos
+      </button>
     </div>
   );
 
   const columns: Column<Message>[] = useMemo(() => [
+    {
+      header: "Tipo",
+      accessorKey: "conversation.isGroup",
+      cell: (message: Message) => {
+        return (
+          <span 
+            className={`px-2 py-1 inline-flex items-center text-xs leading-5 font-semibold rounded-full ${
+              message.conversation.isGroup 
+                ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300" 
+                : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300"
+            }`}
+          >
+            {message.conversation.isGroup ? (
+              <>
+                <Users className="h-3.5 w-3.5 mr-1" />
+                Grupo
+              </>
+            ) : (
+              <>
+                <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                Individual
+              </>
+            )}
+          </span>
+        );
+      },
+      filterElement: filterElement,
+    },
     {
       header: "Estado",
       accessorKey: "read",
@@ -251,7 +439,6 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
           </span>
         );
       },
-      filterElement: statusFilterElement,
     },
     {
       header: "Remitente",
@@ -281,8 +468,31 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     },
     {
       header: "Destinatario",
-      accessorKey: "receiver",
+      accessorKey: "recipient",
       cell: (message: Message) => {
+        if (message.conversation.isGroup) {
+          return (
+            <div className="flex items-center">
+              <div className="h-8 w-8 flex-shrink-0 mr-3">
+                {renderGroupImage(message.conversation)}
+              </div>
+              <div>
+                <Link
+                  href={`/admin/messages/group/${message.conversation.id}`}
+                  className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
+                >
+                  {message.conversation.name || "Grupo sin nombre"}
+                </Link>
+                <div className="text-xs text-muted-foreground">
+                  {message.conversation.participants ? 
+                    `${message.conversation.participants.length} participantes` : 
+                    "Grupo"}
+                </div>
+              </div>
+            </div>
+          );
+        }
+        
         if (!message.receiver) {
           return <span className="text-sm text-muted-foreground">Usuario eliminado</span>;
         }
@@ -311,7 +521,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       cell: (message: Message) => {
         return (
           <div className="text-sm text-foreground max-w-xs truncate">
-            {message.content}
+            {renderMessageContent(message)}
           </div>
         );
       },
@@ -409,7 +619,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         onPageChange={setCurrentPage}
         onFilterChange={setFilterValue}
         filterValue={filterValue}
-        filterPlaceholder="Buscar por usuario o contenido..."
+        filterPlaceholder="Buscar por usuario, grupo o contenido..."
         rowsPerPage={rowsPerPage}
         onRowsPerPageChange={setRowsPerPage}
         emptyMessage="No hay mensajes que mostrar"

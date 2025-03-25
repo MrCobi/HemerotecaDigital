@@ -220,6 +220,36 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       });
     });
   }, [conversation?.id]);
+
+  useEffect(() => {
+    if (!socketInstance || !socketInitialized || !conversation?.id) return;
+    
+    console.log('Configurando listener para nuevos mensajes en el grupo');
+    
+    // Función para manejar nuevos mensajes recibidos por socket
+    const handleNewMessage = (message: any) => {
+      console.log('Nuevo mensaje recibido por socket:', message);
+      
+      // Verificar que el mensaje sea para este grupo
+      if (message.conversationId === conversation.id) {
+        console.log('Procesando mensaje para el grupo actual');
+        processMessages([message]);
+        
+        // Auto-scroll si estamos en la parte inferior
+        if (isAtBottom) {
+          setTimeout(scrollToBottom, 100);
+        }
+      }
+    };
+    
+    // Añadir el listener
+    socketInstance.on('new_message', handleNewMessage);
+    
+    // Limpiar el listener cuando el componente se desmonte
+    return () => {
+      socketInstance.off('new_message', handleNewMessage);
+    };
+  }, [socketInstance, socketInitialized, conversation?.id, processMessages, isAtBottom]);
   
   // Separar completamente la función de carga de mensajes del ciclo de vida del componente
   const loadGroupMessages = useCallback(async (groupId: string, isInitialLoad = false) => {
@@ -519,6 +549,47 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     // setMessages(uniqueMessages);
   }, [messages]);
   
+  // Función para enviar mensajes al servidor y guardarlos en la base de datos
+  const sendMessageToServer = async (message: Message) => {
+    if (!message.conversationId) {
+      throw new Error('ID de conversación no especificado');
+    }
+    
+    try {
+      // Enviar el mensaje a través de la API para guardarlo en la base de datos
+      const requestBody = {
+        content: message.content || '', // Asegurar que content nunca es undefined
+        conversationId: message.conversationId,
+        mediaUrl: message.mediaUrl,
+        messageType: message.messageType || 'text',
+        tempId: message.tempId || Date.now().toString(),
+        isGroupMessage: true, // Indicar explícitamente que es un mensaje de grupo
+        // No incluimos receiverId para mensajes de grupo
+      };
+      
+      console.log("Enviando mensaje al servidor:", requestBody);
+      
+      const response = await fetch('/api/messages/group-messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.user?.email || ''}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al guardar el mensaje en la base de datos');
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error al enviar mensaje al servidor:', error);
+      throw error;
+    }
+  };
+
   // Manejar envío de mensajes
   const handleSendMessage = async () => {
     if (!newMessage.trim() || isSending || !conversation || !currentUserId) return;
@@ -581,12 +652,19 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       
       // Si tenemos socket, enviar notificación en tiempo real
       if (socketInstance && socketInitialized) {
-        socketSendMessage({
+        // Usamos el mismo formato que el backend para mantener consistencia
+        const socketMessage = {
           ...finalMessage,
-          receiverId: 'group', // Marcar que es un mensaje de grupo
-          conversationId: groupId
-        });
+          isGroupMessage: true,
+          id: finalMessage.tempId // Asegurarnos de que tiene un ID para el socket
+        };
+        console.log('Emitiendo mensaje por socket:', socketMessage);
+        socketInstance.emit('send_message', socketMessage);
       }
+      
+      // No es necesario volver a enviar el mensaje al servidor ya que
+      // ya se guardó en la base de datos con la llamada anterior
+      // await sendMessageToServer(finalMessage);
     } catch (error) {
       console.error("Error al enviar mensaje:", error);
       
@@ -713,27 +791,38 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                   
                   const { url } = await response.json();
                   
+                  // Crear el mensaje con los datos necesarios
+                  const newMessage = {
+                    content: 'Audio mensaje', // Asignar un texto descriptivo en lugar de cadena vacía
+                    senderId: currentUserId || '',
+                    conversationId: conversation.id,
+                    createdAt: new Date(),
+                    tempId: Date.now().toString(),
+                    mediaUrl: url,
+                    messageType: 'voice' as 'voice' | 'text' | 'image' | 'file' | 'video'
+                  };
+                  
+                  // Añadir mensaje al estado local
+                  processMessages([newMessage]);
+                  
+                  // 1. Guardar el mensaje en la base de datos
+                  await sendMessageToServer(newMessage);
+                  
+                  // 2. Enviar mensaje a través de sockets para actualización en tiempo real
                   if (socketInstance && socketInitialized) {
-                    const newMessage = {
-                      content: '',
-                      senderId: currentUserId || '', // Ensure senderId is never undefined
-                      conversationId: conversation.id,
-                      createdAt: new Date(),
-                      tempId: Date.now().toString(),
-                      mediaUrl: url,
-                      messageType: 'voice' as 'voice' | 'text' | 'image' | 'file' | 'video'
+                    // Usamos el mismo formato que el backend para mantener consistencia
+                    const socketMessage = {
+                      ...newMessage,
+                      isGroupMessage: true,
+                      id: newMessage.tempId // Asegurarnos de que tiene un ID para el socket
                     };
-                    
-                    // Añadir mensaje al estado local
-                    processMessages([newMessage]);
-                    
-                    // Enviar mensaje al servidor
-                    socketInstance.emit('group_message', newMessage);
-                    
-                    // Auto-scroll si estamos en la parte inferior
-                    if (isAtBottom) {
-                      setTimeout(scrollToBottom, 100);
-                    }
+                    console.log('Emitiendo mensaje por socket:', socketMessage);
+                    socketInstance.emit('send_message', socketMessage);
+                  }
+                  
+                  // Auto-scroll si estamos en la parte inferior
+                  if (isAtBottom) {
+                    setTimeout(scrollToBottom, 100);
                   }
                   
                   // Desactivar el grabador de voz

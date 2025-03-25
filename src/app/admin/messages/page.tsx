@@ -107,6 +107,12 @@ export default function MessagesPage() {
       </div>
 
       <div className="bg-card shadow overflow-hidden rounded-lg">
+        <div className="p-4 sm:p-6 border-b border-border/40">
+          <h2 className="text-xl font-semibold">Todos los mensajes</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Administra los mensajes individuales y grupales de la plataforma.
+          </p>
+        </div>
         <MessagesTable messages={messages} />
       </div>
     </div>

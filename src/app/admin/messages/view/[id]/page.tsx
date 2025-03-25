@@ -6,10 +6,21 @@ import Link from "next/link";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
-import { ArrowLeft, CheckCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle, Trash2, User, Users } from "lucide-react";
 import { Button } from "@/src/app/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { Badge } from "@/src/app/components/ui/badge";
+
+type Participant = {
+  user: {
+    id: string;
+    name: string | null;
+    username: string | null;
+    image: string | null;
+    email: string | null;
+  };
+};
 
 type Message = {
   id: string;
@@ -18,6 +29,8 @@ type Message = {
   read: boolean;
   senderId: string;
   receiverId: string;
+  messageType?: string;
+  mediaUrl?: string;
   sender: {
     id: string;
     name: string | null;
@@ -31,6 +44,14 @@ type Message = {
     username: string | null;
     email: string | null;
     image: string | null;
+  } | null;
+  conversation?: {
+    id: string;
+    name: string | null;
+    isGroup: boolean;
+    imageUrl: string | null;
+    description: string | null;
+    participants: Participant[];
   } | null;
 };
 
@@ -169,6 +190,36 @@ export default function MessageViewPage() {
             height={size}
             className="h-full w-full object-cover rounded-full"
           />
+        )}
+      </div>
+    );
+  };
+
+  // Función para renderizar la imagen del grupo
+  const renderGroupImage = (conversation: Message['conversation'], size: number = 40) => {
+    if (!conversation) return null;
+    
+    const defaultImage = "/images/GroupAvatarPredeterminado.webp";
+    const containerStyle = { width: `${size}px`, height: `${size}px` };
+    
+    return (
+      <div className="overflow-hidden rounded-full flex items-center justify-center bg-gray-100" style={containerStyle}>
+        {conversation.imageUrl ? (
+          <Image
+            src={conversation.imageUrl}
+            alt={conversation.name || "Grupo"}
+            width={size}
+            height={size}
+            className="h-full w-full object-cover rounded-full"
+            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+              const target = e.target as HTMLImageElement;
+              target.src = defaultImage;
+            }}
+          />
+        ) : (
+          <div className="bg-primary h-full w-full flex items-center justify-center text-white">
+            <Users className="h-[60%] w-[60%]" />
+          </div>
         )}
       </div>
     );
@@ -339,7 +390,44 @@ export default function MessageViewPage() {
               
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Destinatario</h3>
-                {message.receiver ? (
+                {message.conversation?.isGroup ? (
+                  // Es un mensaje de grupo
+                  <div className="p-4 bg-card/50 rounded-lg border">
+                    <div className="flex items-center mb-3">
+                      <div className="h-12 w-12 flex-shrink-0 mr-4">
+                        {renderGroupImage(message.conversation, 48)}
+                      </div>
+                      <div>
+                        <div className="text-primary text-md font-medium flex items-center">
+                          {message.conversation.name || "Grupo sin nombre"}
+                          <Badge className="ml-2" variant="secondary">Grupo</Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {message.conversation.participants.length} participantes
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3 border-t pt-3">
+                      <p className="text-sm font-medium mb-2">Participantes:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {message.conversation.participants.map((participant) => (
+                          <Link 
+                            key={participant.user.id}
+                            href={`/admin/users/view/${participant.user.id}`}
+                            className="inline-flex items-center text-xs bg-card/80 hover:bg-card p-1 px-2 rounded-full border"
+                          >
+                            <div className="h-5 w-5 mr-1">
+                              {renderUserImage(participant.user, 20)}
+                            </div>
+                            {participant.user.name || participant.user.username || participant.user.email || "Usuario"}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : message.receiver ? (
+                  // Es un mensaje individual con receptor
                   <div className="flex items-center p-4 bg-card/50 rounded-lg border">
                     <div className="h-12 w-12 flex-shrink-0 mr-4">
                       {renderUserImage(message.receiver, 48)}
@@ -355,6 +443,7 @@ export default function MessageViewPage() {
                     </div>
                   </div>
                 ) : (
+                  // Es un mensaje individual sin receptor (eliminado)
                   <div className="p-4 bg-card/50 rounded-lg border text-muted-foreground">
                     Usuario eliminado
                   </div>
@@ -365,6 +454,40 @@ export default function MessageViewPage() {
             <div className="space-y-2">
               <h3 className="text-lg font-medium">Contenido del mensaje</h3>
               <div className="p-4 bg-card/50 rounded-lg border whitespace-pre-wrap">
+                {message.messageType && message.messageType !== 'text' && (
+                  <Badge className="mb-2" variant="outline">
+                    {message.messageType === 'image' && 'Imagen'}
+                    {message.messageType === 'voice' && 'Audio'}
+                    {message.messageType === 'video' && 'Video'}
+                    {message.messageType === 'file' && 'Archivo'}
+                  </Badge>
+                )}
+                
+                {message.mediaUrl && ['image'].includes(message.messageType || '') ? (
+                  <div className="mb-3">
+                    <a href={message.mediaUrl} target="_blank" rel="noopener noreferrer">
+                      <Image 
+                        src={message.mediaUrl} 
+                        alt="Contenido multimedia" 
+                        width={300} 
+                        height={200} 
+                        className="max-w-full h-auto rounded-md"
+                      />
+                    </a>
+                  </div>
+                ) : message.mediaUrl ? (
+                  <div className="mb-3">
+                    <a 
+                      href={message.mediaUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-primary/80 underline flex items-center"
+                    >
+                      Ver archivo adjunto
+                    </a>
+                  </div>
+                ) : null}
+                
                 {message.content}
               </div>
             </div>
