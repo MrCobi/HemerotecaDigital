@@ -1697,7 +1697,7 @@ export default function MessagesPage() {
                                 }}
                               />
                             ) : (
-                              <Image
+                              <Image 
                                 src={"/images/AvatarPredeterminado.webp"}
                                 width={48}
                                 height={48}
@@ -1860,12 +1860,12 @@ export default function MessagesPage() {
                         priority
                         onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                           const target = e.target as HTMLImageElement;
-                          target.src = "/images/grupo_default.png";
+                          target.src = "/images/AvatarPredeterminado.webp";
                         }}
                       />
                     ) : (
                       <Image 
-                        src="/images/grupo_default.png"
+                        src="/images/AvatarPredeterminado.webp"
                         alt={selectedConversationData?.name || "Grupo"}
                         width={48}
                         height={48}
