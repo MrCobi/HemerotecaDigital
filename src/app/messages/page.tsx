@@ -16,6 +16,7 @@ import Image from "next/image";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 import { CldImage } from "next-cloudinary";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
+import { useToast } from "@/src/app/components/ui/use-toast";
 
 // Interfaces optimizadas
 interface User {
@@ -26,15 +27,18 @@ interface User {
 }
 
 export interface Message {
-  id: string;
-  content: string;
+  id?: string;
+  content: string | null;
+  createdAt: Date | string;
+  read?: boolean;
   senderId: string;
-  receiverId: string;
-  createdAt: string;
-  read: boolean;
-  tempId?: string;
-  messageType?: 'text' | 'image' | 'voice' | 'file' | 'video';
-  mediaUrl?: string;
+  sender?: {
+    id: string;
+    username: string | null;
+    name?: string | null;
+    image?: string | null;
+  };
+  messageType?: string;
 }
 
 export interface Conversation {
@@ -63,6 +67,7 @@ export interface Conversation {
   imageUrl?: string;
   description?: string;
   participants?: User[];
+  participantsCount?: number;
 }
 
 interface CombinedItem {
@@ -152,10 +157,15 @@ export default function MessagesPage() {
           // Verificar si es un grupo basado en el ID o la propiedad isGroup
           const isGroupConversation = conv.isGroup || (conv.id && typeof conv.id === 'string' && conv.id.startsWith('group_'));
           
+          // Log para depuración
+          console.log(`Procesando conversación: isGroup=${isGroupConversation}, id=${conv.id}, name=${conv.name || 'Sin nombre'}`);
+
           // Si es un grupo, dar formato como grupo
           if (isGroupConversation) {
-            console.log(`Procesando grupo: ${conv.id}`);
-            return {
+            console.log(`Procesando grupo: ${conv.id}, Nombre: ${conv.name || 'Sin nombre'}, Participantes: ${conv.participantsCount || (Array.isArray(conv.participants) ? conv.participants.length : 0)}`);
+            
+            // Crear una copia de los datos del grupo para evitar modificar el original
+            const processedGroup = {
               id: conv.id,
               isGroup: true,
               name: conv.name || "Grupo sin nombre",
@@ -171,6 +181,7 @@ export default function MessagesPage() {
               updatedAt: conv.updatedAt || conv.createdAt || new Date().toISOString(),
               unreadCount: conv.unreadCount || 0,
               participants: Array.isArray(conv.participants) ? conv.participants : [],
+              participantsCount: conv.participantsCount || (Array.isArray(conv.participants) ? conv.participants.length : 0),
               isEmpty: !conv.lastMessage,
               // Añadir un otherUser ficticio para compatibilidad con la interfaz existente
               otherUser: {
@@ -179,6 +190,10 @@ export default function MessagesPage() {
                 image: conv.imageUrl || null
               }
             };
+            
+            console.log(`Grupo procesado: ${processedGroup.id}, Nombre: ${processedGroup.name}, Participantes: ${processedGroup.participantsCount}`);
+            
+            return processedGroup;
           }
           
           const otherUser = conv.receiver || conv.otherUser || {};
@@ -682,7 +697,7 @@ export default function MessagesPage() {
     const conversation = conversations.find((c) => c?.id === conversationId);
     if (conversation) {
       // Determinar si es un grupo o una conversación 1:1
-      if (conversation.isGroup || (typeof conversationId === 'string' && conversationId.startsWith('group_'))) {
+      if (conversation.isGroup || conversation.id.startsWith('group_')) {
         // Para grupos, solo actualizamos la URL con el ID del grupo
         console.log(`Navegando a grupo: ${conversationId}`);
         router.push(`/messages?conversationWith=${conversation.id}`);
@@ -781,6 +796,7 @@ export default function MessagesPage() {
             image: session.user.image || null
           }
         ],
+        participantsCount: selectedParticipants.length + 1,
         unreadCount: 0,
         isEmpty: true
       };
@@ -859,21 +875,113 @@ export default function MessagesPage() {
 
   // Renderizado de mensajes de conversación - memoizado
   const renderConversationMessage = useCallback((conversation: Conversation) => {
-    if (conversation.isEmpty || !conversation.lastMessage) {
-      return (
-        <p className="text-sm text-gray-500 truncate">
-          No hay mensajes aún. ¡Envía el primero!
-        </p>
-      );
-    }
+    const hasLastMessage = conversation.lastMessage && conversation.lastMessage.content;
+    const isGroup = conversation.isGroup || conversation.id.startsWith('group_');
     
-    const isCurrentUserSender = conversation.lastMessage.senderId === session?.user?.id;
+    if (!hasLastMessage) {
+      return <p className="text-sm text-gray-500 truncate">No hay mensajes aún</p>;
+    }
+
+    // Para mensajes de grupo, mostrar quién envió el mensaje
+    const senderPrefix = isGroup && conversation.lastMessage?.sender?.username ? 
+      `${conversation.lastMessage.sender.username}: ` : 
+      '';
+      
     return (
       <p className="text-sm text-gray-500 truncate">
-        {isCurrentUserSender ? `Tú: ` : ""}{conversation.lastMessage.content}
+        {senderPrefix}
+        {conversation.lastMessage?.content}
       </p>
     );
-  }, [session?.user?.id]);
+  }, []);
+
+  // Cargar las conversaciones - Función para depuración
+  const loadConversationsDirectly = async () => {
+    const { toast } = useToast();
+    try {
+      setLoading(true);
+      const response = await fetch('/api/messages/conversations');
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar las conversaciones",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const conversationsData = await response.json();
+      console.log("Datos directos de la API:", conversationsData);
+      
+      // Verificar si hay grupos y su estructura
+      conversationsData.forEach((conv: any) => {
+        if (conv.isGroup || (typeof conv.id === 'string' && conv.id.startsWith('group_'))) {
+          console.log(`[DEBUG] Grupo encontrado: ID=${conv.id}`);
+          console.log(`[DEBUG] Nombre del grupo: ${conv.name || 'Sin nombre'}`);
+          console.log(`[DEBUG] Participantes: ${conv.participantsCount || (conv.participants?.length || 0)}`);
+          console.log(`[DEBUG] Estructura completa:`, JSON.stringify(conv));
+        }
+      });
+      
+      // Procesar las conversaciones manualmente para depuración
+      const processedConvs = conversationsData.map((conv: any) => {
+        // Verificar si es un grupo
+        if (conv.isGroup || (typeof conv.id === 'string' && conv.id.startsWith('group_'))) {
+          return {
+            id: conv.id,
+            isGroup: true,
+            name: conv.name || "Grupo sin nombre",
+            description: conv.description || "",
+            imageUrl: conv.imageUrl || null,
+            lastMessage: conv.lastMessage || null,
+            createdAt: conv.createdAt || new Date().toISOString(),
+            updatedAt: conv.updatedAt || conv.createdAt || new Date().toISOString(),
+            unreadCount: conv.unreadCount || 0,
+            participants: Array.isArray(conv.participants) ? conv.participants : [],
+            participantsCount: conv.participantsCount || (Array.isArray(conv.participants) ? conv.participants.length : 0),
+            isEmpty: !conv.lastMessage,
+            otherUser: {
+              id: conv.id,
+              username: conv.name || "Grupo",
+              image: conv.imageUrl || null
+            }
+          };
+        } else {
+          // Conversación normal
+          return {
+            id: conv.id,
+            otherUser: conv.receiver || conv.otherUser || {},
+            lastMessage: conv.lastMessage || null,
+            unreadCount: conv.unreadCount || 0,
+            createdAt: conv.createdAt || new Date().toISOString(),
+            updatedAt: conv.updatedAt || conv.createdAt || new Date().toISOString(),
+            isGroup: false
+          };
+        }
+      });
+      
+      setConversations(processedConvs);
+    } catch (error) {
+      console.error("Error cargando conversaciones:", error);
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al cargar las conversaciones",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getParticipantCount = (conversation: Conversation) => {
+    if (conversation.participantsCount !== undefined) {
+      return conversation.participantsCount;
+    } else if (conversation.participants !== undefined) {
+      return conversation.participants.length;
+    } else {
+      return 0;
+    }
+  };
 
   if (loading) {
     return (
@@ -961,6 +1069,7 @@ export default function MessagesPage() {
                   .map((item) => {
                     const conversation = item.data as Conversation;
                     const isSelected = selectedConversation === conversation.id;
+                    const isGroup = conversation.isGroup || conversation.id.startsWith('group_');
                       
                     return (
                       <div
@@ -968,30 +1077,50 @@ export default function MessagesPage() {
                         className={`p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer flex items-start space-x-3 ${isSelected && "bg-blue-50 dark:bg-gray-700"}`}
                         onClick={() => handleConversationSelect(conversation.id)}
                       >
+                        {/* Avatar */}
                         <Avatar className="h-12 w-12 border-2 border-gray-200 dark:border-gray-700">
-                          {conversation.otherUser?.image ? (
-                            <Image
-                              src="/images/AvatarPredeterminado.webp"
-                              width={48}
-                              height={48}
-                              alt={conversation.otherUser?.username || "Usuario"}
-                              className="h-12 w-12 rounded-full object-cover"
-                              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = "/images/AvatarPredeterminado.webp";
-                              }}
-                            />
+                          {isGroup ? (
+                            // Avatar para grupos
+                            conversation.imageUrl ? (
+                              <AvatarImage 
+                                src={conversation.imageUrl} 
+                                alt={conversation.name || "Grupo"} 
+                              />
+                            ) : (
+                              <AvatarFallback>
+                                {(conversation.name && conversation.name.charAt(0).toUpperCase()) || "G"}
+                              </AvatarFallback>
+                            )
                           ) : (
-                            <AvatarFallback>
-                              {conversation.otherUser?.username?.charAt(0).toUpperCase() || "U"}
-                            </AvatarFallback>
+                            // Avatar para conversaciones individuales
+                            conversation.otherUser?.image ? (
+                              <Image
+                                src="/images/AvatarPredeterminado.webp"
+                                width={48}
+                                height={48}
+                                alt={conversation.otherUser?.username || "Usuario"}
+                                className="h-12 w-12 rounded-full object-cover"
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = "/images/AvatarPredeterminado.webp";
+                                }}
+                              />
+                            ) : (
+                              <AvatarFallback>
+                                {conversation.otherUser?.username?.charAt(0).toUpperCase() || "U"}
+                              </AvatarFallback>
+                            )
                           )}
                         </Avatar>
                           
+                        {/* Info del chat */}
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between items-start">
                             <h3 className="font-medium truncate">
-                              {conversation.otherUser?.username || "Usuario desconocido"}
+                              {isGroup 
+                                ? (conversation.name || "Grupo sin nombre") 
+                                : (conversation.otherUser?.username || "Usuario desconocido")
+                              }
                             </h3>
                             <span className="text-xs text-gray-500">
                               {conversation.updatedAt && new Date(conversation.updatedAt).toLocaleTimeString([], {
@@ -1000,6 +1129,15 @@ export default function MessagesPage() {
                               })}
                             </span>
                           </div>
+                          
+                          {/* Mostrar número de participantes para grupos */}
+                          {isGroup && (
+                            <p className="text-xs text-gray-500 mb-1">
+                              {getParticipantCount(conversation)} participantes
+                            </p>
+                          )}
+                          
+                          {/* Último mensaje */}
                           {renderConversationMessage(conversation)}
                         </div>
                         {(conversation.unreadCount ?? 0) > 0 && (
@@ -1038,6 +1176,16 @@ export default function MessagesPage() {
             <Users className="h-5 w-5 mr-2" />
             Nuevo grupo
           </Button>
+          
+          {/* Botón de depuración - solo visible en desarrollo */}
+          {process.env.NODE_ENV !== 'production' && (
+            <Button
+              onClick={loadConversationsDirectly}
+              className="col-span-2 mt-2 bg-gray-200 hover:bg-gray-300 text-gray-800"
+            >
+              Recargar conversaciones (Debug)
+            </Button>
+          )}
         </div>
       </div>
 

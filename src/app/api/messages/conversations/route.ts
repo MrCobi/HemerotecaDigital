@@ -18,16 +18,37 @@ interface ConversationResponse {
     image: string | null;
   };
   lastMessage?: {
+    id: string;
     content: string | null;
     createdAt: Date;
     read: boolean;
     senderId: string;
-    messageType: string;
+    sender: {
+      id: string;
+      username: string | null;
+      image: string | null;
+    };
   };
   unreadCount: number;
   createdAt: Date;
   updatedAt: Date;
   isGroup: boolean;
+  name?: string;
+  description?: string;
+  imageUrl?: string;
+  participants?: {
+    id: string;
+    userId: string;
+    conversationId: string;
+    isAdmin: boolean;
+    joinedAt: Date;
+    user: {
+      id: string;
+      username: string | null;
+      image: string | null;
+    };
+  }[];
+  participantsCount?: number;
 }
 
 export async function GET(request: NextRequest) {
@@ -48,7 +69,10 @@ export async function GET(request: NextRequest) {
         c.id as conversationId,
         c.created_at as createdAt, 
         c.updated_at as updatedAt,
-        c.is_group as isGroup
+        c.is_group as isGroup,
+        c.name as name,
+        c.description as description,
+        c.image_url as imageUrl
       FROM conversations c
       JOIN conversation_participants cp ON c.id = cp.conversation_id
       WHERE cp.user_id = ${session.user.id}
@@ -65,75 +89,148 @@ export async function GET(request: NextRequest) {
     const conversationsWithParticipants = await Promise.all(
       (userConversations as any[]).map(async (conv) => {
         try {
-          // Obtener al otro participante
-          const otherParticipant = await prisma.$queryRaw`
-            SELECT 
-              u.id, 
-              u.username, 
-              u.name, 
-              u.image
-            FROM conversation_participants cp
-            JOIN users u ON cp.user_id = u.id
-            WHERE cp.conversation_id = ${conv.conversationId}
-            AND cp.user_id != ${session.user.id}
-            LIMIT 1
-          `;
+          // Determinar si es un grupo basado en el ID
+          const isGroup = conv.isGroup || (typeof conv.conversationId === 'string' && conv.conversationId.startsWith('group_'));
+          
+          if (isGroup) {
+            // Obtener datos completos del grupo
+            const groupData = await prisma.conversation.findUnique({
+              where: { id: conv.conversationId },
+              include: {
+                participants: {
+                  include: {
+                    user: {
+                      select: { id: true, username: true, image: true }
+                    }
+                  }
+                }
+              }
+            });
+            
+            if (!groupData) return null;
+            
+            console.log(`[DEBUG] Datos del grupo: ID=${groupData.id}, Nombre=${groupData.name}, Participantes=${groupData.participants.length}`);
+            console.log(`[DEBUG] Detalles del grupo:`, JSON.stringify({
+              id: groupData.id,
+              name: groupData.name,
+              participants: groupData.participants.length
+            }));
+            
+            // Obtener el último mensaje y conteo de no leídos
+            const [lastMessage, unreadCount] = await Promise.all([
+              prisma.directMessage.findFirst({
+                where: { conversationId: conv.conversationId },
+                orderBy: { createdAt: 'desc' },
+                include: {
+                  sender: {
+                    select: { id: true, username: true, image: true }
+                  }
+                }
+              }),
+              prisma.directMessage.count({
+                where: {
+                  conversationId: conv.conversationId,
+                  senderId: { not: session.user.id },
+                  read: false
+                }
+              })
+            ]);
+            
+            const formattedGroup = {
+              id: conv.conversationId,
+              isGroup: true,
+              name: groupData.name,
+              description: groupData.description,
+              imageUrl: groupData.imageUrl,
+              participants: groupData.participants,
+              participantsCount: groupData.participants.length,
+              lastMessage: lastMessage ? {
+                id: lastMessage.id,
+                content: lastMessage.content,
+                createdAt: lastMessage.createdAt,
+                senderId: lastMessage.senderId,
+                read: lastMessage.read,
+                sender: lastMessage.sender
+              } : null,
+              unreadCount,
+              createdAt: conv.createdAt,
+              updatedAt: conv.updatedAt
+            };
+            
+            console.log(`[DEBUG] Devolviendo grupo formateado:`, JSON.stringify({
+              id: formattedGroup.id,
+              name: formattedGroup.name,
+              participantsCount: formattedGroup.participantsCount
+            }));
+            
+            return formattedGroup;
+          } else {
+            // Obtener al otro participante
+            const otherParticipant = await prisma.$queryRaw`
+              SELECT 
+                u.id, 
+                u.username, 
+                u.name, 
+                u.image
+              FROM conversation_participants cp
+              JOIN users u ON cp.user_id = u.id
+              WHERE cp.conversation_id = ${conv.conversationId}
+              AND cp.user_id != ${session.user.id}
+              LIMIT 1
+            `;
 
-          // Si no hay otro participante (posible en conversaciones grupales o corruptas)
-          if (!Array.isArray(otherParticipant) || otherParticipant.length === 0) {
-            console.log(`No se encontró otro participante para conversación: ${conv.conversationId}`);
-            return null;
-          }
-
-          // Asegurar que otherParticipant tiene el formato correcto
-          const otherUser = {
-            id: otherParticipant[0].id as string,
-            username: otherParticipant[0].username as string | null,
-            name: otherParticipant[0].name as string | null,
-            image: otherParticipant[0].image as string | null
-          };
-
-          // Obtener el último mensaje usando conversationId (ajuste clave)
-          const lastMessage = await prisma.directMessage.findFirst({
-            where: {
-              conversationId: conv.conversationId
-            },
-            orderBy: { createdAt: 'desc' }
-          });
-
-          // Obtener número de mensajes no leídos
-          const unreadCount = await prisma.directMessage.count({
-            where: {
-              conversationId: conv.conversationId,
-              senderId: { not: session.user.id },
-              read: false
+            // Si no hay otro participante (posible en conversaciones grupales o corruptas)
+            if (!Array.isArray(otherParticipant) || otherParticipant.length === 0) {
+              console.log(`No se encontró otro participante para conversación: ${conv.conversationId}`);
+              return null;
             }
-          });
 
-          // Determinar si es un grupo basado en el campo isGroup o el prefijo 'group_' en el ID
-          const isGroupConversation = Boolean(conv.isGroup) || 
-            (typeof conv.conversationId === 'string' && conv.conversationId.startsWith('group_'));
+            // Asegurar que otherParticipant tiene el formato correcto
+            const otherUser = {
+              id: otherParticipant[0].id as string,
+              username: otherParticipant[0].username as string | null,
+              name: otherParticipant[0].name as string | null,
+              image: otherParticipant[0].image as string | null
+            };
 
-          return {
-            id: conv.conversationId,
-            receiver: {
-              id: otherUser.id,
-              username: otherUser.username,
-              name: otherUser.name,
-              image: otherUser.image
-            },
-            lastMessage: lastMessage ? {
-              content: lastMessage.content,
-              createdAt: lastMessage.createdAt,
-              read: lastMessage.read,
-              senderId: lastMessage.senderId,
-              messageType: lastMessage.messageType
-            } : undefined,
-            unreadCount,
-            createdAt: conv.createdAt,
-            updatedAt: conv.updatedAt || conv.createdAt,
-            isGroup: isGroupConversation
-          };
+            // Obtener el último mensaje usando conversationId (ajuste clave)
+            const lastMessage = await prisma.directMessage.findFirst({
+              where: {
+                conversationId: conv.conversationId
+              },
+              orderBy: { createdAt: 'desc' }
+            });
+
+            // Obtener número de mensajes no leídos
+            const unreadCount = await prisma.directMessage.count({
+              where: {
+                conversationId: conv.conversationId,
+                senderId: { not: session.user.id },
+                read: false
+              }
+            });
+
+            return {
+              id: conv.conversationId,
+              receiver: {
+                id: otherUser.id,
+                username: otherUser.username,
+                name: otherUser.name,
+                image: otherUser.image
+              },
+              lastMessage: lastMessage ? {
+                id: lastMessage.id,
+                content: lastMessage.content,
+                createdAt: lastMessage.createdAt,
+                senderId: lastMessage.senderId,
+                read: lastMessage.read
+              } : null,
+              unreadCount,
+              createdAt: conv.createdAt,
+              updatedAt: conv.updatedAt || conv.createdAt,
+              isGroup: false
+            };
+          }
         } catch (error) {
           console.error(`Error procesando conversación ${conv.conversationId}:`, error);
           return null;
