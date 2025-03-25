@@ -259,7 +259,7 @@ export default function DashboardPage() {
     {
       icon: Settings,
       label: "Editar perfil",
-      href: `/users/edit/${user.username}`,
+      href: `/users/edit`,
       active: false,
     },
     {
@@ -628,7 +628,7 @@ export default function DashboardPage() {
                       <div>
                         <Button
                           className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
-                          onClick={() => router.push(`/users/edit/${user.username}`)}
+                          onClick={() => router.push(`/users/edit`)}
                         >
                           <Settings className="h-4 w-4 mr-2" />
                           Editar perfil

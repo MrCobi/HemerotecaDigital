@@ -180,7 +180,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       
       return true; // Para otros providers, seguimos el flujo normal
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      // Actualización inicial cuando el usuario hace login
       if (user) {
         token.id = user.id;
         token.role = user.role;
@@ -191,8 +192,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.createdAt = user.createdAt;
         token.emailVerified = (user as any).emailVerified;
         token.favoriteSourceIds = (user as any).favoriteSourceIds;
-        token.accessToken = (user as any).accessToken; // Añadir esta línea
+        token.accessToken = (user as any).accessToken;
+        token.bio = (user as any).bio;
       }
+
+      // Si se está actualizando la sesión manualmente con el método update()
+      if (trigger === "update" && session) {
+        console.log("Actualizando sesión desde trigger update:", session);
+        
+        // Actualizar los campos del token con los datos del nuevo session
+        if (session.user) {
+          Object.assign(token, {
+            name: session.user.name,
+            username: session.user.username,
+            image: session.user.image,
+            bio: session.user.bio,
+            // No actualizamos email ni campos sensibles
+          });
+        }
+      }
+      
       return token;
     },
     async session({ session, token }) {
@@ -206,11 +225,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           username: token.username as string | null,
           email: token.email as string | null,
           image: token.image as string | null,
+          bio: token.bio as string | null,
           createdAt: token.createdAt as Date,
           emailVerified: token.emailVerified as Date | null,
           favoriteSourceIds: token.favoriteSourceIds as string[] | undefined
         },
-        accessToken: token.accessToken as string // Añadir esta línea
+        accessToken: token.accessToken as string
       };
     }
   }

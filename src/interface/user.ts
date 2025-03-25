@@ -18,7 +18,7 @@ export interface User {
   name?: string | null; // Nombre completo del usuario (opcional)
   email?: string | null; // Correo electrónico del usuario (opcional)
   image?: string | null; // URL de la imagen de perfil del usuario (opcional)
-  bio: string | null;
+  bio?: string | null; // Biografía del usuario (opcional)
   username?: string | null; // Nombre de usuario (opcional)
   role: string; // Rol del usuario (por ejemplo, "user" o "admin")
   createdAt?: Date | string; // Fecha de creación del usuario (opcional)
