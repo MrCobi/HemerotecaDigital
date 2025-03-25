@@ -82,6 +82,7 @@ export default function MessagesPage() {
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const unreadMessagesContext = React.useContext(UnreadMessagesContext);
+  const { toast } = useToast();
 
   // Configuración
   const CONVERSATIONS_PER_PAGE = 15;
@@ -108,6 +109,7 @@ export default function MessagesPage() {
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupImage, setGroupImage] = useState<File | null>(null);
   const [groupImagePreview, setGroupImagePreview] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   // Referencias para controlar ciclos y renderizado
   const isProcessingUrlRef = useRef(false);
@@ -507,7 +509,11 @@ export default function MessagesPage() {
   const startNewConversation = useCallback(async (userId: string) => {
     try {
       if (!userId || !session?.user?.id) {
-        console.error("Missing user ID or session");
+        toast({
+          title: "Error",
+          description: "Datos insuficientes para crear conversación",
+          variant: "destructive"
+        });
         return;
       }
       
@@ -635,7 +641,11 @@ export default function MessagesPage() {
       
     } catch (error) {
       console.error("Error starting conversation:", error);
-      alert(error instanceof Error ? error.message : "No se pudo iniciar la conversación. Inténtalo de nuevo.");
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "No se pudo iniciar la conversación. Inténtalo de nuevo.",
+        variant: "destructive"
+      });
     } finally {
       setCreatingConversation(false);
     }
@@ -737,33 +747,82 @@ export default function MessagesPage() {
     [selectedConversationData]
   );
 
+  // Función para subir imagen a Cloudinary
+  const uploadFile = useCallback((file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append("file", file);
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percent);
+        }
+      });
+
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200) {
+            resolve(JSON.parse(xhr.responseText).url);
+          } else {
+            reject(new Error(xhr.statusText || "Error subiendo archivo"));
+          }
+        }
+      };
+
+      xhr.open("POST", API_ROUTES.messages.uploadGroupImage);
+      xhr.send(formData);
+    });
+  }, []);
+
   // Función para crear un grupo nuevo
   const createGroup = useCallback(async () => {
     if (!session?.user?.id || !groupName || selectedParticipants.length === 0) {
-      console.error("Datos de grupo incompletos");
+      toast({
+        title: "Error",
+        description: "Datos de grupo incompletos",
+        variant: "destructive"
+      });
       return;
     }
     
     try {
       setCreatingGroup(true);
+      setUploadProgress(0);
       
-      // Crear FormData para enviar datos e imagen
-      const formData = new FormData();
-      formData.append('name', groupName);
-      formData.append('description', groupDescription || '');
-      
-      // Añadir participantes como JSON
-      formData.append('participantIds', JSON.stringify(selectedParticipants.map(user => user.id)));
-      
-      // Añadir imagen si existe
+      // Subir imagen a Cloudinary primero si existe
+      let imageUrl = undefined;
       if (groupImage) {
-        formData.append('image', groupImage);
+        try {
+          imageUrl = await uploadFile(groupImage);
+        } catch (err) {
+          console.error("Error subiendo imagen:", err);
+          toast({
+            title: "Error al subir la imagen",
+            description: "No se pudo subir la imagen del grupo. Inténtalo de nuevo.",
+            variant: "destructive"
+          });
+          setCreatingGroup(false);
+          return;
+        }
       }
+      
+      // Preparar datos para la API
+      const groupData = {
+        name: groupName,
+        description: groupDescription || '',
+        participantIds: selectedParticipants.map(user => user.id),
+        imageUrl: imageUrl // Enviar la URL de Cloudinary en lugar del archivo
+      };
       
       // Crear el grupo a través del API
       const response = await fetch('/api/messages/group', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(groupData),
       });
       
       if (!response.ok) {
@@ -819,7 +878,11 @@ export default function MessagesPage() {
       setTimeout(loadConversationsData, 1000);
     } catch (error) {
       console.error("Error creating group:", error);
-      alert(error instanceof Error ? error.message : "No se pudo crear el grupo. Inténtalo de nuevo.");
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "No se pudo crear el grupo. Inténtalo de nuevo.",
+        variant: "destructive"
+      });
     } finally {
       setCreatingGroup(false);
     }
@@ -831,13 +894,21 @@ export default function MessagesPage() {
     if (file) {
       // Comprobar que es una imagen
       if (!file.type.startsWith('image/')) {
-        alert('Por favor, selecciona un archivo de imagen válido.');
+        toast({
+          title: "Error",
+          description: "Por favor, selecciona un archivo de imagen válido.",
+          variant: "destructive"
+        });
         return;
       }
       
       // Comprobar tamaño (5MB máx)
       if (file.size > 5 * 1024 * 1024) {
-        alert('La imagen es demasiado grande. El tamaño máximo es 5MB.');
+        toast({
+          title: "Error",
+          description: "La imagen es demasiado grande. El tamaño máximo es 5MB.",
+          variant: "destructive"
+        });
         return;
       }
       
@@ -897,7 +968,6 @@ export default function MessagesPage() {
 
   // Cargar las conversaciones - Función para depuración
   const loadConversationsDirectly = async () => {
-    const { toast } = useToast();
     try {
       setLoading(true);
       const response = await fetch('/api/messages/conversations');
@@ -1081,34 +1151,91 @@ export default function MessagesPage() {
                         <Avatar className="h-12 w-12 border-2 border-gray-200 dark:border-gray-700">
                           {isGroup ? (
                             // Avatar para grupos
-                            conversation.imageUrl ? (
-                              <AvatarImage 
-                                src={conversation.imageUrl} 
-                                alt={conversation.name || "Grupo"} 
-                              />
-                            ) : (
-                              <AvatarFallback>
-                                {(conversation.name && conversation.name.charAt(0).toUpperCase()) || "G"}
-                              </AvatarFallback>
-                            )
-                          ) : (
-                            // Avatar para conversaciones individuales
-                            conversation.otherUser?.image ? (
-                              <Image
-                                src="/images/AvatarPredeterminado.webp"
+                            conversation.imageUrl && conversation.imageUrl.includes('cloudinary') ? (
+                              <CldImage
+                                src={conversation.imageUrl}
+                                alt={conversation.name || "Grupo"}
                                 width={48}
                                 height={48}
-                                alt={conversation.otherUser?.username || "Usuario"}
-                                className="h-12 w-12 rounded-full object-cover"
+                                crop="fill"
+                                gravity="face"
+                                className="object-cover rounded-full"
+                                priority
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = "/images/AvatarPredeterminado.webp";
+                                }}
+                              />
+                            ) : conversation.imageUrl && !conversation.imageUrl.startsWith('/') && !conversation.imageUrl.startsWith('http') ? (
+                              <CldImage
+                                src={conversation.imageUrl}
+                                alt={conversation.name || "Grupo"}
+                                width={48}
+                                height={48}
+                                crop="fill"
+                                gravity="face"
+                                className="object-cover rounded-full"
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
                                   target.src = "/images/AvatarPredeterminado.webp";
                                 }}
                               />
                             ) : (
-                              <AvatarFallback>
-                                {conversation.otherUser?.username?.charAt(0).toUpperCase() || "U"}
-                              </AvatarFallback>
+                              <Image
+                                src={"/images/AvatarPredeterminado.webp"}
+                                width={48}
+                                height={48}
+                                alt={conversation.name || "Grupo"}
+                                className="rounded-full object-cover"
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = "/images/AvatarPredeterminado.webp";
+                                }}
+                              />
+                            )
+                          ) : (
+                            // Avatar para conversaciones individuales
+                            conversation.otherUser?.image && conversation.otherUser.image.includes('cloudinary') ? (
+                              <CldImage
+                                src={conversation.otherUser.image}
+                                alt={conversation.otherUser?.username || "Usuario"}
+                                width={48}
+                                height={48}
+                                crop="fill"
+                                gravity="face"
+                                className="object-cover"
+                                priority
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = "/images/AvatarPredeterminado.webp";
+                                }}
+                              />
+                            ) : conversation.otherUser?.image && !conversation.otherUser.image.startsWith('/') && !conversation.otherUser.image.startsWith('http') ? (
+                              <CldImage
+                                src={conversation.otherUser.image}
+                                alt={conversation.otherUser?.username || "Usuario"}
+                                width={48}
+                                height={48}
+                                crop="fill"
+                                gravity="face"
+                                className="object-cover"
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = "/images/AvatarPredeterminado.webp";
+                                }}
+                              />
+                            ) : (
+                              <Image
+                                src={conversation.otherUser?.image || "/images/AvatarPredeterminado.webp"}
+                                width={48}
+                                height={48}
+                                alt={conversation.otherUser?.username || "Usuario"}
+                                className="rounded-full object-cover"
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = "/images/AvatarPredeterminado.webp";
+                                }}
+                              />
                             )
                           )}
                         </Avatar>
@@ -1203,22 +1330,47 @@ export default function MessagesPage() {
                   </Button>
                 )}
                 <Avatar className="h-10 w-10">
-                  {otherUser.image ? (
-                    <Image
-                      src="/images/AvatarPredeterminado.webp"
+                  {otherUser.image && otherUser.image.includes('cloudinary') ? (
+                    <CldImage
+                      src={otherUser.image}
+                      alt={otherUser.username || "Usuario"}
                       width={48}
                       height={48}
+                      crop="fill"
+                      gravity="face"
+                      className="object-cover"
+                      priority
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : otherUser.image && !otherUser.image.startsWith('/') && !otherUser.image.startsWith('http') ? (
+                    <CldImage
+                      src={otherUser.image}
                       alt={otherUser.username || "Usuario"}
-                      className="h-10 w-10 rounded-full object-cover"
+                      width={48}
+                      height={48}
+                      crop="fill"
+                      gravity="face"
+                      className="object-cover"
                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                         const target = e.target as HTMLImageElement;
                         target.src = "/images/AvatarPredeterminado.webp";
                       }}
                     />
                   ) : (
-                    <AvatarFallback>
-                      {otherUser.username?.charAt(0).toUpperCase() || "U"}
-                    </AvatarFallback>
+                    <Image
+                      src={otherUser.image || "/images/AvatarPredeterminado.webp"}
+                      width={48}
+                      height={48}
+                      alt={otherUser.username || "Usuario"}
+                      className="rounded-full object-cover"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
                   )}
                 </Avatar>
                 <h2 className="font-medium">{otherUser.username || "Usuario"}</h2>
@@ -1293,33 +1445,60 @@ export default function MessagesPage() {
                       return (
                         <div
                           key={user.id}
-                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 transition cursor-pointer"
                           onClick={() => {
                             setShowNewMessageModal(false);
                             startNewConversation(user.id);
                           }}
                         >
-                          <Avatar className="h-10 w-10">
-                            {user.image ? (
-                              <Image 
-                                src="/images/AvatarPredeterminado.webp" 
-                                alt={user.username || "Usuario"} 
-                                width={40} 
-                                height={40}
-                                className="rounded-full object-cover"
-                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.src = "/images/AvatarPredeterminado.webp";
-                                }}
-                              />
-                            ) : (
-                              <AvatarFallback>
-                                {user.username?.charAt(0).toUpperCase() || "U"}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
-                          <div className="flex-1">
-                            <p className="font-medium">{user.username || "Usuario"}</p>
+                          <div className="flex items-center flex-1">
+                            <Avatar className="h-10 w-10 mr-2">
+                              {user.image && user.image.includes('cloudinary') ? (
+                                <CldImage
+                                  src={user.image}
+                                  alt={user.username || 'Usuario'}
+                                  width={48}
+                                  height={48}
+                                  crop="fill"
+                                  gravity="face"
+                                  className="object-cover"
+                                  priority
+                                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = "/images/AvatarPredeterminado.webp";
+                                  }}
+                                />
+                              ) : user.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
+                                <CldImage
+                                  src={user.image}
+                                  alt={user.username || 'Usuario'}
+                                  width={48}
+                                  height={48}
+                                  crop="fill"
+                                  gravity="face"
+                                  className="object-cover"
+                                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = "/images/AvatarPredeterminado.webp";
+                                  }}
+                                />
+                              ) : (
+                                <Image 
+                                  src={user.image || "/images/AvatarPredeterminado.webp"} 
+                                  alt={user.username || 'Usuario'} 
+                                  width={40} 
+                                  height={40}
+                                  className="rounded-full object-cover"
+                                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = "/images/AvatarPredeterminado.webp";
+                                  }}
+                                />
+                              )}
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{user.username || 'Usuario sin nombre'}</p>
+                            </div>
                           </div>
                         </div>
                       );
@@ -1455,8 +1634,48 @@ export default function MessagesPage() {
                             >
                               <div className="flex items-center flex-1">
                                 <Avatar className="h-8 w-8 mr-2">
-                                  <AvatarImage src={user.image || undefined} alt={user.username || 'Usuario'} />
-                                  <AvatarFallback>{user.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                                  {user.image && user.image.includes('cloudinary') ? (
+                                    <CldImage
+                                      src={user.image}
+                                      alt={user.username || 'Usuario'}
+                                      width={48}
+                                      height={48}
+                                      crop="fill"
+                                      gravity="face"
+                                      className="object-cover"
+                                      priority
+                                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = "/images/AvatarPredeterminado.webp";
+                                      }}
+                                    />
+                                  ) : user.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
+                                    <CldImage
+                                      src={user.image}
+                                      alt={user.username || 'Usuario'}
+                                      width={48}
+                                      height={48}
+                                      crop="fill"
+                                      gravity="face"
+                                      className="object-cover"
+                                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = "/images/AvatarPredeterminado.webp";
+                                      }}
+                                    />
+                                  ) : (
+                                    <Image 
+                                      src={user.image || "/images/AvatarPredeterminado.webp"} 
+                                      alt={user.username || 'Usuario'} 
+                                      width={40} 
+                                      height={40}
+                                      className="rounded-full object-cover"
+                                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = "/images/AvatarPredeterminado.webp";
+                                      }}
+                                    />
+                                  )}
                                 </Avatar>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium truncate">{user.username || 'Usuario sin nombre'}</p>

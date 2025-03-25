@@ -14,6 +14,8 @@ import { API_ROUTES } from '@/src/config/api-routes';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import VoiceMessageRecorder from './VoiceMessageRecorder';
 import { useToast } from '@/src/app/hooks/use-toast';
+import Image from 'next/image';
+import { CldImage } from 'next-cloudinary';
 
 // Reutiliza estos componentes de ChatWindowContent.tsx
 import { MessageItem, DateSeparator, VoiceMessagePlayer } from './ChatComponents/ChatComponents';

@@ -2,39 +2,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "@/src/lib/auth-utils";
-import path from 'path';
-import { writeFile, mkdir } from 'fs/promises';
+import { ParticipantRole } from "@prisma/client";
 import crypto from 'crypto';
-
-// Función para generar un ID único para los archivos
-const generateUniqueId = () => {
-  return crypto.randomBytes(16).toString('hex');
-};
 
 // Exportamos la ruta POST con autenticación
 export const POST = withAuth(async (req: any, { userId, user }: { userId: string, user: any }) => {
   try {
-    // Convertir a NextRequest para acceder a formData
+    // Convertir a NextRequest para acceder a json
     const request = req as unknown as NextRequest;
     
-    // Obtener datos de la solicitud como FormData para manejar la imagen
-    const formData = await request.formData();
-    const name = formData.get('name') as string;
-    const description = formData.get('description') as string || '';
+    // Obtener datos de la solicitud como JSON
+    const data = await request.json();
+    const name = data.name as string;
+    const description = data.description as string || '';
+    const imageUrl = data.imageUrl as string | undefined;
     
     // Obtener y validar la lista de participantes
-    const participantIdsJson = formData.get('participantIds') as string;
-    let participantIds: string[] = [];
+    const participantIds = data.participantIds as string[] || [];
     
-    try {
-      participantIds = JSON.parse(participantIdsJson || '[]');
-    } catch (error) {
-      return NextResponse.json(
-        { error: "Formato de participantes inválido" },
-        { status: 400 }
-      );
-    }
-
     // Validar datos obligatorios
     if (!name || participantIds.length === 0) {
       return NextResponse.json(
@@ -43,86 +28,74 @@ export const POST = withAuth(async (req: any, { userId, user }: { userId: string
       );
     }
 
-    // Procesar la imagen si se proporciona
-    const imageFile = formData.get('image') as File;
-    let imageUrl: string | undefined;
-
-    if (imageFile) {
-      try {
-        // Generar un nombre único para la imagen
-        const fileExt = imageFile.name.split('.').pop() || 'jpg';
-        const fileName = `group-${generateUniqueId()}.${fileExt}`;
-        
-        // Crear directorio si no existe
-        const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'groups');
-        await mkdir(uploadDir, { recursive: true });
-        
-        // Guardar la imagen
-        const filePath = path.join(uploadDir, fileName);
-        const arrayBuffer = await imageFile.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        await writeFile(filePath, buffer);
-        
-        // Generar URL para la base de datos
-        imageUrl = `/uploads/groups/${fileName}`;
-      } catch (error) {
-        console.error("Error al guardar la imagen:", error);
-        // Continuamos sin imagen si hay error
+    // Verificar que todos los participantes son seguidores mutuos
+    // Buscar todas las relaciones de seguimiento donde el usuario está involucrado
+    const follows = await prisma.follow.findMany({
+      where: {
+        OR: [
+          { followerId: userId, followingId: { in: participantIds } },
+          { followingId: userId, followerId: { in: participantIds } }
+        ]
       }
-    }
+    });
 
-    // Asegurarse de que el usuario actual esté incluido como participante
-    if (!participantIds.includes(userId)) {
-      participantIds.push(userId);
-    }
-
-    // Verificar las relaciones de seguimiento de un modo más sencillo
-    const follows = await prisma.$queryRaw`
-      SELECT follower_id, following_id FROM follows
-    `;
+    // Crear mapas para verificar relaciones bidireccionales
+    const userFollows = new Set<string>();
+    const followsUser = new Set<string>();
     
-    // Convertir a array de objetos para facilitar búsqueda
-    const followsArray = Array.isArray(follows) ? follows : [];
-    
-    // Filtrar para asegurarnos de que todos son seguimiento mutuo
-    const validParticipantIds: string[] = [userId]; // El creador siempre está incluido
-    
-    for (const pId of participantIds) {
-      if (pId === userId) continue; // Saltamos al creador que ya está incluido
-      
-      // Verificar que existe seguimiento en ambas direcciones
-      const userFollowsParticipant = followsArray.some((f: any) => 
-        f.follower_id === userId && f.following_id === pId);
-      
-      const participantFollowsUser = followsArray.some((f: any) => 
-        f.follower_id === pId && f.following_id === userId);
-      
-      if (userFollowsParticipant && participantFollowsUser) {
-        validParticipantIds.push(pId);
+    follows.forEach((follow) => {
+      if (follow.followerId === userId) {
+        userFollows.add(follow.followingId);
       }
-    }
+      if (follow.followingId === userId) {
+        followsUser.add(follow.followerId);
+      }
+    });
 
-    // Si no hay participantes válidos además del creador, mostrar error
-    if (validParticipantIds.length <= 1) {
+    // Verificar que todos son seguidores mutuos
+    const validParticipants: string[] = [];
+    const invalidParticipants: string[] = [];
+    
+    participantIds.forEach((participantId: string) => {
+      if (userFollows.has(participantId) && followsUser.has(participantId)) {
+        validParticipants.push(participantId);
+      } else {
+        invalidParticipants.push(participantId);
+      }
+    });
+
+    if (invalidParticipants.length > 0) {
       return NextResponse.json(
-        { error: "No hay participantes válidos para crear el grupo. Asegúrate de seguir mutuamente a los usuarios." },
-        { status: 400 }
+        { error: "Algunos participantes no son seguidores mutuos", invalidParticipants }, 
+        { status: 403 }
       );
     }
 
-    // Creamos la conversación con todos los datos necesarios
-    const groupData = await prisma.conversation.create({
+    // Crear el grupo en la base de datos
+    const group = await prisma.conversation.create({
       data: {
-        id: `group_${crypto.randomBytes(12).toString('hex')}`,
-        name,
-        imageUrl,
+        id: `group_${crypto.randomUUID().replace(/-/g, '')}`,
         isGroup: true,
+        name,
+        description,
+        imageUrl,
+        creatorId: userId, // Añadir el ID del creador
         participants: {
-          create: validParticipantIds.map((participantId: string) => ({
-            userId: participantId,
-            role: participantId === userId ? 'admin' : 'member',
-          })),
-        },
+          create: [
+            // Añadir al creador como admin
+            {
+              userId: userId,
+              isAdmin: true,
+              role: ParticipantRole.admin
+            },
+            // Añadir al resto de participantes como miembros
+            ...validParticipants.map((participantId: string) => ({
+              userId: participantId,
+              isAdmin: false,
+              role: ParticipantRole.member
+            }))
+          ]
+        }
       },
       include: {
         participants: {
@@ -131,30 +104,28 @@ export const POST = withAuth(async (req: any, { userId, user }: { userId: string
               select: {
                 id: true,
                 username: true,
-                image: true,
-              },
-            },
-          },
-        },
-      },
+                image: true
+              }
+            }
+          }
+        }
+      }
     });
 
-    // Extraer los participantes del grupo para usar en la respuesta
-    const participantsData = groupData.participants.map((participant: any) => ({
-      id: participant.user.id,
-      username: participant.user.username,
-      image: participant.user.image,
-      role: participant.role,
-    }));
-
-    // Notificar a los participantes
-    for (const participantId of validParticipantIds) {
-      try {
-        console.log(`Notificar al usuario ${participantId} sobre nuevo grupo: ${groupData.id}`);
-      } catch (error) {
-        console.warn(`Error al notificar al usuario ${participantId}:`, error);
-      }
-    }
+    // Formatear la respuesta
+    const formattedGroup = {
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      imageUrl: group.imageUrl,
+      isGroup: group.isGroup,
+      participants: group.participants.map((p: any) => ({
+        id: p.user.id,
+        username: p.user.username,
+        image: p.user.image,
+        role: p.role
+      }))
+    };
 
     // También intentar notificar por websocket si está disponible
     try {
@@ -162,32 +133,26 @@ export const POST = withAuth(async (req: any, { userId, user }: { userId: string
       const socketUrl = 'http://localhost:3001/webhook/new-group';
       await fetch(socketUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          conversation: {
-            id: groupData.id,
-            name: groupData.name,
-            isGroup: true,
-            participants: validParticipantIds
-          }
-        })
+          groupId: group.id,
+          participantIds: [userId, ...validParticipants],
+          sender: {
+            id: userId,
+            username: user.username || 'Usuario',
+            image: user.image
+          },
+          type: 'NEW_GROUP'
+        }),
       });
-    } catch (error) {
-      console.warn("Error al notificar al servidor de websockets:", error);
+    } catch (socketError) {
+      console.warn("No se pudo notificar por websocket:", socketError);
+      // No fallamos la petición principal si falla el socket
     }
 
-    // Devolver respuesta con el grupo creado
-    return NextResponse.json({
-      success: true,
-      group: {
-        id: groupData.id,
-        name: groupData.name,
-        isGroup: groupData.isGroup,
-        imageUrl: groupData.imageUrl,
-        participants: participantsData,
-        createdAt: groupData.createdAt,
-      }
-    });
+    return NextResponse.json(formattedGroup);
   } catch (error) {
     console.error("Error al crear grupo:", error);
     return NextResponse.json(

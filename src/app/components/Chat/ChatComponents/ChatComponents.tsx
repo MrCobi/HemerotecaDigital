@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Play, Pause, SkipForward, SkipBack } from 'lucide-react';
+import Image from 'next/image';
+import { CldImage } from 'next-cloudinary';
 
 // Tipos para los mensajes y usuarios
 export type User = {
@@ -88,12 +90,46 @@ export const MessageItem = React.memo(({
       >
         {!isCurrentUser && showAvatar && (
           <Avatar className="h-8 w-8 flex-shrink-0">
-            {otherUser?.image ? (
-              <AvatarImage src={otherUser.image} alt={otherUser.username || 'Usuario'} />
+            {otherUser?.image && otherUser.image.includes('cloudinary') ? (
+              <CldImage
+                src={otherUser.image}
+                alt={otherUser.username || 'Usuario'}
+                width={32}
+                height={32}
+                crop="fill"
+                gravity="face"
+                className="object-cover"
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/images/AvatarPredeterminado.webp";
+                }}
+              />
+            ) : otherUser?.image && !otherUser.image.startsWith('/') && !otherUser.image.startsWith('http') ? (
+              <CldImage
+                src={otherUser.image}
+                alt={otherUser.username || 'Usuario'}
+                width={32}
+                height={32}
+                crop="fill"
+                gravity="face"
+                className="object-cover"
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/images/AvatarPredeterminado.webp";
+                }}
+              />
             ) : (
-              <AvatarFallback>
-                {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
-              </AvatarFallback>
+              <Image 
+                src={otherUser?.image || "/images/AvatarPredeterminado.webp"}
+                alt={otherUser?.username || 'Usuario'}
+                width={32}
+                height={32}
+                className="rounded-full object-cover"
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/images/AvatarPredeterminado.webp";
+                }}
+              />
             )}
           </Avatar>
         )}
@@ -151,12 +187,46 @@ export const MessageItem = React.memo(({
         
         {isCurrentUser && showAvatar && (
           <Avatar className="h-8 w-8 flex-shrink-0">
-            {session?.user?.image ? (
-              <AvatarImage src={session.user.image} alt={session.user.name || 'Usuario'} />
+            {session?.user?.image && session.user.image.includes('cloudinary') ? (
+              <CldImage
+                src={session.user.image}
+                alt={session.user.name || 'Usuario'}
+                width={32}
+                height={32}
+                crop="fill"
+                gravity="face"
+                className="object-cover"
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/images/AvatarPredeterminado.webp";
+                }}
+              />
+            ) : session?.user?.image && !session.user.image.startsWith('/') && !session.user.image.startsWith('http') ? (
+              <CldImage
+                src={session.user.image}
+                alt={session.user.name || 'Usuario'}
+                width={32}
+                height={32}
+                crop="fill"
+                gravity="face"
+                className="object-cover"
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/images/AvatarPredeterminado.webp";
+                }}
+              />
             ) : (
-              <AvatarFallback>
-                {session?.user?.name?.charAt(0).toUpperCase() || 'U'}
-              </AvatarFallback>
+              <Image
+                src={session?.user?.image || "/images/AvatarPredeterminado.webp"}
+                alt={session?.user?.name || 'Usuario'}
+                width={32}
+                height={32}
+                className="rounded-full object-cover"
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/images/AvatarPredeterminado.webp";
+                }}
+              />
             )}
           </Avatar>
         )}

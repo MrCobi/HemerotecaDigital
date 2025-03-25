@@ -94,6 +94,8 @@ export const API_ROUTES = {
     list: "/api/messages",  // Para obtener todas las conversaciones
     conversations: "/api/messages/conversations",
     createConversation: "/api/messages/conversations/create",
+    createGroup: "/api/messages/group",
+    uploadGroupImage: "/api/messages/upload",
     read: "/api/messages/read",
     unreadCount: "/api/messages/unread/count",
     sse: "/api/messages/sse",
