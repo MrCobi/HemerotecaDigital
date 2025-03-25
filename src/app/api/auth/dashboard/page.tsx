@@ -188,8 +188,8 @@ export default function DashboardPage() {
       fetch(API_ROUTES.relationships.followers(session.user.id, 1, 1))
         .then((response) => response.json())
         .then((data) => {
-          // En tu endpoint de followers, el count se devuelve en data.meta.total
-          setFollowersCount(data.meta?.total || 0);
+          // La estructura correcta muestra que el total está en pagination.total
+          setFollowersCount(data.pagination?.total || 0);
         })
         .catch((error) =>
           console.error("Error al cargar el conteo de seguidores:", error)
@@ -199,8 +199,8 @@ export default function DashboardPage() {
       fetch(API_ROUTES.relationships.following(session.user.id, 1, 1))
         .then((response) => response.json())
         .then((data) => {
-          // En el endpoint de following, el count se devuelve en data.total
-          setFollowingCount(data.total || 0);
+          // La estructura correcta muestra que el total está en pagination.total
+          setFollowingCount(data.pagination?.total || 0);
         })
         .catch((error) =>
           console.error("Error al cargar el conteo de seguidos:", error)
