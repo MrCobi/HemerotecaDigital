@@ -307,13 +307,13 @@ export default function MessagesPage() {
         .filter(conv => conv && typeof conv === 'object' && conv.id)
         .map((conv) => {
           // Verificar si es un grupo basado en el ID o la propiedad isGroup
-          const isGroupConversation = conv.isGroup || (conv.id && typeof conv.id === 'string' && conv.id.startsWith('group_'));
+          const isGroup: boolean = Boolean(conv.isGroup) || (typeof conv.id === 'string' && conv.id.startsWith('group_'));
           
           // Log para depuración
-          console.log(`Procesando conversación: isGroup=${isGroupConversation}, id=${conv.id}, name=${conv.name || 'Sin nombre'}`);
+          console.log(`Procesando conversación: isGroup=${isGroup}, id=${conv.id}, name=${conv.name || 'Sin nombre'}`);
 
           // Si es un grupo, dar formato como grupo
-          if (isGroupConversation) {
+          if (isGroup) {
             console.log(`Procesando grupo: ${conv.id}, Nombre: ${conv.name || 'Sin nombre'}, Participantes: ${conv.participantsCount || (Array.isArray(conv.participants) ? conv.participants.length : 0)}`);
             
             // Crear una copia de los datos del grupo para evitar modificar el original
@@ -856,7 +856,8 @@ export default function MessagesPage() {
   // Función para seleccionar una conversación - memoizada
   const handleConversationSelect = async (conversation: Conversation) => {
     try {
-      setLoading(true);
+      console.log(`Seleccionando conversación: ${conversation.id}, isGroup: ${Boolean(conversation.isGroup)}`);
+      
       // Si la conversación que se está seleccionando ya está seleccionada y estamos en vista móvil,
       // entonces solo cambiar a la vista de chat
       if (mobileView && selectedConversation === conversation.id) {
@@ -865,12 +866,37 @@ export default function MessagesPage() {
       }
 
       if (conversation) {
+        // Primero establecemos el ID de la conversación seleccionada
         setSelectedConversation(conversation.id);
         
-        // Convertir participantes si es necesario
+        // En el caso de grupos, asegurarnos de que los participantes estén correctamente formateados
+        let participants: Participant[] = [];
+        
+        if (Array.isArray(conversation.participants)) {
+          participants = conversation.participants.map((participant: any) => {
+            // Si ya es un objeto Participant, lo devolvemos tal cual
+            if (participant.userId && participant.role) {
+              return participant as Participant;
+            }
+            // Si es un objeto User, lo convertimos a Participant
+            return {
+              id: participant.id || crypto.randomUUID(),
+              userId: participant.id,
+              role: 'member' as 'admin' | 'member' | 'moderator' | 'owner',
+              user: participant
+            };
+          });
+        }
+        
+        // Detectar si es un grupo basado en el ID o la propiedad isGroup
+        const isGroup: boolean = Boolean(conversation.isGroup) || (typeof conversation.id === 'string' && conversation.id.startsWith('group_'));
+        
+        console.log(`Es un grupo: ${isGroup}, Participantes: ${participants.length}`);
+        
+        // Crear objeto normalizado de la conversación
         let normalizedConversation: ConversationData = {
           id: conversation.id,
-          isGroup: conversation.isGroup ?? false,
+          isGroup: isGroup,
           name: conversation.name || undefined,
           description: conversation.description || undefined,
           imageUrl: conversation.imageUrl || undefined,
@@ -878,35 +904,50 @@ export default function MessagesPage() {
           createdAt: conversation.createdAt,
           updatedAt: conversation.updatedAt,
           unreadCount: conversation.unreadCount,
-          participants: Array.isArray(conversation.participants) 
-            ? conversation.participants.map((participant: any) => {
-                // Si ya es un objeto Participant, lo devolvemos tal cual
-                if (participant.userId && participant.role) {
-                  return participant as Participant;
-                }
-                // Si es un objeto User, lo convertimos a Participant
-                return {
-                  id: participant.id,
-                  userId: participant.id,
-                  role: 'member' as 'admin' | 'member' | 'moderator' | 'owner',
-                  user: participant
-                };
-              })
-            : []
+          participants: participants,
+          otherUser: undefined // Lo estableceremos a continuación si no es un grupo
         };
         
-        // Solo para conversaciones 1-a-1, asegurarnos de que otherUser esté definido
-        if (!normalizedConversation.isGroup) {
-          // Buscar al otro usuario
-          const otherParticipant = normalizedConversation.participants.find(
-            p => p.userId !== session?.user?.id
-          );
-          
-          if (otherParticipant) {
-            normalizedConversation.otherUser = otherParticipant.user;
+        // Si no es un grupo, necesitamos asegurarnos de que otherUser esté definido
+        if (!isGroup) {
+          // Primero intentamos usar otherUser directamente si está disponible
+          if (conversation.otherUser) {
+            normalizedConversation.otherUser = conversation.otherUser;
+            console.log(`otherUser asignado desde conversation.otherUser: ${conversation.otherUser.id}`);
+          } 
+          // Si no hay otherUser, intentamos encontrarlo en los participantes
+          else if (participants.length > 0) {
+            const otherParticipant = participants.find(
+              p => p.userId !== session?.user?.id
+            );
+            
+            if (otherParticipant) {
+              normalizedConversation.otherUser = otherParticipant.user;
+              console.log(`otherUser asignado desde participantes: ${otherParticipant.user.id}`);
+            }
+          }
+          // Si aún no tenemos otherUser, intentamos usar receiver/sender
+          else if (conversation.receiverId && conversation.receiverId !== session?.user?.id) {
+            normalizedConversation.otherUser = {
+              id: conversation.receiverId,
+              username: conversation.receiver?.username || null,
+              image: conversation.receiver?.image || null
+            };
+            console.log(`otherUser asignado desde receiver: ${conversation.receiverId}`);
+          }
+          else if (conversation.senderId && conversation.senderId !== session?.user?.id) {
+            normalizedConversation.otherUser = {
+              id: conversation.senderId,
+              username: conversation.sender?.username || null,
+              image: conversation.sender?.image || null
+            };
+            console.log(`otherUser asignado desde sender: ${conversation.senderId}`);
           }
         }
         
+        console.log('Conversación normalizada:', JSON.stringify(normalizedConversation, null, 2));
+        
+        // Actualizamos el estado con la conversación normalizada
         setSelectedConversationData(normalizedConversation);
         
         // Cambiar la vista en modo móvil
@@ -1793,7 +1834,7 @@ export default function MessagesPage() {
 
       {/* Panel derecho - Contenido de la conversación seleccionada */}
       <div className={`w-full md:w-2/3 lg:w-3/4 bg-white dark:bg-gray-800 flex flex-col ${!mobileView || (mobileView && selectedConversation) ? "flex" : "hidden md:flex"}`}>
-        {selectedConversation && otherUser ? (
+        {selectedConversation && selectedConversationData ? (
           // Contenido de la conversación
           <div className="h-full flex flex-col">
             {/* Cabecera de la conversación */}
@@ -1889,7 +1930,7 @@ export default function MessagesPage() {
             </div>
             
             {/* Contenido de la conversación integrado directamente */}
-            {selectedConversation && selectedConversationData?.isGroup ? (
+            {selectedConversationData?.isGroup ? (
               <GroupChatWindowContent 
                 conversation={selectedConversationData} 
                 className="h-full" 
@@ -1942,7 +1983,7 @@ export default function MessagesPage() {
                 <div className="text-center py-4">
                   <MessageCircle className="mx-auto h-12 w-12 text-gray-300 mb-2" />
                   <p className="text-gray-500 mb-2">No se encontraron seguidores mutuos.</p>
-                  <p className="text-sm text-gray-400">Solo puedes iniciar conversaciones con usuarios que te siguen mutuamente.</p>
+                  <p className="text-xs mt-1">Solo puedes iniciar conversaciones con usuarios que te siguen mutuamente.</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
