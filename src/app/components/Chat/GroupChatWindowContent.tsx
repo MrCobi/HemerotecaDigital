@@ -596,11 +596,11 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   
   // Renderización del componente
   return (
-    <div className={cn("flex flex-col h-full bg-white dark:bg-gray-900", className)}>
+    <div className={cn("flex flex-col h-full max-h-full bg-white dark:bg-gray-900", className)}>
       {/* Contenedor principal de mensajes con scroll */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
         onScroll={() => {
           const element = chatContainerRef.current;
           if (element) {

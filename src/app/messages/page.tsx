@@ -1579,9 +1579,9 @@ export default function MessagesPage() {
 
   return (
     <>
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="flex flex-col md:flex-row h-screen bg-gray-100 dark:bg-gray-900 overflow-hidden">
       {/* Panel izquierdo - Lista de conversaciones y seguidores mutuos */}
-      <div className={`w-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col ${mobileView && selectedConversation ? "hidden md:flex" : "flex"}`}>
+      <div className={`w-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col h-full overflow-hidden ${mobileView && selectedConversation ? "hidden md:flex" : "flex"}`}>
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
           <h1 className="text-xl font-semibold">Mensajes</h1>
           
@@ -1628,7 +1628,7 @@ export default function MessagesPage() {
           </div>
         </div>
           
-        <div className="p-2">
+        <div className="p-2 flex-shrink-0">
           <Input
             type="text"
             placeholder="Buscar..."
@@ -1803,7 +1803,7 @@ export default function MessagesPage() {
         )}
         
         {/* Nuevos botones para crear conversaciones y grupos */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 grid grid-cols-2 gap-2">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 grid grid-cols-2 gap-2 flex-shrink-0">
           <Button
             onClick={() => setShowNewMessageModal(true)}
             className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium rounded-lg"
@@ -1833,7 +1833,7 @@ export default function MessagesPage() {
       </div>
 
       {/* Panel derecho - Contenido de la conversación seleccionada */}
-      <div className={`w-full md:w-2/3 lg:w-3/4 bg-white dark:bg-gray-800 flex flex-col ${!mobileView || (mobileView && selectedConversation) ? "flex" : "hidden md:flex"}`}>
+      <div className={`w-full md:w-2/3 lg:w-3/4 bg-white dark:bg-gray-800 flex flex-col h-full overflow-hidden ${!mobileView || (mobileView && selectedConversation) ? "flex" : "hidden md:flex"}`}>
         {selectedConversation && selectedConversationData ? (
           // Contenido de la conversación
           <div className="h-full flex flex-col">

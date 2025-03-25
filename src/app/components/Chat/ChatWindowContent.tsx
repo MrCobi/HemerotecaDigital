@@ -1621,11 +1621,11 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   }, [connected, reconnect, currentUserId]);
   
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-      {/* Contenedor de mensajes */}
+    <div className={cn("flex flex-col h-full max-h-full", className)}>
+      {/* Contenedor de mensajes - max-height para evitar desbordamiento */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
         onScroll={handleScroll}
       >
         {isLoadingMessages ? (
