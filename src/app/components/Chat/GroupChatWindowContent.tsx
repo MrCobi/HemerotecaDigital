@@ -100,6 +100,12 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [socketAuthenticated, setSocketAuthenticated] = useState(false);
 
+  // Implementar un controlador de aborto para cancelar peticiones anteriores
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Referencia para mantener el último ID de conversación procesado
+  const lastProcessedConversationRef = useRef<string | null>(null);
+
   // Socket.io
   const { 
     socketInstance,
@@ -172,10 +178,15 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   
   // Función para procesar y deduplicar mensajes
   const processMessages = useCallback((newMessages: Message[], existingMessages: Message[] = []) => {
+    // Evitar procesar mensajes vacíos
     if (!newMessages || newMessages.length === 0) return existingMessages;
     
+    console.log(`Procesando ${newMessages.length} mensajes nuevos`);
+    
+    // Clonar el mapa actual para trabajar sobre una copia
     const updatedMap = new Map(messageMap);
     
+    // Añadir los nuevos mensajes al mapa
     newMessages.forEach(msg => {
       if (msg.id) {
         updatedMap.set(msg.id, msg);
@@ -194,97 +205,299 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       }
     });
     
+    // Actualizar el mapa en el estado
     setMessageMap(updatedMap);
     
+    // Crear una nueva array ordenada con todos los mensajes únicos
     const uniqueMessages = Array.from(updatedMap.values()).sort((a, b) => {
       const dateA = new Date(a.createdAt);
       const dateB = new Date(b.createdAt);
       return dateA.getTime() - dateB.getTime();
     });
     
+    // Actualizar el estado de los mensajes directamente
+    setMessages(uniqueMessages);
+    
     return uniqueMessages;
   }, [messageMap]);
-  
-  // Cargar mensajes
-  useEffect(() => {
-    if (!conversation?.id || isFetchingRef.current) return;
+
+  // Separar completamente la función de carga de mensajes del ciclo de vida del componente
+  const loadGroupMessages = useCallback(async (groupId: string, isInitialLoad = false) => {
+    // Si ya hay una petición en curso y no es la carga inicial, no iniciar otra
+    if (isFetchingRef.current && !isInitialLoad) {
+      console.log('Ya hay una petición en curso, ignorando nueva carga');
+      return;
+    }
     
-    const fetchMessages = async (pageNum = 1) => {
-      if (isFetchingRef.current) return;
-      isFetchingRef.current = true;
-      
+    // Marcar que estamos en proceso de carga
+    isFetchingRef.current = true;
+    if (isInitialLoad) {
       setIsLoadingMessages(true);
-      setErrorLoadingMessages(null);
+    }
+    
+    try {
+      console.log(`Cargando mensajes para ${groupId} (inicial: ${isInitialLoad})`);
       
-      try {
-        if (!conversation.id || !currentUserId) {
-          throw new Error('Faltan datos necesarios para cargar mensajes');
+      // Hacer la petición fetch SIN usar AbortController para evitar cancelaciones
+      const response = await fetch(
+        `/api/messages/group-messages?conversationId=${groupId}&page=1&limit=${pageSize}&nocache=${Date.now()}`, 
+        { 
+          method: 'GET',
+          headers: { 
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
         }
-        
-        // Asegurarnos de usar el ID con el prefijo correcto
-        // Si ya tiene el prefijo 'group_', lo usamos tal cual
-        const groupId = conversation.id.startsWith('group_') 
-          ? conversation.id 
-          : `group_${conversation.id}`;
-        
-        // Usar la nueva API específica para mensajes de grupo
-        const response = await fetch(
-          `/api/messages/group-messages?conversationId=${groupId}&page=${pageNum}&limit=${pageSize}&t=${Date.now()}`, 
-          { cache: 'no-store' }
-        );
-        
+      );
+      
+      if (!response.ok) {
         if (response.status === 404) {
-          console.log('El grupo ya no existe en la base de datos');
-          setErrorLoadingMessages('Este grupo ya no existe. Por favor, vuelve a la lista de mensajes.');
-          setMessages([]);
-          
-          isFetchingRef.current = false;
-          setIsLoadingMessages(false);
-          return;
-        }
-        
-        if (!response.ok) {
-          console.error(`Error al cargar mensajes (${response.status}): ${await response.text()}`);
-          throw new Error(`Error al cargar los mensajes: ${response.status}`);
-        }
-        
-        let data;
-        try {
-          data = await response.json();
-        } catch (parseError) {
-          console.error('Error al parsear respuesta JSON:', parseError);
-          throw new Error('Error al procesar la respuesta del servidor');
-        }
-        
-        if (!data) {
-          console.error('Estructura de datos inesperada: respuesta vacía');
-          throw new Error('El servidor devolvió una respuesta vacía');
-        }
-        
-        if (Array.isArray(data.messages)) {
-          console.log(`Recibidos ${data.messages.length} mensajes para el grupo ${conversation.id}`);
-          
-          const fetchedMessages = data.messages;
-          const uniqueMessages = processMessages(fetchedMessages, []);
-          
-          setMessages(uniqueMessages);
-          setHasMore(fetchedMessages.length === pageSize);
-          setPage(pageNum);
+          setErrorLoadingMessages('Este grupo ya no existe.');
         } else {
-          console.error('Estructura de datos inesperada:', data);
-          throw new Error('El servidor devolvió una estructura de datos inesperada');
+          setErrorLoadingMessages(`Error (${response.status})`);
         }
-      } catch (error) {
-        console.error('Error al cargar los mensajes:', error);
-        setErrorLoadingMessages('No se pudieron cargar los mensajes. Inténtalo de nuevo.');
-      } finally {
-        setIsLoadingMessages(false);
-        isFetchingRef.current = false;
+        return;
+      }
+      
+      const data = await response.json();
+      console.log("Respuesta de API recibida:", JSON.stringify(data).substring(0, 200) + "...");
+      
+      // Verificamos la estructura de la respuesta y extraemos los mensajes
+      let apiMessages: any[] = [];
+      
+      if (Array.isArray(data)) {
+        apiMessages = data;
+        console.log("Formato de respuesta: array directo");
+      } else if (data.messages && Array.isArray(data.messages)) {
+        apiMessages = data.messages;
+        console.log("Formato de respuesta: objeto con campo messages");
+      } else if (data.data && Array.isArray(data.data)) {
+        apiMessages = data.data;
+        console.log("Formato de respuesta: objeto con campo data");
+      } else {
+        console.error("Formato de respuesta desconocido:", data);
+        setErrorLoadingMessages('Formato de respuesta inesperado');
+        return;
+      }
+      
+      console.log(`Recibidos ${apiMessages.length} mensajes`);
+      
+      if (apiMessages.length > 0) {
+        // Asegurarnos de que los mensajes tienen el formato correcto
+        const formattedMessages = apiMessages.map((msg: any) => {
+          // Si el mensaje ya tiene el formato correcto, devolverlo tal cual
+          if (typeof msg.createdAt === 'string' || msg.createdAt instanceof Date) {
+            return msg;
+          }
+          
+          // Asegurarse de que createdAt es un string o Date
+          return {
+            ...msg,
+            createdAt: msg.createdAt 
+              ? new Date(msg.createdAt).toISOString() 
+              : new Date().toISOString()
+          };
+        });
+        
+        // Procesar los mensajes correctamente
+        const uniqueMessages = processMessages(formattedMessages, []);
+        console.log(`Actualizados a ${uniqueMessages.length} mensajes únicos`);
+        
+        setHasMore(apiMessages.length === pageSize);
+        setPage(1);
+      } else {
+        console.log("No se encontraron mensajes para esta conversación");
+        // Incluso si no hay mensajes, actualizamos el estado para reflejar que la carga ha finalizado
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error cargando mensajes:", error);
+      setErrorLoadingMessages('Error al cargar mensajes: ' + (error instanceof Error ? error.message : 'desconocido'));
+    } finally {
+      isFetchingRef.current = false;
+      setIsLoadingMessages(false);
+    }
+  }, [pageSize, processMessages]);
+
+  // Un efecto para cargar los mensajes iniciales cuando cambia la conversación
+  useEffect(() => {
+    if (!conversation?.id || !currentUserId) return;
+    
+    console.log(`Cambio de conversación detectado. Nueva conversación: ${conversation.id}`);
+    
+    // Si la referencia es distinta pero el ID es el mismo, no hacer nada
+    if (lastProcessedConversationRef.current === conversation.id) {
+      console.log('Mismo ID de conversación, ignorando nueva carga');
+      return;
+    }
+    
+    // Limpiar estado para la nueva conversación
+    setMessages([]);
+    setMessageMap(new Map());
+    setPage(1);
+    setHasMore(true);
+    setErrorLoadingMessages(null);
+    
+    // Actualizar la referencia de la conversación actual
+    lastProcessedConversationRef.current = conversation.id;
+    
+    // Preparar ID con formato correcto
+    const groupId = conversation.id.startsWith('group_') 
+      ? conversation.id 
+      : `group_${conversation.id}`;
+    
+    // Cargar mensajes para la nueva conversación
+    loadGroupMessages(groupId, true);
+  }, [conversation?.id, currentUserId, loadGroupMessages]);
+
+  // Cargar más mensajes al hacer scroll hacia arriba
+  const loadMoreMessages = async () => {
+    // Evitar cargas paralelas y cargas cuando no hay más mensajes
+    if (isLoadingMore || isFetchingRef.current || !hasMore || !currentUserId) return;
+    
+    console.log(`Cargando más mensajes antiguos, página ${page + 1}`);
+    
+    // Marcar que estamos cargando
+    setIsLoadingMore(true);
+    isFetchingRef.current = true;
+    
+    // Guardar posición de scroll actual
+    if (chatContainerRef.current) {
+      setPreserveScrollPosition(true);
+      scrollHeightBeforeLoad.current = chatContainerRef.current.scrollHeight;
+      scrollTopBeforeLoad.current = chatContainerRef.current.scrollTop;
+    }
+    
+    try {
+      const nextPage = page + 1;
+      
+      // Asegurarnos de usar el ID con el prefijo correcto
+      const groupId = conversation.id.startsWith('group_') 
+        ? conversation.id 
+        : `group_${conversation.id}`;
+      
+      console.log(`Cargando mensajes para ${groupId}`);
+      
+      // Hacer la petición fetch SIN usar AbortController para evitar cancelaciones
+      const response = await fetch(
+        `/api/messages/group-messages?conversationId=${groupId}&page=${nextPage}&limit=${pageSize}&nocache=${Date.now()}`, 
+        { 
+          method: 'GET',
+          headers: { 
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Error al cargar mensajes: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!Array.isArray(data.messages)) {
+        throw new Error('Formato de respuesta inesperado');
+      }
+      
+      console.log(`Recibidos ${data.messages.length} mensajes antiguos para página ${nextPage}`);
+      
+      const oldMessages = data.messages;
+      
+      // Si no hay mensajes nuevos, no hay más para cargar
+      if (oldMessages.length === 0) {
+        setHasMore(false);
+        return;
+      }
+      
+      // Procesar y añadir los mensajes antiguos preservando el estado actual
+      const updatedMessages = processMessages(oldMessages, messages);
+      setMessages(updatedMessages);
+      
+      // Actualizar estado
+      setPage(nextPage);
+      setHasMore(oldMessages.length === pageSize);
+      
+    } catch (error) {
+      console.error('Error al cargar más mensajes:', error);
+      setErrorLoadingMessages('Error al cargar mensajes antiguos. Intenta de nuevo.');
+    } finally {
+      setIsLoadingMore(false);
+      isFetchingRef.current = false;
+    }
+  };
+  
+  // Restaurar posición de scroll después de cargar más mensajes
+  useEffect(() => {
+    if (preserveScrollPosition && chatContainerRef.current) {
+      const newScrollHeight = chatContainerRef.current.scrollHeight;
+      const heightDifference = newScrollHeight - scrollHeightBeforeLoad.current;
+      chatContainerRef.current.scrollTop = scrollTopBeforeLoad.current + heightDifference;
+      setPreserveScrollPosition(false);
+    }
+  }, [preserveScrollPosition, messages]);
+
+  // Scroll inicial y al recibir nuevos mensajes
+  useEffect(() => {
+    // Solo hacer scroll si no estamos cargando más mensajes (hacia arriba)
+    if (!isLoadingMore && messagesEndRef.current && chatContainerRef.current && !preserveScrollPosition) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [isLoadingMore, preserveScrollPosition, messages.length]);
+
+  // Manejar scroll automático para nuevos mensajes
+  useEffect(() => {
+    // Prevenir configuración de manejadores si no tenemos socket o conversación
+    if (!socketInstance || !conversation?.id || !currentUserId) return;
+    
+    const handleNewMessage = (message: MessageType) => {
+      // Asegurarse de que el mensaje pertenece a esta conversación
+      const groupId = conversation.id.startsWith('group_') ? conversation.id : `group_${conversation.id}`;
+      
+      if (message.conversationId === conversation.id || 
+          message.conversationId === groupId) {
+        
+        console.log(`Recibido nuevo mensaje para ${groupId} vía socket`);
+        
+        // Procesar el nuevo mensaje con nuestra función de deduplicación
+        processMessages([message], messages);
+        
+        // Si el autoscroll está habilitado, desplazar hacia el nuevo mensaje
+        if (autoScrollEnabled) {
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'nearest'
+            });
+          }, 50);
+        }
       }
     };
+
+    console.log(`Configurando manejadores de socket para grupo ${conversation.id}`);
+    socketInstance.on('new_message', handleNewMessage);
+    socketInstance.on('new_group_message', handleNewMessage);
     
-    fetchMessages();
-  }, [conversation?.id, currentUserId, processMessages]);
+    return () => {
+      console.log(`Limpiando manejadores de socket para grupo ${conversation.id}`);
+      socketInstance.off('new_message', handleNewMessage);
+      socketInstance.off('new_group_message', handleNewMessage);
+    };
+  }, [socketInstance, conversation?.id, autoScrollEnabled, currentUserId, processMessages]);
+  
+  // Deshabilitar efecto que ya no es necesario al tener processMessages
+  useEffect(() => {
+    // Deshabilitado para evitar renderizados dobles
+    // const uniqueMessages = Array.from(messageMap.values()).sort((a, b) => {
+    //   const dateA = new Date(a.createdAt);
+    //   const dateB = new Date(b.createdAt);
+    //   return dateA.getTime() - dateB.getTime();
+    // });
+    
+    // setMessages(uniqueMessages);
+  }, [messageMap]);
   
   // Manejar envío de mensajes
   const handleSendMessage = async () => {
@@ -379,35 +592,6 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     }
   };
   
-  // Función para cargar más mensajes antiguos
-  const loadMoreMessages = async () => {
-    // Implementación similar a ChatWindowContent
-  };
-  
-  // Scroll automático cuando llegan nuevos mensajes
-  useEffect(() => {
-    if (messages.length > 0 && messagesEndRef.current && autoScrollEnabled && !isLoadingMore) {
-      messagesEndRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'end',
-      });
-    }
-  }, [messages, autoScrollEnabled, isLoadingMore]);
-  
-  // Escuchar nuevos mensajes por socket
-  useEffect(() => {
-    const handleNewMessage = (message: MessageType) => {
-      if (message.conversationId === conversation?.id) {
-        processMessages([message], messages);
-      }
-    };
-  
-    socketInstance?.on('new_message', handleNewMessage);
-    return () => {
-      socketInstance?.off('new_message', handleNewMessage);
-    };
-  }, [socketInstance, conversation?.id, messages, processMessages]);
-  
   // Renderización del componente
   return (
     <div className={cn("flex flex-col h-full bg-white dark:bg-gray-900", className)}>
@@ -415,11 +599,12 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       <div 
         ref={chatContainerRef}
         className="flex-1 overflow-y-auto p-4 space-y-4"
-        onScroll={(e) => {
+        onScroll={() => {
           const element = chatContainerRef.current;
           if (element) {
             // Verificar si estamos cerca del top para cargar más mensajes
-            if (element.scrollTop < 100 && hasMore && !isLoadingMore) {
+            // Solo intentar cargar si no está ya cargando y hay más mensajes
+            if (element.scrollTop < 100 && hasMore && !isLoadingMore && !isFetchingRef.current) {
               loadMoreMessages();
             }
             
