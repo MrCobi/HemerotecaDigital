@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { Send, X, Mic, Play, Pause, MessageSquare, Square, ChevronRight, SkipForward, SkipBack } from 'lucide-react';
+import { Send, X, Mic, Play, Pause, MessageSquare, Square, ChevronRight, SkipForward, SkipBack, Loader2, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -1063,16 +1063,27 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     };
   }, [socketInstance, safeConversationId, autoScrollEnabled, messages, processMessages]);
   
-  // Detectar posición del scroll
+  // Manejador de scroll para detectar si estamos en la parte inferior - versión unificada
   const handleScroll = () => {
     const element = chatContainerRef.current;
     if (element) {
       const isNearBottom = 
         element.scrollHeight - element.scrollTop <= element.clientHeight + 100;
+      setIsAtBottom(isNearBottom);
       setAutoScrollEnabled(isNearBottom);
     }
   };
   
+  useEffect(() => {
+    const element = chatContainerRef.current;
+    if (element) {
+      const isNearBottom = 
+        element.scrollHeight - element.scrollTop <= element.clientHeight + 100;
+      setIsAtBottom(isNearBottom);
+      setAutoScrollEnabled(isNearBottom);
+    }
+  }, [chatContainerRef]);
+
   // Enviar notificación de escritura
   const sendTypingNotification = useCallback((newMessage: string) => {
     if (newMessage.trim().length > 0 && !isTyping && socketInstance && socketInitialized && currentUserId && otherUser?.id) {
@@ -1625,192 +1636,184 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       setIsAtBottom(true);
     }
   };
-  
+
+  // Efecto para hacer scroll al final cuando los mensajes se cargan inicialmente
+  useEffect(() => {
+    if (!isLoadingMessages && messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [isLoadingMessages, messages.length]);
+
   return (
-    <div className={cn("flex flex-col h-full max-h-full", className)}>
-      {/* Contenedor de mensajes - con display flex y justify-content para alinear los mensajes al final cuando hay pocos */}
-      <div 
-        ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-4 min-h-0 flex flex-col justify-end"
-        onScroll={handleScroll}
-      >
-        {isLoadingMessages ? (
-          <div className="flex justify-center items-center h-full">
-            <LoadingSpinner className="w-8 h-8 text-blue-500" />
-          </div>
-        ) : errorLoadingMessages ? (
-          <div className="text-center py-4 text-red-500">
-            <p>{errorLoadingMessages}</p>
-            {!errorLoadingMessages.includes('no existe') && (
-              <Button 
-                onClick={() => {
-                  // Reintentar la carga con los parámetros iniciales
-                  setPage(1);
-                  setMessages([]);
-                  setMessageMap(new Map());
-                  setIsLoadingMessages(true);
-                  setErrorLoadingMessages('');
-                  // UseEffect detectará estos cambios y llamará a fetchMessages
-                }} 
-                variant="outline" 
-                className="mt-2 text-sm" 
-                size="sm"
-              >
-                Reintentar
-              </Button>
-            )}
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-6 text-center">
-            <div className="mb-4 text-gray-400">
-              <MessageSquare className="h-12 w-12" />
+    <div className={`flex flex-col max-h-[calc(100vh-4rem)] ${className}`}>
+      {/* Contenedor principal con altura controlada y flex-col */}
+      <div className="flex flex-col h-full">
+        {/* Área de mensajes con scroll */}
+        <div className="flex-1 overflow-y-auto min-h-0" ref={chatContainerRef} onScroll={handleScroll}>
+          {isLoadingMessages ? (
+            <div className="flex flex-col items-center justify-center h-full">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <p className="mt-2 text-sm text-gray-500">Cargando mensajes...</p>
             </div>
-            <h3 className="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Conversación vacía</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
-              Aún no hay mensajes en esta conversación.<br />
-              ¡Escribe algo para comenzar a chatear!
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Indicador de carga para mensajes antiguos */}
-            {isLoadingMore && (
-              <div className="text-center py-2">
-                <LoadingSpinner className="w-5 h-5 text-blue-500 inline-block" />
-                <span className="ml-2 text-sm text-gray-500">Cargando mensajes anteriores...</span>
-              </div>
-            )}
-            
-            {/* Renderizar cada mensaje con su propia clave única basada en índice */}
-            <div className="space-y-4">
-              {messages.map((message, index) => {
-                const isCurrentUser = message.senderId === currentUserId;
-                const showAvatar = 
-                  index === 0 || 
-                  messages[index - 1].senderId !== message.senderId;
-                
-                // Determinar si necesitamos mostrar un separador de fecha
-                const showDateSeparator = index === 0 || !isSameDay(
-                  new Date(message.createdAt),
-                  new Date(messages[index - 1].createdAt)
-                );
-                
-                // Crear una clave única y garantizada para cada mensaje
-                // Usamos una combinación de índice, id/tempId y timestamp para asegurar unicidad
-                const messageKey = `msg-${index}-${message.id || message.tempId || Date.now()}`;
-                
-                return (
-                  <div key={messageKey}>
-                    <MessageItem
-                      message={message}
-                      currentUserId={currentUserId || ''}
-                      otherUser={otherUser}
-                      showAvatar={showAvatar}
-                      showDateSeparator={showDateSeparator}
-                      index={index}
-                      session={session}
-                    />
-                  </div>
-                );
-              })}
-              
-              {/* Indicador de escritura */}
-              {peerIsTyping && (
-                <div className="flex items-end gap-2">
-                  <Avatar className="h-8 w-8">
-                    {otherUser?.image ? (
-                      <AvatarImage src={otherUser.image} alt={otherUser.username || 'Usuario'} />
+          ) : (
+            <>
+              {hasMore && (
+                <div className="flex justify-center p-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={loadMoreMessages}
+                    disabled={isLoadingMore}
+                    className="text-xs flex items-center gap-1"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <span>Cargando...</span>
+                      </>
                     ) : (
-                      <AvatarFallback>
-                        {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
-                      </AvatarFallback>
+                      <>
+                        <ChevronUp className="h-3 w-3" />
+                        <span>Cargar mensajes anteriores</span>
+                      </>
                     )}
-                  </Avatar>
-                  <div className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg text-sm">
-                    <span className="typing-indicator">
-                      <span className="dot"></span>
-                      <span className="dot"></span>
-                      <span className="dot"></span>
-                    </span>
-                  </div>
+                  </Button>
                 </div>
               )}
               
-              {/* Elemento para el scroll automático */}
-              <div ref={messagesEndRef} />
-            </div>
-          </>
-        )}
-      </div>
-  
-      {/* Indicador de escritura */}
-      {peerIsTyping && (
-        <div className="px-4 py-1 text-xs text-gray-500 italic">
-          {otherUser?.username || 'El otro usuario'} está escribiendo...
+              <div className="flex flex-col space-y-2 p-4 pb-2">
+                {/* Renderizar mensajes agrupados por día */}
+                {messages.map((message, index) => {
+                  const isCurrentUser = message.senderId === currentUserId;
+                  const showAvatar = 
+                    index === 0 || 
+                    messages[index - 1].senderId !== message.senderId;
+                  
+                  // Determinar si necesitamos mostrar un separador de fecha
+                  const showDateSeparator = index === 0 || !isSameDay(
+                    new Date(message.createdAt),
+                    new Date(messages[index - 1].createdAt)
+                  );
+                  
+                  // Crear una clave única y garantizada para cada mensaje
+                  // Usamos una combinación de índice, id/tempId y timestamp para asegurar unicidad
+                  const messageKey = `msg-${index}-${message.id || message.tempId || Date.now()}`;
+                  
+                  return (
+                    <div key={messageKey}>
+                      <MessageItem
+                        message={message}
+                        currentUserId={currentUserId || ''}
+                        otherUser={otherUser}
+                        showAvatar={showAvatar}
+                        showDateSeparator={showDateSeparator}
+                        index={index}
+                        session={session}
+                      />
+                    </div>
+                  );
+                })}
+                
+                {/* Mostrar indicador de "está escribiendo" */}
+                {peerIsTyping && (
+                  <div className="flex items-start mb-2">
+                    <div className="flex items-center space-x-2">
+                      <Avatar className="h-8 w-8">
+                        {otherUser?.image ? (
+                          <AvatarImage src={otherUser.image} />
+                        ) : (
+                          <AvatarFallback>
+                            {otherUser?.username?.[0]?.toUpperCase() || "?"}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded-lg">
+                        <span className="typing-indicator">
+                          <span className="dot"></span>
+                          <span className="dot"></span>
+                          <span className="dot"></span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Elemento para el scroll automático */}
+                <div ref={messagesEndRef} />
+              </div>
+            </>
+          )}
         </div>
-      )}
-  
-      {/* Contenedor para la entrada de mensajes - siempre visible y fijo en la parte inferior */}
-      <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex-shrink-0">
-        {canSendMessages === false ? (
-          <div className="text-center text-gray-500 mb-2">
-            <p>No puedes enviar mensajes a este usuario.</p>
-            <p className="text-xs">
-              Ambos usuarios deben seguirse mutuamente para poder enviar mensajes.
-            </p>
-          </div>
-        ) : isCheckingRelationship ? (
-          <div className="text-center text-gray-500 mb-2">
-            <p>Verificando si puedes enviar mensajes...</p>
-          </div>
-        ) : (
-          <div className="flex items-end gap-2">
-            <Textarea
-              ref={messageInputRef}
-              value={newMessage}
-              onChange={(e) => {
-                setNewMessage(e.target.value);
-                sendTypingNotification(e.target.value);
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Escribe un mensaje..."
-              className="flex-1 resize-none max-h-32"
-              rows={1}
-              disabled={isSending || !canSendMessages}
-            />
-            <div className="flex gap-2">
-              <Button
-                size="icon"
-                onClick={() => {
-                  // Limpiar cualquier estado previo antes de mostrar
-                  try {
-                    localStorage.removeItem('voice_recorder_audio_url');
-                    localStorage.removeItem('voice_recorder_state');
-                  } catch (e) {
-                    console.error('Error limpiando localStorage:', e);
-                  }
-                  setIsVoiceRecorderVisible(true);
-                }}
-                disabled={isSending || !canSendMessages}
-                className="h-10 w-10 rounded-full bg-green-500 hover:bg-green-600"
-                title="Grabar mensaje de voz"
-              >
-                <Mic className="h-5 w-5 text-white" />
-              </Button>
-              <Button
-                size="icon"
-                onClick={sendMessage}
-                disabled={!newMessage.trim() || isSending || !canSendMessages}
-                className="h-10 w-10 rounded-full bg-blue-500 hover:bg-blue-600"
-                title="Enviar mensaje"
-              >
-                <Send className="h-5 w-5 text-white" />
-              </Button>
-            </div>
+
+        {/* Indicador de escritura - fuera del área de scroll pero antes del input */}
+        {peerIsTyping && (
+          <div className="px-4 py-1 text-xs text-gray-500 italic bg-white dark:bg-gray-800">
+            {otherUser?.username || 'El otro usuario'} está escribiendo...
           </div>
         )}
+
+        {/* Contenedor para la entrada de mensajes - ajustado para no quedar pegado al footer */}
+        <div className="border-t border-gray-200 dark:border-gray-700 p-3 pb-4 mb-3 flex-shrink-0 bg-white dark:bg-gray-800 shadow-sm">
+          {canSendMessages === false ? (
+            <div className="text-center text-gray-500 mb-2">
+              <p>No puedes enviar mensajes a este usuario.</p>
+              <p className="text-xs">
+                Ambos usuarios deben seguirse mutuamente para poder enviar mensajes.
+              </p>
+            </div>
+          ) : isCheckingRelationship ? (
+            <div className="text-center text-gray-500 mb-2">
+              <p>Verificando si puedes enviar mensajes...</p>
+            </div>
+          ) : (
+            <div className="flex items-end gap-2">
+              <Textarea
+                ref={messageInputRef}
+                value={newMessage}
+                onChange={(e) => {
+                  setNewMessage(e.target.value);
+                  sendTypingNotification(e.target.value);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Escribe un mensaje..."
+                className="flex-1 resize-none max-h-32"
+                rows={1}
+                disabled={isSending || !canSendMessages}
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="icon"
+                  onClick={() => {
+                    // Limpiar cualquier estado previo antes de mostrar
+                    try {
+                      localStorage.removeItem('voice_recorder_audio_url');
+                      localStorage.removeItem('voice_recorder_state');
+                    } catch (e) {
+                      console.error('Error limpiando localStorage:', e);
+                    }
+                    setIsVoiceRecorderVisible(true);
+                  }}
+                  disabled={isSending || !canSendMessages}
+                  className="h-10 w-10 rounded-full bg-green-500 hover:bg-green-600"
+                  title="Grabar mensaje de voz"
+                >
+                  <Mic className="h-5 w-5 text-white" />
+                </Button>
+                <Button
+                  size="icon"
+                  onClick={sendMessage}
+                  disabled={!newMessage.trim() || isSending || !canSendMessages}
+                  className="h-10 w-10 rounded-full bg-blue-500 hover:bg-blue-600"
+                  title="Enviar mensaje"
+                >
+                  <Send className="h-5 w-5 text-white" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-  
+
       {/* Componente de grabación de voz */}
       {isVoiceRecorderVisible && currentUserId && otherUser && (
         <VoiceMessageRecorder
@@ -1839,97 +1842,6 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           setUploadStatus={setUploadStatus}
         />
       )}
-  
-      {/* Estado de error */}
-      {errorLoadingMessages && (
-        <div className="flex flex-col items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 rounded-lg mx-auto my-4 max-w-md">
-          <p className="mb-2">{errorLoadingMessages}</p>
-          {!errorLoadingMessages.includes('no existe') && (
-            <Button 
-              onClick={() => {
-                // Reintentar la carga con los parámetros iniciales
-                setPage(1);
-                setMessages([]);
-                setMessageMap(new Map());
-                setIsLoadingMessages(true);
-                setErrorLoadingMessages('');
-                // UseEffect detectará estos cambios y llamará a fetchMessages
-              }} 
-              variant="outline" 
-              className="mt-2 text-sm" 
-              size="sm"
-            >
-              Reintentar
-            </Button>
-          )}
-        </div>
-      )}
-  
-      {/* Estilos para el indicador de escritura */}
-      <style jsx global>{`
-        .typing-indicator {
-          display: flex;
-          align-items: center;
-        }
-        
-        .dot {
-          background-color: rgba(0, 0, 0, 0.5);
-          border-radius: 50%;
-          display: inline-block;
-          height: 5px;
-          margin-right: 3px;
-          width: 5px;
-          animation: bounce 1.5s infinite;
-        }
-        
-        .dot:nth-child(2) {
-          animation-delay: 0.2s;
-        }
-        
-        .dot:nth-child(3) {
-          animation-delay: 0.4s;
-        }
-        
-        @keyframes bounce {
-          0%, 60%, 100% {
-            transform: translateY(0);
-          }
-          30% {
-            transform: translateY(-5px);
-          }
-        }
-        
-        .dark .dot {
-          background-color: rgba(255, 255, 255, 0.5);
-        }
-        
-        .audio-player-light {
-          background-color: #f0f0f0;
-          border: 1px solid #ddd;
-        }
-        
-        .audio-player-dark {
-          background-color: #333;
-          border: 1px solid #444;
-        }
-        
-        .audio-player-light::-webkit-media-controls-panel {
-          background-color: #f0f2f5;
-        }
-        
-        .audio-player-dark::-webkit-media-controls-panel {
-          background-color: #333;
-        }
-        
-        @keyframes progressAnim {
-          from {
-            width: 0%;
-          }
-          to {
-            width: 100%;
-          }
-        }
-      `}</style>
     </div>
   );
 }

@@ -531,11 +531,11 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     const tempMessage: Message = {
       tempId,
       content: newMessage.trim(),
-      senderId: currentUserId,
+      senderId: currentUserId || '', // Ensure senderId is never undefined
       createdAt: new Date(),
       status: 'sending',
       conversationId: conversation.id,
-      messageType: 'text'
+      messageType: 'text' as 'text' | 'image' | 'voice' | 'file' | 'video'
     };
     
     // Añadir mensaje temporal a la lista
@@ -612,142 +612,188 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     }
   };
   
-  // Renderización del componente
+  // Render principal del componente
   return (
-    <div className={cn("flex flex-col h-full max-h-full bg-white dark:bg-gray-900", className)}>
-      {/* Contenedor principal de mensajes con scroll, y flex para que los mensajes aparezcan en la parte inferior */}
-      <div 
-        ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-4 min-h-0 flex flex-col justify-end"
-        onScroll={handleScroll}
-      >
-        {/* Spinner de carga inicial */}
-        {isLoadingMessages && messages.length === 0 && (
-          <div className="flex justify-center items-center h-40">
-            <LoadingSpinner />
-          </div>
-        )}
-        
-        {/* Mensaje de error */}
-        {errorLoadingMessages && (
-          <div className="flex justify-center items-center h-40 text-center text-red-500 px-4">
-            {errorLoadingMessages}
-          </div>
-        )}
-        
-        {/* Spinner de carga para mensajes antiguos */}
-        {isLoadingMore && (
-          <div className="flex justify-center items-center py-2">
-            <LoadingSpinner size="small" />
-          </div>
-        )}
-        
-        {/* Lista de mensajes */}
-        {messages.length > 0 && messages.map((message, index) => {
-          const isCurrentUser = message.senderId === currentUserId;
-          
-          // Determinar si mostrar avatar y separador de fecha
-          const showAvatar = index === 0 || 
-            messages[index - 1]?.senderId !== message.senderId;
-          
-          const showDateSeparator = index === 0 || !isSameDay(
-            new Date(message.createdAt), 
-            new Date(messages[index - 1]?.createdAt || Date.now())
-          );
-          
-          // Encontrar el remitente en la lista de participantes
-          const sender = conversation?.participants?.find(
-            p => p.userId === message.senderId
-          )?.user;
-          
-          return (
-            <React.Fragment key={message.id || message.tempId || index}>
-              <MessageItem 
-                message={message}
-                currentUserId={currentUserId || ''}
-                otherUser={{
-                  id: sender?.id || '',
-                  username: sender?.username || '',
-                  name: sender?.name || '',
-                  image: sender?.image || ''
-                }}
-                showAvatar={showAvatar}
-                showDateSeparator={showDateSeparator}
-                index={index}
-                session={session}
-                isGroupChat={true}
-              />
-            </React.Fragment>
-          );
-        })}
-        
-        {/* Referencia al final de los mensajes para auto-scroll */}
-        <div ref={messagesEndRef} />
-      </div>
-      
-      {/* Indicador de escritura */}
-      {typingUsers.length > 0 && (
-        <div className="px-4 py-1 text-xs text-gray-500 italic">
-          {typingUsers.length === 1 
-            ? `${typingUsers[0]} está escribiendo...` 
-            : typingUsers.length === 2 
-              ? `${typingUsers[0]} y ${typingUsers[1]} están escribiendo...` 
-              : `${typingUsers.length} personas están escribiendo...`}
+    <div className={cn("flex flex-col max-h-[calc(100vh-4rem)]", className)}>
+      {/* Contenedor principal con altura controlada y flex-col */}
+      <div className="flex flex-col h-full">
+        {/* Área de mensajes con scroll */}
+        <div className="flex-1 overflow-y-auto min-h-0 p-4" ref={chatContainerRef} onScroll={handleScroll}>
+          {isLoadingMessages ? (
+            <div className="flex flex-col items-center justify-center h-full">
+              <LoadingSpinner className="w-8 h-8 text-blue-500" />
+              <p className="mt-2 text-sm text-gray-500">Cargando mensajes...</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Loader para mensajes anteriores */}
+              {isLoadingMore && (
+                <div className="flex justify-center p-2">
+                  <LoadingSpinner className="w-5 h-5 text-blue-500" />
+                </div>
+              )}
+              
+              {/* Mensajes */}
+              {messages.map((message, index) => {
+                const isCurrentUser = message.senderId === currentUserId;
+                const showAvatar = 
+                  index === 0 || 
+                  messages[index - 1]?.senderId !== message.senderId;
+                
+                const showDateSeparator = index === 0 || !isSameDay(
+                  new Date(message.createdAt), 
+                  new Date(messages[index - 1]?.createdAt || Date.now())
+                );
+                
+                // Encontrar el remitente en la lista de participantes
+                const sender = conversation?.participants?.find(
+                  p => p.userId === message.senderId
+                )?.user;
+                
+                return (
+                  <React.Fragment key={message.id || message.tempId || index}>
+                    <MessageItem 
+                      message={message}
+                      currentUserId={currentUserId || ''}
+                      otherUser={{
+                        id: sender?.id || '',
+                        username: sender?.username || '',
+                        name: sender?.name || '',
+                        image: sender?.image || ''
+                      }}
+                      showAvatar={showAvatar}
+                      showDateSeparator={showDateSeparator}
+                      index={index}
+                      session={session}
+                      isGroupChat={true}
+                    />
+                  </React.Fragment>
+                );
+              })}
+              
+              {/* Referencia al final de los mensajes para auto-scroll */}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
-      )}
-      
-      {/* Área de entrada de mensajes */}
-      <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex-shrink-0">
-        {isVoiceRecorderVisible ? (
-          <VoiceMessageRecorder 
-            onSend={async (audioBlob) => {
-              // Implementar el envío de mensajes de voz
-              setIsVoiceRecorderVisible(false);
-            }}
-            onCancel={() => setIsVoiceRecorderVisible(false)}
-            isVisible={isVoiceRecorderVisible}
-            senderId={session?.user?.id || ''}
-            receiverId={conversation.id || ''}
-            session={session}
-            onClose={() => setIsVoiceRecorderVisible(false)}
-            setUploadStatus={(status) => {
-              // Manejar el estado de la carga aquí si es necesario
-              console.log('Upload status:', status);
-            }}
-          />
-        ) : (
-          <div className="flex items-center gap-2">
-            <Textarea
-              value={newMessage}
-              onChange={(e) => {
-                setNewMessage(e.target.value);
-                // También implementar notificación de escritura
-              }}
-              placeholder="Escribe un mensaje..."
-              className="min-h-10 max-h-32 resize-none flex-1"
-              ref={messageInputRef}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
+        
+        {/* Indicador de escritura - fuera del área de scroll pero antes del input */}
+        {typingUsers.length > 0 && (
+          <div className="px-4 py-1 text-xs text-gray-500 italic bg-white dark:bg-gray-800">
+            {typingUsers.length === 1 
+              ? `${typingUsers[0]} está escribiendo...` 
+              : typingUsers.length === 2 
+                ? `${typingUsers[0]} y ${typingUsers[1]} están escribiendo...` 
+                : `${typingUsers.length} personas están escribiendo...`}
+          </div>
+        )}
+        
+        {/* Área de entrada de mensajes - ajustada para no estar tan pegada al footer */}
+        <div className="border-t border-gray-200 dark:border-gray-700 p-3 pb-4 mb-3 flex-shrink-0 bg-white dark:bg-gray-800">
+          {isVoiceRecorderVisible ? (
+            <VoiceMessageRecorder 
+              onSend={async (audioBlob) => {
+                try {
+                  setIsSending(true);
+                  
+                  // Crear un FormData para subir el archivo
+                  const formData = new FormData();
+                  formData.append('file', audioBlob, 'audio.webm');
+                  formData.append('conversationId', conversation.id);
+                  
+                  // Subir el archivo al servidor
+                  const response = await fetch('/api/messages/upload-voice', {
+                    method: 'POST',
+                    body: formData,
+                  });
+                  
+                  if (!response.ok) {
+                    throw new Error('Error al subir el mensaje de voz');
+                  }
+                  
+                  const { url } = await response.json();
+                  
+                  if (socketInstance && socketInitialized) {
+                    const newMessage = {
+                      content: '',
+                      senderId: currentUserId || '', // Ensure senderId is never undefined
+                      conversationId: conversation.id,
+                      createdAt: new Date(),
+                      tempId: Date.now().toString(),
+                      mediaUrl: url,
+                      messageType: 'voice' as 'voice' | 'text' | 'image' | 'file' | 'video'
+                    };
+                    
+                    // Añadir mensaje al estado local
+                    processMessages([newMessage]);
+                    
+                    // Enviar mensaje al servidor
+                    socketInstance.emit('group_message', newMessage);
+                    
+                    // Auto-scroll si estamos en la parte inferior
+                    if (isAtBottom) {
+                      setTimeout(scrollToBottom, 100);
+                    }
+                  }
+                  
+                  // Desactivar el grabador de voz
+                  setIsVoiceRecorderVisible(false);
+                } catch (error) {
+                  console.error('Error al enviar mensaje de voz:', error);
+                  toast({
+                    title: 'Error',
+                    description: 'No se pudo enviar el mensaje de voz',
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setIsSending(false);
                 }
               }}
+              onCancel={() => setIsVoiceRecorderVisible(false)}
+              isVisible={isVoiceRecorderVisible}
+              senderId={session?.user?.id || ''}
+              receiverId={conversation.id || ''}
+              session={session}
+              onClose={() => setIsVoiceRecorderVisible(false)}
+              setUploadStatus={(status) => {
+                // Manejar el estado de la carga aquí si es necesario
+                console.log('Upload status:', status);
+              }}
             />
-            
-            <Button 
-              onClick={handleSendMessage} 
-              disabled={!newMessage.trim() || isSending || !currentUserId}
-              size="icon" 
-              className="rounded-full bg-blue-500 text-white hover:bg-blue-600 flex-shrink-0"
-            >
-              {isSending ? (
-                <div className="h-5 w-5 border-2 border-t-transparent border-white rounded-full animate-spin" />
-              ) : (
-                <Send className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center gap-2">
+              <Textarea
+                value={newMessage}
+                onChange={(e) => {
+                  setNewMessage(e.target.value);
+                  // También implementar notificación de escritura
+                }}
+                placeholder="Escribe un mensaje..."
+                className="min-h-10 max-h-32 resize-none flex-1"
+                ref={messageInputRef}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+              />
+              
+              <Button 
+                onClick={handleSendMessage} 
+                disabled={!newMessage.trim() || isSending || !currentUserId}
+                size="icon" 
+                className="rounded-full bg-blue-500 text-white hover:bg-blue-600 flex-shrink-0"
+              >
+                {isSending ? (
+                  <div className="h-5 w-5 border-2 border-t-transparent border-white rounded-full animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
