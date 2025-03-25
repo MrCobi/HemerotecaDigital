@@ -12,10 +12,12 @@ import { auth } from "@/auth";
  */
 export async function POST(req: NextRequest) {
   try {
+    console.log("Iniciando verificación de contraseña");
     // Verificar la autenticación del usuario que hace la solicitud
     const session = await auth();
     
     if (!session || !session.user) {
+      console.log("No hay sesión de usuario activa");
       return NextResponse.json(
         { error: "No autenticado" },
         { status: 401 }
@@ -25,9 +27,11 @@ export async function POST(req: NextRequest) {
     // Obtener los datos de la solicitud
     const body = await req.json();
     const { userId, password } = body;
+    console.log("Solicitud de verificación para usuario:", userId);
     
     // Verificar que los datos necesarios estén presentes
     if (!userId || !password) {
+      console.log("Faltan datos requeridos: userId o password");
       return NextResponse.json(
         { error: "Faltan datos requeridos" },
         { status: 400 }
@@ -36,6 +40,9 @@ export async function POST(req: NextRequest) {
     
     // Verificar que el usuario autenticado sea el mismo que se intenta modificar
     if (session.user.id !== userId) {
+      console.log("Verificación rechazada: intento de modificar otro usuario");
+      console.log("ID de sesión:", session.user.id);
+      console.log("ID solicitado:", userId);
       return NextResponse.json(
         { error: "No tienes permiso para realizar esta acción" },
         { status: 403 }
@@ -53,14 +60,19 @@ export async function POST(req: NextRequest) {
     
     // Verificar que el usuario exista
     if (!user || !user.password) {
+      console.log("Usuario no encontrado o sin contraseña:", userId);
       return NextResponse.json(
         { error: "Usuario no encontrado" },
         { status: 404 }
       );
     }
     
+    console.log("Usuario encontrado, verificando contraseña...");
+    
     // Verificar que la contraseña sea correcta
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    
+    console.log("Resultado de verificación:", isPasswordValid ? "Correcta" : "Incorrecta");
     
     if (!isPasswordValid) {
       return NextResponse.json(
@@ -70,6 +82,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Si llegamos aquí, la contraseña es válida
+    console.log("Verificación exitosa para el usuario:", userId);
     return NextResponse.json({ success: true });
     
   } catch (error) {

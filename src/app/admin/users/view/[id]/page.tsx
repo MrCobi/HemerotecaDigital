@@ -234,34 +234,9 @@ export default function UserViewPage({ params }: PageProps) {
             <div className="md:w-1/3 bg-primary/10 p-6">
               <div className="text-center">
                 <div className="relative w-32 h-32 mx-auto mb-4">
-                  {user.image ? (
+                  {user.image && user.image.includes('cloudinary') ? (
                     <CldImage
-                      src={(() => {
-                        // Extraer el public_id limpio, manejando diferentes formatos
-                        let publicId = user.image;
-
-                        // Si es una URL completa de Cloudinary
-                        if (user.image.includes('cloudinary.com')) {
-                          // Extraer el public_id eliminando la parte de la URL
-                          // Buscamos 'hemeroteca_digital' como punto de referencia seguro
-                          const match = user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
-                          if (match && match[1]) {
-                            publicId = `hemeroteca_digital/${match[1]}`;
-                          } else {
-                            // Si no encontramos el patrón específico, intentamos una extracción más general
-                            publicId = user.image.replace(/.*\/v\d+\//, '').split('?')[0];
-                          }
-                        }
-
-                        // Verificar que el ID no esté duplicado o anidado
-                        if (publicId.includes('https://')) {
-                          console.warn('ID público contiene URL completa:', publicId);
-                          publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
-                        }
-
-                        console.log('Public ID extraído:', publicId);
-                        return publicId;
-                      })()}
+                      src={user.image}
                       alt={user.name || "Avatar"}
                       width={128}
                       height={128}
@@ -270,20 +245,36 @@ export default function UserViewPage({ params }: PageProps) {
                       className="rounded-full object-cover border-4 border-primary/30"
                       priority
                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        console.error('Error cargando imagen de usuario:', user.image);
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : user.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
+                    <CldImage
+                      src={user.image}
+                      alt={user.name || "Avatar"}
+                      width={128}
+                      height={128}
+                      crop="fill"
+                      gravity="face"
+                      className="rounded-full object-cover border-4 border-primary/30"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                         const target = e.target as HTMLImageElement;
                         target.src = "/images/AvatarPredeterminado.webp";
                       }}
                     />
                   ) : (
-                    // Para imágenes locales o fallback
                     <Image
-                      src="/images/AvatarPredeterminado.webp"
+                      src={user.image || "/images/AvatarPredeterminado.webp"}
                       alt={user.name || "Avatar"}
                       width={128}
                       height={128}
                       className="rounded-full object-cover border-4 border-primary/30"
                       priority
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
                     />
                   )}
                   <Badge className={`absolute bottom-0 right-0 ${

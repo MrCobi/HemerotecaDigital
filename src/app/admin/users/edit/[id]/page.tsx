@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { CldImage } from "next-cloudinary";
 import { Button, buttonVariants } from "@/src/app/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/src/app/components/ui/card";
 import { Input } from "@/src/app/components/ui/input";
 import { Label } from "@/src/app/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/app/components/ui/select";
-import { Loader2, ArrowLeft, Save, Image as ImageIcon } from "lucide-react";
+import { Loader2, ArrowLeft, Save, ImageIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
 import { toast } from "sonner";
 
@@ -258,28 +259,57 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
             {/* Panel lateral izquierdo */}
             <div className="md:w-1/3 bg-primary/10 p-6">
               <div className="text-center">
-                <div className="relative w-32 h-32 mx-auto mb-4">
+                <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-md">
                   {preview ? (
-                    <>
-                      <Image
-                        src={preview}
-                        alt={form.name || "Avatar"}
-                        fill
-                        className="rounded-full object-cover"
-                        priority
-                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = "/images/AvatarPredeterminado.webp";
-                        }}
-                      />
-                    </>
+                    <Image
+                      src={preview}
+                      alt="Vista previa"
+                      fill
+                      className="object-cover"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : userInfo?.image && userInfo.image.includes('cloudinary') ? (
+                    <CldImage
+                      src={userInfo.image}
+                      alt={userInfo.name || "Avatar"}
+                      width={128}
+                      height={128}
+                      crop="fill"
+                      gravity="face"
+                      className="object-cover"
+                      priority
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : userInfo?.image && !userInfo.image.startsWith('/') && !userInfo.image.startsWith('http') ? (
+                    <CldImage
+                      src={userInfo.image}
+                      alt={userInfo.name || "Avatar"}
+                      width={128}
+                      height={128}
+                      crop="fill"
+                      gravity="face"
+                      className="object-cover"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
                   ) : (
                     <Image
-                      src="/images/AvatarPredeterminado.webp"
-                      alt={form.name || "Avatar"}
+                      src={userInfo?.image || "/images/AvatarPredeterminado.webp"}
+                      alt="Avatar"
                       fill
-                      className="rounded-full object-cover border-4 border-primary/30"
-                      priority
+                      className="object-cover"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
                     />
                   )}
                 </div>
@@ -306,6 +336,33 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                   </>
                 )}
               </div>
+              <div className="mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="flex flex-col items-center space-y-3">
+                    <input
+                      id="imageUpload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                    />
+                    
+                    {uploadProgress > 0 && (
+                      <div className="bg-primary/10 text-primary p-2 rounded-md">
+                        Subiendo imagen... {uploadProgress}%
+                      </div>
+                    )}
+                    {uploadError && (
+                      <div className="bg-destructive/10 text-destructive p-2 rounded-md">
+                        {uploadError}
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Imagen recomendada: cuadrada, mínimo 200x200px. Formatos aceptados: JPG, PNG.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Formulario lado derecho */}
@@ -328,34 +385,6 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                     <CardTitle>Información personal</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <Label htmlFor="imageUpload">Imagen de perfil</Label>
-                      <div className="space-y-3 mt-2">
-                        {/* Widget de subida de archivo */}
-                        <input
-                          id="imageUpload"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileChange}
-                          className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                        />
-                        
-                        {uploadProgress > 0 && (
-                          <div className="bg-primary/10 text-primary p-2 rounded-md">
-                            Subiendo imagen... {uploadProgress}%
-                          </div>
-                        )}
-                        {uploadError && (
-                          <div className="bg-destructive/10 text-destructive p-2 rounded-md">
-                            {uploadError}
-                          </div>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                          Imagen recomendada: cuadrada, mínimo 200x200px. Formatos aceptados: JPG, PNG.
-                        </p>
-                      </div>
-                    </div>
-
                     <div>
                       <Label htmlFor="name">Nombre completo</Label>
                       <Input

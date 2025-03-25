@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
+import bcrypt from 'bcryptjs';
 
 // Función auxiliar para verificar si el usuario es administrador
 async function isAdmin() {
@@ -59,6 +60,9 @@ export async function PATCH(
   try {
     const { id: userId } = await params;
     const body = await req.json();
+    
+    console.log("Administrador actualizando usuario:", userId);
+    console.log("Datos recibidos:", JSON.stringify(body));
 
     // Validar que el usuario existe
     const existingUser = await prisma.user.findUnique({
@@ -69,10 +73,42 @@ export async function PATCH(
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
+    // Preparar datos para actualización
+    const updateData: any = {
+      name: body.name,
+      username: body.username,
+      email: body.email,
+      image: body.image, // No establecer imagen predeterminada automáticamente
+      role: body.role,
+      bio: body.bio,
+    };
+    
+    // Campos opcionales
+    if (body.showActivity !== undefined) {
+      updateData.showActivity = body.showActivity;
+    }
+    
+    if (body.showFavorites !== undefined) {
+      updateData.showFavorites = body.showFavorites;
+    }
+
+    // Manejar cambio de contraseña si se proporciona (los admins pueden cambiar sin verificar la actual)
+    if (body.newPassword) {
+      if (body.newPassword.length < 6 || body.newPassword.length > 32) {
+        return NextResponse.json(
+          { error: "La contraseña debe tener entre 6 y 32 caracteres" },
+          { status: 400 }
+        );
+      }
+      
+      console.log("Administrador cambiando contraseña para el usuario:", userId);
+      updateData.password = await bcrypt.hash(body.newPassword, 10);
+    }
+
     // Verificar si el email ya existe (si se está actualizando)
-    if (body.email && body.email !== existingUser.email) {
+    if (updateData.email && updateData.email !== existingUser.email) {
       const emailExists = await prisma.user.findUnique({
-        where: { email: body.email },
+        where: { email: updateData.email },
       });
 
       if (emailExists) {
@@ -84,9 +120,9 @@ export async function PATCH(
     }
 
     // Verificar si el username ya existe (si se está actualizando)
-    if (body.username && body.username !== existingUser.username) {
+    if (updateData.username && updateData.username !== existingUser.username) {
       const usernameExists = await prisma.user.findUnique({
-        where: { username: body.username },
+        where: { username: updateData.username },
       });
 
       if (usernameExists) {
@@ -98,23 +134,52 @@ export async function PATCH(
     }
 
     // Actualizar el usuario
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        name: body.name,
-        username: body.username,
-        email: body.email,
-        image: body.image || "/images/AvatarPredeterminado.webp",
-        role: body.role,
-        bio: body.bio,
-        showActivity: body.showActivity,
-        showFavorites: body.showFavorites,
-      },
-    });
+    try {
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          username: true,
+          image: true, 
+          bio: true,
+          role: true,
+          createdAt: true,
+          showActivity: true,
+          showFavorites: true,
+        }
+      });
+      
+      if (updateData.password) {
+        console.log("Contraseña actualizada por el administrador para el usuario:", userId);
+      }
 
-    return NextResponse.json(updatedUser);
+      return NextResponse.json(updatedUser);
+    } catch (updateError) {
+      console.error("Error al actualizar usuario:", updateError);
+      
+      // Manejar error de duplicación
+      if (typeof updateError === 'object' && updateError !== null && 'code' in updateError && updateError.code === 'P2002') {
+        return NextResponse.json(
+          { error: "El email o username ya está en uso" },
+          { status: 409 }
+        );
+      }
+      
+      return NextResponse.json(
+        { error: "Error al actualizar usuario" },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Error al actualizar usuario:", error);
+    
+    if (error instanceof SyntaxError && error.message.includes('JSON')) {
+      return NextResponse.json({ error: "Formato de datos inválido" }, { status: 400 });
+    }
+    
     return NextResponse.json(
       { error: "Error al actualizar el usuario" },
       { status: 500 }

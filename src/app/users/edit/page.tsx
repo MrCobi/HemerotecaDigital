@@ -48,6 +48,8 @@ export default function EditProfilePage() {
     bio: "",
     image: "",
     email: "",
+    showFavorites: false,
+    showActivity: false,
   });
   const [preview, setPreview] = useState<string | null>(null);
 
@@ -72,6 +74,8 @@ export default function EditProfilePage() {
       bio: user.bio || "",
       image: user.image || "",
       email: user.email || "",
+      showFavorites: false,
+      showActivity: false,
     });
 
     if (user.image) {
@@ -132,134 +136,136 @@ export default function EditProfilePage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true);
     setError("");
     setSuccessMessage("");
-    setSaving(true);
-
+    
     try {
-      // Validaciones básicas
-      if (!formData.username || !formData.name) {
-        setError("El nombre y el nombre de usuario son obligatorios");
+      // Validar que las contraseñas coincidan si se intenta cambiar
+      if (formData.newPassword && formData.newPassword !== formData.confirmPassword) {
+        setError("Las contraseñas no coinciden");
+        setSaving(false);
         return;
       }
-
-      // Validación específica para cambio de contraseña
-      const isChangingPassword = formData.newPassword && formData.newPassword.trim() !== '';
       
+      // Validar longitud de contraseña
+      if (formData.newPassword && (formData.newPassword.length < 6 || formData.newPassword.length > 32)) {
+        setError("La contraseña debe tener entre 6 y 32 caracteres");
+        setSaving(false);
+        return;
+      }
+      
+      const isChangingPassword = Boolean(formData.newPassword && formData.password);
+      
+      // Si se está cambiando la contraseña, verificar la contraseña actual
       if (isChangingPassword) {
-        // Verificar que se proporcionó la contraseña actual
-        if (!formData.password || formData.password.trim() === '') {
-          setError("Debes proporcionar tu contraseña actual para poder cambiarla");
-          return;
-        }
-        
-        // Verificar que la nueva contraseña y la confirmación coinciden
-        if (formData.newPassword !== formData.confirmPassword) {
-          setError("Las contraseñas no coinciden");
-          return;
-        }
-        
-        // Verificar que la contraseña actual es correcta mediante una solicitud al backend
-        const verifyPasswordResponse = await fetch('/api/auth/verify-password', {
-          method: 'POST',
+        console.log("Verificando contraseña actual antes de actualizar");
+        const verifyResponse = await fetch("/api/auth/verify-password", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            userId: session?.user?.id,
-            password: formData.password
-          }),
+          body: JSON.stringify({ password: formData.password, userId: session?.user?.id }),
         });
         
-        if (!verifyPasswordResponse.ok) {
-          const verifyData = await verifyPasswordResponse.json();
-          setError(verifyData.error || "La contraseña actual es incorrecta");
+        const verifyData = await verifyResponse.json();
+        
+        if (!verifyResponse.ok) {
+          console.error("Error al verificar contraseña:", verifyData.error);
+          setError(verifyData.error || "No se ha podido verificar la contraseña actual");
+          setSaving(false);
           return;
         }
-      }
-
-      // Preparar datos para la actualización
-      let imageUrl = preview;
-      
-      // Si hay una nueva imagen en formato base64, subirla
-      if (formData.image && formData.image.startsWith('data:image/')) {
-        const imageFormData = new FormData();
-        const blob = await (await fetch(formData.image)).blob();
-        imageFormData.append('file', blob);
         
-        const uploadResponse = await fetch('/api/upload', {
-          method: 'POST',
-          body: imageFormData,
-        });
-        
-        if (!uploadResponse.ok) {
-          throw new Error('Error al subir la imagen');
+        if (!verifyData.success) {
+          console.error("Contraseña actual incorrecta");
+          setError("La contraseña actual es incorrecta");
+          setSaving(false);
+          return;
         }
         
-        const uploadData = await uploadResponse.json();
-        imageUrl = uploadData.url || uploadData.secure_url || uploadData.public_id;
+        console.log("Contraseña verificada correctamente");
       }
       
-      // Preparar datos para la API
-      const updateData = {
-        id: session?.user?.id,
+      // Preparar datos a actualizar
+      const formDataToUpdate: any = {
         name: formData.name,
         username: formData.username,
         bio: formData.bio,
-        image: imageUrl,
-        email: formData.email, // Incluir el email actual del usuario
+        image: formData.image,
       };
-
-      // Añadir contraseña solo si se ha proporcionado y validado
+      
+      // Solo incluir contraseñas si se están cambiando
       if (isChangingPassword) {
-        Object.assign(updateData, { 
-          currentPassword: formData.password,
-          newPassword: formData.newPassword 
-        });
+        formDataToUpdate.currentPassword = formData.password;
+        formDataToUpdate.newPassword = formData.newPassword;
       }
-
-      // Enviar solicitud a la API para actualizar el usuario
-      const response = await fetch(`/api/users/${session?.user?.id}`, {
-        method: "PUT",
+      
+      console.log("Enviando solicitud de actualización para el usuario:", session?.user?.id);
+      console.log("Datos a actualizar:", formDataToUpdate);
+      
+      const updateResponse = await fetch(`/api/users/${session?.user?.id}`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(updateData),
+        body: JSON.stringify(formDataToUpdate),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Error al actualizar el perfil");
-      }
-
-      // Actualizar la sesión usando el método update() de NextAuth
-      await update({
-        user: {
-          name: formData.name,
-          username: formData.username,
-          bio: formData.bio,
-          image: imageUrl,
+      
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        console.error("Error response from server:", errorText);
+        
+        let errorMessage = "Error al actualizar perfil";
+        try {
+          if (errorText) {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorMessage;
+          }
+        } catch (e) {
+          console.error("Error parsing error response:", e);
         }
-      });
+        
+        setError(errorMessage);
+        setSaving(false);
+        return;
+      }
       
-      setSuccessMessage("Perfil actualizado correctamente");
-      toast.success("Perfil actualizado correctamente. Redirigiendo al dashboard...");
+      const responseData = await updateResponse.json();
+      console.log("Perfil actualizado exitosamente:", responseData);
       
-      // Redirigir al dashboard después de un breve retraso
-      setTimeout(() => {
-        router.push('/api/auth/dashboard');
-      }, 1500);
-      
+      // Actualizar la sesión si es necesario
+      if (isChangingPassword) {
+        console.log("Contraseña actualizada, se requerirá iniciar sesión nuevamente");
+        setSuccessMessage("Perfil actualizado correctamente. Se te redirigirá al inicio de sesión en unos segundos...");
+        
+        // Esperar un momento y luego cerrar la sesión
+        setTimeout(() => {
+          signOut({ callbackUrl: '/login' });
+        }, 3000);
+      } else {
+        setSuccessMessage("Perfil actualizado correctamente");
+        
+        // Actualizar datos del formulario con la respuesta
+        setFormData(prev => ({
+          ...prev,
+          name: responseData.name || prev.name,
+          username: responseData.username || prev.username,
+          bio: responseData.bio || prev.bio,
+          image: responseData.image || prev.image,
+          password: "",
+          newPassword: "",
+          confirmPassword: "",
+        }));
+        
+        // Actualizar la sesión
+        update();
+      }
     } catch (error) {
-      console.error("Error en actualización:", error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "Error al guardar los cambios";
-      setError(errorMessage);
-      toast.error(errorMessage);
+      console.error("Error en la actualización de perfil:", error);
+      setError("Ha ocurrido un error al actualizar el perfil");
     } finally {
       setSaving(false);
     }
@@ -274,216 +280,255 @@ export default function EditProfilePage() {
   }
 
   return (
-    <div className="container max-w-4xl mx-auto py-8 px-4 sm:px-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Editar Perfil</h1>
-          <p className="text-muted-foreground">Actualiza tu información personal</p>
-        </div>
-        <Button variant="outline" onClick={() => router.back()} className="flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Volver
-        </Button>
-      </div>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 pt-10 pb-20">
+      <div className="container max-w-4xl mx-auto px-4">
+        <Link
+          href="/api/auth/dashboard"
+          className="text-primary inline-flex items-center mb-6 transition-all hover:text-primary/80"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Volver al Dashboard
+        </Link>
 
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+        <h1 className="text-3xl font-bold mb-8 text-center text-gray-800 dark:text-white">
+          Editar Perfil
+        </h1>
 
-      {successMessage && (
-        <Alert className="mb-6 bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/30">
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertDescription>{successMessage}</AlertDescription>
-        </Alert>
-      )}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      <form onSubmit={handleSubmit}>
-        <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8">
-            <TabsTrigger value="general" className="text-sm sm:text-base">Información General</TabsTrigger>
-            <TabsTrigger value="security" className="text-sm sm:text-base">Contraseña</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="general">
-            <Card>
-              <CardHeader>
-                <CardTitle>Información del Perfil</CardTitle>
-                <CardDescription>
-                  Actualiza tu información personal y foto de perfil
+        {successMessage && (
+          <Alert variant="default" className="mb-6 bg-green-50 border-green-500 text-green-700 dark:bg-green-900/50 dark:text-green-300">
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertDescription>{successMessage}</AlertDescription>
+          </Alert>
+        )}
+
+        <Card className="shadow-md border-gray-200 dark:border-gray-800">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row items-center justify-between">
+              <div className="text-center sm:text-left mb-4 sm:mb-0">
+                <CardTitle className="text-gray-800 dark:text-white">
+                  Tu información personal
+                </CardTitle>
+                <CardDescription className="text-gray-500 dark:text-gray-400">
+                  Actualiza tus datos y personaliza tu perfil
                 </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
-                  <div className="relative group">
-                    <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-                      {preview ? (
-                        <Image
-                          src={preview}
-                          alt="Imagen de perfil"
-                          width={128}
-                          height={128}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <UserIcon className="h-16 w-16 text-gray-400" />
-                      )}
-                    </div>
-                    <label
-                      htmlFor="profileImage"
-                      className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"
-                    >
-                      <Camera className="w-8 h-8 text-white" />
-                      <span className="sr-only">Cambiar imagen</span>
-                    </label>
-                    <input
-                      id="profileImage"
-                      name="profileImage"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="sr-only"
+              </div>
+              
+              <div className="text-center relative">
+                <div className="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-md mb-2">
+                  {preview ? (
+                    <Image
+                      src={preview}
+                      alt="Perfil"
+                      fill
+                      className="object-cover"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
                     />
-                  </div>
-                  
-                  <div className="space-y-5 flex-1">
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Nombre</Label>
-                        <Input
-                          id="name"
-                          name="name"
-                          placeholder="Tu nombre"
-                          value={formData.name}
-                          onChange={handleChange}
-                          required
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="username">Nombre de usuario</Label>
-                        <Input
-                          id="username"
-                          name="username"
-                          placeholder="username"
-                          value={formData.username}
-                          onChange={handleChange}
-                          required
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Correo electrónico</Label>
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder="tu.correo@example.com"
-                        value={formData.email}
-                        readOnly
-                        disabled
-                        className="bg-muted"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        El correo electrónico no se puede modificar.
-                      </p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="bio">Biografía</Label>
-                      <Textarea
-                        id="bio"
-                        name="bio"
-                        placeholder="Cuéntanos un poco sobre ti..."
-                        value={formData.bio}
-                        onChange={handleChange}
-                        className="min-h-24"
-                      />
-                    </div>
-                  </div>
+                  ) : formData.image && formData.image.includes('cloudinary') ? (
+                    <CldImage
+                      src={formData.image}
+                      alt={formData.name || "Avatar"}
+                      width={96}
+                      height={96}
+                      crop="fill"
+                      gravity="face"
+                      className="object-cover"
+                      priority
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : formData.image && !formData.image.startsWith('/') && !formData.image.startsWith('http') ? (
+                    <CldImage
+                      src={formData.image}
+                      alt={formData.name || "Avatar"}
+                      width={96}
+                      height={96}
+                      crop="fill"
+                      gravity="face"
+                      className="object-cover"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  ) : (
+                    <Image
+                      src={formData.image || "/images/AvatarPredeterminado.webp"}
+                      alt={formData.name || "Avatar"}
+                      width={96}
+                      height={96}
+                      className="object-cover"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle>Cambiar contraseña</CardTitle>
-                <CardDescription>
-                  Actualiza tu contraseña para mantener tu cuenta segura
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="password">Contraseña actual</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={handleChange}
+                <label htmlFor="image-upload" className="cursor-pointer flex justify-center">
+                  <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-2 shadow-lg transform translate-x-3 translate-y-3">
+                    <Camera className="w-4 h-4" />
+                  </div>
+                  <input 
+                    id="image-upload" 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden"
+                    onChange={handleImageChange}
                   />
-                </div>
-                
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                </label>
+                <p className="text-xs text-gray-500 mt-2">
+                  Haz clic en el icono para cambiar tu foto
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6 p-6">
+            <Tabs defaultValue="general" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-8">
+                <TabsTrigger value="general" className="text-sm sm:text-base">Información General</TabsTrigger>
+                <TabsTrigger value="security" className="text-sm sm:text-base">Contraseña</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="general">
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nombre</Label>
+                      <Input
+                        id="name"
+                        name="name"
+                        placeholder="Tu nombre"
+                        value={formData.name}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="username">Nombre de usuario</Label>
+                      <Input
+                        id="username"
+                        name="username"
+                        placeholder="username"
+                        value={formData.username}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+                  </div>
+                  
                   <div className="space-y-2">
-                    <Label htmlFor="newPassword">Nueva contraseña</Label>
+                    <Label htmlFor="email">Correo electrónico</Label>
                     <Input
-                      id="newPassword"
-                      name="newPassword"
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="tu.correo@example.com"
+                      value={formData.email}
+                      readOnly
+                      disabled
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      El correo electrónico no se puede modificar.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="bio">Biografía</Label>
+                    <Textarea
+                      id="bio"
+                      name="bio"
+                      placeholder="Cuéntanos un poco sobre ti..."
+                      value={formData.bio}
+                      onChange={handleChange}
+                      className="min-h-24"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="security">
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Contraseña actual</Label>
+                    <Input
+                      id="password"
+                      name="password"
                       type="password"
                       placeholder="••••••••"
-                      value={formData.newPassword}
+                      value={formData.password}
                       onChange={handleChange}
                     />
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirmar nueva contraseña</Label>
-                    <Input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type="password"
-                      placeholder="••••••••"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
-                    />
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="newPassword">Nueva contraseña</Label>
+                      <Input
+                        id="newPassword"
+                        name="newPassword"
+                        type="password"
+                        placeholder="••••••••"
+                        value={formData.newPassword}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Confirmar nueva contraseña</Label>
+                      <Input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type="password"
+                        placeholder="••••••••"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                      />
+                    </div>
                   </div>
+                  
+                  <p className="text-xs text-muted-foreground">
+                    Deja estos campos en blanco si no deseas cambiar tu contraseña
+                  </p>
                 </div>
-                
-                <p className="text-xs text-muted-foreground">
-                  Deja estos campos en blanco si no deseas cambiar tu contraseña
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-        
-        <div className="mt-8 flex justify-end">
-          <Button
-            type="submit"
-            className="w-full sm:w-auto flex items-center justify-center gap-2"
-            disabled={saving}
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Guardar cambios
-              </>
-            )}
-          </Button>
-        </div>
-      </form>
+              </TabsContent>
+            </Tabs>
+            
+            <div className="mt-8 flex justify-end">
+              <Button
+                type="submit"
+                className="w-full sm:w-auto flex items-center justify-center gap-2"
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Guardar cambios
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
