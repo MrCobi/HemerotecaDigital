@@ -1891,7 +1891,7 @@ export default function MessagesPage() {
       <div className={`w-full md:w-2/3 lg:w-3/4 bg-white dark:bg-gray-800 flex flex-col h-full ${!mobileView || (mobileView && selectedConversation) ? "flex" : "hidden md:flex"}`}>
         {selectedConversation && selectedConversationData ? (
           // Contenido de la conversación
-          <div className="h-full flex flex-col">
+          <div className="h-full flex flex-col overflow-hidden">
             {/* Cabecera de la conversación */}
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800 z-10 flex-shrink-0">
               <div className="flex items-center space-x-3">
@@ -1946,12 +1946,14 @@ export default function MessagesPage() {
                         target.src = "/images/AvatarPredeterminado.webp";
                       }}
                     />
-                  ) : selectedConversationData?.otherUser?.image ? (
-                    <Image 
+                  ) : selectedConversationData?.otherUser?.image && !selectedConversationData.otherUser.image.startsWith('/') && !selectedConversationData.otherUser.image.startsWith('http') ? (
+                    <CldImage
                       src={selectedConversationData.otherUser.image}
                       alt={selectedConversationData.otherUser.username || "Usuario"}
                       width={48}
                       height={48}
+                      crop="fill"
+                      gravity="face"
                       className="h-full w-full object-cover"
                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                         const target = e.target as HTMLImageElement;
@@ -1959,9 +1961,17 @@ export default function MessagesPage() {
                       }}
                     />
                   ) : (
-                    <AvatarFallback>
-                      {selectedConversationData?.otherUser?.username?.[0]?.toUpperCase() || "?"}
-                    </AvatarFallback>
+                    <Image 
+                      src={selectedConversationData.otherUser?.image || "/images/AvatarPredeterminado.webp"} 
+                      alt={selectedConversationData.otherUser?.username || "Usuario"} 
+                      width={40} 
+                      height={40}
+                      className="h-full w-full object-cover"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
+                    />
                   )}
                 </Avatar>
                 <h2 className="font-medium">
@@ -1993,14 +2003,14 @@ export default function MessagesPage() {
               <GroupChatWindowContent 
                 key={selectedConversation} 
                 conversation={selectedConversationData} 
-                className="h-full" 
+                className="flex-1 min-h-0" 
               />
             ) : (
               <ChatWindowContent 
                 key={selectedConversation}
                 otherUser={selectedConversationData?.otherUser || null} 
                 conversationId={selectedConversation}
-                className="h-full" 
+                className="flex-1 min-h-0" 
               />
             )}
           </div>

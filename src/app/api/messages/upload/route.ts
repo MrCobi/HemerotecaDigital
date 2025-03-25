@@ -25,9 +25,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No se encontró ningún archivo" }, { status: 400 });
     }
 
-    // Verificar que sea una imagen
-    if (!file.type.startsWith('image/')) {
-      return NextResponse.json({ error: "El archivo debe ser una imagen" }, { status: 400 });
+    // Verificar que sea una imagen o audio
+    if (!file.type.startsWith('image/') && !file.type.startsWith('audio/')) {
+      return NextResponse.json({ error: "El archivo debe ser una imagen o un audio" }, { status: 400 });
     }
 
     // Obtener los bytes del archivo
@@ -39,16 +39,22 @@ export async function POST(request: NextRequest) {
     const userId = session.user.id;
     const filename = `group_${userId}_${timestamp}`;
 
+    // Determinar el tipo de recurso (imagen o audio)
+    const resourceType = file.type.startsWith('audio/') ? 'video' : 'image';
+    
     // Subir a Cloudinary
     return new Promise((resolve, reject) => {
       // Stream a Cloudinary
       const uploadOptions = {
         public_id: `groups/${filename}`,
         folder: 'hemeroteca/groups',
-        resource_type: 'image' as 'image',
-        transformation: [
-          { width: 500, height: 500, crop: 'limit', quality: 'auto:good' }
-        ]
+        resource_type: resourceType as 'image' | 'video',
+        // Solo aplicar transformaciones si es una imagen
+        ...(resourceType === 'image' && {
+          transformation: [
+            { width: 500, height: 500, crop: 'limit', quality: 'auto:good' }
+          ]
+        })
       };
 
       cloudinary.uploader.upload_stream(
@@ -57,9 +63,10 @@ export async function POST(request: NextRequest) {
           if (error) {
             console.error('Error al subir a Cloudinary:', error);
             resolve(NextResponse.json({ 
-              error: "Error al subir la imagen", 
+              error: "Error al subir el archivo", 
               details: error.message 
             }, { status: 500 }));
+            return;
           } else {
             resolve(NextResponse.json({ url: result?.secure_url }));
           }

@@ -13,6 +13,7 @@ import useSocket, { MessageType } from '@/src/hooks/useSocket';
 import { API_ROUTES } from '@/src/config/api-routes';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import VoiceMessageRecorder from './VoiceMessageRecorder';
+import { useToast } from '@/src/app/components/ui/use-toast';
 
 type User = {
   id: string;
@@ -544,6 +545,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   className,
 }) => {
   const { data: session } = useSession();
+  const { toast } = useToast();
   const currentUserId = session?.user?.id;
   const [messages, setMessages] = useState<Message[]>([]);
   const [processedMessageIds, setProcessedMessageIds] = useState<Set<string>>(new Set());
@@ -1202,82 +1204,68 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   
   // Nueva función para enviar mensaje de voz
   const handleVoiceMessageSend = async (audioBlob: Blob) => {
-    if (isSending || !otherUser || !canSendMessages || !currentUserId) return;
-    
-    setIsSending(true);
-    setIsVoiceRecorderVisible(false); // Ocultar grabador inmediatamente al enviar
-    
     try {
-      console.log("Preparando para enviar mensaje de voz...");
-      setUploadStatus('uploading');
+      setIsSending(true);
       
       // Crear un FormData para subir el archivo
       const formData = new FormData();
+      formData.append('file', audioBlob, 'audio.webm');
       
-      // Crear un nuevo archivo con extensión más compatible
-      const audioFile = new File([audioBlob], `voice_message_${Date.now()}.webm`, { 
-        type: audioBlob.type || 'audio/webm' 
-      });
+      if (actualConversationId) {
+        formData.append('conversationId', actualConversationId);
+      }
       
-      console.log('Subiendo archivo de audio:', audioFile.name, audioFile.type, audioFile.size);
-      
-      formData.append('file', audioFile);
-      formData.append('fileType', 'audio');
-      
-      // Subir a la API
-      const uploadResponse = await fetch('/api/upload', {
+      // Subir el archivo al servidor
+      const response = await fetch('/api/messages/upload', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.user?.email || ''}`,
-        },
         body: formData,
       });
-  
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        console.error('Error al subir el audio', errorText);
-        throw new Error("Error al subir el audio: " + errorText);
-      }
-  
-      const data = await uploadResponse.json();
-      // Usar la URL completa devuelta por la API
-      const audioUrl = data.url;
-      console.log('Audio subido correctamente, URL:', audioUrl);
       
-      // Crear mensaje temporal
-      const tempId = `voice-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      if (!response.ok) {
+        throw new Error('Error al subir el mensaje de voz');
+      }
+      
+      const { url } = await response.json();
+      
+      // Generar un ID temporal único
+      const tempId = Date.now().toString();
+      
+      // Crear el mensaje
       const messageToSend: Message = {
-        tempId,
         content: '',
-        mediaUrl: audioUrl,
-        messageType: 'voice',
-        senderId: currentUserId,
-        receiverId: otherUser.id,
+        senderId: currentUserId || '',
+        receiverId: otherUser?.id,
         createdAt: new Date(),
+        tempId,
         status: 'sending',
+        mediaUrl: url,
+        messageType: 'voice',
         conversationId: actualConversationId || undefined,
       };
       
-      // Añadir mensaje al estado local usando la función de procesamiento
+      // Añadir mensaje al estado local
       const updatedMessages = addLocalMessage(messageToSend);
       setMessages(updatedMessages);
       
       // Enviar mensaje al servidor
       await sendMessageToServer(messageToSend, tempId);
-  
+      
+      // Auto-scroll si estamos en la parte inferior
+      if (isAtBottom) {
+        setTimeout(scrollToBottom, 100);
+      }
+      
+      // Desactivar el grabador de voz
+      setIsVoiceRecorderVisible(false);
     } catch (error) {
-      console.error('Error enviando mensaje de voz:', error);
-      alert("Error al enviar mensaje de voz: " + (error instanceof Error ? error.message : String(error)));
+      console.error('Error al enviar mensaje de voz:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo enviar el mensaje de voz',
+        variant: 'destructive',
+      });
     } finally {
       setIsSending(false);
-      setUploadStatus('idle');
-      // Limpiar cualquier estado relacionado con la grabación en localStorage
-      try {
-        localStorage.removeItem('voice_recorder_audio_url');
-        localStorage.removeItem('voice_recorder_state');
-      } catch (e) {
-        console.error('Error limpiando localStorage:', e);
-      }
     }
   };
   
@@ -1645,203 +1633,284 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   }, [isLoadingMessages, messages.length]);
 
   return (
-    <div className={`flex flex-col max-h-[calc(100vh-4rem)] ${className}`}>
-      {/* Contenedor principal con altura controlada y flex-col */}
-      <div className="flex flex-col h-full">
-        {/* Área de mensajes con scroll */}
-        <div className="flex-1 overflow-y-auto min-h-0" ref={chatContainerRef} onScroll={handleScroll}>
-          {isLoadingMessages ? (
-            <div className="flex flex-col items-center justify-center h-full">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-              <p className="mt-2 text-sm text-gray-500">Cargando mensajes...</p>
+    <div className={cn("flex flex-col h-full max-h-full", className)}>
+      {/* Contenedor de mensajes - max-height para evitar desbordamiento */}
+      <div 
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
+        onScroll={handleScroll}
+      >
+        {isLoadingMessages ? (
+          <div className="flex justify-center items-center h-full">
+            <LoadingSpinner className="w-8 h-8 text-blue-500" />
+          </div>
+        ) : errorLoadingMessages ? (
+          <div className="text-center py-4 text-red-500">
+            <p>{errorLoadingMessages}</p>
+            {!errorLoadingMessages.includes('no existe') && (
+              <Button 
+                onClick={() => {
+                  // Reintentar la carga con los parámetros iniciales
+                  setPage(1);
+                  setMessages([]);
+                  setMessageMap(new Map());
+                  setIsLoadingMessages(true);
+                  setErrorLoadingMessages('');
+                  // UseEffect detectará estos cambios y llamará a fetchMessages
+                }} 
+                variant="outline" 
+                className="mt-2 text-sm" 
+                size="sm"
+              >
+                Reintentar
+              </Button>
+            )}
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-6 text-center">
+            <div className="mb-4 text-gray-400">
+              <MessageSquare className="h-12 w-12" />
             </div>
-          ) : (
-            <>
-              {hasMore && (
-                <div className="flex justify-center p-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={loadMoreMessages}
-                    disabled={isLoadingMore}
-                    className="text-xs flex items-center gap-1"
-                  >
-                    {isLoadingMore ? (
-                      <>
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        <span>Cargando...</span>
-                      </>
+            <h3 className="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Conversación vacía</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
+              Aún no hay mensajes en esta conversación.<br />
+              ¡Escribe algo para comenzar a chatear!
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Indicador de carga para mensajes antiguos */}
+            {isLoadingMore && (
+              <div className="text-center py-2">
+                <LoadingSpinner className="w-5 h-5 text-blue-500 inline-block" />
+                <span className="ml-2 text-sm text-gray-500">Cargando mensajes anteriores...</span>
+              </div>
+            )}
+            
+            {/* Renderizar cada mensaje con su propia clave única basada en índice */}
+            <div className="space-y-4">
+              {messages.map((message, index) => {
+                const isCurrentUser = message.senderId === currentUserId;
+                const showAvatar = 
+                  index === 0 || 
+                  messages[index - 1].senderId !== message.senderId;
+                
+                // Determinar si necesitamos mostrar un separador de fecha
+                const showDateSeparator = index === 0 || !isSameDay(
+                  new Date(message.createdAt),
+                  new Date(messages[index - 1].createdAt)
+                );
+                
+                // Crear una clave única y garantizada para cada mensaje
+                // Usamos una combinación de índice, id/tempId y timestamp para asegurar unicidad
+                const messageKey = `msg-${index}-${message.id || message.tempId || Date.now()}`;
+                
+                return (
+                  <div key={messageKey}>
+                    <MessageItem
+                      message={message}
+                      currentUserId={currentUserId || ''}
+                      otherUser={otherUser}
+                      showAvatar={showAvatar}
+                      showDateSeparator={showDateSeparator}
+                      index={index}
+                      session={session}
+                    />
+                  </div>
+                );
+              })}
+              
+              {/* Indicador de escritura */}
+              {peerIsTyping && (
+                <div className="flex items-end gap-2">
+                  <Avatar className="h-8 w-8">
+                    {otherUser?.image ? (
+                      <AvatarImage src={otherUser.image} alt={otherUser.username || 'Usuario'} />
                     ) : (
-                      <>
-                        <ChevronUp className="h-3 w-3" />
-                        <span>Cargar mensajes anteriores</span>
-                      </>
+                      <AvatarFallback>
+                        {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
+                      </AvatarFallback>
                     )}
-                  </Button>
+                  </Avatar>
+                  <div className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg text-sm">
+                    <span className="typing-indicator">
+                      <span className="dot"></span>
+                      <span className="dot"></span>
+                      <span className="dot"></span>
+                    </span>
+                  </div>
                 </div>
               )}
               
-              <div className="flex flex-col space-y-2 p-4 pb-2">
-                {/* Renderizar mensajes agrupados por día */}
-                {messages.map((message, index) => {
-                  const isCurrentUser = message.senderId === currentUserId;
-                  const showAvatar = 
-                    index === 0 || 
-                    messages[index - 1].senderId !== message.senderId;
-                  
-                  // Determinar si necesitamos mostrar un separador de fecha
-                  const showDateSeparator = index === 0 || !isSameDay(
-                    new Date(message.createdAt),
-                    new Date(messages[index - 1].createdAt)
-                  );
-                  
-                  // Crear una clave única y garantizada para cada mensaje
-                  // Usamos una combinación de índice, id/tempId y timestamp para asegurar unicidad
-                  const messageKey = `msg-${index}-${message.id || message.tempId || Date.now()}`;
-                  
-                  return (
-                    <div key={messageKey}>
-                      <MessageItem
-                        message={message}
-                        currentUserId={currentUserId || ''}
-                        otherUser={otherUser}
-                        showAvatar={showAvatar}
-                        showDateSeparator={showDateSeparator}
-                        index={index}
-                        session={session}
-                      />
-                    </div>
-                  );
-                })}
-                
-                {/* Mostrar indicador de "está escribiendo" */}
-                {peerIsTyping && (
-                  <div className="flex items-start mb-2">
-                    <div className="flex items-center space-x-2">
-                      <Avatar className="h-8 w-8">
-                        {otherUser?.image ? (
-                          <AvatarImage src={otherUser.image} />
-                        ) : (
-                          <AvatarFallback>
-                            {otherUser?.username?.[0]?.toUpperCase() || "?"}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded-lg">
-                        <span className="typing-indicator">
-                          <span className="dot"></span>
-                          <span className="dot"></span>
-                          <span className="dot"></span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Elemento para el scroll automático */}
-                <div ref={messagesEndRef} />
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Indicador de escritura - fuera del área de scroll pero antes del input */}
-        {peerIsTyping && (
-          <div className="px-4 py-1 text-xs text-gray-500 italic bg-white dark:bg-gray-800">
-            {otherUser?.username || 'El otro usuario'} está escribiendo...
-          </div>
+              {/* Elemento para el scroll automático */}
+              <div ref={messagesEndRef} />
+            </div>
+          </>
         )}
-
-        {/* Contenedor para la entrada de mensajes - ajustado para no quedar pegado al footer */}
-        <div className="border-t border-gray-200 dark:border-gray-700 p-3 pb-4 mb-3 flex-shrink-0 bg-white dark:bg-gray-800 shadow-sm">
-          {canSendMessages === false ? (
-            <div className="text-center text-gray-500 mb-2">
-              <p>No puedes enviar mensajes a este usuario.</p>
-              <p className="text-xs">
-                Ambos usuarios deben seguirse mutuamente para poder enviar mensajes.
-              </p>
-            </div>
-          ) : isCheckingRelationship ? (
-            <div className="text-center text-gray-500 mb-2">
-              <p>Verificando si puedes enviar mensajes...</p>
-            </div>
-          ) : (
-            <div className="flex items-end gap-2">
-              <Textarea
-                ref={messageInputRef}
-                value={newMessage}
-                onChange={(e) => {
-                  setNewMessage(e.target.value);
-                  sendTypingNotification(e.target.value);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="Escribe un mensaje..."
-                className="flex-1 resize-none max-h-32"
-                rows={1}
-                disabled={isSending || !canSendMessages}
+      </div>
+  
+      {/* Input para enviar mensajes */}
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        {canSendMessages === false ? (
+          <div className="text-center text-gray-500 mb-2">
+            <p>No puedes enviar mensajes a este usuario.</p>
+            <p className="text-xs">
+              Ambos usuarios deben seguirse mutuamente para poder enviar mensajes.
+            </p>
+          </div>
+        ) : isCheckingRelationship ? (
+          <div className="text-center text-gray-500 mb-2">
+            <p>Verificando si puedes enviar mensajes...</p>
+          </div>
+        ) : (
+          <>
+            {isVoiceRecorderVisible ? (
+              <VoiceMessageRecorder 
+                onSend={handleVoiceMessageSend}
+                onCancel={() => setIsVoiceRecorderVisible(false)}
+                isVisible={isVoiceRecorderVisible}
+                senderId={currentUserId || ''}
+                receiverId={otherUser?.id || ''}
+                session={session}
+                onClose={() => setIsVoiceRecorderVisible(false)}
+                setUploadStatus={setUploadStatus}
               />
-              <div className="flex gap-2">
+            ) : (
+              <div className="flex items-center gap-2">
                 <Button
+                  onClick={() => setIsVoiceRecorderVisible(true)}
+                  type="button"
+                  variant="ghost"
                   size="icon"
-                  onClick={() => {
-                    // Limpiar cualquier estado previo antes de mostrar
-                    try {
-                      localStorage.removeItem('voice_recorder_audio_url');
-                      localStorage.removeItem('voice_recorder_state');
-                    } catch (e) {
-                      console.error('Error limpiando localStorage:', e);
-                    }
-                    setIsVoiceRecorderVisible(true);
-                  }}
+                  className="flex-shrink-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  title="Enviar mensaje de voz"
                   disabled={isSending || !canSendMessages}
-                  className="h-10 w-10 rounded-full bg-green-500 hover:bg-green-600"
-                  title="Grabar mensaje de voz"
                 >
-                  <Mic className="h-5 w-5 text-white" />
+                  <Mic className="h-5 w-5" />
                 </Button>
-                <Button
-                  size="icon"
-                  onClick={sendMessage}
+                
+                <Textarea
+                  ref={messageInputRef}
+                  value={newMessage}
+                  onChange={(e) => {
+                    setNewMessage(e.target.value);
+                    sendTypingNotification(e.target.value);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Escribe un mensaje..."
+                  className="min-h-10 max-h-32 resize-none flex-1"
+                  rows={1}
+                  disabled={isSending || !canSendMessages}
+                />
+                
+                <Button 
+                  onClick={sendMessage} 
                   disabled={!newMessage.trim() || isSending || !canSendMessages}
-                  className="h-10 w-10 rounded-full bg-blue-500 hover:bg-blue-600"
-                  title="Enviar mensaje"
+                  size="icon" 
+                  className="rounded-full bg-blue-500 text-white hover:bg-blue-600 flex-shrink-0"
                 >
-                  <Send className="h-5 w-5 text-white" />
+                  {isSending ? (
+                    <div className="h-5 w-5 border-2 border-t-transparent border-white rounded-full animate-spin" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
                 </Button>
               </div>
-            </div>
+            )}
+          </>
+        )}
+      </div>
+  
+      {/* Estado de error */}
+      {errorLoadingMessages && (
+        <div className="flex flex-col items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 rounded-lg mx-auto my-4 max-w-md">
+          <p className="mb-2">{errorLoadingMessages}</p>
+          {!errorLoadingMessages.includes('no existe') && (
+            <Button 
+              onClick={() => {
+                // Reintentar la carga con los parámetros iniciales
+                setPage(1);
+                setMessages([]);
+                setMessageMap(new Map());
+                setIsLoadingMessages(true);
+                setErrorLoadingMessages('');
+                // UseEffect detectará estos cambios y llamará a fetchMessages
+              }} 
+              variant="outline" 
+              className="mt-2 text-sm" 
+              size="sm"
+            >
+              Reintentar
+            </Button>
           )}
         </div>
-      </div>
-
-      {/* Componente de grabación de voz */}
-      {isVoiceRecorderVisible && currentUserId && otherUser && (
-        <VoiceMessageRecorder
-          onSend={handleVoiceMessageSend}
-          onCancel={() => {
-            setIsVoiceRecorderVisible(false);
-            // Limpiar estados
-            setUploadStatus('idle');
-            // Limpiar localStorage
-            try {
-              localStorage.removeItem('voice_recorder_audio_url');
-              localStorage.removeItem('voice_recorder_state');
-            } catch (e) {
-              console.error('Error limpiando localStorage:', e);
-            }
-          }}
-          isVisible={true}
-          senderId={currentUserId || ''}
-          receiverId={otherUser?.id || ''}
-          session={session}
-          onClose={() => {
-            setIsVoiceRecorderVisible(false);
-            // Asegurar que todos los estados se limpian
-            setUploadStatus('idle');
-          }}
-          setUploadStatus={setUploadStatus}
-        />
       )}
+  
+      {/* Estilos para el indicador de escritura */}
+      <style jsx global>{`
+        .typing-indicator {
+          display: flex;
+          align-items: center;
+        }
+        
+        .dot {
+          background-color: rgba(0, 0, 0, 0.5);
+          border-radius: 50%;
+          display: inline-block;
+          height: 5px;
+          margin-right: 3px;
+          width: 5px;
+          animation: bounce 1.5s infinite;
+        }
+        
+        .dot:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+        
+        .dot:nth-child(3) {
+          animation-delay: 0.4s;
+        }
+        
+        @keyframes bounce {
+          0%, 60%, 100% {
+            transform: translateY(0);
+          }
+          30% {
+            transform: translateY(-5px);
+          }
+        }
+        
+        .dark .dot {
+          background-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .audio-player-light {
+          background-color: #f0f0f0;
+          border: 1px solid #ddd;
+        }
+        
+        .audio-player-dark {
+          background-color: #333;
+          border: 1px solid #444;
+        }
+        
+        .audio-player-light::-webkit-media-controls-panel {
+          background-color: #f0f2f5;
+        }
+        
+        .audio-player-dark::-webkit-media-controls-panel {
+          background-color: #333;
+        }
+        
+        @keyframes progressAnim {
+          from {
+            width: 0%;
+          }
+          to {
+            width: 100%;
+          }
+        }
+      `}</style>
     </div>
   );
 }

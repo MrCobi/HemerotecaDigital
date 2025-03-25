@@ -618,7 +618,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       {/* Contenedor principal con altura controlada y flex-col */}
       <div className="flex flex-col h-full">
         {/* Área de mensajes con scroll */}
-        <div className="flex-1 overflow-y-auto min-h-0 p-4" ref={chatContainerRef} onScroll={handleScroll}>
+        <div className="flex-1 overflow-y-auto min-h-0 p-4 pb-16" ref={chatContainerRef} onScroll={handleScroll}>
           {isLoadingMessages ? (
             <div className="flex flex-col items-center justify-center h-full">
               <LoadingSpinner className="w-8 h-8 text-blue-500" />
@@ -702,7 +702,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                   formData.append('conversationId', conversation.id);
                   
                   // Subir el archivo al servidor
-                  const response = await fetch('/api/messages/upload-voice', {
+                  const response = await fetch('/api/messages/upload', {
                     method: 'POST',
                     body: formData,
                   });
@@ -762,6 +762,17 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
             />
           ) : (
             <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setIsVoiceRecorderVisible(true)}
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="flex-shrink-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                title="Enviar mensaje de voz"
+              >
+                <Mic className="h-5 w-5" />
+              </Button>
+              
               <Textarea
                 value={newMessage}
                 onChange={(e) => {
