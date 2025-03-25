@@ -1097,9 +1097,7 @@ export default function HomePage() {
                       </h3>
                       <div className="flex items-center mt-2 text-sm text-blue-50">
                         <Link
-                          href={`/Articulos?category=${encodeURIComponent(
-                            category
-                          )}`}
+                          href={`/categories/${encodeURIComponent(category)}`}
                           className="flex items-center text-blue-100 hover:text-white transition-colors"
                         >
                           Explorar{" "}
