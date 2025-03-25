@@ -1,29 +1,52 @@
+// src/app/messages/page.tsx
 "use client";
-
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useRouter, useSearchParams } from "next/navigation";
-import { useSession } from 'next-auth/react';
-import { MessageType } from "@/src/hooks/useSocket";
-import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { ChatWindowContent } from "@/src/app/components/Chat/ChatWindowContent";
 import GroupChatWindowContent from "@/src/app/components/Chat/GroupChatWindowContent";
-import { MessageCircle, Search, MessageSquare, ArrowLeft, MessageSquarePlus, Users, Plus, X, Check, ImagePlus } from "lucide-react";
+import GroupManagementModal from '../components/Chat/GroupManagementModal';
+import { MessageCircle, Search, MessageSquare, MessageSquarePlus, ArrowLeft, Users, Plus, X, Check, ImagePlus, Settings, Trash, LogOut } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/src/app/components/ui/avatar";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
+import { Textarea } from "@/src/app/components/ui/textarea";
+import { Label } from "@/src/app/components/ui/label";
 import Image from "next/image";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 import { CldImage } from "next-cloudinary";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/src/app/components/ui/dialog";
 import { useToast } from "@/src/app/components/ui/use-toast";
+import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 
 // Interfaces optimizadas
 interface User {
   id: string;
-  username: string | null;
-  image: string | null;
+  username?: string | null;
+  name?: string | null;
+  image?: string | null;
+}
+
+interface Participant {
+  id: string;
+  userId: string;
+  role: 'admin' | 'member' | 'moderator' | 'owner';
+  user: User;
+}
+
+interface ConversationData {
+  id: string;
   name?: string;
+  description?: string;
+  imageUrl?: string;
+  isGroup: boolean;
+  participants: Participant[];
+  lastMessage?: Message;
+  createdAt?: string;
+  updatedAt?: string;
+  unreadCount?: number;
+  otherUser?: User;
 }
 
 export interface Message {
@@ -96,6 +119,7 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [generalSearchTerm, setGeneralSearchTerm] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [selectedConversationData, setSelectedConversationData] = useState<ConversationData | null>(null);
   const [mobileView, setMobileView] = useState(false);
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -111,8 +135,134 @@ export default function MessagesPage() {
   const [groupImagePreview, setGroupImagePreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   
+  // Estados para la administración de grupos
+  const [showGroupManagementModal, setShowGroupManagementModal] = useState(false);
+  const [isGroupAdmin, setIsGroupAdmin] = useState(false);
+  const [groupNameEdit, setGroupNameEdit] = useState("");
+  const [groupDescriptionEdit, setGroupDescriptionEdit] = useState("");
+  const [showAddParticipantsModal, setShowAddParticipantsModal] = useState(false);
+  const [possibleParticipants, setPossibleParticipants] = useState<User[]>([]);
+  const [selectedNewParticipants, setSelectedNewParticipants] = useState<string[]>([]);
+  const [isUpdatingGroup, setIsUpdatingGroup] = useState(false);
+  
   // Referencias para controlar ciclos y renderizado
   const isProcessingUrlRef = useRef(false);
+  const messagesDivRef = useRef<HTMLDivElement>(null);
+  const newMessageInputRef = useRef<HTMLTextAreaElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Función para actualizar la información del grupo
+  const updateGroupInfo = async (data: { name?: string, description?: string, imageUrl?: string }) => {
+    if (!selectedConversation) return false;
+    
+    try {
+      setIsUpdatingGroup(true);
+      
+      const response = await fetch(`${API_ROUTES.messages.createGroup}/${selectedConversation}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al actualizar el grupo');
+      }
+      
+      // Actualizar el estado local
+      if (selectedConversationData) {
+        const updatedData = {
+          ...selectedConversationData,
+          ...data
+        };
+        
+        // Actualizar el estado
+        setSelectedConversationData(updatedData);
+        
+        // También actualizar en la lista de conversaciones
+        setConversations(prev => prev.map(conv => 
+          conv.id === selectedConversation ? {...conv, ...data} : conv
+        ));
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error al actualizar el grupo:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la información del grupo",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsUpdatingGroup(false);
+    }
+  };
+  
+  // Función para cambiar la imagen del grupo
+  const handleChangeGroupImage = () => {
+    // Implementar selección de imagen como en la creación de grupos
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files && target.files[0]) {
+        const file = target.files[0];
+        
+        // Crear URL para previsualización
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            // Preview en este caso no es necesario ya que no mostramos una previsualización
+          }
+        };
+        reader.readAsDataURL(file);
+        
+        // Subir la imagen a Cloudinary
+        try {
+          // Iniciar carga
+          setIsUpdatingGroup(true);
+          
+          // Usar el endpoint de carga de imágenes para grupos
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          const response = await fetch(API_ROUTES.messages.uploadGroupImage, {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!response.ok) {
+            throw new Error('Error al subir la imagen');
+          }
+          
+          const data = await response.json();
+          
+          // Actualizar el grupo con la nueva imagen
+          await updateGroupInfo({
+            imageUrl: data.url
+          });
+          
+          toast({
+            title: "Imagen actualizada",
+            description: "La imagen del grupo ha sido actualizada correctamente",
+          });
+        } catch (error) {
+          console.error('Error al cambiar la imagen:', error);
+          toast({
+            title: "Error",
+            description: "No se pudo cambiar la imagen del grupo",
+            variant: "destructive",
+          });
+        } finally {
+          setIsUpdatingGroup(false);
+        }
+      }
+    };
+    input.click();
+  };
   
   // Funciones memoizadas para procesar respuestas API
   const processConvResponse = useCallback(async (convRes: Response): Promise<Conversation[]> => {
@@ -182,7 +332,21 @@ export default function MessagesPage() {
               createdAt: conv.createdAt,
               updatedAt: conv.updatedAt || conv.createdAt || new Date().toISOString(),
               unreadCount: conv.unreadCount || 0,
-              participants: Array.isArray(conv.participants) ? conv.participants : [],
+              participants: Array.isArray(conv.participants) 
+                ? conv.participants.map((participant: any) => {
+                    // Si ya es un objeto Participant, lo devolvemos tal cual
+                    if (participant.userId && participant.role) {
+                      return participant;
+                    }
+                    // Si es un objeto User, lo convertimos a Participant
+                    return {
+                      id: participant.id,
+                      userId: participant.id,
+                      role: 'member' as const,
+                      user: participant
+                    };
+                  })
+                : [],
               participantsCount: conv.participantsCount || (Array.isArray(conv.participants) ? conv.participants.length : 0),
               isEmpty: !conv.lastMessage,
               // Añadir un otherUser ficticio para compatibilidad con la interfaz existente
@@ -563,7 +727,7 @@ export default function MessagesPage() {
       const response = await fetch('/api/messages/conversations', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           receiverId: userId
@@ -630,15 +794,7 @@ export default function MessagesPage() {
       router.push(`/messages?conversationWith=${userId}`);
       
       // Forzar una recarga de conversaciones desde el servidor para asegurarnos de tener datos actualizados
-      setTimeout(async () => {
-        const freshConvRes = await fetch(`${API_ROUTES.messages.conversations}?page=1&limit=${CONVERSATIONS_PER_PAGE}`);
-        const freshConversations = await processConvResponse(freshConvRes);
-        if (freshConversations.length > 0) {
-          console.log("Refreshed conversations from server:", freshConversations.length);
-          setConversations(freshConversations);
-        }
-      }, 1000);
-      
+      setTimeout(loadConversationsData, 1000);
     } catch (error) {
       console.error("Error starting conversation:", error);
       toast({
@@ -698,35 +854,77 @@ export default function MessagesPage() {
   }, [showCreateGroupModal, processMutualResponse, session?.user?.id]);
 
   // Función para seleccionar una conversación - memoizada
-  const handleConversationSelect = useCallback((conversationId: string) => {
-    console.log(`Seleccionando conversación: ${conversationId}`);
-    
-    // Establecer la conversación seleccionada inmediatamente para mejor UX
-    setSelectedConversation(conversationId);
-    
-    const conversation = conversations.find((c) => c?.id === conversationId);
-    if (conversation) {
-      // Determinar si es un grupo o una conversación 1:1
-      if (conversation.isGroup || conversation.id.startsWith('group_')) {
-        // Para grupos, solo actualizamos la URL con el ID del grupo
-        console.log(`Navegando a grupo: ${conversationId}`);
-        router.push(`/messages?conversationWith=${conversation.id}`);
-      } else {
-        // Para conversaciones 1:1, usamos el ID del otro usuario
-        const otherUserId = 
-          conversation.senderId === session?.user?.id
-            ? conversation.receiverId
-            : conversation.senderId;
+  const handleConversationSelect = async (conversation: Conversation) => {
+    try {
+      setLoading(true);
+      // Si la conversación que se está seleccionando ya está seleccionada y estamos en vista móvil,
+      // entonces solo cambiar a la vista de chat
+      if (mobileView && selectedConversation === conversation.id) {
+        setMobileView(false);
+        return;
+      }
+
+      if (conversation) {
+        setSelectedConversation(conversation.id);
         
-        if (otherUserId) {
-          console.log(`Navegando a conversación 1:1 con usuario: ${otherUserId}`);
-          router.push(`/messages?conversationWith=${otherUserId}`);
+        // Convertir participantes si es necesario
+        let normalizedConversation: ConversationData = {
+          id: conversation.id,
+          isGroup: conversation.isGroup ?? false,
+          name: conversation.name || undefined,
+          description: conversation.description || undefined,
+          imageUrl: conversation.imageUrl || undefined,
+          lastMessage: conversation.lastMessage || undefined,
+          createdAt: conversation.createdAt,
+          updatedAt: conversation.updatedAt,
+          unreadCount: conversation.unreadCount,
+          participants: Array.isArray(conversation.participants) 
+            ? conversation.participants.map((participant: any) => {
+                // Si ya es un objeto Participant, lo devolvemos tal cual
+                if (participant.userId && participant.role) {
+                  return participant as Participant;
+                }
+                // Si es un objeto User, lo convertimos a Participant
+                return {
+                  id: participant.id,
+                  userId: participant.id,
+                  role: 'member' as 'admin' | 'member' | 'moderator' | 'owner',
+                  user: participant
+                };
+              })
+            : []
+        };
+        
+        // Solo para conversaciones 1-a-1, asegurarnos de que otherUser esté definido
+        if (!normalizedConversation.isGroup) {
+          // Buscar al otro usuario
+          const otherParticipant = normalizedConversation.participants.find(
+            p => p.userId !== session?.user?.id
+          );
+          
+          if (otherParticipant) {
+            normalizedConversation.otherUser = otherParticipant.user;
+          }
+        }
+        
+        setSelectedConversationData(normalizedConversation);
+        
+        // Cambiar la vista en modo móvil
+        if (mobileView) {
+          setMobileView(false);
         }
       }
-    } else {
-      console.error(`No se encontró la conversación con ID: ${conversationId}`);
+    } catch (error) {
+      console.error("Error al seleccionar conversación:", error);
+      toast({
+        title: "Error",
+        description: "No pudimos cargar la conversación",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [conversations, router, session?.user?.id]);
+  };
 
   // Función para volver a la lista de conversaciones - memoizada
   const handleBackToList = useCallback(() => {
@@ -737,11 +935,6 @@ export default function MessagesPage() {
   }, [mobileView, router]);
 
   // Valores calculados derivados del estado
-  const selectedConversationData = useMemo(() => 
-    conversations.find((conv) => conv.id === selectedConversation),
-    [conversations, selectedConversation]
-  );
-  
   const otherUser = useMemo(() => 
     selectedConversationData ? selectedConversationData.otherUser : null,
     [selectedConversationData]
@@ -1004,7 +1197,7 @@ export default function MessagesPage() {
             description: conv.description || "",
             imageUrl: conv.imageUrl || null,
             lastMessage: conv.lastMessage || null,
-            createdAt: conv.createdAt || new Date().toISOString(),
+            createdAt: conv.createdAt,
             updatedAt: conv.updatedAt || conv.createdAt || new Date().toISOString(),
             unreadCount: conv.unreadCount || 0,
             participants: Array.isArray(conv.participants) ? conv.participants : [],
@@ -1023,7 +1216,7 @@ export default function MessagesPage() {
             otherUser: conv.receiver || conv.otherUser || {},
             lastMessage: conv.lastMessage || null,
             unreadCount: conv.unreadCount || 0,
-            createdAt: conv.createdAt || new Date().toISOString(),
+            createdAt: conv.createdAt,
             updatedAt: conv.updatedAt || conv.createdAt || new Date().toISOString(),
             isGroup: false
           };
@@ -1036,7 +1229,7 @@ export default function MessagesPage() {
       toast({
         title: "Error",
         description: "Ocurrió un error al cargar las conversaciones",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -1050,6 +1243,288 @@ export default function MessagesPage() {
       return conversation.participants.length;
     } else {
       return 0;
+    }
+  };
+
+  // Verificar si el usuario es administrador del grupo antes de abrir el modal
+  const handleOpenGroupManagement = useCallback(() => {
+    if (selectedConversationData?.participants) {
+      // Buscar si el usuario actual es administrador del grupo
+      const currentUserParticipant = selectedConversationData.participants.find(
+        p => p.userId === session?.user?.id
+      );
+      
+      setIsGroupAdmin(currentUserParticipant?.role === 'admin');
+      
+      // Inicializar valores de edición
+      setGroupNameEdit(selectedConversationData.name || "");
+      setGroupDescriptionEdit(selectedConversationData.description || "");
+      
+      // Abrir el modal
+      setShowGroupManagementModal(true);
+    }
+  }, [selectedConversationData, session?.user?.id]);
+
+  // Función para eliminar el grupo (solo para administradores)
+  const handleDeleteGroup = async () => {
+    if (!selectedConversation || !isGroupAdmin) return;
+    
+    // Confirmar la eliminación
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este grupo? Esta acción no se puede deshacer.")) {
+      return;
+    }
+    
+    try {
+      setIsUpdatingGroup(true);
+      
+      const response = await fetch(`${API_ROUTES.messages.createGroup}/${selectedConversation}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al eliminar el grupo');
+      }
+      
+      // Cerrar el modal y actualizar el estado
+      setShowGroupManagementModal(false);
+      
+      // Eliminar el grupo de la lista de conversaciones
+      setConversations(prev => prev.filter(conv => conv.id !== selectedConversation));
+      
+      // Deseleccionar la conversación actual
+      setSelectedConversation(null);
+      
+      toast({
+        title: "Grupo eliminado",
+        description: "El grupo ha sido eliminado correctamente",
+      });
+    } catch (error) {
+      console.error('Error al eliminar el grupo:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el grupo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingGroup(false);
+    }
+  };
+
+  // Función para abandonar el grupo (para miembros no administradores)
+  const handleLeaveGroup = async () => {
+    if (!selectedConversation || !session?.user?.id) return;
+    
+    // Confirmar la acción
+    if (!window.confirm("¿Estás seguro de que deseas abandonar este grupo?")) {
+      return;
+    }
+    
+    try {
+      setIsUpdatingGroup(true);
+      
+      const response = await fetch(`${API_ROUTES.messages.createGroup}/${selectedConversation}/leave`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al abandonar el grupo');
+      }
+      
+      // Cerrar el modal y actualizar el estado
+      setShowGroupManagementModal(false);
+      
+      // Eliminar el grupo de la lista de conversaciones
+      setConversations(prev => prev.filter(conv => conv.id !== selectedConversation));
+      
+      // Deseleccionar la conversación actual
+      setSelectedConversation(null);
+      
+      toast({
+        title: "Grupo abandonado",
+        description: "Has abandonado el grupo correctamente",
+      });
+    } catch (error) {
+      console.error('Error al abandonar el grupo:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo abandonar el grupo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingGroup(false);
+    }
+  };
+
+  // Función para expulsar a un participante (solo para administradores)
+  const handleRemoveParticipant = async (participantId: string) => {
+    if (!selectedConversation || !isGroupAdmin) return;
+    
+    try {
+      setIsUpdatingGroup(true);
+      
+      const response = await fetch(`${API_ROUTES.messages.createGroup}/${selectedConversation}/participants/${participantId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al expulsar al participante');
+      }
+      
+      // Actualizar la lista de participantes en el estado local
+      if (selectedConversationData) {
+        const updatedParticipants = selectedConversationData.participants.filter(
+          p => p.userId !== participantId
+        );
+        
+        const updatedData = {
+          ...selectedConversationData,
+          participants: updatedParticipants
+        };
+        
+        setSelectedConversationData(updatedData);
+      }
+      
+      toast({
+        title: "Participante expulsado",
+        description: "El participante ha sido expulsado del grupo",
+      });
+    } catch (error) {
+      console.error('Error al expulsar al participante:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo expulsar al participante",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingGroup(false);
+    }
+  };
+
+  // Función para cargar seguidores mutuos que no están en el grupo
+  const loadPossibleParticipants = useCallback(async () => {
+    if (!selectedConversation || !session?.user?.id) return;
+    
+    try {
+      // Obtener seguidores mutuos
+      const response = await fetch('/api/follow/mutual');
+      if (!response.ok) {
+        throw new Error('Error al cargar seguidores mutuos');
+      }
+      
+      const mutualFollowers = await response.json();
+      
+      // Filtrar los que ya están en el grupo
+      const currentParticipantIds = selectedConversationData?.participants?.map(p => p.userId) || [];
+      const filteredUsers = mutualFollowers.filter(
+        (user: User) => !currentParticipantIds.includes(user.id)
+      );
+      
+      setPossibleParticipants(filteredUsers);
+      setSelectedNewParticipants([]);
+      setShowAddParticipantsModal(true);
+    } catch (error) {
+      console.error('Error al cargar posibles participantes:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los posibles participantes",
+        variant: "destructive",
+      });
+    }
+  }, [selectedConversation, selectedConversationData, session?.user?.id, toast]);
+
+  // Función para añadir participantes al grupo
+  const handleAddParticipants = async () => {
+    if (!selectedConversation || selectedNewParticipants.length === 0) return;
+    
+    try {
+      setIsUpdatingGroup(true);
+      
+      const response = await fetch(`${API_ROUTES.messages.createGroup}/${selectedConversation}/participants`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          participantIds: selectedNewParticipants
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al añadir participantes');
+      }
+      
+      const data = await response.json();
+      
+      // Actualizar la lista local de participantes
+      if (selectedConversationData && data.participants) {
+        const updatedData = {
+          ...selectedConversationData,
+          participants: data.participants
+        };
+        
+        // Actualizar el estado
+        setSelectedConversationData(updatedData);
+      }
+      
+      // Cerrar el modal de añadir participantes
+      setShowAddParticipantsModal(false);
+      
+      toast({
+        title: "Participantes añadidos",
+        description: `Se han añadido ${selectedNewParticipants.length} participantes al grupo`,
+      });
+      
+      // Limpiar la selección
+      setSelectedNewParticipants([]);
+    } catch (error) {
+      console.error('Error al añadir participantes:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron añadir los participantes al grupo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingGroup(false);
+    }
+  };
+
+  // Manejar selección/deselección de participantes
+  const toggleParticipantSelection = (userId: string) => {
+    if (selectedNewParticipants.includes(userId)) {
+      setSelectedNewParticipants(prev => prev.filter(id => id !== userId));
+    } else {
+      setSelectedNewParticipants(prev => [...prev, userId]);
+    }
+  };
+
+  // Función para actualizar el nombre del grupo
+  const handleUpdateGroupName = async () => {
+    if (groupNameEdit.trim() === "") {
+      toast({
+        title: "Error",
+        description: "El nombre del grupo no puede estar vacío",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const success = await updateGroupInfo({ name: groupNameEdit });
+    if (success) {
+      toast({
+        title: "Nombre actualizado",
+        description: "El nombre del grupo ha sido actualizado correctamente",
+      });
+    }
+  };
+
+  // Función para actualizar la descripción del grupo
+  const handleUpdateGroupDescription = async () => {
+    const success = await updateGroupInfo({ description: groupDescriptionEdit });
+    if (success) {
+      toast({
+        title: "Descripción actualizada",
+        description: "La descripción del grupo ha sido actualizada correctamente",
+      });
     }
   };
 
@@ -1145,7 +1620,7 @@ export default function MessagesPage() {
                       <div
                         key={conversation.id}
                         className={`p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer flex items-start space-x-3 ${isSelected && "bg-blue-50 dark:bg-gray-700"}`}
-                        onClick={() => handleConversationSelect(conversation.id)}
+                        onClick={() => handleConversationSelect(conversation)}
                       >
                         {/* Avatar */}
                         <Avatar className="h-12 w-12 border-2 border-gray-200 dark:border-gray-700">
@@ -1174,7 +1649,7 @@ export default function MessagesPage() {
                                 height={48}
                                 crop="fill"
                                 gravity="face"
-                                className="object-cover rounded-full"
+                                className="object-cover"
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
                                   target.src = "/images/AvatarPredeterminado.webp";
@@ -1329,11 +1804,37 @@ export default function MessagesPage() {
                     <ArrowLeft className="h-5 w-5" />
                   </Button>
                 )}
-                <Avatar className="h-10 w-10">
-                  {otherUser.image && otherUser.image.includes('cloudinary') ? (
+                <Avatar className="h-10 w-10 mr-2">
+                  {selectedConversationData?.isGroup ? (
+                    // Avatar para grupos
+                    selectedConversationData.imageUrl && selectedConversationData.imageUrl.includes('cloudinary') ? (
+                      <CldImage
+                        src={selectedConversationData.imageUrl}
+                        alt={selectedConversationData.name || "Grupo"}
+                        width={48}
+                        height={48}
+                        crop="fill"
+                        gravity="face"
+                        className="object-cover"
+                        priority
+                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/grupo_default.png";
+                        }}
+                      />
+                    ) : (
+                      <Image 
+                        src="/images/grupo_default.png"
+                        alt={selectedConversationData?.name || "Grupo"}
+                        width={48}
+                        height={48}
+                        className="rounded-full object-cover"
+                      />
+                    )
+                  ) : selectedConversationData?.otherUser?.image && selectedConversationData.otherUser.image.includes('cloudinary') ? (
                     <CldImage
-                      src={otherUser.image}
-                      alt={otherUser.username || "Usuario"}
+                      src={selectedConversationData.otherUser.image}
+                      alt={selectedConversationData.otherUser.username || "Usuario"}
                       width={48}
                       height={48}
                       crop="fill"
@@ -1345,49 +1846,59 @@ export default function MessagesPage() {
                         target.src = "/images/AvatarPredeterminado.webp";
                       }}
                     />
-                  ) : otherUser.image && !otherUser.image.startsWith('/') && !otherUser.image.startsWith('http') ? (
-                    <CldImage
-                      src={otherUser.image}
-                      alt={otherUser.username || "Usuario"}
+                  ) : selectedConversationData?.otherUser?.image ? (
+                    <Image 
+                      src={selectedConversationData.otherUser.image}
+                      alt={selectedConversationData.otherUser.username || "Usuario"}
                       width={48}
                       height={48}
-                      crop="fill"
-                      gravity="face"
-                      className="object-cover"
-                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
-                    />
-                  ) : (
-                    <Image
-                      src={otherUser.image || "/images/AvatarPredeterminado.webp"}
-                      width={48}
-                      height={48}
-                      alt={otherUser.username || "Usuario"}
                       className="rounded-full object-cover"
                       onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                         const target = e.target as HTMLImageElement;
                         target.src = "/images/AvatarPredeterminado.webp";
                       }}
                     />
+                  ) : (
+                    <AvatarFallback>
+                      {selectedConversationData?.otherUser?.username?.[0]?.toUpperCase() || "?"}
+                    </AvatarFallback>
                   )}
                 </Avatar>
-                <h2 className="font-medium">{otherUser.username || "Usuario"}</h2>
+                <h2 className="font-medium">
+                  {selectedConversationData?.isGroup 
+                    ? selectedConversationData.name || "Grupo" 
+                    : selectedConversationData?.otherUser?.username || "Usuario"
+                  }
+                </h2>
               </div>
+              
+              {/* Botón de administración de grupo (solo visible para grupos) */}
+              {selectedConversationData?.isGroup && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleOpenGroupManagement}
+                    className="flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                  >
+                    <Settings className="h-5 w-5 mr-1" />
+                    <span className="hidden sm:inline">Administrar grupo</span>
+                  </Button>
+                </div>
+              )}
             </div>
             
             {/* Contenido de la conversación integrado directamente */}
             {selectedConversation && selectedConversationData?.isGroup ? (
               <GroupChatWindowContent 
-                conversation={selectedConversationData as any}
-                key={`group-chat-content-${selectedConversation}`}
+                conversation={selectedConversationData} 
+                className="h-full" 
               />
             ) : (
               <ChatWindowContent 
+                otherUser={selectedConversationData?.otherUser || null} 
                 conversationId={selectedConversation}
-                otherUser={otherUser}
-                key={`chat-content-${selectedConversation}`}
+                className="h-full" 
               />
             )}
           </div>
@@ -1441,68 +1952,66 @@ export default function MessagesPage() {
                       return searchTerm.trim() === "" || 
                         (user.username && user.username.toLowerCase().includes(searchTerm));
                     })
-                    .map((user) => {
-                      return (
-                        <div
-                          key={user.id}
-                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 transition cursor-pointer"
-                          onClick={() => {
-                            setShowNewMessageModal(false);
-                            startNewConversation(user.id);
-                          }}
-                        >
-                          <div className="flex items-center flex-1">
-                            <Avatar className="h-10 w-10 mr-2">
-                              {user.image && user.image.includes('cloudinary') ? (
-                                <CldImage
-                                  src={user.image}
-                                  alt={user.username || 'Usuario'}
-                                  width={48}
-                                  height={48}
-                                  crop="fill"
-                                  gravity="face"
-                                  className="object-cover"
-                                  priority
-                                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.src = "/images/AvatarPredeterminado.webp";
-                                  }}
-                                />
-                              ) : user.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
-                                <CldImage
-                                  src={user.image}
-                                  alt={user.username || 'Usuario'}
-                                  width={48}
-                                  height={48}
-                                  crop="fill"
-                                  gravity="face"
-                                  className="object-cover"
-                                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.src = "/images/AvatarPredeterminado.webp";
-                                  }}
-                                />
-                              ) : (
-                                <Image 
-                                  src={user.image || "/images/AvatarPredeterminado.webp"} 
-                                  alt={user.username || 'Usuario'} 
-                                  width={40} 
-                                  height={40}
-                                  className="rounded-full object-cover"
-                                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.src = "/images/AvatarPredeterminado.webp";
-                                  }}
-                                />
-                              )}
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{user.username || 'Usuario sin nombre'}</p>
-                            </div>
+                    .map(user => (
+                      <div
+                        key={user.id}
+                        className="flex items-center gap-3 p-2 rounded-lg cursor-pointer"
+                        onClick={() => {
+                          setShowNewMessageModal(false);
+                          startNewConversation(user.id);
+                        }}
+                      >
+                        <div className="flex items-center flex-1">
+                          <Avatar className="h-8 w-8 mr-2">
+                            {user.image && user.image.includes('cloudinary') ? (
+                              <CldImage
+                                src={user.image}
+                                alt={user.username || 'Usuario'}
+                                width={48}
+                                height={48}
+                                crop="fill"
+                                gravity="face"
+                                className="object-cover"
+                                priority
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = "/images/AvatarPredeterminado.webp";
+                                }}
+                              />
+                            ) : user.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
+                              <CldImage
+                                src={user.image}
+                                alt={user.username || 'Usuario'}
+                                width={48}
+                                height={48}
+                                crop="fill"
+                                gravity="face"
+                                className="object-cover"
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = "/images/AvatarPredeterminado.webp";
+                                }}
+                              />
+                            ) : (
+                              <Image 
+                                src={user.image || "/images/AvatarPredeterminado.webp"} 
+                                alt={user.username || 'Usuario'} 
+                                width={40} 
+                                height={40}
+                                className="rounded-full object-cover"
+                                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = "/images/AvatarPredeterminado.webp";
+                                }}
+                              />
+                            )}
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{user.username || 'Usuario sin nombre'}</p>
                           </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                 </div>
               )}
             </>
@@ -1730,6 +2239,46 @@ export default function MessagesPage() {
         </div>
       </DialogContent>
     </Dialog>
+    
+    {/* Modal para administrar grupo */}
+    <GroupManagementModal 
+      isOpen={showGroupManagementModal} 
+      onClose={() => setShowGroupManagementModal(false)} 
+      conversationData={selectedConversationData} 
+      currentUserId={session?.user?.id || ""} 
+      onConversationUpdate={(updatedData) => {
+        if (selectedConversationData) {
+          // Actualizar el estado con conversión de tipos
+          const newData = {
+            ...selectedConversationData,
+            ...updatedData,
+            // Convertir posibles null a undefined para cumplir con el tipo
+            name: updatedData.name === null ? undefined : updatedData.name || selectedConversationData.name,
+            description: updatedData.description === null ? undefined : updatedData.description || selectedConversationData.description,
+            imageUrl: updatedData.imageUrl === null ? undefined : updatedData.imageUrl || selectedConversationData.imageUrl
+          };
+          
+          setSelectedConversationData(newData);
+          
+          // También actualizar en la lista de conversaciones
+          setConversations(prev => prev.map(conv => 
+            conv.id === selectedConversationData.id ? {...conv, ...updatedData as any} : conv
+          ));
+        }
+      }} 
+      onDeleteGroup={() => {
+        // Eliminar de la lista de conversaciones
+        setConversations(prev => prev.filter(conv => conv.id !== selectedConversationData?.id));
+        setSelectedConversation(null);
+        setSelectedConversationData(null);
+      }} 
+      onLeaveGroup={() => {
+        // Eliminar de la lista de conversaciones
+        setConversations(prev => prev.filter(conv => conv.id !== selectedConversationData?.id));
+        setSelectedConversation(null);
+        setSelectedConversationData(null);
+      }} 
+    />
     </>
   );
 }
