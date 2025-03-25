@@ -1837,8 +1837,8 @@ export default function MessagesPage() {
         {selectedConversation && selectedConversationData ? (
           // Contenido de la conversación
           <div className="h-full flex flex-col">
-            {/* Cabecera de la conversación */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            {/* Cabecera de la conversación - añadir sticky para que permanezca siempre visible */}
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800 z-10 flex-shrink-0 sticky top-0">
               <div className="flex items-center space-x-3">
                 {mobileView && (
                   <Button variant="ghost" size="icon" onClick={handleBackToList}>

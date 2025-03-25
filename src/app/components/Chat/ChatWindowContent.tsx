@@ -1620,6 +1620,17 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     };
   }, [connected, reconnect, currentUserId]);
   
+  // Función para hacer scroll al final de los mensajes
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      setIsAtBottom(true);
+    } else if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      setIsAtBottom(true);
+    }
+  };
+  
   return (
     <div className={cn("flex flex-col h-full max-h-full", className)}>
       {/* Contenedor de mensajes - max-height para evitar desbordamiento */}
@@ -1737,8 +1748,28 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         )}
       </div>
   
-      {/* Input para enviar mensajes */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+      {/* Indicador de mensajes nuevos */}
+      {!isAtBottom && messages.length > 0 && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-24 right-4 bg-blue-500 text-white rounded-full p-2 shadow-lg hover:bg-blue-600 transition-all z-10"
+          aria-label="Nuevos mensajes"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+          </svg>
+        </button>
+      )}
+  
+      {/* Indicador de escritura */}
+      {peerIsTyping && (
+        <div className="px-4 py-1 text-xs text-gray-500 italic">
+          {otherUser?.username || 'El otro usuario'} está escribiendo...
+        </div>
+      )}
+  
+      {/* Contenedor para la entrada de mensajes - asegurarse que siempre sea visible */}
+      <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex-shrink-0">
         {canSendMessages === false ? (
           <div className="text-center text-gray-500 mb-2">
             <p>No puedes enviar mensajes a este usuario.</p>

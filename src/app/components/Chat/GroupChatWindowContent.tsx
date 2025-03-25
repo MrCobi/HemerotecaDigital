@@ -488,7 +488,26 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       socketInstance.off('new_group_message', handleNewMessage);
     };
   }, [socketInstance, conversation?.id, autoScrollEnabled, currentUserId, processMessages]);
-  
+
+  const handleScroll = () => {
+    const element = chatContainerRef.current;
+    if (element) {
+      const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 100;
+      setIsAtBottom(isAtBottom);
+    }
+  };
+
+  // Función para hacer scroll al final de los mensajes
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      setIsAtBottom(true);
+    } else if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      setIsAtBottom(true);
+    }
+  };
+
   // Deshabilitar efecto que ya no es necesario al tener processMessages
   useEffect(() => {
     // Deshabilitado para evitar renderizados dobles
@@ -601,20 +620,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       <div 
         ref={chatContainerRef}
         className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
-        onScroll={() => {
-          const element = chatContainerRef.current;
-          if (element) {
-            // Verificar si estamos cerca del top para cargar más mensajes
-            // Solo intentar cargar si no está ya cargando y hay más mensajes
-            if (element.scrollTop < 100 && hasMore && !isLoadingMore && !isFetchingRef.current) {
-              loadMoreMessages();
-            }
-            
-            // Verificar si estamos cerca del bottom para auto-scroll
-            const isNearBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 100;
-            setAutoScrollEnabled(isNearBottom);
-          }
-        }}
+        onScroll={handleScroll}
       >
         {/* Spinner de carga inicial */}
         {isLoadingMessages && messages.length === 0 && (
@@ -707,8 +713,21 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         )}
       </div>
       
+      {/* Indicador de mensajes nuevos */}
+      {!isAtBottom && messages.length > 0 && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-24 right-4 bg-blue-500 text-white rounded-full p-2 shadow-lg hover:bg-blue-600 transition-all z-10"
+          aria-label="Nuevos mensajes"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+          </svg>
+        </button>
+      )}
+      
       {/* Área de entrada de mensajes */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex-shrink-0">
         {isVoiceRecorderVisible ? (
           <VoiceMessageRecorder 
             onSend={async (audioBlob) => {
