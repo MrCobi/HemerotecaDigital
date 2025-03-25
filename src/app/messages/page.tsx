@@ -405,25 +405,41 @@ export default function MessagesPage() {
             return;
           }
           
-          const targetConv = conversations.find(conv =>
-            (conv?.otherUser?.id === conversationIdParam) ||
-            (conv?.receiverId === conversationIdParam) ||
-            (conv?.senderId === conversationIdParam)
-          );
+          // Buscar si el parámetro es un ID de grupo existente
+          const isGroupParam = conversationIdParam.startsWith('group_');
+          
+          // Primero, buscar si el conversationIdParam coincide directamente con un ID de conversación
+          let targetConv = conversations.find(conv => conv.id === conversationIdParam);
+          
+          // Si no lo encontramos por ID directo, buscamos por otherUser.id o senderId/receiverId
+          if (!targetConv) {
+            targetConv = conversations.find(conv =>
+              (conv?.otherUser?.id === conversationIdParam) ||
+              (conv?.receiverId === conversationIdParam) ||
+              (conv?.senderId === conversationIdParam)
+            );
+          }
           
           if (targetConv) {
+            console.log(`Conversación encontrada por URL, ID: ${targetConv.id}, isGroup: ${Boolean(targetConv.isGroup)}`);
             if (selectedConversation !== targetConv.id) {
               setSelectedConversation(targetConv.id);
             }
           } 
-          else if (!selectedConversation && mutualFollowers.length > 0) {
+          else if (!selectedConversation && !isGroupParam && mutualFollowers.length > 0) {
+            // Si no es un grupo y no tenemos conversación seleccionada, verificamos si es un usuario válido
             const isValidUser = mutualFollowers.some(user => user.id === conversationIdParam);
             
             if (isValidUser) {
+              console.log(`Iniciando nueva conversación con usuario: ${conversationIdParam}`);
               await startNewConversation(conversationIdParam);
             } else {
+              console.log(`Usuario no válido o no es un seguidor mutuo: ${conversationIdParam}`);
               router.push("/messages");
             }
+          } else if (isGroupParam) {
+            console.log(`URL contiene ID de grupo que no existe: ${conversationIdParam}`);
+            router.push("/messages");
           }
         }
       } catch (error) {
@@ -658,16 +674,32 @@ export default function MessagesPage() {
 
   // Función para seleccionar una conversación - memoizada
   const handleConversationSelect = useCallback((conversationId: string) => {
+    console.log(`Seleccionando conversación: ${conversationId}`);
+    
+    // Establecer la conversación seleccionada inmediatamente para mejor UX
+    setSelectedConversation(conversationId);
+    
     const conversation = conversations.find((c) => c?.id === conversationId);
     if (conversation) {
-      const otherUserId =
-        conversation.senderId === session?.user?.id
-          ? conversation.receiverId
-          : conversation.senderId;
-      if (otherUserId) {
-        router.push(`/messages?conversationWith=${otherUserId}`);
-        setSelectedConversation(conversationId);
+      // Determinar si es un grupo o una conversación 1:1
+      if (conversation.isGroup || (typeof conversationId === 'string' && conversationId.startsWith('group_'))) {
+        // Para grupos, solo actualizamos la URL con el ID del grupo
+        console.log(`Navegando a grupo: ${conversationId}`);
+        router.push(`/messages?conversationWith=${conversation.id}`);
+      } else {
+        // Para conversaciones 1:1, usamos el ID del otro usuario
+        const otherUserId = 
+          conversation.senderId === session?.user?.id
+            ? conversation.receiverId
+            : conversation.senderId;
+        
+        if (otherUserId) {
+          console.log(`Navegando a conversación 1:1 con usuario: ${otherUserId}`);
+          router.push(`/messages?conversationWith=${otherUserId}`);
+        }
       }
+    } else {
+      console.error(`No se encontró la conversación con ID: ${conversationId}`);
     }
   }, [conversations, router, session?.user?.id]);
 

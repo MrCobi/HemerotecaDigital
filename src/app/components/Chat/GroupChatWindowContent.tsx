@@ -13,6 +13,7 @@ import useSocket, { MessageType } from '@/src/hooks/useSocket';
 import { API_ROUTES } from '@/src/config/api-routes';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import VoiceMessageRecorder from './VoiceMessageRecorder';
+import { useToast } from '@/src/app/hooks/use-toast';
 
 // Reutiliza estos componentes de ChatWindowContent.tsx
 import { MessageItem, DateSeparator, VoiceMessagePlayer } from './ChatComponents/ChatComponents';
@@ -64,6 +65,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
 }) => {
   const { data: session } = useSession();
   const currentUserId = session?.user?.id;
+  const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageMap, setMessageMap] = useState<Map<string, Message>>(new Map());
   const [newMessage, setNewMessage] = useState('');
@@ -221,12 +223,13 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         
         // Asegurarnos de usar el ID con el prefijo correcto
         // Si ya tiene el prefijo 'group_', lo usamos tal cual
-        const withParam = conversation.id.startsWith('group_') 
+        const groupId = conversation.id.startsWith('group_') 
           ? conversation.id 
           : `group_${conversation.id}`;
         
+        // Usar la nueva API específica para mensajes de grupo
         const response = await fetch(
-          `${API_ROUTES.messages.list}?with=${withParam}&page=${pageNum}&limit=${pageSize}&t=${Date.now()}`, 
+          `/api/messages/group-messages?conversationId=${groupId}&page=${pageNum}&limit=${pageSize}&t=${Date.now()}`, 
           { cache: 'no-store' }
         );
         
@@ -249,8 +252,8 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         try {
           data = await response.json();
         } catch (parseError) {
-          console.error('Error al parsear la respuesta JSON:', parseError, await response.text());
-          throw new Error('La respuesta del servidor no es un JSON válido');
+          console.error('Error al parsear respuesta JSON:', parseError);
+          throw new Error('Error al procesar la respuesta del servidor');
         }
         
         if (!data) {
@@ -285,9 +288,13 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   
   // Manejar envío de mensajes
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || isSending || !currentUserId || !conversation?.id) return;
+    if (!newMessage.trim() || isSending || !conversation || !currentUserId) return;
     
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    setIsSending(true);
+    
+    // Crear mensaje temporal para mostrar inmediatamente
     const tempMessage: Message = {
       tempId,
       content: newMessage.trim(),
@@ -307,14 +314,20 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     try {
       setIsSending(true);
       
-      // Enviar mensaje a través de la API
-      const response = await fetch(API_ROUTES.messages.send, {
+      // Asegurarnos de usar el ID con el prefijo correcto
+      const groupId = conversation.id.startsWith('group_') 
+        ? conversation.id 
+        : `group_${conversation.id}`;
+      
+      // Enviar mensaje a través de la nueva API específica para grupos
+      const response = await fetch('/api/messages/group-messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content: tempMessage.content,
-          conversationId: conversation.id.startsWith('group_') ? conversation.id : `group_${conversation.id}`,
-          messageType: 'text'
+          conversationId: groupId,
+          messageType: 'text',
+          tempId
         }),
       });
       
@@ -338,20 +351,29 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         socketSendMessage({
           ...finalMessage,
           receiverId: 'group', // Marcar que es un mensaje de grupo
-          conversationId: conversation.id.startsWith('group_') ? conversation.id : `group_${conversation.id}`
+          conversationId: groupId
         });
       }
-      
     } catch (error) {
-      console.error('Error al enviar mensaje:', error);
+      console.error("Error al enviar mensaje:", error);
       
-      // Actualizar estado del mensaje temporal a error
-      const errorMessage: Message = {
+      // Marcar el mensaje temporal como fallido
+      const errorMessage = {
         ...tempMessage,
-        status: 'error',
+        status: 'error' as const,
       };
       
       processMessages([errorMessage], messages);
+      
+      // Mostrar error al usuario
+      toast({
+        title: "Error al enviar el mensaje",
+        description: error instanceof Error ? error.message : "Inténtalo de nuevo",
+        variant: "destructive",
+      });
+      
+      // Recuperar el texto del mensaje para que el usuario pueda intentar de nuevo
+      setNewMessage(tempMessage.content);
     } finally {
       setIsSending(false);
     }
