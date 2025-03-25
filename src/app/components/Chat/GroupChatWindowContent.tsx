@@ -69,15 +69,13 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   const currentUserId = session?.user?.id;
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [messageMap, setMessageMap] = useState<Map<string, Message>>(new Map());
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isVoiceRecorderVisible, setIsVoiceRecorderVisible] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const [isTyping, setIsTyping] = useState(false);
-  const [peerIsTyping, setPeerIsTyping] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   
@@ -178,51 +176,51 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     };
   }, [socketInitialized, conversation?.id, currentUserId, joinConversation, leaveConversation, connected, socketInstance, session]);
   
-  // Función para procesar y deduplicar mensajes
-  const processMessages = useCallback((newMessages: Message[], existingMessages: Message[] = []) => {
-    // Evitar procesar mensajes vacíos
-    if (!newMessages || newMessages.length === 0) return existingMessages;
+  // Función para procesar mensajes
+  const processMessages = useCallback((newMessages: Message[]) => {
+    if (!newMessages || newMessages.length === 0) return;
     
-    console.log(`Procesando ${newMessages.length} mensajes nuevos`);
+    // Filtrar mensajes para incluir solo los que corresponden a esta conversación
+    const filteredMessages = newMessages.filter(msg => {
+      // Solo procesar mensajes que pertenezcan específicamente a esta conversación
+      return msg.conversationId === conversation?.id;
+    });
     
-    // Clonar el mapa actual para trabajar sobre una copia
-    const updatedMap = new Map(messageMap);
-    
-    // Añadir los nuevos mensajes al mapa
-    newMessages.forEach(msg => {
-      if (msg.id) {
-        updatedMap.set(msg.id, msg);
-        
-        if (msg.tempId && updatedMap.has(msg.tempId)) {
-          updatedMap.delete(msg.tempId);
+    setMessages(prev => {
+      // Crear un mapa para deduplicar mensajes
+      const messageMap = new Map<string, Message>();
+      
+      // Añadir mensajes previos al mapa
+      prev.forEach(msg => {
+        if (msg.id) {
+          messageMap.set(msg.id, msg);
+        } else if (msg.tempId) {
+          messageMap.set(msg.tempId, msg);
         }
-      } 
-      else if (msg.tempId) {
-        updatedMap.set(msg.tempId, msg);
-      }
-      else {
-        const now = Date.now();
-        const uniqueKey = `msg-${msg.senderId}-${now}-${Math.random().toString(36).substr(2, 9)}`;
-        updatedMap.set(uniqueKey, msg);
-      }
+      });
+      
+      // Añadir o actualizar nuevos mensajes
+      filteredMessages.forEach(msg => {
+        if (msg.id) {
+          // Si el mensaje tiene un id y también un tempId que ya existe, eliminar la versión temporal
+          if (msg.tempId && messageMap.has(msg.tempId)) {
+            messageMap.delete(msg.tempId);
+          }
+          messageMap.set(msg.id, msg);
+        } else if (msg.tempId && !messageMap.has(msg.tempId)) {
+          messageMap.set(msg.tempId, msg);
+        }
+      });
+      
+      // Convertir el mapa a un array y ordenar por fecha
+      return Array.from(messageMap.values()).sort((a, b) => {
+        const dateA = new Date(a.createdAt);
+        const dateB = new Date(b.createdAt);
+        return dateA.getTime() - dateB.getTime();
+      });
     });
-    
-    // Actualizar el mapa en el estado
-    setMessageMap(updatedMap);
-    
-    // Crear una nueva array ordenada con todos los mensajes únicos
-    const uniqueMessages = Array.from(updatedMap.values()).sort((a, b) => {
-      const dateA = new Date(a.createdAt);
-      const dateB = new Date(b.createdAt);
-      return dateA.getTime() - dateB.getTime();
-    });
-    
-    // Actualizar el estado de los mensajes directamente
-    setMessages(uniqueMessages);
-    
-    return uniqueMessages;
-  }, [messageMap]);
-
+  }, [conversation?.id]);
+  
   // Separar completamente la función de carga de mensajes del ciclo de vida del componente
   const loadGroupMessages = useCallback(async (groupId: string, isInitialLoad = false) => {
     // Si ya hay una petición en curso y no es la carga inicial, no iniciar otra
@@ -303,8 +301,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         });
         
         // Procesar los mensajes correctamente
-        const uniqueMessages = processMessages(formattedMessages, []);
-        console.log(`Actualizados a ${uniqueMessages.length} mensajes únicos`);
+        processMessages(formattedMessages);
         
         setHasMore(apiMessages.length === pageSize);
         setPage(1);
@@ -336,7 +333,6 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     
     // Limpiar estado para la nueva conversación
     setMessages([]);
-    setMessageMap(new Map());
     setPage(1);
     setHasMore(true);
     setErrorLoadingMessages(null);
@@ -415,8 +411,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       }
       
       // Procesar y añadir los mensajes antiguos preservando el estado actual
-      const updatedMessages = processMessages(oldMessages, messages);
-      setMessages(updatedMessages);
+      processMessages(oldMessages);
       
       // Actualizar estado
       setPage(nextPage);
@@ -455,29 +450,33 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     if (!socketInstance || !conversation?.id || !currentUserId) return;
     
     const handleNewMessage = (message: MessageType) => {
-      // Asegurarse de que el mensaje pertenece a esta conversación
-      const groupId = conversation.id.startsWith('group_') ? conversation.id : `group_${conversation.id}`;
+      console.log('Nuevo mensaje recibido en grupo:', message);
       
-      if (message.conversationId === conversation.id || 
-          message.conversationId === groupId) {
-        
-        console.log(`Recibido nuevo mensaje para ${groupId} vía socket`);
-        
-        // Procesar el nuevo mensaje con nuestra función de deduplicación
-        processMessages([message], messages);
-        
-        // Si el autoscroll está habilitado, desplazar hacia el nuevo mensaje
-        if (autoScrollEnabled) {
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({
-              behavior: 'smooth',
-              block: 'nearest'
-            });
-          }, 50);
-        }
+      // Verificar si el mensaje pertenece a esta conversación grupal
+      if (message.conversationId !== conversation.id) {
+        console.log('Mensaje ignorado: no pertenece a esta conversación de grupo');
+        return;
+      }
+      
+      // Si el mensaje es de otra persona, marcarlo como leído
+      if (message.senderId !== currentUserId && !message.read) {
+        socketInstance.emit('markMessageAsRead', {
+          messageId: message.id,
+          conversationId: message.conversationId
+        });
+      }
+      
+      // Procesar el mensaje
+      processMessages([message]);
+      
+      // Auto-scroll si estamos en la parte inferior
+      if (isAtBottom) {
+        setTimeout(() => {
+          scrollToBottom();
+        }, 100);
       }
     };
-
+    
     console.log(`Configurando manejadores de socket para grupo ${conversation.id}`);
     socketInstance.on('new_message', handleNewMessage);
     socketInstance.on('new_group_message', handleNewMessage);
@@ -518,7 +517,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     // });
     
     // setMessages(uniqueMessages);
-  }, [messageMap]);
+  }, [messages]);
   
   // Manejar envío de mensajes
   const handleSendMessage = async () => {
@@ -540,7 +539,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     };
     
     // Añadir mensaje temporal a la lista
-    processMessages([tempMessage], messages);
+    processMessages([tempMessage]);
     
     // Limpiar campo de texto
     setNewMessage('');
@@ -578,7 +577,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         status: 'sent',
       };
       
-      processMessages([finalMessage], messages);
+      processMessages([finalMessage]);
       
       // Si tenemos socket, enviar notificación en tiempo real
       if (socketInstance && socketInitialized) {
@@ -597,7 +596,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         status: 'error' as const,
       };
       
-      processMessages([errorMessage], messages);
+      processMessages([errorMessage]);
       
       // Mostrar error al usuario
       toast({
@@ -616,10 +615,10 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   // Renderización del componente
   return (
     <div className={cn("flex flex-col h-full max-h-full bg-white dark:bg-gray-900", className)}>
-      {/* Contenedor principal de mensajes con scroll */}
+      {/* Contenedor principal de mensajes con scroll, y flex para que los mensajes aparezcan en la parte inferior */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
+        className="flex-1 overflow-y-auto p-4 min-h-0 flex flex-col justify-end"
         onScroll={handleScroll}
       >
         {/* Spinner de carga inicial */}
@@ -682,48 +681,19 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
           );
         })}
         
-        {/* Indicador de escritura */}
-        {peerIsTyping && (
-          <div className="flex items-center space-x-2 pl-10">
-            <div className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 p-2 rounded-lg rounded-bl-none">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-500 dark:bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-gray-500 dark:bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-gray-500 dark:bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              </div>
-            </div>
-          </div>
-        )}
-        
         {/* Referencia al final de los mensajes para auto-scroll */}
         <div ref={messagesEndRef} />
-        
-        {/* Mensaje para conversaciones vacías */}
-        {messages.length === 0 && !isLoadingMessages && !errorLoadingMessages && (
-          <div className="flex flex-col items-center justify-center p-6 text-center">
-            <div className="mb-4 text-gray-400">
-              <MessageSquare className="h-12 w-12" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Conversación vacía</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
-              Aún no hay mensajes en esta conversación.<br />
-              ¡Escribe algo para comenzar a chatear!
-            </p>
-          </div>
-        )}
       </div>
       
-      {/* Indicador de mensajes nuevos */}
-      {!isAtBottom && messages.length > 0 && (
-        <button
-          onClick={scrollToBottom}
-          className="absolute bottom-24 right-4 bg-blue-500 text-white rounded-full p-2 shadow-lg hover:bg-blue-600 transition-all z-10"
-          aria-label="Nuevos mensajes"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 19V5M5 12l7-7 7 7"/>
-          </svg>
-        </button>
+      {/* Indicador de escritura */}
+      {typingUsers.length > 0 && (
+        <div className="px-4 py-1 text-xs text-gray-500 italic">
+          {typingUsers.length === 1 
+            ? `${typingUsers[0]} está escribiendo...` 
+            : typingUsers.length === 2 
+              ? `${typingUsers[0]} y ${typingUsers[1]} están escribiendo...` 
+              : `${typingUsers.length} personas están escribiendo...`}
+        </div>
       )}
       
       {/* Área de entrada de mensajes */}
@@ -746,7 +716,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
             }}
           />
         ) : (
-          <div className="flex items-end space-x-2">
+          <div className="flex items-center gap-2">
             <Textarea
               value={newMessage}
               onChange={(e) => {
@@ -754,7 +724,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                 // También implementar notificación de escritura
               }}
               placeholder="Escribe un mensaje..."
-              className="flex-1 max-h-32 resize-none"
+              className="min-h-10 max-h-32 resize-none flex-1"
               ref={messageInputRef}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -763,29 +733,19 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                 }
               }}
             />
-            <div className="flex space-x-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={() => setIsVoiceRecorderVisible(true)}
-              >
-                <Mic className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="default"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || isSending}
-              >
-                {isSending ? (
-                  <div className="h-5 w-5 border-2 border-t-transparent border-white rounded-full animate-spin" />
-                ) : (
-                  <Send className="h-5 w-5" />
-                )}
-              </Button>
-            </div>
+            
+            <Button 
+              onClick={handleSendMessage} 
+              disabled={!newMessage.trim() || isSending || !currentUserId}
+              size="icon" 
+              className="rounded-full bg-blue-500 text-white hover:bg-blue-600 flex-shrink-0"
+            >
+              {isSending ? (
+                <div className="h-5 w-5 border-2 border-t-transparent border-white rounded-full animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+            </Button>
           </div>
         )}
       </div>

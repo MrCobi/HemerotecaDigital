@@ -1244,6 +1244,7 @@ export default function MessagesPage() {
             participants: Array.isArray(conv.participants) ? conv.participants : [],
             participantsCount: conv.participantsCount || (Array.isArray(conv.participants) ? conv.participants.length : 0),
             isEmpty: !conv.lastMessage,
+            // Añadir un otherUser ficticio para compatibilidad con la interfaz existente
             otherUser: {
               id: conv.id,
               username: conv.name || "Grupo",
@@ -1579,14 +1580,14 @@ export default function MessagesPage() {
 
   return (
     <>
-    <div className="flex flex-col md:flex-row h-screen bg-gray-100 dark:bg-gray-900 overflow-hidden">
+    <div className="flex flex-col md:flex-row h-screen bg-gray-100 dark:bg-gray-900">
       {/* Panel izquierdo - Lista de conversaciones y seguidores mutuos */}
-      <div className={`w-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col h-full overflow-hidden ${mobileView && selectedConversation ? "hidden md:flex" : "flex"}`}>
+      <div className={`w-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col h-full ${mobileView && selectedConversation ? "hidden md:flex" : "flex"}`}>
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
           <h1 className="text-xl font-semibold">Mensajes</h1>
           
           <div className="flex items-center space-x-2">
-            {/* Botón de actualización */}
+            {/* Botones de acción */}
             <Button 
               variant="ghost" 
               size="icon" 
@@ -1833,12 +1834,12 @@ export default function MessagesPage() {
       </div>
 
       {/* Panel derecho - Contenido de la conversación seleccionada */}
-      <div className={`w-full md:w-2/3 lg:w-3/4 bg-white dark:bg-gray-800 flex flex-col h-full overflow-hidden ${!mobileView || (mobileView && selectedConversation) ? "flex" : "hidden md:flex"}`}>
+      <div className={`w-full md:w-2/3 lg:w-3/4 bg-white dark:bg-gray-800 flex flex-col h-full ${!mobileView || (mobileView && selectedConversation) ? "flex" : "hidden md:flex"}`}>
         {selectedConversation && selectedConversationData ? (
           // Contenido de la conversación
           <div className="h-full flex flex-col">
-            {/* Cabecera de la conversación - añadir sticky para que permanezca siempre visible */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800 z-10 flex-shrink-0 sticky top-0">
+            {/* Cabecera de la conversación */}
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800 z-10 flex-shrink-0">
               <div className="flex items-center space-x-3">
                 {mobileView && (
                   <Button variant="ghost" size="icon" onClick={handleBackToList}>
@@ -1870,6 +1871,10 @@ export default function MessagesPage() {
                         width={48}
                         height={48}
                         className="rounded-full object-cover"
+                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
                       />
                     )
                   ) : selectedConversationData?.otherUser?.image && selectedConversationData.otherUser.image.includes('cloudinary') ? (
@@ -1932,11 +1937,13 @@ export default function MessagesPage() {
             {/* Contenido de la conversación integrado directamente */}
             {selectedConversationData?.isGroup ? (
               <GroupChatWindowContent 
+                key={selectedConversation} 
                 conversation={selectedConversationData} 
                 className="h-full" 
               />
             ) : (
               <ChatWindowContent 
+                key={selectedConversation}
                 otherUser={selectedConversationData?.otherUser || null} 
                 conversationId={selectedConversation}
                 className="h-full" 
@@ -1945,13 +1952,36 @@ export default function MessagesPage() {
           </div>
         ) : (
           // Panel de bienvenida cuando no hay conversación seleccionada
-          <div className="h-full flex flex-col items-center justify-center p-4">
-            <div className="text-center max-w-md">
-              <MessageSquare className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Tus mensajes</h2>
-              <p className="text-gray-500 mb-6">
-                Selecciona una conversación de la lista o inicia una nueva para comenzar a chatear.
-              </p>
+          <div className="h-full flex flex-col">
+            <div className="flex-1 flex flex-col items-center justify-center p-4">
+              <div className="text-center max-w-md">
+                <MessageSquare className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+                <h2 className="text-xl font-semibold mb-2">Tus mensajes</h2>
+                <p className="text-gray-500 mb-6">
+                  Selecciona una conversación de la lista o inicia una nueva para comenzar a chatear.
+                </p>
+              </div>
+            </div>
+            
+            {/* Área de entrada de mensaje siempre visible, incluso sin conversación */}
+            <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Escribe un mensaje..."
+                  disabled
+                  className="w-full"
+                />
+                <Button 
+                  size="icon" 
+                  disabled
+                  className="rounded-full bg-blue-500 text-white"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                    <path d="M22 2L11 13"></path>
+                    <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                  </svg>
+                </Button>
+              </div>
             </div>
           </div>
         )}

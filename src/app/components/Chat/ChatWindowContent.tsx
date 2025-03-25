@@ -689,8 +689,20 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     // Clonar el mapa actual para trabajar sobre una copia
     const updatedMap = new Map(messageMap);
     
+    // Filtrar mensajes para incluir solo los que corresponden a esta conversación
+    const filteredMessages = newMessages.filter(msg => {
+      // Solo procesar mensajes que pertenezcan específicamente a esta conversación
+      return msg.conversationId === actualConversationId || 
+             msg.conversationId === safeConversationId || 
+             // Para mensajes directos sin ID de conversación
+             (!msg.conversationId && (
+               (msg.senderId === currentUserId && msg.receiverId === otherUser?.id) ||
+               (msg.senderId === otherUser?.id && msg.receiverId === currentUserId)
+             ));
+    });
+    
     // Añadir los nuevos mensajes, reemplazando cualquier mensaje temporal con su versión final si tiene ID
-    newMessages.forEach(msg => {
+    filteredMessages.forEach(msg => {
       // Usamos el ID como clave principal si existe
       if (msg.id) {
         // Si el mensaje tiene ID, es un mensaje confirmado por el servidor
@@ -701,33 +713,39 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           updatedMap.delete(msg.tempId);
         }
       } 
-      // Si no tiene ID pero tiene tempId, usamos el tempId como clave
-      else if (msg.tempId) {
-        // Solo añadir si no existe ya o actualizar mensaje temporal existente
+      // Para mensajes temporales sin ID (enviados desde el cliente pero aún no confirmados)
+      else if (msg.tempId && !updatedMap.has(msg.tempId)) {
         updatedMap.set(msg.tempId, msg);
-      }
-      // Para mensajes sin ID ni tempId (caso raro), crear una clave única compuesta
-      else {
-        // Usar una combinación del senderId, receiverId, contenido y timestamp para generar una clave única
-        // que garantice que no se filtren mensajes duplicados legítimos
-        const now = Date.now();
-        const uniqueKey = `msg-${msg.senderId}-${now}-${Math.random().toString(36).substr(2, 9)}`;
-        updatedMap.set(uniqueKey, msg);
       }
     });
     
-    // Actualizar el estado del mapa de mensajes
-    setMessageMap(updatedMap);
+    // Convertir el mapa actualizado a un array y ordenar por fecha de creación
+    const allMessages = Array.from(updatedMap.values());
     
-    // Convertir el mapa a un array y ordenar por fecha de creación
-    const uniqueMessages = Array.from(updatedMap.values()).sort((a, b) => {
+    // Aplicar filtro de conversación otra vez para garantizar que solo se muestren mensajes de esta conversación
+    const finalMessages = allMessages.filter(msg => {
+      return msg.conversationId === actualConversationId || 
+             msg.conversationId === safeConversationId || 
+             // Para mensajes sin conversationId pero que coincidan con los participantes
+             (!msg.conversationId && (
+               (msg.senderId === currentUserId && msg.receiverId === otherUser?.id) || 
+               (msg.senderId === otherUser?.id && msg.receiverId === currentUserId)
+             ));
+    });
+    
+    // Ordenar mensajes por fecha
+    finalMessages.sort((a, b) => {
       const dateA = new Date(a.createdAt);
       const dateB = new Date(b.createdAt);
       return dateA.getTime() - dateB.getTime();
     });
     
-    return uniqueMessages;
-  }, [messageMap]);
+    // Actualizar el mapa de mensajes (para referencia futura)
+    setMessageMap(updatedMap);
+    
+    // Aplicar nuevo estado solo si hay cambios
+    return finalMessages;
+  }, [messageMap, currentUserId, otherUser?.id, actualConversationId, safeConversationId]);
   
   // Actualizar el estado de mensajes cuando cambia el mapa
   useEffect(() => {
@@ -1121,61 +1139,38 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     const handleNewMessage = (message: any) => {
       console.log('Nuevo mensaje recibido por socket:', message);
       
-      // Solo procesar mensajes relevantes para esta conversación
-      if ((message.conversationId && (message.conversationId === actualConversationId || message.conversationId === safeConversationId)) || 
-          (message.senderId === otherUser.id && message.receiverId === currentUserId) || 
-          (message.senderId === currentUserId && message.receiverId === otherUser.id)) {
-        
-        // Verificar si ya tenemos este mensaje para evitar duplicados
-        setMessageMap(prevMap => {
-          // Si ya tenemos este mensaje con el mismo ID, no hacer nada
-          if (message.id && prevMap.has(message.id)) {
-            return prevMap; // No modificar el mapa
-          }
-          
-          // Si tenemos el mensaje con tempId pero ahora llega con id, actualizar
-          if (message.id && message.tempId && prevMap.has(message.tempId)) {
-            const newMap = new Map(prevMap);
-            newMap.delete(message.tempId);
-            newMap.set(message.id, message);
-            return newMap;
-          }
-          
-          // En otros casos, agregamos el mensaje normalmente
-          const newMap = new Map(prevMap);
-          
-          // Si el mensaje tiene un ID, usar ese como clave
-          if (message.id) {
-            newMap.set(message.id, message);
-          } 
-          // Si no tiene ID pero tiene tempId, usar el tempId como clave
-          else if (message.tempId) {
-            newMap.set(message.tempId, message);
-          }
-          // Para mensajes sin ID ni tempId, crear una clave única
-          else {
-            const uniqueKey = `msg-${message.senderId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            newMap.set(uniqueKey, message);
-          }
-          
-          return newMap;
+      // Verificar si el mensaje pertenece a esta conversación
+      const belongsToConversation = 
+        message.conversationId === actualConversationId || 
+        message.conversationId === safeConversationId ||
+        // Para mensajes directos sin ID de conversación
+        (!message.conversationId && (
+          (message.senderId === currentUserId && message.receiverId === otherUser?.id) ||
+          (message.senderId === otherUser?.id && message.receiverId === currentUserId)
+        ));
+      
+      if (!belongsToConversation) {
+        console.log('Mensaje ignorado: no pertenece a esta conversación');
+        return;
+      }
+      
+      // Si el mensaje es de otra persona, marcarlo como leído
+      if (message.senderId === otherUser?.id && !message.read && socketInstance) {
+        console.log('Marcando mensaje como leído:', message.id);
+        socketMarkMessageAsRead({
+          messageId: message.id as string,
+          conversationId: message.conversationId || safeConversationId
         });
-        
-        // Si no somos el remitente, marcar el mensaje como leído automáticamente
-        // Usar una ref para evitar que esto se ejecute en cada renderizado
-        if (message.senderId !== currentUserId && message.id && socketInitialized && !message.read) {
-          socketMarkMessageAsRead({
-            messageId: message.id,
-            conversationId: message.conversationId || safeConversationId
-          });
-        }
-        
-        // Scroll automático a la parte inferior si el usuario está cerca del final
-        if (isAtBottom && messagesEndRef.current) {
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-        }
+      }
+      
+      // Procesar el nuevo mensaje con nuestra función de deduplicación
+      processMessages([message], messages);
+      
+      // Scroll automático a la parte inferior si el usuario está cerca del final
+      if (isAtBottom && messagesEndRef.current) {
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
       }
     };
     
@@ -1633,10 +1628,10 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   
   return (
     <div className={cn("flex flex-col h-full max-h-full", className)}>
-      {/* Contenedor de mensajes - max-height para evitar desbordamiento */}
+      {/* Contenedor de mensajes - con display flex y justify-content para alinear los mensajes al final cuando hay pocos */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
+        className="flex-1 overflow-y-auto p-4 min-h-0 flex flex-col justify-end"
         onScroll={handleScroll}
       >
         {isLoadingMessages ? (
@@ -1748,19 +1743,6 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         )}
       </div>
   
-      {/* Indicador de mensajes nuevos */}
-      {!isAtBottom && messages.length > 0 && (
-        <button
-          onClick={scrollToBottom}
-          className="absolute bottom-24 right-4 bg-blue-500 text-white rounded-full p-2 shadow-lg hover:bg-blue-600 transition-all z-10"
-          aria-label="Nuevos mensajes"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 19V5M5 12l7-7 7 7"/>
-          </svg>
-        </button>
-      )}
-  
       {/* Indicador de escritura */}
       {peerIsTyping && (
         <div className="px-4 py-1 text-xs text-gray-500 italic">
@@ -1768,7 +1750,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         </div>
       )}
   
-      {/* Contenedor para la entrada de mensajes - asegurarse que siempre sea visible */}
+      {/* Contenedor para la entrada de mensajes - siempre visible y fijo en la parte inferior */}
       <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex-shrink-0">
         {canSendMessages === false ? (
           <div className="text-center text-gray-500 mb-2">
