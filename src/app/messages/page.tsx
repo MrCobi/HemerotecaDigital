@@ -145,6 +145,9 @@ export default function MessagesPage() {
   const [selectedNewParticipants, setSelectedNewParticipants] = useState<string[]>([]);
   const [isUpdatingGroup, setIsUpdatingGroup] = useState(false);
   
+  // Estados para el filtro de conversaciones
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'private' | 'group'>('all');
+  
   // Referencias para controlar ciclos y renderizado
   const isProcessingUrlRef = useRef(false);
   const messagesDivRef = useRef<HTMLDivElement>(null);
@@ -649,25 +652,48 @@ export default function MessagesPage() {
     }
   }, [selectedConversation, conversations]);
 
-  const filteredCombinedList = useMemo(() => {
-    return combinedList.filter((item) => {
-      if (item.isConversation) {
-        const conversation = item.data as Conversation;
-        const username = conversation.otherUser?.username?.toLowerCase() || "";
-        const searchTerm = generalSearchTerm.toLowerCase();
-        return searchTerm.trim() === "" || username.includes(searchTerm);
-      } else {
-        const user = item.data as User;
-        const username = user.username?.toLowerCase() || "";
-        const searchTerm = generalSearchTerm.toLowerCase();
-        return searchTerm.trim() === "" || username.includes(searchTerm);
-      }
-    });
-  }, [combinedList, generalSearchTerm]);
+  // Filtramos las conversaciones según el filtro seleccionado y el término de búsqueda
+  const filteredConversations = useMemo(() => {
+    // Primero filtramos por tipo de conversación (privada/grupo/todos)
+    let filtered = combinedList;
+    
+    if (selectedFilter === 'private') {
+      filtered = combinedList.filter(item => 
+        item.isConversation && 
+        !((item.data as Conversation).isGroup || 
+          ((item.data as Conversation).id && (item.data as Conversation).id.startsWith('group_')))
+      );
+    } else if (selectedFilter === 'group') {
+      filtered = combinedList.filter(item => 
+        item.isConversation && 
+        ((item.data as Conversation).isGroup || 
+         ((item.data as Conversation).id && (item.data as Conversation).id.startsWith('group_')))
+      );
+    }
+    
+    // Luego filtramos por término de búsqueda
+    if (generalSearchTerm.trim() !== "") {
+      const searchTerm = generalSearchTerm.toLowerCase();
+      filtered = filtered.filter((item) => {
+        if (item.isConversation) {
+          const conversation = item.data as Conversation;
+          const username = conversation.otherUser?.username?.toLowerCase() || "";
+          const name = conversation.name?.toLowerCase() || "";
+          return username.includes(searchTerm) || name.includes(searchTerm);
+        } else {
+          const user = item.data as User;
+          const username = user.username?.toLowerCase() || "";
+          return username.includes(searchTerm);
+        }
+      });
+    }
+    
+    return filtered;
+  }, [combinedList, selectedFilter, generalSearchTerm]);
 
   useEffect(() => {
-    console.log(`Filtered combinedList has ${filteredCombinedList.length} items (search: "${generalSearchTerm}")`);
-  }, [filteredCombinedList.length, generalSearchTerm]);
+    console.log(`Filtered combinedList has ${filteredConversations.length} items (search: "${generalSearchTerm}")`);
+  }, [filteredConversations.length, generalSearchTerm]);
 
   // Función para iniciar una nueva conversación - optimizada y memoizada
   const startNewConversation = useCallback(async (userId: string) => {
@@ -1639,6 +1665,34 @@ export default function MessagesPage() {
           />
         </div>
           
+        {/* Filtros de conversación */}
+        <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex space-x-2">
+          <Button 
+            variant={selectedFilter === 'all' ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedFilter('all')}
+            className="text-xs flex-1"
+          >
+            Todos
+          </Button>
+          <Button 
+            variant={selectedFilter === 'private' ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedFilter('private')}
+            className="text-xs flex-1"
+          >
+            Privados
+          </Button>
+          <Button 
+            variant={selectedFilter === 'group' ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedFilter('group')}
+            className="text-xs flex-1"
+          >
+            Grupos
+          </Button>
+        </div>
+
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
@@ -1649,9 +1703,9 @@ export default function MessagesPage() {
         ) : (
           <div className="flex-1 overflow-y-auto">
             {/* Tabs */}
-            {filteredCombinedList.length > 0 && filteredCombinedList.some(item => item.isConversation) ? (
+            {filteredConversations.length > 0 && filteredConversations.some(item => item.isConversation) ? (
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredCombinedList
+                {filteredConversations
                   .filter(item => item.isConversation)
                   .map((item) => {
                     const conversation = item.data as Conversation;
@@ -1743,10 +1797,10 @@ export default function MessagesPage() {
                               />
                             ) : (
                               <Image
-                                src={conversation.otherUser?.image || "/images/AvatarPredeterminado.webp"}
-                                width={48}
-                                height={48}
-                                alt={conversation.otherUser?.username || "Usuario"}
+                                src={conversation.otherUser?.image || "/images/AvatarPredeterminado.webp"} 
+                                alt={conversation.otherUser?.username || "Usuario"} 
+                                width={40} 
+                                height={40}
                                 className="rounded-full object-cover"
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                   const target = e.target as HTMLImageElement;
