@@ -520,13 +520,17 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
     
     console.log(`Parámetro 'with' recibido: "${conversationParam}"`);
     
-    // Si el parámetro comienza con 'conv_', mantenemos el formato tal cual
+    // Identificar el tipo de conversación basado en el prefijo
     if (conversationParam.startsWith('conv_')) {
-      conversationId = conversationParam; // Mantener el ID completo con prefijo
+      conversationId = conversationParam; // Mantener el ID completo con prefijo para chats 1:1
       isDirectConversationId = true;
-      console.log(`Identificado como ID de conversación directo: ${conversationId}`);
+      console.log(`Identificado como ID de conversación directa: ${conversationId}`);
+    } else if (conversationParam.startsWith('group_')) {
+      conversationId = conversationParam; // Mantener el ID completo con prefijo para grupos
+      isDirectConversationId = true;
+      console.log(`Identificado como ID de conversación de grupo: ${conversationId}`);
     } else {
-      // Si no tiene prefijo, asumimos que es el ID de otro usuario o de conversación directamente
+      // Si no tiene prefijo, asumimos que es el ID de otro usuario
       conversationId = conversationParam;
       console.log(`Identificado como posible ID de usuario: ${conversationId}`);
     }
@@ -551,11 +555,23 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
         // Verificar si la conversación existe
         console.log(`DEPURACIÓN: Buscando conversación con ID exacto: "${conversationId}"`);
         
+        // Detectar si es un ID de grupo o de conversación normal
+        const isGroupConversation = conversationId.startsWith('group_');
+        
+        // Si es un intento de acceder a "conv_group_X", corregir el ID
+        if (conversationId.startsWith('conv_group_')) {
+          const correctedId = conversationId.replace('conv_group_', 'group_');
+          console.log(`Corrigiendo ID de conversación mal formado. Original: ${conversationId}, Corregido: ${correctedId}`);
+          conversationId = correctedId;
+        }
+        
         // Primero hacemos una búsqueda más permisiva para debuggear
         const similarConversations = await prisma.conversation.findMany({
           where: {
             id: {
-              contains: conversationId.replace('conv_', '')
+              contains: isGroupConversation 
+                ? conversationId.replace('group_', '') 
+                : conversationId.replace('conv_', '')
             }
           },
           select: {
@@ -695,27 +711,56 @@ async function fetchMessagesByConversationId(conversationId: string, skip: numbe
   
   // Primero, verificar que la conversación existe realizando una consulta bruta a la base de datos
   try {
+    // Normalizar el ID para la búsqueda quitando prefijos si existen
+    let normalizedId = conversationId;
+    
+    // Detectar y manejar prefijos específicos
+    if (conversationId.startsWith('conv_')) {
+      normalizedId = conversationId.replace('conv_', '');
+      console.log(`Normalizado ID de conversación directa: ${normalizedId}`);
+    } else if (conversationId.startsWith('group_')) {
+      normalizedId = conversationId; // Los IDs de grupo ya incluyen el prefijo en la BD
+      console.log(`Usando ID de grupo tal cual: ${normalizedId}`);
+    }
+    
     // Para depuración, buscar por coincidencia parcial también
     const conversationsWithSimilarId = await prisma.$queryRaw`
       SELECT id FROM conversations 
-      WHERE id LIKE ${`%${conversationId.replace('conv_', '')}%`}
+      WHERE id LIKE ${`%${normalizedId.replace('group_', '')}%`}
       LIMIT 5
     `;
     
     console.log(`Conversaciones con ID similar:`, conversationsWithSimilarId);
     
-    const conversationExists = await prisma.conversation.findUnique({
+    // Intentar encontrar la conversación con el ID exacto primero
+    let conversationExists = await prisma.conversation.findUnique({
       where: {
         id: conversationId
       }
     });
     
-    console.log(`Resultado de búsqueda de conversación exacta "${conversationId}": ${conversationExists ? 'Encontrada' : 'No encontrada'}`);
+    // Si no se encuentra con el ID exacto, probar con el ID normalizado
+    if (!conversationExists && normalizedId !== conversationId) {
+      conversationExists = await prisma.conversation.findUnique({
+        where: {
+          id: normalizedId
+        }
+      });
+      
+      if (conversationExists) {
+        console.log(`Encontrada conversación con ID normalizado: ${normalizedId}`);
+        // Usar el ID normalizado para el resto de la función
+        conversationId = normalizedId;
+      }
+    }
+    
+    console.log(`Resultado final de búsqueda: ${conversationExists ? 'Encontrada' : 'No encontrada'}`);
     
     if (!conversationExists) {
       return null; // Conversación no encontrada
     }
     
+    // Ahora podemos obtener los mensajes normalmente
     return await getMessagesForConversation(conversationId, skip, limit);
   } catch (error) {
     console.error(`Error grave al buscar la conversación:`, error);

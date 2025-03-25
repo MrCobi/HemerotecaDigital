@@ -822,13 +822,15 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         // Definir el parámetro 'with'
         let withParam: string;
         
-        // Si tenemos un ID de conversación real, añadimos el prefijo 'conv_'
-        // pero solo si no tiene ya el prefijo
+        // Si tenemos un ID de conversación real, añadimos el prefijo adecuado
         if (actualConversationId) {
-          // Evitar la duplicación del prefijo
-          withParam = actualConversationId.startsWith('conv_') 
-            ? actualConversationId 
-            : `conv_${actualConversationId}`;
+          // No modificar IDs que ya tengan prefijos
+          if (actualConversationId.startsWith('conv_') || actualConversationId.startsWith('group_')) {
+            withParam = actualConversationId;
+          } else {
+            // Para IDs sin prefijo, añadir el prefijo 'conv_'
+            withParam = `conv_${actualConversationId}`;
+          }
           console.log(`Consultando mensajes con ID de conversación: ${withParam}`);
         } 
         // Si no, usamos el ID del otro usuario directamente

@@ -219,15 +219,16 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
           throw new Error('Faltan datos necesarios para cargar mensajes');
         }
         
-        // Las conversaciones de grupo NO llevan el prefijo 'conv_' en la base de datos
-        const withParam = conversation.id;
+        // Asegurarnos de usar el ID con el prefijo correcto
+        // Si ya tiene el prefijo 'group_', lo usamos tal cual
+        const withParam = conversation.id.startsWith('group_') 
+          ? conversation.id 
+          : `group_${conversation.id}`;
         
         const response = await fetch(
           `${API_ROUTES.messages.list}?with=${withParam}&page=${pageNum}&limit=${pageSize}&t=${Date.now()}`, 
           { cache: 'no-store' }
         );
-        
-        const responseText = await response.text();
         
         if (response.status === 404) {
           console.log('El grupo ya no existe en la base de datos');
@@ -240,15 +241,15 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         }
         
         if (!response.ok) {
-          console.error(`Error al cargar mensajes (${response.status}): ${responseText}`);
+          console.error(`Error al cargar mensajes (${response.status}): ${await response.text()}`);
           throw new Error(`Error al cargar los mensajes: ${response.status}`);
         }
         
         let data;
         try {
-          data = JSON.parse(responseText);
+          data = await response.json();
         } catch (parseError) {
-          console.error('Error al parsear la respuesta JSON:', parseError, responseText);
+          console.error('Error al parsear la respuesta JSON:', parseError, await response.text());
           throw new Error('La respuesta del servidor no es un JSON válido');
         }
         
@@ -312,7 +313,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content: tempMessage.content,
-          conversationId: conversation.id,
+          conversationId: conversation.id.startsWith('group_') ? conversation.id : `group_${conversation.id}`,
           messageType: 'text'
         }),
       });
@@ -337,7 +338,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         socketSendMessage({
           ...finalMessage,
           receiverId: 'group', // Marcar que es un mensaje de grupo
-          conversationId: conversation.id
+          conversationId: conversation.id.startsWith('group_') ? conversation.id : `group_${conversation.id}`
         });
       }
       

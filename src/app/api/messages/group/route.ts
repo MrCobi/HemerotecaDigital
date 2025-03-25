@@ -113,6 +113,7 @@ export const POST = withAuth(async (req: any, { userId, user }: { userId: string
     // Creamos la conversación con todos los datos necesarios
     const groupData = await prisma.conversation.create({
       data: {
+        id: `group_${crypto.randomBytes(12).toString('hex')}`,
         name,
         imageUrl,
         isGroup: true,

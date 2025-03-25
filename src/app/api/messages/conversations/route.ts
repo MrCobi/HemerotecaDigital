@@ -27,6 +27,7 @@ interface ConversationResponse {
   unreadCount: number;
   createdAt: Date;
   updatedAt: Date;
+  isGroup: boolean;
 }
 
 export async function GET(request: NextRequest) {
@@ -46,7 +47,8 @@ export async function GET(request: NextRequest) {
       SELECT 
         c.id as conversationId,
         c.created_at as createdAt, 
-        c.updated_at as updatedAt
+        c.updated_at as updatedAt,
+        c.is_group as isGroup
       FROM conversations c
       JOIN conversation_participants cp ON c.id = cp.conversation_id
       WHERE cp.user_id = ${session.user.id}
@@ -108,6 +110,10 @@ export async function GET(request: NextRequest) {
             }
           });
 
+          // Determinar si es un grupo basado en el campo isGroup o el prefijo 'group_' en el ID
+          const isGroupConversation = Boolean(conv.isGroup) || 
+            (typeof conv.conversationId === 'string' && conv.conversationId.startsWith('group_'));
+
           return {
             id: conv.conversationId,
             receiver: {
@@ -125,7 +131,8 @@ export async function GET(request: NextRequest) {
             } : undefined,
             unreadCount,
             createdAt: conv.createdAt,
-            updatedAt: conv.updatedAt || conv.createdAt
+            updatedAt: conv.updatedAt || conv.createdAt,
+            isGroup: isGroupConversation
           };
         } catch (error) {
           console.error(`Error procesando conversación ${conv.conversationId}:`, error);

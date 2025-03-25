@@ -149,8 +149,12 @@ export default function MessagesPage() {
       const validConversations = conversations
         .filter(conv => conv && typeof conv === 'object' && conv.id)
         .map((conv) => {
-          // Verificar si es un grupo
-          if (conv.isGroup) {
+          // Verificar si es un grupo basado en el ID o la propiedad isGroup
+          const isGroupConversation = conv.isGroup || (conv.id && typeof conv.id === 'string' && conv.id.startsWith('group_'));
+          
+          // Si es un grupo, dar formato como grupo
+          if (isGroupConversation) {
+            console.log(`Procesando grupo: ${conv.id}`);
             return {
               id: conv.id,
               isGroup: true,
