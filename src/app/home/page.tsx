@@ -103,6 +103,107 @@ const decorativeElements = [
   { left: "15%", top: "35%", width: "6px", height: "6px", duration: "2.9s" },
 ];
 
+const categoryMappings = {
+  "technology": {
+    spanish: "Tecnología",
+    lightImage: "/images/categories/technology-light.webp",
+    darkImage: "/images/categories/technology-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1488229297570-58520851e868?q=80&w=2069&auto=format&fit=crop",
+    color: "from-blue-600 to-indigo-600"
+  },
+  "politics": {
+    spanish: "Política",
+    lightImage: "/images/categories/politics-light.webp",
+    darkImage: "/images/categories/politics-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1575320181282-9afab399332c?q=80&w=2070&auto=format&fit=crop",
+    color: "from-red-600 to-orange-600"
+  },
+  "science": {
+    spanish: "Ciencia",
+    lightImage: "/images/categories/science-light.webp",
+    darkImage: "/images/categories/science-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1623493308303-53f46fd1ed5c?q=80&w=2013&auto=format&fit=crop",
+    color: "from-green-600 to-teal-600"
+  },
+  "health": {
+    spanish: "Salud",
+    lightImage: "/images/categories/health-light.webp",
+    darkImage: "/images/categories/health-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?q=80&w=2070&auto=format&fit=crop",
+    color: "from-purple-600 to-pink-600"
+  },
+  "sports": {
+    spanish: "Deportes",
+    lightImage: "/images/categories/sports-light.webp",
+    darkImage: "/images/categories/sports-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=2070&auto=format&fit=crop",
+    color: "from-yellow-600 to-amber-600"
+  },
+  "economy": {
+    spanish: "Economía",
+    lightImage: "/images/categories/economy-light.webp",
+    darkImage: "/images/categories/economy-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=80&w=2070&auto=format&fit=crop",
+    color: "from-emerald-600 to-green-600"
+  },
+  "culture": {
+    spanish: "Cultura",
+    lightImage: "/images/categories/culture-light.webp",
+    darkImage: "/images/categories/culture-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1460572894071-bde5697f7197?q=80&w=2069&auto=format&fit=crop",
+    color: "from-cyan-600 to-blue-600"
+  },
+  "social": {
+    spanish: "Social",
+    lightImage: "/images/categories/social-light.webp",
+    darkImage: "/images/categories/social-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1511632765486-a01980e01a18?q=80&w=2070&auto=format&fit=crop",
+    color: "from-violet-600 to-purple-600"
+  },
+  "education": {
+    spanish: "Educación",
+    lightImage: "/images/categories/education-light.webp",
+    darkImage: "/images/categories/education-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=2022&auto=format&fit=crop",
+    color: "from-amber-600 to-orange-600"
+  },
+  "environment": {
+    spanish: "Medio Ambiente",
+    lightImage: "/images/categories/environment-light.webp",
+    darkImage: "/images/categories/environment-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1623493308303-53f46fd1ed5c?q=80&w=2070&auto=format&fit=crop",
+    color: "from-lime-600 to-green-600"
+  }
+};
+
+const getSpanishCategory = (englishCategory: string): string => {
+  return categoryMappings[englishCategory.toLowerCase() as keyof typeof categoryMappings]?.spanish || englishCategory;
+};
+
+const getCategoryGradient = (englishCategory: string): string => {
+  return categoryMappings[englishCategory.toLowerCase() as keyof typeof categoryMappings]?.color || "from-blue-600 to-indigo-600";
+};
+
+const getCategoryImage = (englishCategory: string, isDarkMode: boolean): string => {
+  const mapping = categoryMappings[englishCategory.toLowerCase() as keyof typeof categoryMappings];
+  if (!mapping) {
+    return `https://source.unsplash.com/random/300x200?${encodeURIComponent(englishCategory)}`;
+  }
+  
+  // Si estamos en modo oscuro y hay imagen para modo oscuro
+  if (isDarkMode && mapping.darkImage) {
+    return mapping.darkImage;
+  }
+  
+  // Si estamos en modo claro o no hay imagen para modo oscuro
+  if (mapping.lightImage) {
+    return mapping.lightImage;
+  }
+  
+  // Imagen de respaldo
+  return mapping.fallbackImage || `https://source.unsplash.com/random/300x200?${encodeURIComponent(englishCategory)}`;
+};
+
 const StatItem = ({
   icon,
   label,
@@ -748,6 +849,25 @@ export default function HomePage() {
     );
   };
 
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    // Detecta el modo oscuro
+    setIsDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches);
+    
+    // Escucha cambios en el modo de color
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      setIsDarkMode(e.matches);
+    };
+    
+    darkModeMediaQuery.addEventListener('change', handleChange);
+    return () => {
+      darkModeMediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
   if (!mounted || session === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-900">
@@ -1072,7 +1192,13 @@ export default function HomePage() {
               onMouseUp={horizontalScroll.onMouseUp}
               onMouseMove={horizontalScroll.onMouseMove}
             >
-              {categories.map((category, i) => (
+              {categories.map((category, i) => {
+                const englishCategory = category.toLowerCase();
+                const spanishCategory = getSpanishCategory(englishCategory);
+                const gradientClass = getCategoryGradient(englishCategory);
+                const resolvedBgImage = getCategoryImage(englishCategory, isDarkMode);
+                
+                return (
                 <motion.div
                   key={i}
                   initial={animationVariants.hidden}
@@ -1085,19 +1211,17 @@ export default function HomePage() {
                     <div
                       className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-110"
                       style={{
-                        backgroundImage: `url(https://source.unsplash.com/random/300x200?${encodeURIComponent(
-                          category
-                        )})`,
+                        backgroundImage: `url(${resolvedBgImage})`,
                       }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
+                    <div className={`absolute inset-0 bg-gradient-to-t ${gradientClass} opacity-70`} />
                     <div className="absolute bottom-0 left-0 right-0 p-5">
                       <h3 className="text-xl font-bold text-white">
-                        {category}
+                        {spanishCategory}
                       </h3>
                       <div className="flex items-center mt-2 text-sm text-blue-50">
                         <Link
-                          href={`/categories/${encodeURIComponent(category)}`}
+                          href={`/categories/${encodeURIComponent(englishCategory)}`}
                           className="flex items-center text-blue-100 hover:text-white transition-colors"
                         >
                           Explorar{" "}
@@ -1107,7 +1231,7 @@ export default function HomePage() {
                     </div>
                   </div>
                 </motion.div>
-              ))}
+              )})}
             </div>
 
             {/* Botones de navegación */}
