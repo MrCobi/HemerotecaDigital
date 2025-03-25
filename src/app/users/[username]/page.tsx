@@ -419,7 +419,9 @@ export default function UserProfilePage() {
                 <div className="text-center py-12 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
                   <Heart className="h-16 w-16 mx-auto text-red-400/50 mb-4" />
                   <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    No tienes periódicos favoritos
+                    {session?.user?.id === user.id 
+                      ? "No tienes periódicos favoritos" 
+                      : `${user.name || user.username} no tiene periódicos favoritos`}
                   </p>
                 </div>
               ) : (
@@ -546,44 +548,62 @@ export default function UserProfilePage() {
                             </div>
                             <div>
                               <p className="text-sm text-gray-600 dark:text-gray-400">
-                                {activity.type === "favorite_added" &&
-                                  `Agregaste ${activity.sourceName || "una fuente"
-                                  } a favoritos.`}
-                                {activity.type === "favorite_removed" &&
-                                  `Eliminaste ${activity.sourceName || "una fuente"
-                                  } de favoritos.`}
-                                {activity.type === "comment" &&
-                                  `Comentaste en ${activity.sourceName || "una fuente"
-                                  }.`}
-                                {activity.type === "rating_added" &&
-                                  `Valoraste ${activity.sourceName || "una fuente"
-                                  }.`}
-                                {activity.type === "rating_removed" &&
-                                  `Eliminaste la valoración de ${activity.sourceName || "una fuente"
-                                  }.`}
-                                {activity.type === "follow" &&
-                                  `Comenzaste a seguir a ${activity.user?.name || "un usuario"
-                                  }.`}
-                                {activity.type === "comment_reply" &&
-                                  `Respondiste a un comentario en ${activity.sourceName || "una fuente"
-                                  }.`}
-                                {activity.type === "comment_deleted" &&
-                                  `Eliminaste un comentario en ${activity.sourceName || "una fuente"
-                                  }.`}
-                                {activity.type === "unfollow" &&
-                                  `Dejaste de seguir a ${activity.user?.name || "un usuario"
-                                  }.`}
-                                {activity.type === "favorite" &&
-                                  `${activity.user?.name || "un usuario"} marcó como favorito a ${activity.sourceName || "una fuente"
-                                  }.`}
+                                {/* Verificamos si estamos viendo nuestro propio perfil o el de otro usuario */}
+                                {session?.user?.id === user.id ? (
+                                  // Actividad en primera persona (mi propio perfil)
+                                  <>
+                                    {activity.type === "favorite_added" &&
+                                      `Agregaste ${activity.sourceName || "una fuente"} a favoritos.`}
+                                    {activity.type === "favorite_removed" &&
+                                      `Eliminaste ${activity.sourceName || "una fuente"} de favoritos.`}
+                                    {activity.type === "comment" &&
+                                      `Comentaste en ${activity.sourceName || "una fuente"}.`}
+                                    {activity.type === "rating_added" &&
+                                      `Valoraste ${activity.sourceName || "una fuente"}.`}
+                                    {activity.type === "rating_removed" &&
+                                      `Eliminaste la valoración de ${activity.sourceName || "una fuente"}.`}
+                                    {activity.type === "follow" &&
+                                      `Comenzaste a seguir a ${activity.targetName || "un usuario"}.`}
+                                    {activity.type === "comment_reply" &&
+                                      `Respondiste a un comentario en ${activity.sourceName || "una fuente"}.`}
+                                    {activity.type === "comment_deleted" &&
+                                      `Eliminaste un comentario en ${activity.sourceName || "una fuente"}.`}
+                                    {activity.type === "unfollow" &&
+                                      `Dejaste de seguir a ${activity.targetName || "un usuario"}.`}
+                                    {activity.type === "favorite" &&
+                                      `Marcaste como favorito a ${activity.sourceName || "una fuente"}.`}
+                                  </>
+                                ) : (
+                                  // Actividad en tercera persona (perfil de otra persona)
+                                  <>
+                                    {activity.type === "favorite_added" &&
+                                      `${user.name || user.username} agregó ${activity.sourceName || "una fuente"} a favoritos.`}
+                                    {activity.type === "favorite_removed" &&
+                                      `${user.name || user.username} eliminó ${activity.sourceName || "una fuente"} de favoritos.`}
+                                    {activity.type === "comment" &&
+                                      `${user.name || user.username} comentó en ${activity.sourceName || "una fuente"}.`}
+                                    {activity.type === "rating_added" &&
+                                      `${user.name || user.username} valoró ${activity.sourceName || "una fuente"}.`}
+                                    {activity.type === "rating_removed" &&
+                                      `${user.name || user.username} eliminó la valoración de ${activity.sourceName || "una fuente"}.`}
+                                    {activity.type === "follow" &&
+                                      `${user.name || user.username} comenzó a seguir a ${activity.targetName || "un usuario"}.`}
+                                    {activity.type === "comment_reply" &&
+                                      `${user.name || user.username} respondió a un comentario en ${activity.sourceName || "una fuente"}.`}
+                                    {activity.type === "comment_deleted" &&
+                                      `${user.name || user.username} eliminó un comentario en ${activity.sourceName || "una fuente"}.`}
+                                    {activity.type === "unfollow" &&
+                                      `${user.name || user.username} dejó de seguir a ${activity.targetName || "un usuario"}.`}
+                                    {activity.type === "favorite" &&
+                                      `${user.name || user.username} marcó como favorito a ${activity.sourceName || "una fuente"}.`}
+                                  </>
+                                )}
                                 {/* Texto de fallback para tipos no reconocidos */}
                                 {!["favorite_added", "favorite_removed", "comment", "rating_added",
                                   "rating_removed", "follow", "comment_reply", "comment_deleted",
                                   "unfollow", "favorite"].includes(activity.type) &&
                                   `Actividad: ${activity.type || "desconocida"} ${activity.sourceName ? `en ${activity.sourceName}` :
-                                    activity.user?.name ? `con ${activity.user?.name}` :
-                                      ""
-                                  }`}
+                                    activity.targetName ? `con ${activity.targetName}` : ""}`}
                               </p>
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                 {activity.createdAt
