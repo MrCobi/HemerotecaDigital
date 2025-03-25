@@ -62,7 +62,8 @@ export const MessageItem = React.memo(({
   showAvatar,
   showDateSeparator,
   index,
-  session
+  session,
+  isGroupChat = false
 }: { 
   message: Message, 
   currentUserId: string,
@@ -70,7 +71,8 @@ export const MessageItem = React.memo(({
   showAvatar: boolean,
   showDateSeparator: boolean,
   index: number,
-  session: any
+  session: any,
+  isGroupChat?: boolean
 }) => {
   const isCurrentUser = message.senderId === currentUserId;
   
@@ -97,6 +99,13 @@ export const MessageItem = React.memo(({
         )}
         
         <div className={`flex flex-col ${!isCurrentUser && showAvatar ? 'ml-0' : !isCurrentUser ? 'ml-10' : ''}`}>
+          {/* Mostrar nombre de usuario en mensajes de grupo cuando no es el usuario actual */}
+          {!isCurrentUser && isGroupChat && showAvatar && (
+            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1 ml-1">
+              {otherUser?.username || 'Usuario'}
+            </span>
+          )}
+          
           <div
             className={cn(
               'max-w-xs md:max-w-md p-3 rounded-lg',

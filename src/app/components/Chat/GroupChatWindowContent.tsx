@@ -411,36 +411,11 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   // Renderización del componente
   return (
     <div className={cn("flex flex-col h-full bg-white dark:bg-gray-900", className)}>
-      {/* Cabecera del chat de grupo */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-        <div className="flex items-center">
-          <div className="flex items-center mr-3">
-            <Avatar className="h-10 w-10 mr-3">
-              {conversation.imageUrl ? (
-                <AvatarImage src={conversation.imageUrl} alt={conversation.name || "Grupo"} />
-              ) : (
-                <AvatarFallback>
-                  {conversation.name ? conversation.name.charAt(0).toUpperCase() : "G"}
-                </AvatarFallback>
-              )}
-            </Avatar>
-            <div>
-              <h2 className="font-semibold text-lg">
-                {conversation.name || "Grupo sin nombre"}
-              </h2>
-              <p className="text-sm text-gray-500">
-                {conversation.participants?.length || 0} participantes
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Contenedor de mensajes */}
+      {/* Contenedor principal de mensajes con scroll */}
       <div 
         ref={chatContainerRef}
         className="flex-1 overflow-y-auto p-4 space-y-4"
-        onScroll={() => {
+        onScroll={(e) => {
           const element = chatContainerRef.current;
           if (element) {
             // Verificar si estamos cerca del top para cargar más mensajes
@@ -508,6 +483,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                 showDateSeparator={showDateSeparator}
                 index={index}
                 session={session}
+                isGroupChat={true}
               />
             </React.Fragment>
           );
