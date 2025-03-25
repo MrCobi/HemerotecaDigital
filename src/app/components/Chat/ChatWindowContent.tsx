@@ -1655,8 +1655,15 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
             )}
           </div>
         ) : messages.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">
-            <p>No hay mensajes aún. ¡Comienza la conversación!</p>
+          <div className="flex flex-col items-center justify-center p-6 text-center">
+            <div className="mb-4 text-gray-400">
+              <MessageSquare className="h-12 w-12" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Conversación vacía</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
+              Aún no hay mensajes en esta conversación.<br />
+              ¡Escribe algo para comenzar a chatear!
+            </p>
           </div>
         ) : (
           <>
@@ -1842,20 +1849,6 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
               Reintentar
             </Button>
           )}
-        </div>
-      )}
-  
-      {/* Mensaje para conversaciones vacías */}
-      {messages.length === 0 && !isLoadingMessages && !errorLoadingMessages && (
-        <div className="flex flex-col items-center justify-center p-6 text-center">
-          <div className="mb-4 text-gray-400">
-            <MessageSquare className="h-12 w-12" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Conversación vacía</h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-4">
-            Aún no hay mensajes en esta conversación.<br />
-            ¡Escribe algo para comenzar a chatear!
-          </p>
         </div>
       )}
   
