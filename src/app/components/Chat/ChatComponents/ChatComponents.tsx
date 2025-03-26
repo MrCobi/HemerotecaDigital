@@ -23,7 +23,7 @@ export type Message = {
   senderId: string;
   receiverId?: string;
   createdAt: Date | string;
-  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error';
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   conversationId?: string;
   read?: boolean;
   mediaUrl?: string;
@@ -179,7 +179,7 @@ export const MessageItem = React.memo(({
                 {message.status === 'sent' && <span>Enviado</span>}
                 {message.status === 'delivered' && <span>Entregado</span>}
                 {message.status === 'read' && <span>Leído</span>}
-                {message.status === 'error' && <span className="text-red-500">Error</span>}
+                {message.status === 'failed' && <span className="text-red-500">Error</span>}
               </span>
             )}
           </div>

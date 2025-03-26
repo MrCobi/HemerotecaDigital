@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/app/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
@@ -21,14 +21,16 @@ type User = {
 type Message = {
   id?: string;
   tempId?: string;
-  content: string;
+  content: string | null;
   senderId: string;
   receiverId?: string;
   createdAt: Date | string;
-  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error';
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   conversationId?: string;
   read?: boolean;
 };
+
+type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 interface ChatWindowProps {
   isOpen: boolean;
@@ -37,8 +39,6 @@ interface ChatWindowProps {
   initialMessages?: Message[];
   conversationId?: string;
 }
-
-type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'error';
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
   isOpen,
@@ -73,8 +73,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     connected,
     error: socketError,
     sendMessage: sendSocketMessage,
-    setTypingStatus,
-    markMessageAsRead
+    updateTypingStatus: setTypingStatus,
+    markMessageAsRead: markAsRead,
+    socketInstance
   } = useSocket({
     userId: currentUserId,
     username: session?.user?.name || session?.user?.username || 'Usuario',
@@ -98,7 +99,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         // Marcar como leído si el mensaje es del otro usuario
         if (message.senderId === otherUser?.id && message.id) {
           console.log('Marcando mensaje como leído:', message.id);
-          markMessageAsRead(message.id, message.conversationId || conversationId || '');
+          markAsRead({ messageId: message.id, conversationId: message.conversationId || conversationId || '' });
         }
       } else {
         console.log('Mensaje ignorado por no pertenecer a esta conversación');
@@ -117,7 +118,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       // Actualizar mensaje como leído
       setMessages(prev => 
         prev.map(msg => 
-          (msg.id === data.messageId || msg.tempId === data.messageId) 
+          (data.messageIds.includes(msg.id || '') || data.messageIds.includes(msg.tempId || '')) 
             ? { ...msg, read: true, status: 'read' } 
             : msg
         )
@@ -245,7 +246,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             const finalTempId = finalId ? undefined : (msg.tempId || message.tempId);
             
             // Usar el mejor estado disponible
-            const finalStatus = message.status === 'error' ? 'error' : 
+            const finalStatus = message.status === 'failed' ? 'failed' : 
                                 (message.status === 'read' || msg.status === 'read') ? 'read' :
                                 (message.status === 'delivered' || msg.status === 'delivered') ? 'delivered' :
                                 (message.status === 'sent' || msg.status === 'sent') ? 'sent' :
@@ -400,7 +401,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           
           if (!response.ok) {
             console.error('Error al guardar mensaje vía API:', response.status);
-            updateMessageStatus(tempId, 'error');
+            updateMessageStatus(tempId, 'failed');
           } else {
             const savedMessage = await response.json();
             console.log('Mensaje guardado correctamente en base de datos vía API', savedMessage);
@@ -417,12 +418,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           }
         } catch (apiError) {
           console.error('Error al guardar mensaje vía API:', apiError);
-          updateMessageStatus(tempId, 'error');
+          updateMessageStatus(tempId, 'failed');
         }
       }
     } catch (error) {
       console.error('Error al enviar mensaje:', error);
-      updateMessageStatus(tempId, 'error');
+      updateMessageStatus(tempId, 'failed');
     } finally {
       setIsSending(false);
     }
@@ -440,7 +441,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     const success = sendSocketMessage(messageToResend);
     
     if (!success) {
-      updateMessageStatus(messageId, 'error');
+      updateMessageStatus(messageId, 'failed');
     }
   };
 
@@ -458,7 +459,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     
     if (otherUser?.id && !isTyping) {
       setIsTyping(true);
-      setTypingStatus(otherUser.id, true);
+      setTypingStatus({ conversationId: conversationId || '', isTyping: true });
     }
     
     // Reset typing timeout
@@ -470,7 +471,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     typingTimeoutRef.current = setTimeout(() => {
       if (otherUser?.id) {
         setIsTyping(false);
-        setTypingStatus(otherUser.id, false);
+        setTypingStatus({ conversationId: conversationId || '', isTyping: false });
       }
     }, 2000);
   };
@@ -535,7 +536,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                         {message.status === 'sent' && '✓'}
                         {message.status === 'delivered' && '✓✓'}
                         {message.status === 'read' && '✓✓'}
-                        {message.status === 'error' && (
+                        {message.status === 'failed' && (
                           <button 
                             onClick={() => handleResendMessage(message.id || message.tempId || '')}
                             className="text-red-400 text-xs hover:underline"
@@ -633,7 +634,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                         {message.status === 'sent' && '✓'}
                         {message.status === 'delivered' && '✓✓'}
                         {message.status === 'read' && '✓✓'}
-                        {message.status === 'error' && (
+                        {message.status === 'failed' && (
                           <button 
                             onClick={() => handleResendMessage(message.id || message.tempId || '')}
                             className="text-red-400 text-xs hover:underline"
@@ -713,7 +714,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         .filter((message): message is HistoricalMessage => Boolean(message))
         .map((message: HistoricalMessage): { 
           id: string; 
-          content: string; 
+          content: string | null; 
           senderId: string; 
           receiverId: string; 
           createdAt: string; 
@@ -863,7 +864,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         
         for (const msg of unreadMessages) {
           if (msg.id) {
-            markMessageAsRead(msg.id, conversationId || '');
+            markAsRead({ messageId: msg.id, conversationId: conversationId || '' });
           }
         }
       }
@@ -873,7 +874,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       setIsLoadingMessages(false);
       setMessagesLoaded(true);
     }
-  }, [otherUser?.id, currentUserId, conversationId, markMessageAsRead]);
+  }, [otherUser?.id, currentUserId, conversationId, markAsRead]);
 
   // IMPORTANTE: Este efecto está causando múltiples cargas, lo reemplazamos
   // por el efecto mejorado arriba que usa sessionStorage
