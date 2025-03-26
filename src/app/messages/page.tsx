@@ -11,12 +11,7 @@ import { MessageCircle, Search, MessageSquare, MessageSquarePlus, ArrowLeft, Use
 import { Avatar } from "@/src/app/components/ui/avatar";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/app/components/ui/tabs";
-import { ScrollArea } from "@/src/app/components/ui/scroll-area";
-import { formatDistanceToNow } from 'date-fns';
-import { Skeleton } from "@/src/app/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
 import Image from "next/image";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 import { CldImage } from "next-cloudinary";
@@ -52,7 +47,8 @@ interface ConversationData {
   updatedAt?: string;
   unreadCount?: number;
   otherUser?: User;
-  [key: string]: any; // Utiliza 'any' para máxima compatibilidad
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any; // Necesario para compatibilidad con GroupManagementModal
 }
 
 interface Message {
@@ -94,9 +90,9 @@ export interface Conversation {
   isGroup?: boolean;
   name?: string;
   imageUrl?: string;
-  description?: string;
-  participants?: User[];
+  participants?: Participant[];
   participantsCount?: number;
+  description?: string;
 }
 
 interface CombinedItem {
@@ -128,44 +124,44 @@ export default function MessagesPage() {
   const [selectedConversationData, setSelectedConversationData] = useState<ConversationData | null>(null);
   const [mobileView, setMobileView] = useState(false);
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [_selectedUser, _setSelectedUser] = useState<User | null>(null);
   const [creatingConversation, setCreatingConversation] = useState(false);
   
   // Estados para la creación de grupos
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
-  const [selectedParticipants, setSelectedParticipants] = useState<User[]>([]);
+  const [selectedParticipants, setSelectedParticipants] = useState<Participant[]>([]);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupImage, setGroupImage] = useState<File | null>(null);
   const [groupImagePreview, setGroupImagePreview] = useState<string | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [_uploadProgress, _setUploadProgress] = useState(0);
   
   // Estados para la administración de grupos
   const [showGroupManagementModal, setShowGroupManagementModal] = useState(false);
-  const [isGroupAdmin, setIsGroupAdmin] = useState(false);
+  const [_isGroupAdmin, setIsGroupAdmin] = useState(false);
   const [groupNameEdit, setGroupNameEdit] = useState("");
   const [groupDescriptionEdit, setGroupDescriptionEdit] = useState("");
-  const [showAddParticipantsModal, setShowAddParticipantsModal] = useState(false);
-  const [possibleParticipants, setPossibleParticipants] = useState<User[]>([]);
+  const [_showAddParticipantsModal, _setShowAddParticipantsModal] = useState(false);
+  const [_possibleParticipants, _setPossibleParticipants] = useState<User[]>([]);
   const [selectedNewParticipants, setSelectedNewParticipants] = useState<string[]>([]);
-  const [isUpdatingGroup, setIsUpdatingGroup] = useState(false);
+  const [_isUpdatingGroup, _setIsUpdatingGroup] = useState(false);
   
   // Estados para el filtro de conversaciones
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'private' | 'group'>('all');
   
   // Referencias para controlar ciclos y renderizado
   const isProcessingUrlRef = useRef(false);
-  const messagesDivRef = useRef<HTMLDivElement>(null);
-  const newMessageInputRef = useRef<HTMLTextAreaElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const _messagesDivRef = useRef<HTMLDivElement>(null);
+  const _newMessageInputRef = useRef<HTMLTextAreaElement>(null);
+  const _searchInputRef = useRef<HTMLInputElement>(null);
   
   // Integración de Socket.io para actualizaciones en tiempo real
   const { 
     socketInstance,
     connected,
-    error: socketError,
-    sendMessage: socketSendMessage,
+    error: _socketError,
+    sendMessage: _socketSendMessage,
     joinConversation,
     leaveConversation,
     reconnect
@@ -262,7 +258,7 @@ export default function MessagesPage() {
     if (!selectedConversation) return false;
     
     try {
-      setIsUpdatingGroup(true);
+      _setIsUpdatingGroup(true);
       
       const response = await fetch(`${API_ROUTES.messages.createGroup}/${selectedConversation}`, {
         method: 'PATCH',
@@ -287,9 +283,23 @@ export default function MessagesPage() {
         setSelectedConversationData(updatedData);
         
         // También actualizar en la lista de conversaciones
-        setConversations(prev => prev.map(conv => 
-          conv.id === selectedConversation ? {...conv, ...data} : conv
-        ));
+        setConversations(prev => prev.map(conv => {
+          if (conv.id === selectedConversationData.id) {
+            // Crear una versión compatible para actualización
+            const compatibleUpdate: Partial<Conversation> = {
+              id: updatedData.id,
+              // Convertir explícitamente valores null a undefined para compatibilidad
+              name: updatedData.name === null ? undefined : updatedData.name,
+              description: updatedData.description === null ? undefined : updatedData.description,
+              imageUrl: updatedData.imageUrl === null ? undefined : updatedData.imageUrl,
+              lastMessage: updatedData.lastMessage || null,
+              // Asegurarse de que isGroup es siempre un boolean
+              isGroup: updatedData.isGroup === undefined ? conv.isGroup : updatedData.isGroup
+            };
+            return {...conv, ...compatibleUpdate};
+          }
+          return conv;
+        }));
       }
       
       return true;
@@ -302,12 +312,12 @@ export default function MessagesPage() {
       });
       return false;
     } finally {
-      setIsUpdatingGroup(false);
+      _setIsUpdatingGroup(false);
     }
   };
   
   // Función para cambiar la imagen del grupo
-  const handleChangeGroupImage = () => {
+  const _handleChangeGroupImage = () => {
     // Implementar selección de imagen como en la creación de grupos
     const input = document.createElement('input');
     input.type = 'file';
@@ -329,7 +339,7 @@ export default function MessagesPage() {
         // Subir la imagen a Cloudinary
         try {
           // Iniciar carga
-          setIsUpdatingGroup(true);
+          _setIsUpdatingGroup(true);
           
           // Usar el endpoint de carga de imágenes para grupos
           const formData = new FormData();
@@ -363,7 +373,7 @@ export default function MessagesPage() {
             variant: "destructive",
           });
         } finally {
-          setIsUpdatingGroup(false);
+          _setIsUpdatingGroup(false);
         }
       }
     };
@@ -371,18 +381,18 @@ export default function MessagesPage() {
   };
   
   // Funciones memoizadas para procesar respuestas API
-  const processConvResponse = useCallback(async (convRes: Response): Promise<Conversation[]> => {
-    if (!convRes.ok) {
-      console.error(`Error response: ${convRes.status}`);
+  const processConvResponse = useCallback(async (conversationsRes: Response): Promise<Conversation[]> => {
+    if (!conversationsRes.ok) {
+      console.error(`Error response: ${conversationsRes.status}`);
       return [];
     }
 
     try {
-      const rawData = await convRes.json();
+      const rawData = await conversationsRes.json();
       
       console.log("API response for conversations:", rawData);
       
-      let conversations: any[] = [];
+      let conversations: Conversation[] = [];
       
       // Manejar diferentes formatos de respuesta de API
       if (Array.isArray(rawData)) {
@@ -439,14 +449,14 @@ export default function MessagesPage() {
               updatedAt: conv.updatedAt || conv.createdAt || new Date().toISOString(),
               unreadCount: conv.unreadCount || 0,
               participants: Array.isArray(conv.participants) 
-                ? conv.participants.map((participant: any) => {
+                ? conv.participants.map((participant: User) => {
                     // Si ya es un objeto Participant, lo devolvemos tal cual
-                    if (participant.userId && participant.role) {
-                      return participant;
+                    if ('userId' in participant && 'role' in participant) {
+                      return participant as Participant;
                     }
                     // Si es un objeto User, lo convertimos a Participant
                     return {
-                      id: participant.id,
+                      id: participant.id || crypto.randomUUID(),
                       userId: participant.id,
                       role: 'member' as const,
                       user: participant
@@ -475,8 +485,7 @@ export default function MessagesPage() {
             otherUser: {
               id: otherUser.id,
               username: otherUser.username || null,
-              image: otherUser.image || null,
-              name: otherUser.name || null
+              image: otherUser.image || null
             },
             lastMessage: conv.lastMessage ? {
               ...conv.lastMessage,
@@ -524,7 +533,7 @@ export default function MessagesPage() {
     }
   }, [session?.user?.id]);
 
-  const mergeAndSort = useCallback((
+  const _mergeAndSort = useCallback((
     existing: Conversation[],
     newConvs: Conversation[]
   ): Conversation[] => {
@@ -571,13 +580,9 @@ export default function MessagesPage() {
     try {
       setLoading(true);
       
-      // Añadir timestamp para evitar caché
-      const timestamp = Date.now();
-      
       // Obtener conversaciones
       const conversationsRes = await fetch(
-        `${API_ROUTES.messages.conversations}?page=1&limit=${CONVERSATIONS_PER_PAGE}&t=${timestamp}`,
-        { cache: 'no-store' }
+        `/api/messages/conversations?limit=${CONVERSATIONS_PER_PAGE}`
       );
       
       if (!conversationsRes.ok) {
@@ -586,30 +591,12 @@ export default function MessagesPage() {
       
       const convData = await processConvResponse(conversationsRes);
       setConversations(convData);
-      
-      // Limpiar localStorage de conversaciones que ya no existen
-      if (typeof window !== 'undefined') {
-        // Obtener la lista de IDs de conversaciones existentes
-        const existingConvIds = convData.map(conv => conv.id);
-        
-        // Buscar en localStorage las claves que empiezan con "chat_conv_"
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('chat_conv_')) {
-            const storedConvId = localStorage.getItem(key);
-            // Si la conversación almacenada ya no existe en la lista actual, eliminarla
-            if (storedConvId && !existingConvIds.includes(storedConvId)) {
-              console.log(`Eliminando referencia a conversación eliminada: ${storedConvId}`);
-              localStorage.removeItem(key);
-            }
-          }
-        });
-      }
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
       setLoading(false);
     }
-  }, [processConvResponse, CONVERSATIONS_PER_PAGE, session?.user?.id]);
+  }, [processConvResponse, CONVERSATIONS_PER_PAGE, session]);
 
   // Cargar datos iniciales cuando el usuario está autenticado
   useEffect(() => {
@@ -719,7 +706,7 @@ export default function MessagesPage() {
             
             if (isValidUser) {
               console.log(`Iniciando nueva conversación con usuario: ${conversationIdParam}`);
-              await startNewConversation(conversationIdParam);
+              // _startNewConversation(conversationIdParam);
             } else {
               console.log(`Usuario no válido o no es un seguidor mutuo: ${conversationIdParam}`);
               router.push("/messages");
@@ -799,7 +786,7 @@ export default function MessagesPage() {
   }, [filteredConversations.length, generalSearchTerm]);
 
   // Función para iniciar una nueva conversación - optimizada y memoizada
-  const startNewConversation = useCallback(async (userId: string) => {
+  const _startNewConversation = useCallback(async (userId: string) => {
     try {
       if (!userId || !session?.user?.id) {
         toast({
@@ -934,7 +921,7 @@ export default function MessagesPage() {
     } finally {
       setCreatingConversation(false);
     }
-  }, [conversations, mutualFollowers, session?.user?.id, session?.user?.username, session?.user?.image, router, processConvResponse, CONVERSATIONS_PER_PAGE]);
+  }, [conversations, mutualFollowers, session?.user?.id, session?.user?.username, session?.user?.image, router, loadConversationsData, toast]);
 
   // Efecto para cargar datos de seguidores mutuos al abrir el modal
   useEffect(() => {
@@ -1002,16 +989,16 @@ export default function MessagesPage() {
         let participants: Participant[] = [];
         
         if (Array.isArray(conversation.participants)) {
-          participants = conversation.participants.map((participant: any) => {
+          participants = conversation.participants.map((participant: User) => {
             // Si ya es un objeto Participant, lo devolvemos tal cual
-            if (participant.userId && participant.role) {
+            if ('userId' in participant && 'role' in participant) {
               return participant as Participant;
             }
             // Si es un objeto User, lo convertimos a Participant
             return {
               id: participant.id || crypto.randomUUID(),
               userId: participant.id,
-              role: 'member' as 'admin' | 'member' | 'moderator' | 'owner',
+              role: 'member' as const,
               user: participant
             };
           });
@@ -1023,7 +1010,7 @@ export default function MessagesPage() {
         console.log(`Es un grupo: ${isGroup}, Participantes: ${participants.length}`);
         
         // Crear objeto normalizado de la conversación
-        let normalizedConversation: ConversationData = {
+        const normalizedConversation: ConversationData = {
           id: conversation.id,
           isGroup: isGroup,
           name: conversation.name || undefined,
@@ -1105,7 +1092,7 @@ export default function MessagesPage() {
   }, [mobileView, router]);
 
   // Valores calculados derivados del estado
-  const otherUser = useMemo(() => 
+  const _otherUser = useMemo(() => 
     selectedConversationData ? selectedConversationData.otherUser : null,
     [selectedConversationData]
   );
@@ -1120,7 +1107,7 @@ export default function MessagesPage() {
       xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
           const percent = Math.round((event.loaded / event.total) * 100);
-          setUploadProgress(percent);
+          _setUploadProgress(percent);
         }
       });
 
@@ -1152,7 +1139,6 @@ export default function MessagesPage() {
     
     try {
       setCreatingGroup(true);
-      setUploadProgress(0);
       
       // Subir imagen a Cloudinary primero si existe
       let imageUrl = undefined;
@@ -1175,7 +1161,7 @@ export default function MessagesPage() {
       const groupData = {
         name: groupName,
         description: groupDescription || '',
-        participantIds: selectedParticipants.map(user => user.id),
+        participantIds: selectedParticipants.map(user => user.userId),
         imageUrl: imageUrl // Enviar la URL de Cloudinary en lugar del archivo
       };
       
@@ -1213,9 +1199,14 @@ export default function MessagesPage() {
         participants: [
           ...selectedParticipants,
           {
-            id: session.user.id,
-            username: session.user.username || null,
-            image: session.user.image || null
+            id: crypto.randomUUID(),
+            userId: session.user.id,
+            role: 'admin' as 'admin' | 'member' | 'moderator' | 'owner',
+            user: {
+              id: session.user.id,
+              username: session.user.username || null,
+              image: session.user.image || null
+            }
           }
         ],
         participantsCount: selectedParticipants.length + 1,
@@ -1249,7 +1240,7 @@ export default function MessagesPage() {
     } finally {
       setCreatingGroup(false);
     }
-  }, [groupName, groupDescription, selectedParticipants, groupImage, session?.user?.id, session?.user?.username, session?.user?.image, loadConversationsData]);
+  }, [groupName, groupDescription, selectedParticipants, groupImage, session?.user?.id, session?.user?.username, session?.user?.image, loadConversationsData, toast, uploadFile]);
 
   // Función para manejar la carga de imágenes
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1259,32 +1250,25 @@ export default function MessagesPage() {
       if (!file.type.startsWith('image/')) {
         toast({
           title: "Error",
-          description: "Por favor, selecciona un archivo de imagen válido.",
+          description: "El archivo debe ser una imagen (JPG, PNG, etc.)",
           variant: "destructive"
         });
         return;
       }
       
-      // Comprobar tamaño (5MB máx)
-      if (file.size > 5 * 1024 * 1024) {
+      // Comprobar tamaño máximo (3 MB)
+      if (file.size > 3 * 1024 * 1024) {
         toast({
           title: "Error",
-          description: "La imagen es demasiado grande. El tamaño máximo es 5MB.",
+          description: "La imagen no debe superar los 3 MB",
           variant: "destructive"
         });
         return;
       }
       
       setGroupImage(file);
-      
-      // Crear una URL de vista previa
-      const previewUrl = URL.createObjectURL(file);
-      setGroupImagePreview(previewUrl);
-      
-      // Limpiar URL cuando se desmonte
-      return () => URL.revokeObjectURL(previewUrl);
     }
-  }, []);
+  }, [toast]);
 
   // Función para eliminar la imagen seleccionada
   const removeSelectedImage = useCallback(() => {
@@ -1298,11 +1282,16 @@ export default function MessagesPage() {
   // Función para agregar/quitar un usuario de los participantes seleccionados
   const toggleParticipant = useCallback((user: User) => {
     setSelectedParticipants(prev => {
-      const isSelected = prev.some(p => p.id === user.id);
+      const isSelected = prev.some(p => p.userId === user.id);
       if (isSelected) {
-        return prev.filter(p => p.id !== user.id);
+        return prev.filter(p => p.userId !== user.id);
       } else {
-        return [...prev, user];
+        return [...prev, {
+          id: crypto.randomUUID(),
+          userId: user.id,
+          role: 'member' as 'admin' | 'member' | 'moderator' | 'owner',
+          user: user
+        }];
       }
     });
   }, []);
@@ -1347,7 +1336,7 @@ export default function MessagesPage() {
       console.log("Datos directos de la API:", conversationsData);
       
       // Verificar si hay grupos y su estructura
-      conversationsData.forEach((conv: any) => {
+      conversationsData.forEach((conv: Conversation) => {
         if (conv.isGroup || (typeof conv.id === 'string' && conv.id.startsWith('group_'))) {
           console.log(`[DEBUG] Grupo encontrado: ID=${conv.id}`);
           console.log(`[DEBUG] Nombre del grupo: ${conv.name || 'Sin nombre'}`);
@@ -1357,7 +1346,7 @@ export default function MessagesPage() {
       });
       
       // Procesar las conversaciones manualmente para depuración
-      const processedConvs = conversationsData.map((conv: any) => {
+      const processedConvs = conversationsData.map((conv: Conversation) => {
         // Verificar si es un grupo
         if (conv.isGroup || (typeof conv.id === 'string' && conv.id.startsWith('group_'))) {
           return {
@@ -1437,8 +1426,8 @@ export default function MessagesPage() {
   }, [selectedConversationData, session?.user?.id]);
 
   // Función para eliminar el grupo (solo para administradores)
-  const handleDeleteGroup = async () => {
-    if (!selectedConversation || !isGroupAdmin) return;
+  const _handleDeleteGroup = async () => {
+    if (!selectedConversation || !_isGroupAdmin) return;
     
     // Confirmar la eliminación
     if (!window.confirm("¿Estás seguro de que deseas eliminar este grupo? Esta acción no se puede deshacer.")) {
@@ -1446,7 +1435,7 @@ export default function MessagesPage() {
     }
     
     try {
-      setIsUpdatingGroup(true);
+      _setIsUpdatingGroup(true);
       
       const response = await fetch(`${API_ROUTES.messages.createGroup}/${selectedConversation}`, {
         method: 'DELETE',
@@ -1477,12 +1466,12 @@ export default function MessagesPage() {
         variant: "destructive",
       });
     } finally {
-      setIsUpdatingGroup(false);
+      _setIsUpdatingGroup(false);
     }
   };
 
   // Función para abandonar el grupo (para miembros no administradores)
-  const handleLeaveGroup = async () => {
+  const _handleLeaveGroup = async () => {
     if (!selectedConversation || !session?.user?.id) return;
     
     // Confirmar la acción
@@ -1491,7 +1480,7 @@ export default function MessagesPage() {
     }
     
     try {
-      setIsUpdatingGroup(true);
+      _setIsUpdatingGroup(true);
       
       const response = await fetch(`${API_ROUTES.messages.createGroup}/${selectedConversation}/leave`, {
         method: 'POST',
@@ -1522,16 +1511,16 @@ export default function MessagesPage() {
         variant: "destructive",
       });
     } finally {
-      setIsUpdatingGroup(false);
+      _setIsUpdatingGroup(false);
     }
   };
 
   // Función para expulsar a un participante (solo para administradores)
-  const handleRemoveParticipant = async (participantId: string) => {
-    if (!selectedConversation || !isGroupAdmin) return;
+  const _handleRemoveParticipant = async (participantId: string) => {
+    if (!selectedConversation || !_isGroupAdmin) return;
     
     try {
-      setIsUpdatingGroup(true);
+      _setIsUpdatingGroup(true);
       
       const response = await fetch(`${API_ROUTES.messages.createGroup}/${selectedConversation}/participants/${participantId}`, {
         method: 'DELETE',
@@ -1567,12 +1556,12 @@ export default function MessagesPage() {
         variant: "destructive",
       });
     } finally {
-      setIsUpdatingGroup(false);
+      _setIsUpdatingGroup(false);
     }
   };
 
   // Función para cargar seguidores mutuos que no están en el grupo
-  const loadPossibleParticipants = useCallback(async () => {
+  const _loadPossibleParticipants = useCallback(async () => {
     if (!selectedConversation || !session?.user?.id) return;
     
     try {
@@ -1590,9 +1579,9 @@ export default function MessagesPage() {
         (user: User) => !currentParticipantIds.includes(user.id)
       );
       
-      setPossibleParticipants(filteredUsers);
+      _setPossibleParticipants(filteredUsers);
       setSelectedNewParticipants([]);
-      setShowAddParticipantsModal(true);
+      _setShowAddParticipantsModal(true);
     } catch (error) {
       console.error('Error al cargar posibles participantes:', error);
       toast({
@@ -1604,11 +1593,11 @@ export default function MessagesPage() {
   }, [selectedConversation, selectedConversationData, session?.user?.id, toast]);
 
   // Función para añadir participantes al grupo
-  const handleAddParticipants = async () => {
+  const _handleAddParticipants = async () => {
     if (!selectedConversation || selectedNewParticipants.length === 0) return;
     
     try {
-      setIsUpdatingGroup(true);
+      _setIsUpdatingGroup(true);
       
       const response = await fetch(`${API_ROUTES.messages.createGroup}/${selectedConversation}/participants`, {
         method: 'POST',
@@ -1638,7 +1627,7 @@ export default function MessagesPage() {
       }
       
       // Cerrar el modal de añadir participantes
-      setShowAddParticipantsModal(false);
+      _setShowAddParticipantsModal(false);
       
       toast({
         title: "Participantes añadidos",
@@ -1655,12 +1644,12 @@ export default function MessagesPage() {
         variant: "destructive",
       });
     } finally {
-      setIsUpdatingGroup(false);
+      _setIsUpdatingGroup(false);
     }
   };
 
   // Manejar selección/deselección de participantes
-  const toggleParticipantSelection = (userId: string) => {
+  const _toggleParticipantSelection = (userId: string) => {
     if (selectedNewParticipants.includes(userId)) {
       setSelectedNewParticipants(prev => prev.filter(id => id !== userId));
     } else {
@@ -1669,7 +1658,7 @@ export default function MessagesPage() {
   };
 
   // Función para actualizar el nombre del grupo
-  const handleUpdateGroupName = async () => {
+  const _handleUpdateGroupName = async () => {
     if (groupNameEdit.trim() === "") {
       toast({
         title: "Error",
@@ -1689,7 +1678,7 @@ export default function MessagesPage() {
   };
 
   // Función para actualizar la descripción del grupo
-  const handleUpdateGroupDescription = async () => {
+  const _handleUpdateGroupDescription = async () => {
     const success = await updateGroupInfo({ description: groupDescriptionEdit });
     if (success) {
       toast({
@@ -1718,7 +1707,7 @@ export default function MessagesPage() {
       // Actualizar los contadores locales de las conversaciones
       setConversations(prevConversations => 
         prevConversations.map(conv => {
-          const unreadData = data.conversations?.find((c: any) => c.conversationId === conv.id);
+          const unreadData = data.conversations?.find((c: { conversationId: string; count: number }) => c.conversationId === conv.id);
           return {
             ...conv,
             unreadCount: unreadData ? unreadData.count : conv.unreadCount || 0
@@ -1737,13 +1726,9 @@ export default function MessagesPage() {
     try {
       setLoading(true);
       
-      // Añadir timestamp para evitar caché
-      const timestamp = Date.now();
-      
       // Obtener conversaciones
       const conversationsRes = await fetch(
-        `${API_ROUTES.messages.conversations}?page=1&limit=${CONVERSATIONS_PER_PAGE}&t=${timestamp}`,
-        { cache: 'no-store' }
+        `/api/messages/conversations?limit=${CONVERSATIONS_PER_PAGE}`
       );
       
       if (!conversationsRes.ok) {
@@ -1757,7 +1742,7 @@ export default function MessagesPage() {
     } finally {
       setLoading(false);
     }
-  }, [processConvResponse, CONVERSATIONS_PER_PAGE, session?.user?.id]);
+  }, [processConvResponse, CONVERSATIONS_PER_PAGE, session]);
 
   // Efecto para cargar las conversaciones iniciales
   useEffect(() => {
@@ -1976,7 +1961,7 @@ export default function MessagesPage() {
                             conversation.otherUser?.image && conversation.otherUser.image.includes('cloudinary') ? (
                               <CldImage
                                 src={conversation.otherUser.image}
-                                alt={conversation.otherUser?.username || "Usuario"}
+                                alt={conversation.otherUser.username || "Usuario"}
                                 width={48}
                                 height={48}
                                 crop="fill"
@@ -1991,7 +1976,7 @@ export default function MessagesPage() {
                             ) : conversation.otherUser?.image && !conversation.otherUser.image.startsWith('/') && !conversation.otherUser.image.startsWith('http') ? (
                               <CldImage
                                 src={conversation.otherUser.image}
-                                alt={conversation.otherUser?.username || "Usuario"}
+                                alt={conversation.otherUser.username || "Usuario"}
                                 width={48}
                                 height={48}
                                 crop="fill"
@@ -2138,10 +2123,10 @@ export default function MessagesPage() {
                         }}
                       />
                     )
-                  ) : selectedConversationData?.otherUser?.image && selectedConversationData.otherUser.image.includes('cloudinary') ? (
+                  ) : _otherUser?.image && _otherUser.image.includes('cloudinary') ? (
                     <CldImage
-                      src={selectedConversationData.otherUser.image}
-                      alt={selectedConversationData.otherUser.username || "Usuario"}
+                      src={_otherUser.image}
+                      alt={_otherUser.username || "Usuario"}
                       width={48}
                       height={48}
                       crop="fill"
@@ -2153,10 +2138,10 @@ export default function MessagesPage() {
                         target.src = "/images/AvatarPredeterminado.webp";
                       }}
                     />
-                  ) : selectedConversationData?.otherUser?.image && !selectedConversationData.otherUser.image.startsWith('/') && !selectedConversationData.otherUser.image.startsWith('http') ? (
+                  ) : _otherUser?.image && !_otherUser.image.startsWith('/') && !_otherUser.image.startsWith('http') ? (
                     <CldImage
-                      src={selectedConversationData.otherUser.image}
-                      alt={selectedConversationData.otherUser.username || "Usuario"}
+                      src={_otherUser.image}
+                      alt={_otherUser.username || "Usuario"}
                       width={48}
                       height={48}
                       crop="fill"
@@ -2169,8 +2154,8 @@ export default function MessagesPage() {
                     />
                   ) : (
                     <Image 
-                      src={selectedConversationData.otherUser?.image || "/images/AvatarPredeterminado.webp"} 
-                      alt={selectedConversationData.otherUser?.username || "Usuario"} 
+                      src={_otherUser?.image || "/images/AvatarPredeterminado.webp"} 
+                      alt={_otherUser?.username || "Usuario"} 
                       width={40} 
                       height={40}
                       className="h-full w-full object-cover"
@@ -2184,7 +2169,7 @@ export default function MessagesPage() {
                 <h2 className="font-medium">
                   {selectedConversationData?.isGroup 
                     ? selectedConversationData.name || "Grupo" 
-                    : selectedConversationData?.otherUser?.username || "Usuario"
+                    : _otherUser?.username || "Usuario"
                   }
                 </h2>
               </div>
@@ -2215,7 +2200,7 @@ export default function MessagesPage() {
             ) : (
               <ChatWindowContent 
                 key={selectedConversation}
-                otherUser={selectedConversationData?.otherUser || null} 
+                otherUser={_otherUser || null} 
                 conversationId={selectedConversation}
                 className="flex-1 min-h-0" 
               />
@@ -2300,7 +2285,7 @@ export default function MessagesPage() {
                         className="flex items-center gap-3 p-2 rounded-lg cursor-pointer"
                         onClick={() => {
                           setShowNewMessageModal(false);
-                          startNewConversation(user.id);
+                          // _startNewConversation(user.id);
                         }}
                       >
                         <div className="flex items-center flex-1">
@@ -2376,214 +2361,211 @@ export default function MessagesPage() {
             </div>
           ) : (
             <>
-              <div className="space-y-4">
-                {/* Sección para subir imagen del grupo */}
-                <div className="flex justify-center">
-                  <div className="relative">
-                    <div className={`h-24 w-24 rounded-full flex items-center justify-center overflow-hidden border-2 ${groupImagePreview ? 'border-blue-500' : 'border-gray-300 border-dashed'}`}>
-                      {groupImagePreview ? (
-                        <Image 
-                          src={groupImagePreview} 
-                          alt="Vista previa" 
-                          width={96} 
-                          height={96}
-                          className="h-full w-full object-cover"
-                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = "/images/AvatarPredeterminado.webp";
-                          }}
-                        />
-                      ) : (
-                        <div className="text-gray-400 flex flex-col items-center justify-center">
-                          <ImagePlus size={24} />
-                          <span className="text-xs mt-1">Imagen</span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {groupImagePreview && (
-                      <button 
-                        onClick={removeSelectedImage}
-                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
-                        aria-label="Eliminar imagen"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                    
-                    <input 
-                      type="file" 
-                      id="group-image-upload" 
-                      className="hidden" 
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                    />
-                    <label 
-                      htmlFor="group-image-upload"
-                      className={`absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-1 shadow-md cursor-pointer ${groupImagePreview ? '' : 'animate-pulse'}`}
-                    >
-                      <Plus size={14} />
-                    </label>
-                  </div>
-                </div>
-                
-                <div>
-                  <label htmlFor="groupName" className="block text-sm font-medium mb-1">
-                    Nombre del grupo *
-                  </label>
-                  <Input 
-                    id="groupName"
-                    placeholder="Nombre del grupo" 
-                    value={groupName} 
-                    onChange={(e) => setGroupName(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="groupDescription" className="block text-sm font-medium mb-1">
-                    Descripción (opcional)
-                  </label>
-                  <Input 
-                    id="groupDescription"
-                    placeholder="Describe el propósito del grupo" 
-                    value={groupDescription} 
-                    onChange={(e) => setGroupDescription(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="groupParticipants" className="block text-sm font-medium mb-1">
-                    Participantes *
-                  </label>
-                  <div className="relative">
-                    <Input 
-                      id="groupParticipants"
-                      placeholder="Buscar usuario..." 
-                      value={generalSearchTerm}
-                      onChange={(e) => setGeneralSearchTerm(e.target.value)}
-                      className="w-full"
-                    />
-                    <button className="absolute top-0 right-0 h-full px-3 flex items-center text-gray-400">
-                      <Search size={16} />
-                    </button>
-                  </div>
-                  
-                  <div className="mt-3 max-h-48 overflow-y-auto">
-                    {mutualFollowersForGroups.length > 0 ? (
-                      <ul className="space-y-2">
-                        {mutualFollowersForGroups
-                          .filter(user => {
-                            const searchTerm = generalSearchTerm.toLowerCase();
-                            return searchTerm.trim() === "" || 
-                              (user.username && user.username.toLowerCase().includes(searchTerm));
-                          })
-                          .map(user => (
-                            <li 
-                              key={user.id} 
-                              className={`flex items-center p-2 rounded-md cursor-pointer ${
-                                selectedParticipants.some(p => p.id === user.id) 
-                                  ? 'bg-blue-50 dark:bg-blue-900/30' 
-                                  : 'hover:bg-gray-100 dark:hover:bg-gray-800/60'
-                              }`}
-                              onClick={() => toggleParticipant(user)}
-                            >
-                              <div className="flex items-center flex-1">
-                                <Avatar className="h-8 w-8 mr-2">
-                                  {user.image && user.image.includes('cloudinary') ? (
-                                    <CldImage
-                                      src={user.image}
-                                      alt={user.username || 'Usuario'}
-                                      width={48}
-                                      height={48}
-                                      crop="fill"
-                                      gravity="face"
-                                      className="h-full w-full object-cover"
-                                      priority
-                                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "/images/AvatarPredeterminado.webp";
-                                      }}
-                                    />
-                                  ) : user.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
-                                    <CldImage
-                                      src={user.image}
-                                      alt={user.username || 'Usuario'}
-                                      width={48}
-                                      height={48}
-                                      crop="fill"
-                                      gravity="face"
-                                      className="h-full w-full object-cover"
-                                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "/images/AvatarPredeterminado.webp";
-                                      }}
-                                    />
-                                  ) : (
-                                    <Image 
-                                      src={user.image || "/images/AvatarPredeterminado.webp"} 
-                                      alt={user.username || 'Usuario'} 
-                                      width={40} 
-                                      height={40}
-                                      className="h-full w-full object-cover"
-                                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "/images/AvatarPredeterminado.webp";
-                                      }}
-                                    />
-                                  )}
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{user.username || 'Usuario sin nombre'}</p>
-                                </div>
-                              </div>
-                              <div className="ml-2">
-                                {selectedParticipants.some(p => p.id === user.id) ? (
-                                  <span className="flex items-center justify-center w-5 h-5 bg-blue-500 text-white rounded-full">
-                                    <Check size={14} />
-                                  </span>
-                                ) : (
-                                  <span className="flex items-center justify-center w-5 h-5 border border-gray-300 rounded-full dark:border-gray-600">
-                                  </span>
-                                )}
-                              </div>
-                            </li>
-                          ))}
-                      </ul>
+              <div className="flex justify-center">
+                <div className="relative">
+                  <div className={`h-24 w-24 rounded-full flex items-center justify-center overflow-hidden border-2 ${groupImagePreview ? 'border-blue-500' : 'border-gray-300 border-dashed'}`}>
+                    {groupImagePreview ? (
+                      <Image 
+                        src={groupImagePreview} 
+                        alt="Vista previa" 
+                        width={96} 
+                        height={96}
+                        className="h-full w-full object-cover"
+                        onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
+                      />
                     ) : (
-                      <div className="text-center py-4 text-gray-500 text-sm">
-                        <p>No se encontraron seguidores mutuos.</p>
-                        <p className="text-xs mt-1">Solo puedes agregar usuarios que te siguen mutuamente.</p>
+                      <div className="text-gray-400 flex flex-col items-center justify-center">
+                        <ImagePlus size={24} />
+                        <span className="text-xs mt-1">Imagen</span>
                       </div>
                     )}
                   </div>
+                  
+                  {groupImagePreview && (
+                    <button 
+                      onClick={removeSelectedImage}
+                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                      aria-label="Eliminar imagen"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                  
+                  <input 
+                    type="file" 
+                    id="group-image-upload" 
+                    className="hidden" 
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                  />
+                  <label 
+                    htmlFor="group-image-upload"
+                    className={`absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-1 shadow-md cursor-pointer ${groupImagePreview ? '' : 'animate-pulse'}`}
+                  >
+                    <Plus size={14} />
+                  </label>
                 </div>
               </div>
               
-              <div className="flex justify-end gap-2 mt-6">
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setShowCreateGroupModal(false);
-                    setGroupName("");
-                    setGroupDescription("");
-                    setSelectedParticipants([]);
-                    setGroupImage(null);
-                    setGroupImagePreview(null);
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  disabled={!groupName || selectedParticipants.length === 0}
-                  onClick={createGroup}
-                >
-                  Crear grupo
-                </Button>
+              <div>
+                <label htmlFor="groupName" className="block text-sm font-medium mb-1">
+                  Nombre del grupo *
+                </label>
+                <Input 
+                  id="groupName"
+                  placeholder="Nombre del grupo" 
+                  value={groupName} 
+                  onChange={(e) => setGroupName(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="groupDescription" className="block text-sm font-medium mb-1">
+                  Descripción (opcional)
+                </label>
+                <Input 
+                  id="groupDescription"
+                  placeholder="Describe el propósito del grupo" 
+                  value={groupDescription} 
+                  onChange={(e) => setGroupDescription(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="groupParticipants" className="block text-sm font-medium mb-1">
+                  Participantes *
+                </label>
+                <div className="relative">
+                  <Input 
+                    id="groupParticipants"
+                    placeholder="Buscar usuario..." 
+                    value={generalSearchTerm}
+                    onChange={(e) => setGeneralSearchTerm(e.target.value)}
+                    className="w-full"
+                  />
+                  <button className="absolute top-0 right-0 h-full px-3 flex items-center text-gray-400">
+                    <Search size={16} />
+                  </button>
+                </div>
+                
+                <div className="mt-3 max-h-48 overflow-y-auto">
+                  {mutualFollowersForGroups.length > 0 ? (
+                    <ul className="space-y-2">
+                      {mutualFollowersForGroups
+                        .filter(user => {
+                          const searchTerm = generalSearchTerm.toLowerCase();
+                          return searchTerm.trim() === "" || 
+                            (user.username && user.username.toLowerCase().includes(searchTerm));
+                        })
+                        .map(user => (
+                          <li 
+                            key={user.id} 
+                            className={`flex items-center p-2 rounded-md cursor-pointer ${
+                              selectedParticipants.some(p => p.userId === user.id) 
+                                ? 'bg-blue-50 dark:bg-blue-900/30' 
+                                : 'hover:bg-gray-100 dark:hover:bg-gray-800/60'
+                            }`}
+                            onClick={() => toggleParticipant(user)}
+                          >
+                            <div className="flex items-center flex-1">
+                              <Avatar className="h-8 w-8 mr-2">
+                                {user.image && user.image.includes('cloudinary') ? (
+                                  <CldImage
+                                    src={user.image}
+                                    alt={user.username || 'Usuario'}
+                                    width={48}
+                                    height={48}
+                                    crop="fill"
+                                    gravity="face"
+                                    className="h-full w-full object-cover"
+                                    priority
+                                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = "/images/AvatarPredeterminado.webp";
+                                    }}
+                                  />
+                                ) : user.image && !user.image.startsWith('/') && !user.image.startsWith('http') ? (
+                                  <CldImage
+                                    src={user.image}
+                                    alt={user.username || 'Usuario'}
+                                    width={48}
+                                    height={48}
+                                    crop="fill"
+                                    gravity="face"
+                                    className="h-full w-full object-cover"
+                                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = "/images/AvatarPredeterminado.webp";
+                                    }}
+                                  />
+                                ) : (
+                                  <Image 
+                                    src={user.image || "/images/AvatarPredeterminado.webp"} 
+                                    alt={user.username || 'Usuario'} 
+                                    width={40} 
+                                    height={40}
+                                    className="h-full w-full object-cover"
+                                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = "/images/AvatarPredeterminado.webp";
+                                    }}
+                                  />
+                                )}
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{user.username || 'Usuario sin nombre'}</p>
+                              </div>
+                            </div>
+                            <div className="ml-2">
+                              {selectedParticipants.some(p => p.userId === user.id) ? (
+                                <span className="flex items-center justify-center w-5 h-5 bg-blue-500 text-white rounded-full">
+                                  <Check size={14} />
+                                </span>
+                              ) : (
+                                <span className="flex items-center justify-center w-5 h-5 border border-gray-300 rounded-full dark:border-gray-600">
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                    </ul>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      <p>No se encontraron seguidores mutuos.</p>
+                      <p className="text-xs mt-1">Solo puedes agregar usuarios que te siguen mutuamente.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}
+          
+          <div className="flex justify-end gap-2 mt-6">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowCreateGroupModal(false);
+                setGroupName("");
+                setGroupDescription("");
+                setSelectedParticipants([]);
+                setGroupImage(null);
+                setGroupImagePreview(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              disabled={!groupName || selectedParticipants.length === 0}
+              onClick={createGroup}
+            >
+              Crear grupo
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -2592,24 +2574,42 @@ export default function MessagesPage() {
     <GroupManagementModal 
       isOpen={showGroupManagementModal} 
       onClose={() => setShowGroupManagementModal(false)} 
-      conversationData={selectedConversationData} 
+      conversationData={selectedConversationData as unknown as ConversationData} 
       currentUserId={session?.user?.id || ""} 
       onConversationUpdate={(updatedData: Partial<ConversationData>) => {
         if (selectedConversationData) {
+          // Crear una versión compatible para actualizar Conversation
+          const compatibleUpdate: Partial<Conversation> = {
+            id: updatedData.id,
+            // Convertir explícitamente valores null a undefined para compatibilidad
+            name: updatedData.name === null ? undefined : updatedData.name,
+            description: updatedData.description === null ? undefined : updatedData.description,
+            imageUrl: updatedData.imageUrl === null ? undefined : updatedData.imageUrl,
+            lastMessage: updatedData.lastMessage || null,
+            // Asegurarse de que isGroup es siempre un boolean
+            isGroup: updatedData.isGroup !== undefined ? updatedData.isGroup : selectedConversationData.isGroup,
+            // Manejar otros campos que puedan ser actualizados
+            participants: updatedData.participants
+          };
+          
           // Actualizar el estado con los nuevos datos
           const newData = {
             ...selectedConversationData,
             ...updatedData
           };
           
-          setSelectedConversationData(newData);
+          // Necesitamos usar type assertion pero evitamos 'any' usando el tipo correcto
+          setSelectedConversationData(newData as unknown as ConversationData);
           
           // También actualizar en la lista de conversaciones
-          setConversations(prev => prev.map(conv => 
-            conv.id === selectedConversationData.id ? {...conv, ...updatedData as any} : conv
-          ));
+          setConversations(prev => prev.map(conv => {
+            if (conv.id === selectedConversationData.id) {
+              return {...conv, ...compatibleUpdate};
+            }
+            return conv;
+          }));
         }
-      }} 
+      }}
       onDeleteGroup={() => {
         // Eliminar de la lista de conversaciones
         setConversations(prev => prev.filter(conv => conv.id !== selectedConversationData?.id));
@@ -2623,6 +2623,7 @@ export default function MessagesPage() {
         setSelectedConversationData(null);
       }} 
     />
-    </>
-  );
+  </>
+);
+
 }
