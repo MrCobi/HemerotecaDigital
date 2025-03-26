@@ -4,7 +4,7 @@ import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
 import { Trash2, Eye, CheckCircle, Users, MessageSquare } from "lucide-react";
@@ -140,7 +140,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     return filteredMessages.slice(startIndex, endIndex);
   }, [filteredMessages, currentPage, rowsPerPage]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     try {
       setIsDeleting(true);
       const response = await fetch(`/api/admin/messages/${id}`, {
@@ -172,7 +172,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [paginatedMessages, currentPage]);
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -337,7 +337,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
   };
 
   // Filtros para tipo de conversación y estado
-  const filterElement = (
+  const filterElement = useMemo(() => (
     <div className="flex flex-wrap gap-2">
       <button 
         onClick={() => setFilterType("all")}
@@ -392,7 +392,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         Grupos
       </button>
     </div>
-  );
+  ), [filterType]);
 
   const columns: Column<Message>[] = useMemo(() => [
     {

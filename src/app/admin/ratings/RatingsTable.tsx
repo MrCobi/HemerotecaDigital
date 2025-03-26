@@ -5,7 +5,7 @@ import Image from "next/image";
 import { CldImage } from "next-cloudinary";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
 import { Trash2, Book } from "lucide-react";
@@ -94,7 +94,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
     return filteredRatings.slice(startIndex, endIndex);
   }, [filteredRatings, currentPage, rowsPerPage]);
 
-  const handleDelete = async (id: string): Promise<void> => {
+  const handleDelete = useCallback(async (id: string): Promise<void> => {
     try {
       setIsDeleting(true);
       const response = await fetch(`/api/admin/ratings/${id}`, {
@@ -128,7 +128,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [currentPage, onRatingDeleted, paginatedRatings.length]);
 
   // Función para renderizar la imagen del usuario
   const renderUserImage = (user: Rating['user'], size: number = 32) => {
@@ -216,7 +216,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
   };
 
   // Filtro de estrellas
-  const ratingFilterElement = (
+  const ratingFilterElement = useMemo(() => (
     <div className="flex space-x-2 items-center">
       <span className="text-sm text-foreground/70">Filtrar por estrellas:</span>
       <div className="flex space-x-1">
@@ -235,7 +235,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
         ))}
       </div>
     </div>
-  );
+  ), [ratingFilter]);
 
   const columns: Column<Rating>[] = useMemo(() => [
     {
@@ -351,7 +351,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
         );
       },
     },
-  ], [isDeleteDialogOpen, ratingToDelete, ratingFilter, handleDelete, isDeleting, ratingFilterElement]);
+  ], [isDeleteDialogOpen, ratingToDelete, handleDelete, isDeleting, ratingFilterElement]);
 
   return (
     <div className="space-y-4">

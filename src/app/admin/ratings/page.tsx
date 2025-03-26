@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import RatingsTable from "./RatingsTable";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export default function RatingsPage() {
   const router = useRouter();
@@ -10,7 +10,7 @@ export default function RatingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadRatings = async () => {
+  const loadRatings = useCallback(async () => {
     setLoading(true);
     try {
       // Verificar sesión
@@ -57,11 +57,11 @@ export default function RatingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     loadRatings();
-  }, [router, loadRatings]);
+  }, [loadRatings]);
 
   // Esta función ya no es necesaria porque RatingsTable maneja las actualizaciones localmente
   // La dejamos como respaldo por si se necesita recargar toda la tabla en algún momento
