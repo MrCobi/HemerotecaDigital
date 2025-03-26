@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
           type: "FOLLOW",
           targetUserId: body.followingId,
           targetUsername: followingExists.username || followingExists.name
-        } as any
+        }
       });
     } catch (error) {
       console.error("Error al registrar actividad:", error);
@@ -257,7 +257,7 @@ export async function DELETE(req: NextRequest) {
           targetType: "user",
           details: `Eliminada relación de seguimiento (por administrador)`,
           createdAt: new Date()
-        } as any
+        }
       });
     } catch (error) {
       console.error("Error al registrar actividad:", error);

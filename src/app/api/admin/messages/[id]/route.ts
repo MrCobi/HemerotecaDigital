@@ -132,7 +132,12 @@ export async function PATCH(
     }
 
     // Actualizar el mensaje
-    const updateData: any = {};
+    const updateData: {
+      read?: boolean;
+      content?: string;
+      messageType?: string;
+      mediaUrl?: string;
+    } = {};
     
     // Solo actualizar campos proporcionados
     if (body.read !== undefined) {

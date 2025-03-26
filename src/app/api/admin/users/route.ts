@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Excluir la contraseña del resultado
-    const { password, ...userWithoutPassword } = newUser;
+    const { password: _password, ...userWithoutPassword } = newUser;
 
     return NextResponse.json(userWithoutPassword, { status: 201 });
   } catch (error) {

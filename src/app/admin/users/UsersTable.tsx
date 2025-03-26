@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { DataTable, Column } from "../components/DataTable";

@@ -26,7 +26,14 @@ export async function GET(req: NextRequest) {
     const endDate = searchParams.get("endDate");
 
     // Construir condiciones de filtro
-    const where: any = {};
+    const where: {
+      userId?: string;
+      type?: string;
+      createdAt?: {
+        gte?: Date;
+        lte?: Date;
+      };
+    } = {};
     
     if (userId) {
       where.userId = userId;
@@ -71,7 +78,25 @@ export async function GET(req: NextRequest) {
     ]);
 
     // Mapear los datos al formato esperado por el cliente
-    const formattedActivities = activities.map((activity: any) => ({
+    const formattedActivities = activities.map((activity: {
+      id: string;
+      type: string;
+      userId: string;
+      createdAt: Date;
+      sourceName?: string;
+      sourceId?: string;
+      targetName?: string;
+      targetId?: string;
+      targetType?: string;
+      details?: string;
+      user?: {
+        id: string;
+        name: string | null;
+        username: string;
+        image: string | null;
+        email: string;
+      };
+    }) => ({
       id: activity.id,
       type: activity.type,
       userId: activity.userId,
@@ -148,7 +173,10 @@ export async function DELETE(req: NextRequest) {
     const endDate = searchParams.get("endDate");
     
     if (startDate || endDate) {
-      const dateFilter: any = {};
+      const dateFilter: {
+        gte?: Date;
+        lte?: Date;
+      } = {};
       if (startDate) dateFilter.gte = new Date(startDate);
       if (endDate) dateFilter.lte = new Date(endDate);
       

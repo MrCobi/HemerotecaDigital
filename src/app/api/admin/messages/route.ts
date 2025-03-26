@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
 
       // Verificar que el remitente es parte de la conversación
       const isSenderParticipant = conversationExists.participants.some(
-        (p) => p.userId === body.senderId
+        (p: { userId: string }) => p.userId === body.senderId
       );
 
       if (!isSenderParticipant) {
@@ -291,7 +291,7 @@ export async function POST(req: NextRequest) {
         targetType: newMessage.conversation.isGroup ? "group" : "user",
         details,
         createdAt: new Date()
-      } as any
+      }
     });
 
     return NextResponse.json(newMessage, { status: 201 });
