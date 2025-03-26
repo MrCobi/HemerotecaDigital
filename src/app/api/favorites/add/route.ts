@@ -46,7 +46,7 @@ export const POST = withAuth(async (req: Request, { userId }: { userId: string }
     }
 
     // Añadir a favoritos y registrar actividad
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // Añadir a favoritos
       await tx.favoriteSource.create({
         data: {
@@ -67,7 +67,7 @@ export const POST = withAuth(async (req: Request, { userId }: { userId: string }
           targetType: null,
           details: `Agregaste ${source.name} a favoritos`,
           createdAt: new Date()
-        } as any
+        }
       });
     });
 

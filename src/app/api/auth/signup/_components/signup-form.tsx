@@ -367,7 +367,7 @@ export default function SignupForm() {
               <FormField
                 control={form.control}
                 name="image"
-                render={({ field: { onChange, ...restField } }) => (
+                render={({ field: { onChange, ... _ } }) => (
                   <FormItem>
                     <FormLabel className="text-gray-700 dark:text-gray-200 font-medium">Foto de perfil (opcional)</FormLabel>
                     <div className="mt-2 flex flex-col items-center justify-center">

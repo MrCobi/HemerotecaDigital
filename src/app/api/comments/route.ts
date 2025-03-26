@@ -2,9 +2,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../lib/auth-utils";
-import { User } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
-export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: User }) => {
+export const POST = withAuth(async (request: Request, { userId }: { userId: string }) => {
   try {
     const { content, sourceId } = await request.json();
     const trimmedContent = content?.trim() || "";
@@ -25,7 +25,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
     }
 
     // Transacción atómica
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Verificar existencia de la fuente
       const sourceExists = await tx.source.findUnique({
         where: { id: sourceId },
@@ -65,7 +65,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
           targetType: null,
           details: `Comentaste: "${trimmedContent.length > 50 ? trimmedContent.substring(0, 50) + '...' : trimmedContent}"`,
           createdAt: new Date(),
-        } as any,
+        },
       });
 
       // 4. Limitar a 20 actividades
@@ -77,7 +77,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
       if (activities.length > 20) {
         const toDelete = activities.slice(20);
         await tx.activityHistory.deleteMany({
-          where: { id: { in: toDelete.map((a) => a.id) } },
+          where: { id: { in: toDelete.map((a: { id: string }) => a.id) } },
         });
       }
 

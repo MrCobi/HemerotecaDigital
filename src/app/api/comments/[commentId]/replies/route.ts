@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 export async function POST(
   request: Request,
@@ -29,7 +30,7 @@ export async function POST(
       );
     }
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Verificar comentario padre y fuente
       const parentComment = await tx.comment.findUnique({
         where: { id: commentId }, // Corregido: Usar `commentId` en lugar de `id`
@@ -70,7 +71,7 @@ export async function POST(
           targetType: "user",
           details: `Respondiste a un comentario de ${parentComment.user.name} en ${parentComment.source.name}`,
           createdAt: new Date(),
-        } as any,
+        }
       });
 
       // 4. Limitar a 20 actividades
@@ -82,7 +83,7 @@ export async function POST(
       if (activities.length > 20) {
         const toDelete = activities.slice(20);
         await tx.activityHistory.deleteMany({
-          where: { id: { in: toDelete.map(a => a.id) } },
+          where: { id: { in: toDelete.map((a: { id: string }) => a.id) } },
         });
       }
 

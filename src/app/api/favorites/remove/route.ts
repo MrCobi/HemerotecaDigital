@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../../lib/auth-utils";
 import { revalidateTag } from "next/cache";
-
+import { PrismaClient } from "@prisma/client";
 
 // Implementación del método DELETE (para compatibilidad con REST)
 export const DELETE = withAuth(async (req: Request, { userId }: { userId: string }) => {
@@ -64,7 +64,7 @@ async function removeFavorite(req: Request, userId: string) {
     }
 
     // Eliminar el favorito y registrar actividad
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use'>) => {
       // Eliminar favorito
       await tx.favoriteSource.deleteMany({
         where: {
@@ -85,7 +85,7 @@ async function removeFavorite(req: Request, userId: string) {
           targetType: null,
           details: `Eliminaste ${source.name} de favoritos`,
           createdAt: new Date()
-        } as any
+        }
       });
     });
 

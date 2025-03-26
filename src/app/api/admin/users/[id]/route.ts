@@ -74,7 +74,17 @@ export async function PATCH(
     }
 
     // Preparar datos para actualización
-    const updateData: any = {
+    const updateData: {
+      name: string;
+      username: string;
+      email: string;
+      image?: string;
+      role: string;
+      bio?: string;
+      showActivity?: boolean;
+      showFavorites?: boolean;
+      password?: string;
+    } = {
       name: body.name,
       username: body.username,
       email: body.email,
