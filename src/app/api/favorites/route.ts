@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { revalidateTag } from "next/cache";
 import { withAuth } from "../../../lib/auth-utils";
+import { Prisma } from "@prisma/client";
 
 // GET para obtener todos los favoritos del usuario
 export const GET = withAuth(async (request: Request, { userId }: { userId: string }) => {
@@ -18,7 +19,7 @@ export const GET = withAuth(async (request: Request, { userId }: { userId: strin
     });
 
     // Extraer los IDs de las fuentes favoritas
-    const favoriteIds = favorites.map(fav => fav.sourceId);
+    const favoriteIds = favorites.map((fav: { sourceId: string }) => fav.sourceId);
 
     return NextResponse.json({ 
       favoriteIds, 
@@ -87,7 +88,7 @@ export const POST = withAuth(async (request: Request, { userId }: { userId: stri
           targetType: null,
           details: `Agregaste ${sourceExists.name} a favoritos`,
           createdAt: new Date(),
-        } as any,
+        },
       }),
     ]);
 
@@ -159,7 +160,7 @@ export const DELETE = withAuth(async (request: Request, { userId }: { userId: st
           targetType: null,
           details: `Eliminaste ${favorite.source.name} de favoritos`,
           createdAt: new Date()
-        } as any,
+        },
       })
     ]);
 

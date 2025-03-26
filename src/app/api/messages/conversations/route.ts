@@ -2,14 +2,15 @@
 import { NextResponse, NextRequest } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { PrismaClient } from "@prisma/client";
 
-interface ConversationPair {
+interface _ConversationPair {
   user1: string;
   user2: string;
   lastMessageDate: Date;
 }
 
-interface ConversationResponse {
+interface _ConversationResponse {
   id: string;
   receiver: {
     id: string;
@@ -51,7 +52,7 @@ interface ConversationResponse {
   participantsCount?: number;
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -87,7 +88,15 @@ export async function GET(request: NextRequest) {
 
     // 2. Para cada conversación, obtener al otro participante
     const conversationsWithParticipants = await Promise.all(
-      (userConversations as any[]).map(async (conv) => {
+      (userConversations as { 
+        id: string; 
+        isGroup?: boolean; 
+        conversationId?: string;
+        createdAt?: Date;
+        updatedAt?: Date;
+        created_at?: Date;
+        updated_at?: Date;
+      }[]).map(async (conv) => {
         try {
           // Determinar si es un grupo basado en el ID
           const isGroup = conv.isGroup || (typeof conv.conversationId === 'string' && conv.conversationId.startsWith('group_'));
@@ -243,9 +252,11 @@ export async function GET(request: NextRequest) {
     
     console.log(`Procesadas ${filteredConversations.length} conversaciones válidas`);
     
-    const sortedConversations = filteredConversations.sort((a, b) => 
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
+    const sortedConversations = filteredConversations.sort((a, b) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
+      const dateB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
+      return dateB.getTime() - dateA.getTime();
+    });
 
     return NextResponse.json(sortedConversations);
 
@@ -304,18 +315,18 @@ export async function POST(request: NextRequest) {
     `;
 
     if (Array.isArray(existingConversations) && existingConversations.length > 0) {
-      const conv = existingConversations[0] as any;
-      console.log(`Conversación existente encontrada: ${conv.id}`);
+      const _conv = existingConversations[0] as { id: string; created_at: Date };
+      console.log(`Conversación existente encontrada: ${_conv.id}`);
       
       return NextResponse.json({
-        id: conv.id,
+        id: _conv.id,
         receiver: {
           id: receiver.id,
           username: receiver.username,
           name: receiver.name,
           image: receiver.image
         },
-        createdAt: conv.created_at,
+        createdAt: _conv.created_at,
         isNew: false
       });
     }
@@ -323,7 +334,7 @@ export async function POST(request: NextRequest) {
     // Crear nueva conversación con transacción correcta
     let newConversation;
     try {
-      newConversation = await prisma.$transaction(async (tx) => {
+      newConversation = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use'>) => {
         // 1. Crear la conversación
         const conv = await tx.$executeRaw`
           INSERT INTO conversations (id, is_group, created_at, updated_at)
@@ -342,7 +353,7 @@ export async function POST(request: NextRequest) {
           throw new Error("No se pudo crear la conversación");
         }
         
-        const newConv = createdConv[0] as any;
+        const newConv = createdConv[0] as { id: string; created_at: Date };
         const conversationId = newConv.id;
         
         // 2. Crear los participantes

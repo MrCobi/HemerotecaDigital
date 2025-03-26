@@ -2,6 +2,7 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 
 export async function DELETE(
     request: Request,
@@ -30,7 +31,7 @@ export async function DELETE(
                 return NextResponse.json({ error: "Comentario no encontrado" }, { status: 404 });
             }
 
-            const result = await prisma.$transaction(async (tx: any) => {
+            const _result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
                 // 1. Obtener comentario con fuente relacionada
                 const comment = await tx.comment.findUnique({
                     where: { id: commentId },
@@ -79,7 +80,7 @@ export async function DELETE(
                 if (activities.length > 20) {
                     const toDelete = activities.slice(20);
                     await tx.activityHistory.deleteMany({
-                        where: { id: { in: toDelete.map((a: any) => a.id) } },
+                        where: { id: { in: toDelete.map((a: { id: string }) => a.id) } },
                     });
                 }
             });

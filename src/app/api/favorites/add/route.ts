@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../../lib/auth-utils";
+import { Prisma } from "@prisma/client";
 
 // Esta es una ruta de compatibilidad transitoria
 // que redirige las solicitudes a la API actualizada en /api/favorites
@@ -46,7 +47,7 @@ export const POST = withAuth(async (req: Request, { userId }: { userId: string }
     }
 
     // Añadir a favoritos y registrar actividad
-    await prisma.$transaction(async (tx: any) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Añadir a favoritos
       await tx.favoriteSource.create({
         data: {
