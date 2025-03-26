@@ -203,7 +203,14 @@ export default function EditProfilePage() {
       }
       
       // Preparar datos a actualizar
-      const formDataToUpdate: any = {
+      const formDataToUpdate: {
+        name: string;
+        username: string;
+        bio: string | null;
+        image: string | null;
+        currentPassword?: string;
+        newPassword?: string;
+      } = {
         name: formData.name,
         username: formData.username,
         bio: formData.bio,

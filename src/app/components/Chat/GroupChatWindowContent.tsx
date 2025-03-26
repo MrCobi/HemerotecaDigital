@@ -58,7 +58,6 @@ type GroupChatWindowContentProps = {
   className?: string;
 };
 
-const MemoizedMessageItem = memo(MessageItem);
 
 const MessageList = memo(({ 
   messages, 

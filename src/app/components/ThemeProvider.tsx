@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useState, useEffect, useContext } from "react";
+import { createContext, useState, useEffect, useContext, useCallback } from "react";
 
 type Theme = "light" | "dark" | "system";
 
@@ -16,17 +16,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   // Función para aplicar el tema según preferencia del sistema
-  const applySystemTheme = () => {
+  const applySystemTheme = useCallback(() => {
     if (typeof window !== "undefined") {
       const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       document.documentElement.classList.toggle("dark", prefersDark);
       document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
       document.documentElement.style.colorScheme = prefersDark ? "dark" : "light";
     }
-  };
+  }, []);
 
   // Función para aplicar un tema específico
-  const applyTheme = (newTheme: Theme) => {
+  const applyTheme = useCallback((newTheme: Theme) => {
     if (typeof window === "undefined") return;
 
     if (newTheme === "system") {
@@ -54,7 +54,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.setAttribute("data-theme", newTheme);
       document.documentElement.style.colorScheme = isDark ? "dark" : "light";
     }
-  };
+  }, [applySystemTheme]);
 
   // Cambiar el tema y guardarlo
   const changeTheme = (newTheme: Theme) => {
@@ -88,7 +88,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         matchMedia.removeEventListener("change", () => applySystemTheme());
       }
     };
-  }, []);
+  }, [applyTheme, applySystemTheme]);
 
   // Evitar problema de hidratación
   if (!mounted) {
