@@ -77,7 +77,7 @@ const MessageItem = React.memo(({
   otherUser,
   showAvatar,
   showDateSeparator,
-  index,
+  _index,
   session
 }: { 
   message: Message, 
@@ -85,8 +85,8 @@ const MessageItem = React.memo(({
   otherUser: User | null,
   showAvatar: boolean,
   showDateSeparator: boolean,
-  index: number,
-  session: any
+  _index: number,
+  session: { user?: { id?: string; name?: string | null; image?: string | null; } }
 }) => {
   const isCurrentUser = message.senderId === currentUserId;
   
@@ -1763,8 +1763,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
                       otherUser={otherUser}
                       showAvatar={showAvatar}
                       showDateSeparator={showDateSeparator}
-                      index={index}
-                      session={session}
+                      _index={index}
+                      session={{ user: { id: session?.user?.id, name: session?.user?.name, image: session?.user?.image } }}
                     />
                   </div>
                 );

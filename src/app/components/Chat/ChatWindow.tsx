@@ -57,25 +57,25 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+  const _isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
   const [isTyping, setIsTyping] = useState(false);
   const [peerIsTyping, setPeerIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const messageInputRef = useRef<HTMLTextAreaElement>(null);
-  
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+
   // Estado para controlar la carga de mensajes
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
-  const [_showEmojiPicker, _setShowEmojiPicker] = useState(false);
-  
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
   // Socket.io integration
   const {
     connected,
-    error: socketError,
+    error: _socketError,
     sendMessage: sendSocketMessage,
     updateTypingStatus: setTypingStatus,
     markMessageAsRead: markAsRead,
-    socketInstance
+    socketInstance: _socketInstance
   } = useSocket({
     userId: currentUserId,
     username: session?.user?.name || session?.user?.username || 'Usuario',
@@ -490,7 +490,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   }, {});
 
   // Renderizar mensajes agrupados por fecha
-  const renderGroupedMessages = () => {
+  const _renderGroupedMessages = () => {
     return Object.entries(groupedMessages).map(([dateKey, messages]) => {
       const date = new Date(dateKey);
       const day = format(date, 'd');
@@ -665,161 +665,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const handleScroll = () => {
     if (chatContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-      const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 10;
-      setIsAtBottom(isAtBottom);
+      const isAtBottomNow = scrollHeight - scrollTop - clientHeight < 30;
+      setIsAtBottom(isAtBottomNow);
     }
   };
-
-  // Función para cargar mensajes históricos de la conversación
-  const loadHistoricalMessages = useCallback(async () => {
-    if (!otherUser?.id || !currentUserId || isLoadingMessages || messagesLoaded) return;
-    
-    setIsLoadingMessages(true);
-    console.log(`Cargando mensajes históricos de la conversación entre ${currentUserId} y ${otherUser.id}`);
-    
-    try {
-      const response = await fetch(API_ROUTES.messages.get(otherUser.id), {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        console.error(`Error al cargar mensajes: ${response.status} ${response.statusText}`);
-        throw new Error('No se pudieron cargar los mensajes históricos');
-      }
-      
-      const data = await response.json();
-      
-      if (!data || !Array.isArray(data) || data.length === 0) {
-        console.log('No hay mensajes históricos para esta conversación');
-        setMessagesLoaded(true);
-        return;
-      }
-      
-      console.log(`${data.length} mensajes históricos cargados`);
-      
-      interface HistoricalMessage {
-        id: string;
-        content: string;
-        senderId: string;
-        receiverId: string;
-        createdAt: string;
-        read?: boolean;
-      }
-      
-      // Define explicit type for message parameter in map function
-      const formattedMessages = data
-        .filter((message): message is HistoricalMessage => Boolean(message))
-        .map((message: HistoricalMessage): { 
-          id: string; 
-          content: string | null; 
-          senderId: string; 
-          receiverId: string; 
-          createdAt: string; 
-          status: MessageStatus;
-        } => {
-          return {
-            id: message.id,
-            content: message.content,
-            senderId: message.senderId,
-            receiverId: message.receiverId,
-            createdAt: message.createdAt,
-            status: (message.read ? 'read' : 'delivered') as MessageStatus
-          };
-        });
-      
-      // Usar una función de estado para asegurar que no perdemos mensajes recientes
-      setMessages(prevMessages => {
-        // Crear un mapa de los mensajes actuales por ID para evitar duplicados
-        const existingMsgMap = new Map(prevMessages.map(msg => [
-          msg.id || msg.tempId, 
-          msg
-        ]));
-        
-        // Añadir mensajes históricos si no existen en la lista actual
-        formattedMessages.forEach((msg) => {
-          if (!existingMsgMap.has(msg.id)) {
-            // Convert the status string to MessageStatus type
-            const messageWithCorrectStatus: Message = {
-              ...msg,
-              status: msg.status as MessageStatus
-            };
-            existingMsgMap.set(msg.id, messageWithCorrectStatus);
-          }
-        });
-        
-        // Convertir el mapa de vuelta a array y ordenar por fecha
-        const mergedMessages = Array.from(existingMsgMap.values());
-        return mergedMessages.sort((a, b) => {
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        });
-      });
-      
-      setMessagesLoaded(true);
-      console.log('Mensajes históricos cargados correctamente');
-      
-    } catch (error) {
-      console.error('Error al cargar mensajes históricos:', error);
-    } finally {
-      setIsLoadingMessages(false);
-    }
-  }, [otherUser?.id, currentUserId, isLoadingMessages, messagesLoaded]);
-
-  // Cargar mensajes históricos cuando se abre la conversación
-  useEffect(() => {
-    if (isOpen && otherUser?.id && currentUserId && !messagesLoaded) {
-      // Usamos una variable para tracking que evite múltiples cargas simultáneas
-      let isCurrentlyMounted = true;
-      
-      // Usamos sessionStorage para recordar si ya hemos cargado esta conversación
-      // en esta sesión y evitar cargas duplicadas
-      const conversationKey = `conversation_loaded_${otherUser.id}`;
-      const alreadyLoaded = sessionStorage.getItem(conversationKey);
-      
-      if (!alreadyLoaded) {
-        console.log(`Iniciando carga de mensajes para conversación con ${otherUser.id}`);
-        
-        // Marcar inmediatamente como cargada para evitar carreras
-        sessionStorage.setItem(conversationKey, 'true');
-        
-        // Agregar un pequeño retraso para evitar múltiples llamadas a la API
-        const loadTimeout = setTimeout(() => {
-          if (isCurrentlyMounted) {
-            loadHistoricalMessages();
-          }
-        }, 300);
-        
-        return () => {
-          isCurrentlyMounted = false;
-          clearTimeout(loadTimeout);
-        };
-      } else {
-        console.log(`Evitando recarga de conversación con ${otherUser.id} (ya cargada en esta sesión)`);
-        setMessagesLoaded(true);
-      }
-    }
-  }, [isOpen, otherUser?.id, currentUserId, messagesLoaded, loadHistoricalMessages]);
-  
-  // Inicializar con mensajes iniciales solo al abrir la conversación
-  useEffect(() => {
-    if (isOpen && otherUser && initialMessages.length > 0 && !messagesLoaded) {
-      console.log('Inicializando con mensajes iniciales al abrir la conversación', initialMessages.length);
-      
-      // Procesamos los mensajes iniciales para evitar duplicados
-      const processedMessages = initialMessages.filter((msg, index, self) => {
-        // Filtrar mensajes duplicados por ID o tempId
-        return self.findIndex(m => 
-          (m.id && m.id === msg.id) || 
-          (m.tempId && m.tempId === msg.tempId)
-        ) === index;
-      });
-      
-      setMessages(processedMessages);
-      setMessagesLoaded(true);
-    }
-  }, [isOpen, otherUser, initialMessages, messagesLoaded]);
 
   // Cargar mensajes de la conversación cuando cambia la conversación o se abre la ventana
   // Usamos useCallback para evitar recrear esta función y causar efectos secundarios
@@ -876,79 +725,68 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [otherUser?.id, currentUserId, conversationId, markAsRead]);
 
-  // IMPORTANTE: Este efecto está causando múltiples cargas, lo reemplazamos
-  // por el efecto mejorado arriba que usa sessionStorage
-  /* useEffect(() => {
-    if (isOpen && !messagesLoaded && otherUser?.id && currentUserId && initialMessages.length < 5) {
-      const loadTimeout = setTimeout(() => {
-        loadConversationMessages();
-      }, 300);
-      
-      return () => clearTimeout(loadTimeout);
+  // Función para cargar mensajes históricos
+  const loadHistoricalMessages = useCallback(async () => {
+    if (!otherUser?.id || !currentUserId || !hasMoreMessages || isLoadingMessages) {
+      return;
     }
-  }, [isOpen, messagesLoaded, otherUser?.id, currentUserId, initialMessages.length, loadConversationMessages]); */
-
-  // Verificar si los usuarios se siguen mutuamente
-  useEffect(() => {
-    if (!otherUser?.id || !currentUserId || !isOpen) return;
     
-    const checkMutualFollow = async () => {
-      // Evitar verificaciones repetidas usando sessionStorage
-      const relationshipKey = `mutual_follow_${currentUserId}_${otherUser.id}`;
-      const cachedRelationship = sessionStorage.getItem(relationshipKey);
+    setIsLoadingMessages(true);
+    
+    try {
+      // Obtener la fecha del mensaje más antiguo actual
+      const oldestMessage = [...messages].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      )[0];
       
-      if (cachedRelationship) {
-        console.log('Usando relación de seguimiento en caché');
-        setCanSendMessages(cachedRelationship === 'true');
+      const beforeDate = oldestMessage 
+        ? new Date(oldestMessage.createdAt).toISOString()
+        : new Date().toISOString();
+      
+      console.log(`Cargando mensajes históricos anteriores a ${beforeDate}`);
+      
+      const response = await fetch(
+        `/api/messages?otherUserId=${otherUser.id}&beforeDate=${beforeDate}&limit=20`
+      );
+      
+      if (!response.ok) {
+        console.error('Error al cargar mensajes históricos:', response.status);
         return;
       }
       
-      try {
-        setIsCheckingRelationship(true);
-        const response = await fetch(`/api/relationships/check?targetUserId=${otherUser.id}`);
+      const data = await response.json();
+      
+      if (data && Array.isArray(data.messages)) {
+        if (data.messages.length === 0) {
+          console.log('No hay más mensajes históricos');
+          setHasMoreMessages(false);
+          return;
+        }
         
-        if (response.ok) {
-          const data = await response.json();
-          // Solo permitir enviar mensajes si ambos usuarios se siguen mutuamente
-          setCanSendMessages(data.isMutualFollow);
-          
-          // Guardar en sessionStorage para evitar peticiones repetidas
-          sessionStorage.setItem(relationshipKey, data.isMutualFollow ? 'true' : 'false');
+        console.log(`Recibidos ${data.messages.length} mensajes históricos`);
+        
+        // Procesar mensajes para evitar duplicados
+        const existingIds = new Set(messages.map(m => m.id).filter(Boolean));
+        const newMessages = data.messages.filter((msg: Message) => !msg.id || !existingIds.has(msg.id));
+        
+        if (newMessages.length > 0) {
+          setMessages(prev => [...newMessages, ...prev]);
         } else {
-          console.error('Error al verificar relación de seguimiento');
-          setCanSendMessages(false);
+          setHasMoreMessages(false);
         }
-      } catch (error) {
-        console.error('Error al verificar relación de seguimiento:', error);
-        setCanSendMessages(false);
-      } finally {
-        setIsCheckingRelationship(false);
       }
-    };
-    
-    checkMutualFollow();
-  }, [otherUser?.id, currentUserId, isOpen]);
-
-  // Limpiar estado de mensajes al cerrar la ventana o cambiar de conversación
-  useEffect(() => {
-    if (!isOpen) {
-      // Al cerrar, no limpiamos los mensajes inmediatamente para evitar recargas al reabrir
-      return () => {
-        // Solo limpiar cuando cambia el otherUser (cambia de conversación)
-        if (!isOpen) {
-          console.log('Limpiando estado de mensajes al cambiar de conversación');
-          setMessagesLoaded(false);
-          // También reiniciar otros estados para evitar comportamientos extraños
-          setCanSendMessages(null);
-        }
-      };
+    } catch (error) {
+      console.error('Error al cargar mensajes históricos:', error);
+    } finally {
+      setIsLoadingMessages(false);
     }
-  }, [isOpen, otherUser?.id]);
+  }, [otherUser?.id, currentUserId, hasMoreMessages, isLoadingMessages, messages]);
 
-  // Manejar cierre de ventana
-  const handleClose = () => {
-    // No limpiar los mensajes al cerrar, solo cuando cambia la conversación
-    onClose();
+  // Función para manejar la carga de mensajes al hacer scroll hacia arriba
+  const handleLoadMore = () => {
+    if (!isLoadingMessages && hasMoreMessages) {
+      loadHistoricalMessages();
+    }
   };
 
   useEffect(() => {
@@ -999,6 +837,28 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     };
   }, [isOpen, messages, onClose]);
 
+  // Limpiar estado de mensajes al cerrar la ventana o cambiar de conversación
+  useEffect(() => {
+    if (!isOpen) {
+      // Al cerrar, no limpiamos los mensajes inmediatamente para evitar recargas al reabrir
+      return () => {
+        // Solo limpiar cuando cambia el otherUser (cambia de conversación)
+        if (!isOpen) {
+          console.log('Limpiando estado de mensajes al cambiar de conversación');
+          setMessagesLoaded(false);
+          // También reiniciar otros estados para evitar comportamientos extraños
+          setCanSendMessages(null);
+        }
+      };
+    }
+  }, [isOpen, otherUser?.id]);
+
+  // Manejar cierre de ventana
+  const handleClose = () => {
+    // No limpiar los mensajes al cerrar, solo cuando cambia la conversación
+    onClose();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       // Solo permitir cerrar si es un evento real del usuario
@@ -1029,6 +889,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         <div 
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-4"
+          onScroll={handleScroll}
         >
           {isLoadingMessages ? (
             <div className="flex justify-center items-center h-full">
@@ -1067,7 +928,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           )}
           <div className="flex items-end gap-2">
             <Textarea
-              ref={messageInputRef}
               className="min-h-10 flex-1 resize-none"
               placeholder={canSendMessages === false ? "No puedes enviar mensajes" : "Escribe tu mensaje..."}
               value={newMessage}
