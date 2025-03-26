@@ -253,7 +253,7 @@ const VoiceMessagePlayer = React.memo(({
       if (audio) audio.currentTime = 0;
     };
     
-    const handleError = (e: any) => {
+    const handleError = (e: Event) => {
       console.error("Error al cargar el audio:", e);
       setError("Error al cargar el audio");
       setIsLoading(false);
@@ -799,11 +799,11 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     };
   }, [socketInitialized, safeConversationId, actualConversationId, currentUserId, joinConversation, leaveConversation, connected, socketInstance, session]);
-  
+
   // Función para procesar y deduplicar mensajes
-  const processMessages = React.useCallback((newMessages: Message[] | MessageType[], existingMessages: Message[] = []) => {
+  const processMessages = useCallback((newMessages: Message[] | MessageType[]) => {
     // Evitar procesar mensajes vacíos
-    if (!newMessages || newMessages.length === 0) return existingMessages;
+    if (!newMessages || newMessages.length === 0) return messages;
     
     // Clonar el mapa actual para trabajar sobre una copia
     const updatedMap = new Map(messageMap);
@@ -862,8 +862,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     
     // Aplicar nuevo estado solo si hay cambios
     return finalMessages;
-  }, [messageMap, currentUserId, otherUser?.id, actualConversationId, safeConversationId]);
-  
+  }, [messageMap, currentUserId, otherUser?.id, actualConversationId, safeConversationId, messages]);
+
   // Actualizar el estado de mensajes cuando cambia el mapa
   React.useEffect(() => {
     const uniqueMessages = Array.from(messageMap.values()).sort((a, b) => {
@@ -874,7 +874,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     
     setMessages(uniqueMessages);
   }, [messageMap]);
-  
+
   // Verificar si los usuarios se siguen mutuamente
   React.useEffect(() => {
     if (!otherUser?.id || !currentUserId) return;
@@ -915,7 +915,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     
     checkMutualFollow();
   }, [currentUserId, otherUser?.id]);
-  
+
   // Cargar mensajes cuando cambia la conversación o al iniciar
   React.useEffect(() => {
     // No hacer nada si no hay ID de conversación o ya se están cargando
@@ -934,7 +934,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     }
     
     // Función para obtener mensajes
-    const fetchMessages = async (pageNum = 1, existingMessages: Message[] = []) => {
+    const fetchMessages = async (pageNum = 1) => {
       // Prevenir múltiples peticiones simultáneas
       if (isFetchingRef.current) return;
       isFetchingRef.current = true;
@@ -1059,7 +1059,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           
           // Procesar y combinar mensajes evitando duplicados
           const combinedMessages = [...messages, ...fetchedMessages];
-          const uniqueMessages = processMessages(combinedMessages, []);
+          const uniqueMessages = processMessages(combinedMessages);
           
           setMessages(uniqueMessages);
           setHasMore(fetchedMessages.length === pageSize);
@@ -1085,7 +1085,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     // Solo incluir safeConversationId como dependencia para evitar el bucle infinito
     // Las otras variables las capturamos en el closure
   }, [safeConversationId, hasMore, pageSize]);
-  
+
   // Cargar más mensajes
   const _loadMoreMessages = async () => {
     if (!safeConversationId || isLoadingMore || !hasMore || isFetchingRef.current) return;
@@ -1147,7 +1147,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       isFetchingRef.current = false;
     }
   };
-  
+
   // Restaurar posición de scroll después de cargar más mensajes
   React.useEffect(() => {
     if (preserveScrollPosition && chatContainerRef.current) {
@@ -1157,13 +1157,13 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       setPreserveScrollPosition(false);
     }
   }, [preserveScrollPosition, messages]);
-  
+
   // Manejar scroll automático
   React.useEffect(() => {
     const handleNewMessage = (message: MessageType) => {
       if (message.conversationId === safeConversationId) {
         // Procesar el nuevo mensaje con nuestra función de deduplicación
-        processMessages([message], messages);
+        processMessages([message]);
         
         if (autoScrollEnabled) {
           setTimeout(() => {
@@ -1181,7 +1181,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       socketInstance?.off('new_message', handleNewMessage);
     };
   }, [socketInstance, safeConversationId, autoScrollEnabled, messages, processMessages]);
-  
+
   // Manejador de scroll para detectar si estamos en la parte inferior - versión unificada
   const handleScroll = () => {
     const element = chatContainerRef.current;
@@ -1192,7 +1192,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       setAutoScrollEnabled(isNearBottom);
     }
   };
-  
+
   React.useEffect(() => {
     const element = chatContainerRef.current;
     if (element) {
@@ -1231,7 +1231,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }, 3000);
     }
   }, [isTyping, socketInstance, socketInitialized, otherUser?.id, currentUserId]);
-  
+
   // Enviar un mensaje
   const sendMessage = async () => {
     if (!newMessage.trim() || isSending || !otherUser || !canSendMessages) return;
@@ -1256,7 +1256,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       };
       
       // Añadir mensaje al estado local usando la función de procesamiento
-      const updatedMessages = addLocalMessage(messageToSend);
+      const updatedMessages = processMessages([messageToSend]);
       setMessages(updatedMessages);
       
       await sendMessageToServer(messageToSend, tempId);
@@ -1267,7 +1267,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       setIsSending(false);
     }
   };
-  
+
   // Función para enviar mensajes al servidor
   const sendMessageToServer = async (message: Message, tempId: string) => {
     try {
@@ -1309,11 +1309,12 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       const data = await response.json();
       
       // Actualizar el mensaje en el estado local con la información del servidor
-      updateLocalMessage(tempId, {
+      processMessages([{
+        ...message,
         id: data.id,
         status: 'sent',
         conversationId: data.conversationId
-      });
+      }]);
       
       // Actualizar la conversación si es necesario
       if (data.conversationId && data.conversationId !== actualConversationId) {
@@ -1329,14 +1330,15 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     } catch (error) {
       console.error('Error al enviar mensaje:', error);
       // Marcar el mensaje como error
-      updateLocalMessage(tempId, {
+      processMessages([{
+        ...message,
         status: 'failed'
-      });
+      }]);
       
       throw error; // Re-lanzar el error para que el catch de nivel superior lo maneje
     }
   };
-  
+
   // Marcar mensaje como leído
   const _markMessageAsRead = (messageId?: string, conversationId?: string) => {
     if (!messageId || !conversationId || !socketInstance || !socketInitialized) {
@@ -1359,7 +1361,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     }, 500); // Pequeño retraso para dar tiempo a que el socket se conecte
   };
-  
+
   // Actualizar estado de un mensaje
   const _updateMessageStatus = (messageId: string, newStatus: MessageStatus) => {
     // Buscar el mensaje en nuestro estado para actualizarlo
@@ -1374,10 +1376,10 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       };
       
       // Procesar la actualización
-      processMessages([updatedMessage], messages);
+      processMessages([updatedMessage]);
     }
   };
-  
+
   // Manejar tecla Enter para enviar
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1385,7 +1387,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       sendMessage();
     }
   };
-  
+
   // Cuando la conversación cambia, restablecer todo
   React.useEffect(() => {
     if (safeConversationId) {
@@ -1403,7 +1405,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     }
   }, [safeConversationId]);
-  
+
   // Enviar estado de "escribiendo"
   React.useEffect(() => {
     if (!otherUser?.id || !socketInstance || !socketInitialized || !currentUserId) return;
@@ -1446,7 +1448,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     };
   }, [currentUserId, isTyping, otherUser?.id, socketInstance, socketInitialized]);
-  
+
   // Unir a conversación cuando el socket esté listo
   React.useEffect(() => {
     if (socketInitialized && safeConversationId) {
@@ -1454,7 +1456,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       joinConversation(safeConversationId);
     }
   }, [socketInitialized, safeConversationId, joinConversation]);
-  
+
   // Añadir efecto para cargar el conversationId desde localStorage al inicio
   React.useEffect(() => {
     if (otherUser?.id && !actualConversationId && !conversationId) {
@@ -1469,7 +1471,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     }
   }, [otherUser?.id, actualConversationId, conversationId]);
-  
+
   // Efecto para reconectar el socket automáticamente si se desconecta
   React.useEffect(() => {
     if (!connected && currentUserId) {
@@ -1477,7 +1479,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       reconnect();
     }
   }, [connected, currentUserId, reconnect]);
-  
+
   // Efecto para notificar al servidor cuando el usuario está activo en la conversación
   React.useEffect(() => {
     // Solo ejecutar cuando cambia la conversación o se inicializa el socket
@@ -1516,7 +1518,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     };
   }, [socketInitialized, safeConversationId, otherUser?.id, messages, socketMarkMessageAsRead]);
-  
+
   // Efecto para cargar el ID de conversación real desde localStorage al iniciar (una sola vez)
   React.useEffect(() => {
     if (typeof window !== 'undefined' && otherUser?.id && !actualConversationId) {
@@ -1527,7 +1529,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     }
   }, [otherUser?.id, actualConversationId]);
-  
+
   // Nueva función para añadir mensaje local de manera más eficiente
   const addLocalMessage = React.useCallback((message: Message) => {
     // Añadir el mensaje al mapa directamente
@@ -1542,7 +1544,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         return dateA.getTime() - dateB.getTime();
       });
   }, [messageMap]);
-  
+
   // Función para actualizar mensaje local existente
   const updateLocalMessage = React.useCallback((messageId: string, updates: Partial<Message>) => {
     setMessageMap(prevMap => {
@@ -1563,7 +1565,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       return newMap;
     });
   }, []);
-  
+
   // Efectos para monitorear la actividad y reconectar el socket si es necesario
   React.useEffect(() => {
     // Escuchar eventos de actividad del usuario
@@ -1585,7 +1587,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       window.removeEventListener('keydown', handleUserActivity);
     };
   }, [connected, reconnect, currentUserId]);
-  
+
   // Función para hacer scroll al final de los mensajes
   const scrollToBottom = () => {
     if (messagesEndRef.current) {

@@ -34,7 +34,8 @@ export type ConversationData = {
   imageUrl?: string | null;
   isGroup: boolean;
   participants: Participant[];
-  [key: string]: any; // Para otras propiedades que puedan existir
+  // Usando Record con union types para propiedades adicionales
+  [key: string]: string | null | boolean | Participant[] | undefined;
 };
 
 interface GroupManagementModalProps {
@@ -56,7 +57,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   onDeleteGroup,
   onLeaveGroup
 }) => {
-  const { data: session } = useSession();
+  const { data: _session } = useSession();
   const { toast } = useToast();
   
   // Estados locales
@@ -245,7 +246,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
     if (showAddParticipantsModal) {
       loadPossibleParticipants();
     }
-  }, [showAddParticipantsModal]);
+  }, [showAddParticipantsModal, loadPossibleParticipants]);
   
   // Función para manejar la selección de nuevos participantes
   const handleToggleParticipant = (userId: string) => {

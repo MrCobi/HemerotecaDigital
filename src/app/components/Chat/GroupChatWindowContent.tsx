@@ -1,6 +1,6 @@
 "use client";
-import * as React from 'react'; // Fix React import
-import {  useState, useEffect, useRef, useCallback } from 'react';
+import * as React from 'react'; 
+import {  useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
@@ -16,7 +16,7 @@ import _Image from 'next/image';
 import _CldImage from 'next-cloudinary';
 
 // Reutiliza estos componentes de ChatWindowContent.tsx
-import { MessageItem, DateSeparator, VoiceMessagePlayer } from './ChatComponents/ChatComponents';
+import { MessageItem } from './ChatComponents/ChatComponents';
 
 type User = {
   id: string;
@@ -64,8 +64,8 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   conversation,
   className,
 }) => {
-  const { data: session } = useSession();
-  const currentUserId = session?.user?.id;
+  const { data: _session } = useSession();
+  const currentUserId = _session?.user?.id;
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -75,7 +75,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   const chatContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const typingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const _typingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const typingTimersRef = React.useRef<Record<string, NodeJS.Timeout>>({});
   const [isTyping, setIsTyping] = useState(false);
   const messageInputRef = React.useRef<HTMLTextAreaElement>(null);
@@ -120,7 +120,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     reconnect  
   } = useSocket({
     userId: currentUserId || "",
-    username: session?.user?.name || session?.user?.username || "",
+    username: _session?.user?.name || _session?.user?.username || "",
     onConnect: () => {
       console.log('Socket conectado en GroupChatWindow');
       setSocketInitialized(true);
@@ -155,7 +155,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
           content: message.content || '',
           senderId: message.senderId,
           createdAt: new Date(message.createdAt),
-          status: 'sent',
+          status: message.status as 'sending' | 'sent' | 'delivered' | 'read' | 'failed',
           messageType: message.messageType,
           mediaUrl: message.mediaUrl,
           conversationId: message.conversationId
@@ -316,28 +316,26 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       }
       
       // Limpiar todos los temporizadores de escritura
-      Object.keys(typingTimersRef.current).forEach(userId => {
-        clearTimeout(typingTimersRef.current[userId]);
+      const currentTimers = { ...typingTimersRef.current };
+      Object.keys(currentTimers).forEach(userId => {
+        clearTimeout(currentTimers[userId]);
         delete typingTimersRef.current[userId];
       });
     };
   }, [socketInitialized, conversation?.id, currentUserId, isTyping, socketUpdateTypingStatus]);
-  
+
   // Función para procesar mensajes
   const processMessages = useCallback((newMessages: Message[]) => {
     if (!newMessages || newMessages.length === 0) return;
     
     // Filtrar mensajes para incluir solo los que corresponden a esta conversación
     const filteredMessages = newMessages.filter(msg => {
-      // Solo procesar mensajes que pertenezcan específicamente a esta conversación
       return msg.conversationId === conversation?.id;
     });
     
     setMessages(prev => {
-      // Crear un mapa para deduplicar mensajes
       const messageMap = new Map<string, Message>();
       
-      // Añadir mensajes previos al mapa
       prev.forEach(msg => {
         if (msg.id) {
           messageMap.set(msg.id, msg);
@@ -346,10 +344,8 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         }
       });
       
-      // Añadir o actualizar nuevos mensajes
       filteredMessages.forEach(msg => {
         if (msg.id) {
-          // Si el mensaje tiene un id y también un tempId que ya existe, eliminar la versión temporal
           if (msg.tempId && messageMap.has(msg.tempId)) {
             messageMap.delete(msg.tempId);
           }
@@ -359,7 +355,6 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         }
       });
       
-      // Convertir el mapa a un array y ordenar por fecha
       return Array.from(messageMap.values()).sort((a, b) => {
         const dateA = new Date(a.createdAt);
         const dateB = new Date(b.createdAt);
@@ -368,52 +363,56 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     });
   }, [conversation?.id]);
 
+  // Función para hacer scroll al final de los mensajes
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      setIsAtBottom(true);
+    } else if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      setIsAtBottom(true);
+    }
+  };
+
   useEffect(() => {
     if (!socketInstance || !socketInitialized || !conversation?.id) return;
     
     console.log('Configurando listener para nuevos mensajes en el grupo');
     
-    // Función para manejar nuevos mensajes recibidos por socket
-    const handleNewMessage = (message: any) => {
+    const handleNewMessage = (message: MessageType) => {
       console.log('Nuevo mensaje recibido por socket:', message);
       
-      // Verificar que el mensaje sea para este grupo
       if (message.conversationId === conversation.id) {
         console.log('Procesando mensaje para el grupo actual');
         
-        // Procesar el mensaje - asegurarse de que content no sea null
         const validMessage: Message = {
           ...message,
-          content: message.content || '' // Si es null, usar string vacío
+          content: message.content || '',
+          status: message.status as 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
         };
         
         processMessages([validMessage]);
         
-        // Auto-scroll si estamos en la parte inferior
         if (isAtBottom) {
           setTimeout(scrollToBottom, 100);
         }
       }
     };
     
-    // Añadir el listener
     socketInstance.on('new_message', handleNewMessage);
     
-    // Limpiar el listener cuando el componente se desmonte
     return () => {
       socketInstance.off('new_message', handleNewMessage);
     };
-  }, [socketInstance, socketInitialized, conversation?.id, processMessages, isAtBottom]);
-  
+  }, [socketInstance, socketInitialized, conversation?.id, processMessages, isAtBottom, scrollToBottom]);
+
   // Separar completamente la función de carga de mensajes del ciclo de vida del componente
   const loadGroupMessages = useCallback(async (groupId: string, isInitialLoad = false) => {
-    // Si ya hay una petición en curso y no es la carga inicial, no iniciar otra
     if (isFetchingRef.current && !isInitialLoad) {
       console.log('Ya hay una petición en curso, ignorando nueva carga');
       return;
     }
     
-    // Marcar que estamos en proceso de carga
     isFetchingRef.current = true;
     if (isInitialLoad) {
       setIsLoadingMessages(true);
@@ -422,7 +421,6 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     try {
       console.log(`Cargando mensajes para ${groupId} (inicial: ${isInitialLoad})`);
       
-      // Hacer la petición fetch SIN usar AbortController para evitar cancelaciones
       const response = await fetch(
         `${API_ROUTES.messages.groupMessages}?conversationId=${groupId}&page=1&limit=${pageSize}&nocache=${Date.now()}`, 
         { 
@@ -446,8 +444,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       const data = await response.json();
       console.log("Respuesta de API recibida:", JSON.stringify(data).substring(0, 200) + "...");
       
-      // Verificamos la estructura de la respuesta y extraemos los mensajes
-      let apiMessages: any[] = [];
+      let apiMessages: MessageType[] = [];
       
       if (Array.isArray(data)) {
         apiMessages = data;
@@ -467,30 +464,24 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       console.log(`Recibidos ${apiMessages.length} mensajes`);
       
       if (apiMessages.length > 0) {
-        // Asegurarnos de que los mensajes tienen el formato correcto
-        const formattedMessages = apiMessages.map((msg: any) => {
-          // Si el mensaje ya tiene el formato correcto, devolverlo tal cual
-          if (typeof msg.createdAt === 'string' || msg.createdAt instanceof Date) {
-            return msg;
-          }
-          
-          // Asegurarse de que createdAt es un string o Date
+        const formattedMessages = apiMessages.map((msg: MessageType) => {
+          // Ensure all required fields are present and correctly typed
           return {
             ...msg,
-            createdAt: msg.createdAt 
-              ? new Date(msg.createdAt).toISOString() 
-              : new Date().toISOString()
-          };
+            content: msg.content || '', // Convert null content to empty string
+            createdAt: typeof msg.createdAt === 'string' || msg.createdAt instanceof Date 
+              ? msg.createdAt 
+              : new Date().toISOString(),
+            status: msg.status as 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
+          } as Message;
         });
         
-        // Procesar los mensajes correctamente
         processMessages(formattedMessages);
         
         setHasMore(apiMessages.length === pageSize);
         setPage(1);
       } else {
         console.log("No se encontraron mensajes para esta conversación");
-        // Incluso si no hay mensajes, actualizamos el estado para reflejar que la carga ha finalizado
         setHasMore(false);
       }
     } catch (error) {
@@ -500,7 +491,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       isFetchingRef.current = false;
       setIsLoadingMessages(false);
     }
-  }, [pageSize, processMessages]);
+  }, [pageSize, processMessages, setErrorLoadingMessages, setHasMore, setIsLoadingMessages, setMessages, setPage]);
 
   // Un efecto para cargar los mensajes iniciales cuando cambia la conversación
   useEffect(() => {
@@ -508,42 +499,34 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     
     console.log(`Cambio de conversación detectado. Nueva conversación: ${conversation.id}`);
     
-    // Si la referencia es distinta pero el ID es el mismo, no hacer nada
     if (lastProcessedConversationRef.current === conversation.id) {
       console.log('Mismo ID de conversación, ignorando nueva carga');
       return;
     }
     
-    // Limpiar estado para la nueva conversación
     setMessages([]);
     setPage(1);
     setHasMore(true);
     setErrorLoadingMessages(null);
     
-    // Actualizar la referencia de la conversación actual
     lastProcessedConversationRef.current = conversation.id;
     
-    // Preparar ID con formato correcto
     const groupId = conversation.id.startsWith('group_') 
       ? conversation.id 
       : `group_${conversation.id}`;
     
-    // Cargar mensajes para la nueva conversación
     loadGroupMessages(groupId, true);
   }, [conversation?.id, currentUserId, loadGroupMessages]);
 
   // Cargar más mensajes al hacer scroll hacia arriba
   const _loadMoreMessages = async () => {
-    // Evitar cargas paralelas y cargas cuando no hay más mensajes
     if (isLoadingMore || isFetchingRef.current || !hasMore || !currentUserId) return;
     
     console.log(`Cargando más mensajes antiguos, página ${page + 1}`);
     
-    // Marcar que estamos cargando
     setIsLoadingMore(true);
     isFetchingRef.current = true;
     
-    // Guardar posición de scroll actual
     if (chatContainerRef.current) {
       setPreserveScrollPosition(true);
       scrollHeightBeforeLoad.current = chatContainerRef.current.scrollHeight;
@@ -553,14 +536,12 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     try {
       const nextPage = page + 1;
       
-      // Asegurarnos de usar el ID con el prefijo correcto
       const groupId = conversation.id.startsWith('group_') 
         ? conversation.id 
         : `group_${conversation.id}`;
       
       console.log(`Cargando mensajes para ${groupId}`);
       
-      // Hacer la petición fetch SIN usar AbortController para evitar cancelaciones
       const response = await fetch(
         `${API_ROUTES.messages.groupMessages}?conversationId=${groupId}&page=${nextPage}&limit=${pageSize}&nocache=${Date.now()}`, 
         { 
@@ -586,16 +567,25 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       
       const oldMessages = data.messages;
       
-      // Si no hay mensajes nuevos, no hay más para cargar
       if (oldMessages.length === 0) {
         setHasMore(false);
         return;
       }
       
-      // Procesar y añadir los mensajes antiguos preservando el estado actual
-      processMessages(oldMessages);
+      const formattedMessages = oldMessages.map((msg: MessageType) => {
+        // Ensure all required fields are present and correctly typed
+        return {
+          ...msg,
+          content: msg.content || '', // Convert null content to empty string
+          createdAt: typeof msg.createdAt === 'string' || msg.createdAt instanceof Date 
+            ? msg.createdAt 
+            : new Date().toISOString(),
+          status: msg.status as 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
+        } as Message;
+      });
       
-      // Actualizar estado
+      processMessages(formattedMessages);
+      
       setPage(nextPage);
       setHasMore(oldMessages.length === pageSize);
       
@@ -620,7 +610,6 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
 
   // Scroll inicial y al recibir nuevos mensajes
   useEffect(() => {
-    // Solo hacer scroll si no estamos cargando más mensajes (hacia arriba)
     if (!isLoadingMore && messagesEndRef.current && chatContainerRef.current && !preserveScrollPosition) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
@@ -628,19 +617,16 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
 
   // Manejar scroll automático para nuevos mensajes
   useEffect(() => {
-    // Prevenir configuración de manejadores si no tenemos socket o conversación
     if (!socketInstance || !conversation?.id || !currentUserId) return;
     
     const handleNewMessage = (message: MessageType) => {
       console.log('Nuevo mensaje recibido en grupo:', message);
       
-      // Verificar si el mensaje pertenece a esta conversación grupal
       if (message.conversationId !== conversation.id) {
         console.log('Mensaje ignorado: no pertenece a esta conversación de grupo');
         return;
       }
       
-      // Si el mensaje es de otra persona, marcarlo como leído
       if (message.senderId !== currentUserId && !message.read) {
         socketInstance.emit('markMessageAsRead', {
           messageId: message.id,
@@ -648,15 +634,14 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         });
       }
       
-      // Procesar el mensaje - asegurarse de que content no sea null
       const validMessage: Message = {
         ...message,
-        content: message.content || '' // Si es null, usar string vacío
+        content: message.content || '',
+        status: message.status as 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
       };
       
       processMessages([validMessage]);
       
-      // Auto-scroll si estamos en la parte inferior
       if (isAtBottom) {
         setTimeout(() => {
           scrollToBottom();
@@ -673,7 +658,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       socketInstance.off('new_message', handleNewMessage);
       socketInstance.off('new_group_message', handleNewMessage);
     };
-  }, [socketInstance, conversation?.id, autoScrollEnabled, currentUserId, processMessages]);
+  }, [socketInstance, conversation?.id, autoScrollEnabled, currentUserId, processMessages, isAtBottom]);
 
   const handleScroll = () => {
     const element = chatContainerRef.current;
@@ -683,29 +668,6 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     }
   };
 
-  // Función para hacer scroll al final de los mensajes
-  const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-      setIsAtBottom(true);
-    } else if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-      setIsAtBottom(true);
-    }
-  };
-
-  // Deshabilitar efecto que ya no es necesario al tener processMessages
-  useEffect(() => {
-    // Deshabilitado para evitar renderizados dobles
-    // const uniqueMessages = Array.from(messageMap.values()).sort((a, b) => {
-    //   const dateA = new Date(a.createdAt);
-    //   const dateB = new Date(b.createdAt);
-    //   return dateA.getTime() - dateB.getTime();
-    // });
-    
-    // setMessages(uniqueMessages);
-  }, [messages]);
-  
   // Función para enviar mensajes al servidor y guardarlos en la base de datos
   const sendMessageToServer = async (message: Message) => {
     if (!message.conversationId) {
@@ -713,15 +675,13 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     }
     
     try {
-      // Enviar el mensaje a través de la API para guardarlo en la base de datos
       const requestBody = {
-        content: message.content || '', // Asegurar que content nunca es undefined
+        content: message.content || '',
         conversationId: message.conversationId,
         mediaUrl: message.mediaUrl,
         messageType: message.messageType || 'text',
         tempId: message.tempId || Date.now().toString(),
-        isGroupMessage: true, // Indicar explícitamente que es un mensaje de grupo
-        // No incluimos receiverId para mensajes de grupo
+        isGroupMessage: true
       };
       
       console.log("Enviando mensaje al servidor:", requestBody);
@@ -754,32 +714,27 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     
     setIsSending(true);
     
-    // Crear mensaje temporal para mostrar inmediatamente
     const tempMessage: Message = {
       tempId,
       content: newMessage.trim(),
-      senderId: currentUserId || '', // Ensure senderId is never undefined
+      senderId: currentUserId || '',
       createdAt: new Date(),
       status: 'sending',
       conversationId: conversation.id,
-      messageType: 'text' as 'text' | 'image' | 'voice' | 'file' | 'video'
+      messageType: 'text'
     };
     
-    // Añadir mensaje temporal a la lista
     processMessages([tempMessage]);
     
-    // Limpiar campo de texto
     setNewMessage('');
     
     try {
       setIsSending(true);
       
-      // Asegurarnos de usar el ID con el prefijo correcto
       const groupId = conversation.id.startsWith('group_') 
         ? conversation.id 
         : `group_${conversation.id}`;
       
-      // Enviar mensaje a través de la nueva API específica para grupos
       const response = await fetch(`${API_ROUTES.messages.groupMessages}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -797,49 +752,45 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       
       const sentMessage = await response.json();
       
-      // Actualizar el mensaje temporal con los datos del servidor
       const finalMessage: Message = {
         ...sentMessage,
         tempId,
         status: 'sent',
+        messageType: sentMessage.messageType as 'text' | 'image' | 'voice' | 'file' | 'video'
       };
       
       processMessages([finalMessage]);
       
-      // Si tenemos socket, enviar notificación en tiempo real
       if (socketInstance && socketInitialized) {
-        // Usamos el mismo formato que el backend para mantener consistencia
         const socketMessage = {
           ...finalMessage,
+          id: finalMessage.tempId,
           isGroupMessage: true,
-          id: finalMessage.tempId // Asegurarnos de que tiene un ID para el socket
-        };
+        } as MessageType & { isGroupMessage: boolean };
+        
         console.log('Emitiendo mensaje por socket:', socketMessage);
         socketInstance.emit('send_message', socketMessage);
       }
       
-      // No es necesario volver a enviar el mensaje al servidor ya que
-      // ya se guardó en la base de datos con la llamada anterior
-      // await sendMessageToServer(finalMessage);
+      if (isAtBottom) {
+        setTimeout(scrollToBottom, 100);
+      }
     } catch (error) {
       console.error("Error al enviar mensaje:", error);
       
-      // Marcar el mensaje temporal como fallido
-      const errorMessage = {
+      const errorMessage: Message = {
         ...tempMessage,
-        status: 'failed' as const,
+        status: 'failed' as const
       };
       
       processMessages([errorMessage]);
       
-      // Mostrar error al usuario
       toast({
         title: "Error al enviar el mensaje",
         description: error instanceof Error ? error.message : "Inténtalo de nuevo",
         variant: "destructive",
       });
       
-      // Recuperar el texto del mensaje para que el usuario pueda intentar de nuevo
       setNewMessage(tempMessage.content || '');
     } finally {
       setIsSending(false);
@@ -860,9 +811,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   // Render principal del componente
   return (
     <div className={cn("flex flex-col max-h-[calc(100vh-4rem)]", className)}>
-      {/* Contenedor principal con altura controlada y flex-col */}
       <div className="flex flex-col h-full">
-        {/* Área de mensajes con scroll */}
         <div className="flex-1 overflow-y-auto min-h-0 p-4 pb-16" ref={chatContainerRef} onScroll={handleScroll}>
           {isLoadingMessages ? (
             <div className="flex flex-col items-center justify-center h-full">
@@ -871,14 +820,12 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Loader para mensajes anteriores */}
               {isLoadingMore && (
                 <div className="flex justify-center p-2">
                   <LoadingSpinner className="w-5 h-5 text-blue-500" />
                 </div>
               )}
               
-              {/* Mensajes */}
               {messages.map((message, index) => {
                 const _isCurrentUser = message.senderId === currentUserId;
                 const showAvatar = 
@@ -890,7 +837,6 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                   new Date(messages[index - 1]?.createdAt || Date.now())
                 );
                 
-                // Encontrar el remitente en la lista de participantes
                 const sender = getMessageSender(message.senderId) || {
                   id: message.senderId,
                   username: 'Usuario',
@@ -907,11 +853,11 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                       showAvatar={showAvatar}
                       showDateSeparator={showDateSeparator}
                       _index={index}
-                      session={session ? {
+                      session={_session ? {
                         user: {
-                          id: session.user?.id || '',
-                          name: session.user?.name || '',
-                          image: session.user?.image || ''
+                          id: _session.user?.id || '',
+                          name: _session.user?.name || '',
+                          image: _session.user?.image || ''
                         }
                       } : {
                         user: {
@@ -926,13 +872,11 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                 );
               })}
               
-              {/* Referencia al final de los mensajes para auto-scroll */}
               <div ref={messagesEndRef} />
             </div>
           )}
         </div>
         
-        {/* Indicador de escritura - fuera del área de scroll pero antes del input */}
         {typingUsers.length > 0 && (
           <div className="px-4 py-1 text-xs text-gray-500 italic bg-white dark:bg-gray-800">
             {typingUsers.length === 1 
@@ -943,7 +887,6 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
           </div>
         )}
         
-        {/* Área de entrada de mensajes - ajustada para no estar tan pegada al footer */}
         <div className="border-t border-gray-200 dark:border-gray-700 p-3 pb-4 mb-3 flex-shrink-0 bg-white dark:bg-gray-800">
           {isVoiceRecorderVisible ? (
             <VoiceMessageRecorder 
@@ -951,12 +894,10 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                 try {
                   setIsSending(true);
                   
-                  // Crear un FormData para subir el archivo
                   const formData = new FormData();
                   formData.append('file', audioBlob, 'audio.webm');
                   formData.append('conversationId', conversation.id);
                   
-                  // Subir el archivo al servidor
                   const response = await fetch(`${API_ROUTES.messages.upload}`, {
                     method: 'POST',
                     body: formData,
@@ -968,41 +909,35 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                   
                   const { url } = await response.json();
                   
-                  // Crear el mensaje con los datos necesarios
-                  const newMessage = {
-                    content: 'Audio mensaje', // Asignar un texto descriptivo en lugar de cadena vacía
+                  const newMessage: Message = {
+                    content: 'Audio mensaje',
                     senderId: currentUserId || '',
                     conversationId: conversation.id,
                     createdAt: new Date(),
                     tempId: Date.now().toString(),
                     mediaUrl: url,
-                    messageType: 'voice' as 'voice' | 'text' | 'image' | 'file' | 'video'
+                    messageType: 'voice' as const
                   };
                   
-                  // Añadir mensaje al estado local
                   processMessages([newMessage]);
                   
-                  // 1. Guardar el mensaje en la base de datos
                   await sendMessageToServer(newMessage);
                   
-                  // 2. Enviar mensaje a través de sockets para actualización en tiempo real
                   if (socketInstance && socketInitialized) {
-                    // Usamos el mismo formato que el backend para mantener consistencia
                     const socketMessage = {
                       ...newMessage,
+                      id: newMessage.tempId,
                       isGroupMessage: true,
-                      id: newMessage.tempId // Asegurarnos de que tiene un ID para el socket
-                    };
+                    } as MessageType & { isGroupMessage: boolean };
+                    
                     console.log('Emitiendo mensaje por socket:', socketMessage);
                     socketInstance.emit('send_message', socketMessage);
                   }
                   
-                  // Auto-scroll si estamos en la parte inferior
                   if (isAtBottom) {
                     setTimeout(scrollToBottom, 100);
                   }
                   
-                  // Desactivar el grabador de voz
                   setIsVoiceRecorderVisible(false);
                 } catch (error) {
                   console.error('Error al enviar mensaje de voz:', error);
@@ -1017,12 +952,11 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
               }}
               onCancel={() => setIsVoiceRecorderVisible(false)}
               isVisible={isVoiceRecorderVisible}
-              senderId={session?.user?.id || ''}
+              senderId={_session?.user?.id || ''}
               receiverId={conversation.id || ''}
-              session={session}
+              session={_session}
               onClose={() => setIsVoiceRecorderVisible(false)}
               setUploadStatus={(status: string) => {
-                // Manejar el estado de la carga aquí si es necesario
                 console.log('Upload status:', status);
               }}
             />
@@ -1043,7 +977,6 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                 value={newMessage}
                 onChange={(e) => {
                   setNewMessage(e.target.value);
-                  // También implementar notificación de escritura
                 }}
                 placeholder="Escribe un mensaje..."
                 className="min-h-10 max-h-32 resize-none flex-1"
