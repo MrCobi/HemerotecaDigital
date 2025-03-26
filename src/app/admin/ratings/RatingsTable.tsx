@@ -332,7 +332,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
                 <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setRatingToDelete(null)}>Cancelar</AlertDialogCancel>
                   <AlertDialogAction 
-                    onClick={(e) => {
+                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                       e.preventDefault();
                       handleDelete(rating.id);
                     }}
@@ -351,7 +351,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
         );
       },
     },
-  ], [isDeleteDialogOpen, ratingToDelete, ratingFilter]);
+  ], [isDeleteDialogOpen, ratingToDelete, ratingFilter, handleDelete, isDeleting, ratingFilterElement]);
 
   return (
     <div className="space-y-4">

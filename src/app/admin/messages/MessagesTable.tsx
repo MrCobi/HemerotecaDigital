@@ -607,7 +607,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
     },
-  ], [isDeleteDialogOpen, messageToDelete, isDeleting, isMarkingAsRead, filterType, filterElement, handleDelete]);
+  ], [isDeleteDialogOpen, messageToDelete, isDeleting, isMarkingAsRead, filterElement, handleDelete]);
 
   return (
     <div className="space-y-4">

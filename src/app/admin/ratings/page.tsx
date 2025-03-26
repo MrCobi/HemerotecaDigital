@@ -61,7 +61,7 @@ export default function RatingsPage() {
 
   useEffect(() => {
     loadRatings();
-  }, [router]);
+  }, [router, loadRatings]);
 
   // Esta función ya no es necesaria porque RatingsTable maneja las actualizaciones localmente
   // La dejamos como respaldo por si se necesita recargar toda la tabla en algún momento
