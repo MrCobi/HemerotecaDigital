@@ -132,23 +132,13 @@ export default function DashboardPage() {
     const calculateActiveDays = () => {
       if (!session?.user?.createdAt) return;
 
+      // Convert to Date object explicitly
       const creationDate = new Date(session.user.createdAt);
       const today = new Date();
 
-      const startDate = Date.UTC(
-        creationDate.getFullYear(),
-        creationDate.getMonth(),
-        creationDate.getDate()
-      );
-
-      const endDate = Date.UTC(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate()
-      );
-
-      const timeDiff = endDate - startDate;
-      const dayDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+      // Use the same calculation method as in the users/stats API
+      const timeDiff = today.getTime() - creationDate.getTime();
+      const dayDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
 
       setActiveDays(dayDiff);
     };
@@ -394,7 +384,7 @@ export default function DashboardPage() {
                           height={48}
                           className="object-cover"
                           priority
-                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>  ) => {
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                             const target = e.target as HTMLImageElement;
                             target.src = "/images/AvatarPredeterminado.webp";
                           }}
@@ -576,7 +566,7 @@ export default function DashboardPage() {
                           height={192}
                           className="object-cover w-full h-full"
                           priority
-                          onError={(e) => {
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                             const target = e.target as HTMLImageElement;
                             target.src = "/images/AvatarPredeterminado.webp";
                           }}
