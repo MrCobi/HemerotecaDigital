@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Source } from "@/src/interface/source";
@@ -93,7 +93,7 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
   );
 
   // Función para manejar la eliminación de una fuente
-  const handleDeleteSource = async (sourceId: string): Promise<void> => {
+  const handleDeleteSource = useCallback(async (sourceId: string): Promise<void> => {
     if (isDeleting) return; // Prevenir múltiples clicks
     
     setIsDeleting(true);
@@ -125,7 +125,7 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [isDeleting, setSources, router]);
 
   const columns: Column<Source & { _count?: { comments?: number; favoriteSources?: number; ratings?: number } }>[] = useMemo(
     () => [

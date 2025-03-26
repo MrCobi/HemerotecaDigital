@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { DataTable, Column } from "../components/DataTable";
 import { Button, buttonVariants } from "@/src/app/components/ui/button";
 import { Trash2, Edit, User, AlertTriangle } from "lucide-react";
-import { useRouter } from "next/navigation";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,7 +73,7 @@ function DeleteUserDialog({ userId, userName, onDelete }: DeleteUserDialogProps)
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
           <AlertDialogAction
-            onClick={(e: any) => {
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.preventDefault();
               handleDelete();
             }}
@@ -119,7 +118,6 @@ export default function UsersTable({ users }: UsersTableProps) {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterValue, setFilterValue] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | null>(null);
-  const router = useRouter();
   const [localUsers, setLocalUsers] = useState<User[]>(users);
 
   // Actualizar localUsers cuando cambia users (por ejemplo, al montar el componente)

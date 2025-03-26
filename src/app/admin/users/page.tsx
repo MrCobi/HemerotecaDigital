@@ -63,15 +63,24 @@ export default function UsersPage() {
           usersArray = [data];
         }
         
-        const formattedUsers: User[] = usersArray.map((user: any) => ({
+        const formattedUsers: User[] = usersArray.map((user: { 
+          id: string; 
+          name: string | null; 
+          username?: string; 
+          email: string | null; 
+          emailVerified?: Date | null;
+          image?: string | null;
+          role?: string;
+          createdAt?: Date;
+        }) => ({
           id: user.id,
           name: user.name,
           username: user.username || undefined,
           email: user.email,
           emailVerified: user.emailVerified,
           image: user.image,
-          role: mapPrismaRoleToComponentRole(user.role),
-          createdAt: user.createdAt
+          role: mapPrismaRoleToComponentRole(user.role || 'USER'),
+          createdAt: user.createdAt || new Date()
         }));
         
         setUsers(formattedUsers);
