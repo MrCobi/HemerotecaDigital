@@ -69,7 +69,17 @@ export const POST = withAuth(async (req: Request, { userId }: { userId: string }
     const uniqueId = `user_uploads/user_${userId}_${timestamp}`;
 
     // Crear una promesa para la carga a Cloudinary
-    const result = await new Promise<any>((resolve, reject) => {
+    interface CloudinaryUploadResult {
+      secure_url: string;
+      public_id: string;
+      format: string;
+      resource_type: string;
+      width?: number;
+      height?: number;
+      [key: string]: unknown;
+    }
+
+    const result = await new Promise<CloudinaryUploadResult>((resolve, reject) => {
       cloudinary.uploader.upload_stream(
         {
           public_id: uniqueId,
@@ -80,9 +90,11 @@ export const POST = withAuth(async (req: Request, { userId }: { userId: string }
           if (error) {
             console.error('Error al subir a Cloudinary:', error);
             reject(error);
-          } else {
+          } else if (result) {
             console.log('Archivo subido con éxito a Cloudinary:', result?.url);
-            resolve(result);
+            resolve(result as CloudinaryUploadResult);
+          } else {
+            reject(new Error('No se recibió respuesta de Cloudinary'));
           }
         }
       ).end(buffer);

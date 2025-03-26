@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../lib/auth-utils";
-import { User, Prisma } from "@prisma/client";
+import { User } from "@prisma/client";
 
 // POST para seguir a un usuario
 export const POST = withAuth(async (req: Request, { userId, user: _user }: { userId: string, user: User }) => {

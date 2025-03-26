@@ -41,7 +41,7 @@ export const GET = withAuth(async (request: Request, { userId, user: _user }: { 
 });
 
 // Método POST modificado
-export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: User }) => {
+export const POST = withAuth(async (request: Request, { userId, user: _user }: { userId: string, user: User }) => {
   const { sourceId, value } = await request.json();
 
   if (!sourceId || value < 1 || value > 5) {
@@ -73,7 +73,9 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
       // 3. Registrar en historial
       await tx.activityHistory.create({
         data: {
-          userId: userId,
+          user: {
+            connect: { id: userId }
+          },
           type: value === 0 ? "rating_removed" : "rating_added",
           sourceName: source.name,
           sourceId: sourceId,
@@ -82,7 +84,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
           targetType: null,
           details: `Valoración ${value === 0 ? "eliminada" : value.toString()} para ${source.name}`,
           createdAt: new Date(),
-        } as any
+        }
       });
 
       // 4. Limitar a 20 actividades
@@ -144,16 +146,20 @@ export const DELETE = withAuth(async (req: Request, { userId, user: _user }: { u
       // 3. Registrar en historial
       await tx.activityHistory.create({
         data: {
-          userId: userId,
-          type: "rating_removed",
+          user: {
+            connect: { id: userId }
+          },
+          type: "rating_deleted",
           sourceName: rating.source.name,
-          sourceId: sourceId,
+          source: {
+            connect: { id: rating.sourceId }
+          },
           targetName: null,
           targetId: null,
           targetType: null,
           details: `Valoración eliminada para ${rating.source.name}`,
           createdAt: new Date(),
-        } as any
+        }
       });
 
       // 4. Limitar a 20 actividades

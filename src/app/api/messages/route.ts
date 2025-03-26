@@ -832,7 +832,7 @@ async function getMessagesForConversation(conversationId: string, skip: number, 
     }
     
     // Las fechas en formato ISO para que se serialicen correctamente
-    const serializedMessages = messages.map((msg: { createdAt: Date | string; [key: string]: any }) => ({
+    const serializedMessages = messages.map((msg: { createdAt: Date | string; [key: string]: unknown }) => ({
       ...msg,
       createdAt: msg.createdAt instanceof Date ? msg.createdAt.toISOString() : msg.createdAt
     }));
