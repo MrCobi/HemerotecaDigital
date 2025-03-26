@@ -6,17 +6,12 @@ import useAudioRecorder from '../../../hooks/useAudioRecorder';
 import { Send, Mic, Trash2, X, AlertCircle } from 'lucide-react';
 import { Session } from 'next-auth';
 
-// Definir ruta API para mensajes
-const API_ROUTES = {
-  MESSAGES: '/api/messages'
-};
-
 interface VoiceMessageRecorderProps {
   onSend: (audioBlob: Blob) => Promise<void>;
   onCancel: () => void;
   isVisible: boolean;
   senderId: string;
-  receiverId: string;
+  _receiverId: string;
   session: Session | null;
   onClose: () => void;
   setUploadStatus: (status: 'idle' | 'uploading' | 'success' | 'error') => void;
@@ -27,7 +22,7 @@ const VoiceMessageRecorder = memo(({
   onCancel,
   isVisible,
   senderId,
-  receiverId, 
+  _receiverId,
   session,
   onClose, 
   setUploadStatus
@@ -96,9 +91,9 @@ const VoiceMessageRecorder = memo(({
       }
       
       setIsProcessing(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error al detener grabación:', err);
-      setError(err.message || 'Error al procesar el audio');
+      setError(err instanceof Error ? err.message : 'Error al procesar el audio');
       setIsProcessing(false);
     }
   }, [stopRecording, audioURL, setAudioURL]);
@@ -113,45 +108,40 @@ const VoiceMessageRecorder = memo(({
       clearRecording();
       // Iniciar nueva grabación
       await startRecording();
-    } catch (err: any) {
-      const errorMessage = err.name === 'NotAllowedError' 
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error && err.name === 'NotAllowedError' 
         ? 'Permiso para usar el micrófono denegado' 
-        : err.message || 'Error al iniciar grabación';
+        : err instanceof Error ? err.message : 'Error al iniciar grabación';
       
       console.error('Error al iniciar grabación:', err);
       setError(errorMessage);
     }
   }, [isRecording, isSending, isProcessing, clearRecording, startRecording]);
 
-  // Manejar la pausa/reanudación de grabación de manera optimizada
-  const handlePauseResume = () => {
-    // Esta función ya no es necesaria
-  };
-
   // Manejar el deslizamiento para cancelar
-  const handleTouchStart = () => {
+  const _handleTouchStart = useCallback(() => {
     if (!isRecording) return;
     
     // Iniciar timer para mostrar la instrucción después de un tiempo
     cancelTimeoutRef.current = setTimeout(() => {
       setIsSliding(true);
     }, 500);
-  };
+  }, [isRecording, setIsSliding]);
 
-  const handleTouchEnd = () => {
+  const _handleTouchEnd = useCallback(() => {
     if (cancelTimeoutRef.current) {
       clearTimeout(cancelTimeoutRef.current);
       cancelTimeoutRef.current = null;
     }
     setIsSliding(false);
-  };
+  }, [setIsSliding]);
 
   // Manejar cancelación de grabación
-  const handleCancel = () => {
+  const _handleCancel = useCallback(() => {
     clearRecording();
     setError(null);
     onCancel();
-  };
+  }, [clearRecording, onCancel]);
 
   // Función para enviar el mensaje de voz
   const handleSendRecord = useCallback(async () => {
@@ -195,7 +185,7 @@ const VoiceMessageRecorder = memo(({
       
       // Cerrar el grabador
       onClose();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error al enviar mensaje de voz:', error);
       setError('Error al enviar el audio');
       setUploadStatus('error');
@@ -231,12 +221,18 @@ const VoiceMessageRecorder = memo(({
   }, [isSliding]);
 
   const recordingControls = useMemo(() => {
+    const handleCancelInside = () => {
+      clearRecording();
+      setError(null);
+      onCancel();
+    };
+    
     if (isRecording) {
       return (
         <div className="flex items-center space-x-4">
           <button
             type="button"
-            onClick={handleCancel}
+            onClick={handleCancelInside}
             className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full transition-colors"
             aria-label="Cancelar grabación"
           >
@@ -261,9 +257,26 @@ const VoiceMessageRecorder = memo(({
       );
     }
     return null;
-  }, [isRecording, formattedRecordingTime, handleCancel, handleStopRecording]);
+  }, [isRecording, formattedRecordingTime, handleStopRecording, clearRecording, onCancel, setError]);
 
   const mainActionButton = useMemo(() => {
+    const handleTouchStartInside = () => {
+      if (!isRecording) return;
+      
+      // Iniciar timer para mostrar la instrucción después de un tiempo
+      cancelTimeoutRef.current = setTimeout(() => {
+        setIsSliding(true);
+      }, 500);
+    };
+  
+    const handleTouchEndInside = () => {
+      if (cancelTimeoutRef.current) {
+        clearTimeout(cancelTimeoutRef.current);
+        cancelTimeoutRef.current = null;
+      }
+      setIsSliding(false);
+    };
+    
     if (audioURL) {
       return (
         <button
@@ -290,11 +303,11 @@ const VoiceMessageRecorder = memo(({
         onClick={handleStartRecording}
         disabled={!!error || isRecording}
         className={micButtonClasses}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onMouseDown={handleTouchStart}
-        onMouseUp={handleTouchEnd}
-        onMouseLeave={handleTouchEnd}
+        onTouchStart={handleTouchStartInside}
+        onTouchEnd={handleTouchEndInside}
+        onMouseDown={handleTouchStartInside}
+        onMouseUp={handleTouchEndInside}
+        onMouseLeave={handleTouchEndInside}
         aria-label="Grabar mensaje de voz"
       >
         <Mic size={20} />
@@ -307,9 +320,9 @@ const VoiceMessageRecorder = memo(({
     handleStartRecording, 
     error, 
     isRecording, 
-    micButtonClasses, 
-    handleTouchStart, 
-    handleTouchEnd
+    micButtonClasses,
+    cancelTimeoutRef,
+    setIsSliding
   ]);
 
   const errorDisplay = useMemo(() => {

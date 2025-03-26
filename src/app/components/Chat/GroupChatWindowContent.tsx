@@ -1000,7 +1000,7 @@ const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
               onCancel={() => setIsVoiceRecorderVisible(false)}
               isVisible={isVoiceRecorderVisible}
               senderId={_session?.user?.id || ''}
-              receiverId={conversation.id || ''}
+              _receiverId={conversation.id || ''}
               session={_session}
               onClose={() => setIsVoiceRecorderVisible(false)}
               setUploadStatus={(status: string) => {

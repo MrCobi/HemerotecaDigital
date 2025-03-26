@@ -1660,7 +1660,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
                 onCancel={() => setIsVoiceRecorderVisible(false)}
                 isVisible={isVoiceRecorderVisible}
                 senderId={currentUserId || ''}
-                receiverId={otherUser?.id || ''}
+                _receiverId={otherUser?.id || ''}
                 session={session}
                 onClose={() => setIsVoiceRecorderVisible(false)}
                 setUploadStatus={setUploadStatus}
