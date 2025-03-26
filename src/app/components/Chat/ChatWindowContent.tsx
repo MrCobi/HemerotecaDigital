@@ -88,7 +88,7 @@ const MessageItem = React.memo(({
   _index: number,
   session: { user?: { id?: string; name?: string | null; image?: string | null; } }
 }) => {
-  const isCurrentUser = message.senderId === currentUserId;
+  const _isCurrentUser = message.senderId === currentUserId;
   
   return (
     <>
@@ -98,9 +98,9 @@ const MessageItem = React.memo(({
       )}
       
       <div
-        className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} items-end gap-2`}
+        className={`flex ${_isCurrentUser ? 'justify-end' : 'justify-start'} items-end gap-2`}
       >
-        {!isCurrentUser && showAvatar && (
+        {!_isCurrentUser && showAvatar && (
           <Avatar className="h-8 w-8 flex-shrink-0">
             {otherUser?.image ? (
               <AvatarImage src={otherUser.image} alt={otherUser.username || 'Usuario'} />
@@ -112,11 +112,11 @@ const MessageItem = React.memo(({
           </Avatar>
         )}
         
-        <div className={`flex flex-col ${!isCurrentUser && showAvatar ? 'ml-0' : !isCurrentUser ? 'ml-10' : ''}`}>
+        <div className={`flex flex-col ${!_isCurrentUser && showAvatar ? 'ml-0' : !_isCurrentUser ? 'ml-10' : ''}`}>
           <div
             className={cn(
               'max-w-xs md:max-w-md p-3 rounded-lg',
-              isCurrentUser
+              _isCurrentUser
                 ? 'bg-blue-500 text-white rounded-br-none'
                 : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'
             )}
@@ -125,7 +125,7 @@ const MessageItem = React.memo(({
             {message.messageType === 'voice' && message.mediaUrl ? (
               <div className="flex flex-col space-y-1 w-full">
                 <div className="flex items-center space-x-2">
-                  <VoiceMessagePlayer mediaUrl={message.mediaUrl} isCurrentUser={isCurrentUser} />
+                  <VoiceMessagePlayer mediaUrl={message.mediaUrl} isCurrentUser={_isCurrentUser} />
                 </div>
               </div>
             ) : (
@@ -133,7 +133,7 @@ const MessageItem = React.memo(({
             )}
           </div>
           
-          <div className={`flex items-center mt-1 text-xs text-gray-500 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+          <div className={`flex items-center mt-1 text-xs text-gray-500 ${_isCurrentUser ? 'justify-end' : 'justify-start'}`}>
             <span>
               {message.createdAt &&
                 format(
@@ -144,7 +144,7 @@ const MessageItem = React.memo(({
                 )}
             </span>
             
-            {isCurrentUser && message.status && (
+            {_isCurrentUser && message.status && (
               <span className="ml-2">
                 {message.status === 'sending' && <span>Enviando...</span>}
                 {message.status === 'sent' && <span>Enviado</span>}
@@ -156,7 +156,7 @@ const MessageItem = React.memo(({
           </div>
         </div>
         
-        {isCurrentUser && showAvatar && (
+        {_isCurrentUser && showAvatar && (
           <Avatar className="h-8 w-8 flex-shrink-0">
             {session?.user?.image ? (
               <AvatarImage src={session.user.image} alt={session.user.name || 'Usuario'} />
@@ -182,7 +182,7 @@ const VoiceMessagePlayer = React.memo(({
   isCurrentUser: boolean 
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [_isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0); // Volver a 0 para evitar mostrar valores incorrectos
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -206,7 +206,7 @@ const VoiceMessagePlayer = React.memo(({
   
   // Cargar los metadatos del audio cuando el componente se monta
   useEffect(() => {
-    let audio = new Audio();
+    const audio = new Audio();
     audio.preload = "metadata";
     audioRef.current = audio;
     
@@ -326,7 +326,7 @@ const VoiceMessagePlayer = React.memo(({
         animationRef.current = null;
       }
     };
-  }, [isPlaying]);
+  }, [isPlaying, mediaUrl]);
 
   const togglePlayPause = () => {
     if (!audioRef.current || isLoading) return;
@@ -368,7 +368,7 @@ const VoiceMessagePlayer = React.memo(({
     }
   };
   
-  const skipForward = () => {
+  const _skipForward = () => {
     if (!audioRef.current || isLoading) return;
     
     const newTime = Math.min(audioRef.current.duration, currentTime + 10);
@@ -376,7 +376,7 @@ const VoiceMessagePlayer = React.memo(({
     setCurrentTime(newTime);
   };
   
-  const skipBackward = () => {
+  const _skipBackward = () => {
     if (!audioRef.current || isLoading) return;
     
     const newTime = Math.max(0, currentTime - 10);
@@ -384,7 +384,7 @@ const VoiceMessagePlayer = React.memo(({
     setCurrentTime(newTime);
   };
   
-  const changePlaybackRate = () => {
+  const _changePlaybackRate = () => {
     if (!audioRef.current || isLoading) return;
     
     // Ciclo entre velocidades: 1x -> 1.5x -> 2x -> 0.5x -> 1x
@@ -395,7 +395,7 @@ const VoiceMessagePlayer = React.memo(({
     audioRef.current.playbackRate = nextRate;
   };
   
-  const handleSliderChange = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleSliderChange = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
     if (!audioRef.current || !sliderRef.current || isLoading || duration <= 0) return;
     
     const slider = sliderRef.current;
@@ -547,7 +547,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   const { toast } = useToast();
   const currentUserId = session?.user?.id;
   const [messages, setMessages] = useState<Message[]>([]);
-  const [processedMessageIds, setProcessedMessageIds] = useState<Set<string>>(new Set());
+  const [_processedMessageIds, _setProcessedMessageIds] = useState<Set<string>>(new Set());
   const [messageMap, setMessageMap] = useState<Map<string, Message>>(new Map());
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -557,12 +557,12 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+  const _isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
   const [isTyping, setIsTyping] = useState(false);
   const [peerIsTyping, setPeerIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [_uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   
   // Estado para controlar la carga de mensajes
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
@@ -586,7 +586,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   // Estado para el socket
   const [socketInitialized, setSocketInitialized] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
-  const [socketAuthenticated, setSocketAuthenticated] = useState(false);
+  const [_socketAuthenticated, setSocketAuthenticated] = useState(false);
 
   // Al principio del componente, asegurar que conversationId siempre sea string
   const safeConversationId = conversationId || (otherUser?.id || '');
@@ -598,7 +598,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   const { 
     socketInstance,
     connected,
-    sendMessage: socketSendMessage,
+    error: _socketError,
+    sendMessage: _socketSendMessage,
     updateTypingStatus: socketUpdateTypingStatus,
     markMessageAsRead: socketMarkMessageAsRead,
     joinConversation,
@@ -823,17 +824,15 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     filteredMessages.forEach(msg => {
       // Usamos el ID como clave principal si existe
       if (msg.id) {
-        // Si el mensaje tiene ID, es un mensaje confirmado por el servidor
-        updatedMap.set(msg.id, msg);
-        
-        // Si este mensaje tenía un tempId, eliminar la versión temporal
-        if (msg.tempId && updatedMap.has(msg.tempId)) {
-          updatedMap.delete(msg.tempId);
-        }
-      } 
-      // Para mensajes temporales sin ID (enviados desde el cliente pero aún no confirmados)
-      else if (msg.tempId && !updatedMap.has(msg.tempId)) {
-        updatedMap.set(msg.tempId, msg);
+        // Asegurarnos de que msg.id existe y es string
+        updatedMap.set(msg.id as string, msg);
+      } else {
+        // Si no tiene ID (raro para mensajes antiguos), usar timestamp y random
+        const createdAtStr = typeof msg.createdAt === 'string' 
+          ? msg.createdAt 
+          : (msg.createdAt as Date).toISOString();
+        const uniqueKey = `old-${msg.senderId}-${Date.parse(createdAtStr)}-${Math.random().toString(36).substring(2, 9)}`;
+        updatedMap.set(uniqueKey, msg);
       }
     });
     
@@ -1052,8 +1051,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
               setActualConversationId(msgConversationId);
               
               // Guardar en localStorage para recordar este conversationId
-              if (typeof window !== 'undefined') {
-                localStorage.setItem(`chat_conv_${otherUser?.id}`, msgConversationId);
+              if (typeof window !== 'undefined' && otherUser?.id) {
+                localStorage.setItem(`chat_conv_${otherUser.id}`, msgConversationId);
               }
             }
           }
@@ -1088,7 +1087,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   }, [safeConversationId, hasMore, pageSize]);
   
   // Cargar más mensajes
-  const loadMoreMessages = async () => {
+  const _loadMoreMessages = async () => {
     if (!safeConversationId || isLoadingMore || !hasMore || isFetchingRef.current) return;
     
     // Guardar la posición de scroll actual
@@ -1115,18 +1114,20 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       const oldMessages = Array.isArray(data.messages) ? data.messages : [];
       
       // Añadir cada mensaje con ID único basado en su fecha real y ID para evitar duplicados
-      oldMessages.forEach((msg: any) => {
-        // Asegurar que cada mensaje tenga un ID único incluso si el contenido es idéntico
-        // Si tiene ID del servidor, usamos ese ID directamente
+      oldMessages.forEach((msg: Message) => {
+        // Asegurarnos de que msg.id existe y es string
         if (msg.id) {
           setMessageMap(prevMap => {
             const newMap = new Map(prevMap);
-            newMap.set(msg.id, msg);
+            newMap.set(msg.id as string, msg);
             return newMap;
           });
         } else {
           // Si no tiene ID (raro para mensajes antiguos), usar timestamp y random
-          const uniqueKey = `old-${msg.senderId}-${Date.parse(msg.createdAt)}-${Math.random().toString(36).substring(2, 9)}`;
+          const createdAtStr = typeof msg.createdAt === 'string' 
+            ? msg.createdAt 
+            : (msg.createdAt as Date).toISOString();
+          const uniqueKey = `old-${msg.senderId}-${Date.parse(createdAtStr)}-${Math.random().toString(36).substring(2, 9)}`;
           setMessageMap(prevMap => {
             const newMap = new Map(prevMap);
             newMap.set(uniqueKey, msg);
@@ -1337,7 +1338,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   };
   
   // Marcar mensaje como leído
-  const markMessageAsRead = (messageId?: string, conversationId?: string) => {
+  const _markMessageAsRead = (messageId?: string, conversationId?: string) => {
     if (!messageId || !conversationId || !socketInstance || !socketInitialized) {
       console.warn('No se puede marcar mensaje como leído. Faltan datos o socket no disponible', {
         messageId, conversationId, socketAvailable: !!socketInstance
@@ -1360,7 +1361,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   };
   
   // Actualizar estado de un mensaje
-  const updateMessageStatus = (messageId: string, newStatus: MessageStatus) => {
+  const _updateMessageStatus = (messageId: string, newStatus: MessageStatus) => {
     // Buscar el mensaje en nuestro estado para actualizarlo
     const messageToUpdate = messages.find(msg => msg.id === messageId || msg.tempId === messageId);
     
@@ -1530,19 +1531,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   // Nueva función para añadir mensaje local de manera más eficiente
   const addLocalMessage = React.useCallback((message: Message) => {
     // Añadir el mensaje al mapa directamente
-    setMessageMap(prevMap => {
-      const newMap = new Map(prevMap);
-      if (message.tempId) {
-        newMap.set(message.tempId, message);
-      } else if (message.id) {
-        newMap.set(message.id, message);
-      } else {
-        // Generar una clave única para el mensaje
-        const uniqueKey = `msg-${message.senderId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        newMap.set(uniqueKey, message);
-      }
-      return newMap;
-    });
+    setMessageMap(prev => prev.set(message.id || message.tempId || '', message));
     
     // Devolver mensajes actualizados para uso inmediato
     return Array.from(messageMap.values())
@@ -1740,7 +1729,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
             {/* Renderizar cada mensaje con su propia clave única basada en índice */}
             <div className="space-y-4">
               {messages.map((message, index) => {
-                const isCurrentUser = message.senderId === currentUserId;
+                const _isCurrentUser = message.senderId === currentUserId;
                 const showAvatar = 
                   index === 0 || 
                   messages[index - 1].senderId !== message.senderId;

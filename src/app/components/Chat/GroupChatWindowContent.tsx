@@ -1,6 +1,6 @@
 "use client";
 import * as React from 'react'; // Fix React import
-import {  useState  } from 'react';
+import {  useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
@@ -12,8 +12,8 @@ import { API_ROUTES } from '@/src/config/api-routes';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import VoiceMessageRecorder from './VoiceMessageRecorder';
 import { useToast } from '@/src/app/hooks/use-toast';
-import Image from 'next/image';
-import { CldImage } from 'next-cloudinary';
+import _Image from 'next/image';
+import _CldImage from 'next-cloudinary';
 
 // Reutiliza estos componentes de ChatWindowContent.tsx
 import { MessageItem, DateSeparator, VoiceMessagePlayer } from './ChatComponents/ChatComponents';
@@ -82,7 +82,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   
   // Estado para controlar la carga de mensajes
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
-  const [errorLoadingMessages, setErrorLoadingMessages] = useState<string | null>(null);
+  const [_errorLoadingMessages, setErrorLoadingMessages] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -98,11 +98,11 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   
   // Estado para el socket
   const [socketInitialized, setSocketInitialized] = useState(false);
-  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
-  const [socketAuthenticated, setSocketAuthenticated] = useState(false);
+  const [autoScrollEnabled, _setAutoScrollEnabled] = useState(true);
+  const [_socketAuthenticated, _setSocketAuthenticated] = useState(false);
 
   // Implementar un controlador de aborto para cancelar peticiones anteriores
-  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const _abortControllerRef = React.useRef<AbortController | null>(null);
 
   // Referencia para mantener el último ID de conversación procesado
   const lastProcessedConversationRef = React.useRef<string | null>(null);
@@ -111,7 +111,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   const { 
     socketInstance,
     connected,
-    sendMessage: socketSendMessage,
+    sendMessage: _socketSendMessage,
     updateTypingStatus: socketUpdateTypingStatus,
     markMessageAsRead: socketMarkMessageAsRead,
     joinConversation,
@@ -246,7 +246,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   });
 
   // Efecto para manejar la unión a la conversación
-  React.useEffect(() => {
+  useEffect(() => {
     if (socketInitialized && conversation?.id && currentUserId && connected) {
       console.log(`Uniéndose a la conversación de grupo: ${conversation.id}`);
       joinConversation(conversation.id);
@@ -262,7 +262,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   }, [socketInitialized, conversation?.id, currentUserId, connected, joinConversation, leaveConversation, setActive]);
 
   // Efecto para manejar el estado de escritura
-  React.useEffect(() => {
+  useEffect(() => {
     if (!socketInitialized || !conversation?.id || !currentUserId) return;
     
     let typingTimer: NodeJS.Timeout | null = null;
@@ -324,7 +324,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   }, [socketInitialized, conversation?.id, currentUserId, isTyping, socketUpdateTypingStatus]);
   
   // Función para procesar mensajes
-  const processMessages = React.useCallback((newMessages: Message[]) => {
+  const processMessages = useCallback((newMessages: Message[]) => {
     if (!newMessages || newMessages.length === 0) return;
     
     // Filtrar mensajes para incluir solo los que corresponden a esta conversación
@@ -368,7 +368,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     });
   }, [conversation?.id]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!socketInstance || !socketInitialized || !conversation?.id) return;
     
     console.log('Configurando listener para nuevos mensajes en el grupo');
@@ -406,7 +406,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   }, [socketInstance, socketInitialized, conversation?.id, processMessages, isAtBottom]);
   
   // Separar completamente la función de carga de mensajes del ciclo de vida del componente
-  const loadGroupMessages = React.useCallback(async (groupId: string, isInitialLoad = false) => {
+  const loadGroupMessages = useCallback(async (groupId: string, isInitialLoad = false) => {
     // Si ya hay una petición en curso y no es la carga inicial, no iniciar otra
     if (isFetchingRef.current && !isInitialLoad) {
       console.log('Ya hay una petición en curso, ignorando nueva carga');
@@ -424,13 +424,12 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       
       // Hacer la petición fetch SIN usar AbortController para evitar cancelaciones
       const response = await fetch(
-        `/api/messages/group-messages?conversationId=${groupId}&page=1&limit=${pageSize}&nocache=${Date.now()}`, 
+        `${API_ROUTES.messages.groupMessages}?conversationId=${groupId}&page=1&limit=${pageSize}&nocache=${Date.now()}`, 
         { 
           method: 'GET',
           headers: { 
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store'
           }
         }
       );
@@ -504,7 +503,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   }, [pageSize, processMessages]);
 
   // Un efecto para cargar los mensajes iniciales cuando cambia la conversación
-  React.useEffect(() => {
+  useEffect(() => {
     if (!conversation?.id || !currentUserId) return;
     
     console.log(`Cambio de conversación detectado. Nueva conversación: ${conversation.id}`);
@@ -534,7 +533,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   }, [conversation?.id, currentUserId, loadGroupMessages]);
 
   // Cargar más mensajes al hacer scroll hacia arriba
-  const loadMoreMessages = async () => {
+  const _loadMoreMessages = async () => {
     // Evitar cargas paralelas y cargas cuando no hay más mensajes
     if (isLoadingMore || isFetchingRef.current || !hasMore || !currentUserId) return;
     
@@ -563,13 +562,12 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       
       // Hacer la petición fetch SIN usar AbortController para evitar cancelaciones
       const response = await fetch(
-        `/api/messages/group-messages?conversationId=${groupId}&page=${nextPage}&limit=${pageSize}&nocache=${Date.now()}`, 
+        `${API_ROUTES.messages.groupMessages}?conversationId=${groupId}&page=${nextPage}&limit=${pageSize}&nocache=${Date.now()}`, 
         { 
           method: 'GET',
           headers: { 
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store'
           }
         }
       );
@@ -611,7 +609,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   };
   
   // Restaurar posición de scroll después de cargar más mensajes
-  React.useEffect(() => {
+  useEffect(() => {
     if (preserveScrollPosition && chatContainerRef.current) {
       const newScrollHeight = chatContainerRef.current.scrollHeight;
       const heightDifference = newScrollHeight - scrollHeightBeforeLoad.current;
@@ -621,7 +619,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   }, [preserveScrollPosition, messages]);
 
   // Scroll inicial y al recibir nuevos mensajes
-  React.useEffect(() => {
+  useEffect(() => {
     // Solo hacer scroll si no estamos cargando más mensajes (hacia arriba)
     if (!isLoadingMore && messagesEndRef.current && chatContainerRef.current && !preserveScrollPosition) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -629,7 +627,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   }, [isLoadingMore, preserveScrollPosition, messages.length]);
 
   // Manejar scroll automático para nuevos mensajes
-  React.useEffect(() => {
+  useEffect(() => {
     // Prevenir configuración de manejadores si no tenemos socket o conversación
     if (!socketInstance || !conversation?.id || !currentUserId) return;
     
@@ -697,7 +695,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   };
 
   // Deshabilitar efecto que ya no es necesario al tener processMessages
-  React.useEffect(() => {
+  useEffect(() => {
     // Deshabilitado para evitar renderizados dobles
     // const uniqueMessages = Array.from(messageMap.values()).sort((a, b) => {
     //   const dateA = new Date(a.createdAt);
@@ -728,11 +726,10 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       
       console.log("Enviando mensaje al servidor:", requestBody);
       
-      const response = await fetch('/api/messages/group-messages', {
+      const response = await fetch(`${API_ROUTES.messages.groupMessages}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.user?.email || ''}`,
         },
         body: JSON.stringify(requestBody),
       });
@@ -783,7 +780,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         : `group_${conversation.id}`;
       
       // Enviar mensaje a través de la nueva API específica para grupos
-      const response = await fetch('/api/messages/group-messages', {
+      const response = await fetch(`${API_ROUTES.messages.groupMessages}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -849,6 +846,17 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     }
   };
   
+  // Función para obtener el remitente de un mensaje basado en el ID
+  const getMessageSender = (senderId: string): User | null => {
+    if (!conversation?.participants) return null;
+    
+    const participant = conversation.participants.find(p => p.userId === senderId);
+    if (!participant) return null;
+    
+    const user = conversation.participants.find(u => u.userId === senderId);
+    return user?.user || null;
+  };
+
   // Render principal del componente
   return (
     <div className={cn("flex flex-col max-h-[calc(100vh-4rem)]", className)}>
@@ -872,7 +880,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
               
               {/* Mensajes */}
               {messages.map((message, index) => {
-                const isCurrentUser = message.senderId === currentUserId;
+                const _isCurrentUser = message.senderId === currentUserId;
                 const showAvatar = 
                   index === 0 || 
                   messages[index - 1]?.senderId !== message.senderId;
@@ -883,25 +891,35 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                 );
                 
                 // Encontrar el remitente en la lista de participantes
-                const sender = conversation?.participants?.find(
-                  p => p.userId === message.senderId
-                )?.user;
+                const sender = getMessageSender(message.senderId) || {
+                  id: message.senderId,
+                  username: 'Usuario',
+                  name: 'Usuario',
+                  image: null
+                };
                 
                 return (
                   <React.Fragment key={message.id || message.tempId || index}>
                     <MessageItem 
                       message={message}
                       currentUserId={currentUserId || ''}
-                      otherUser={{
-                        id: sender?.id || '',
-                        username: sender?.username || '',
-                        name: sender?.name || '',
-                        image: sender?.image || ''
-                      }}
+                      otherUser={sender}
                       showAvatar={showAvatar}
                       showDateSeparator={showDateSeparator}
-                      index={index}
-                      session={session}
+                      _index={index}
+                      session={session ? {
+                        user: {
+                          id: session.user?.id || '',
+                          name: session.user?.name || '',
+                          image: session.user?.image || ''
+                        }
+                      } : {
+                        user: {
+                          id: '',
+                          name: '',
+                          image: ''
+                        }
+                      }}
                       isGroupChat={true}
                     />
                   </React.Fragment>
@@ -939,7 +957,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                   formData.append('conversationId', conversation.id);
                   
                   // Subir el archivo al servidor
-                  const response = await fetch('/api/messages/upload', {
+                  const response = await fetch(`${API_ROUTES.messages.upload}`, {
                     method: 'POST',
                     body: formData,
                   });

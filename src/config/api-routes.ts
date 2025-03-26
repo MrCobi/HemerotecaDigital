@@ -90,12 +90,14 @@ export const API_ROUTES = {
   },
   messages: {
     send: "/api/messages",
-    get: (otherUserId: string) => `/api/messages?with=${otherUserId}`,
+    get: (otherUserId: string) => `/api/messages?otherUserId=${otherUserId}`,
     list: "/api/messages",  // Para obtener todas las conversaciones
     conversations: "/api/messages/conversations",
     createConversation: "/api/messages/conversations/create",
     createGroup: "/api/messages/group",
     uploadGroupImage: "/api/messages/upload",
+    groupMessages: "/api/messages/group-messages",
+    upload: "/api/messages/upload",
     read: "/api/messages/read",
     unreadCount: "/api/messages/unread/count",
     sse: "/api/messages/sse",
