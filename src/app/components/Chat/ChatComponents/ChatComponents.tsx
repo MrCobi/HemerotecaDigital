@@ -63,7 +63,7 @@ export const MessageItem = memo(({
   otherUser,
   showAvatar,
   showDateSeparator,
-  index,
+  _index,
   session,
   isGroupChat = false
 }: { 
@@ -72,8 +72,8 @@ export const MessageItem = memo(({
   otherUser: User | null,
   showAvatar: boolean,
   showDateSeparator: boolean,
-  index: number,
-  session: any,
+  _index: number,
+  session: { user?: { id: string; name?: string; image?: string; } },
   isGroupChat?: boolean
 }) => {
   const isCurrentUser = message.senderId === currentUserId;
@@ -246,7 +246,7 @@ export const VoiceMessagePlayer = React.memo(({
   isCurrentUser: boolean 
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [_isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -269,7 +269,7 @@ export const VoiceMessagePlayer = React.memo(({
   
   // Cargar los metadatos del audio cuando el componente se monta
   useEffect(() => {
-    let audio = new Audio();
+    const audio = new Audio();
     audio.preload = "metadata";
     audioRef.current = audio;
     
@@ -313,7 +313,7 @@ export const VoiceMessagePlayer = React.memo(({
       if (audio) audio.currentTime = 0;
     };
     
-    const handleError = (e: any) => {
+    const handleError = (e: Error | Event) => {
       console.error("Error al cargar el audio:", e);
       setError("Error al cargar el audio");
       setIsLoading(false);
@@ -387,7 +387,7 @@ export const VoiceMessagePlayer = React.memo(({
       }
     };
   }, [isPlaying]);
-
+  
   const togglePlayPause = () => {
     if (!audioRef.current || isLoading) return;
     
@@ -395,7 +395,7 @@ export const VoiceMessagePlayer = React.memo(({
       if (isPlaying) {
         audioRef.current.pause();
         setIsPlaying(false);
-        setIsPaused(true);
+        setIsPaused(false);
       } else {
         // Reproducir desde el inicio si ya terminó
         if (currentTime >= duration && duration > 0) {
@@ -428,7 +428,7 @@ export const VoiceMessagePlayer = React.memo(({
     }
   };
   
-  const skipForward = () => {
+  const _skipForward = () => {
     if (!audioRef.current || isLoading) return;
     
     const newTime = Math.min(audioRef.current.duration, currentTime + 10);
@@ -436,7 +436,7 @@ export const VoiceMessagePlayer = React.memo(({
     setCurrentTime(newTime);
   };
   
-  const skipBackward = () => {
+  const _skipBackward = () => {
     if (!audioRef.current || isLoading) return;
     
     const newTime = Math.max(0, currentTime - 10);

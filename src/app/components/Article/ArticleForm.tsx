@@ -27,14 +27,14 @@ const SearchForm: React.FC<SearchFormProps> = ({
   const [loadingSources, setLoadingSources] = useState(false);
 
   useEffect(() => {
-    if (searchParams.sources) {
+    if (searchParams.language === "") {
       handleInputChange({
         target: { name: "sources", value: "" },
       } as React.ChangeEvent<HTMLInputElement>);
     }
     fetchSources(searchParams.language, setLoadingSources, setAvailableSources);
     console.log(`Cargando fuentes para idioma: ${searchParams.language}`);
-  }, [searchParams.language]);
+  }, [searchParams.language, handleInputChange, searchParams.sources]);
 
   return (
     <form

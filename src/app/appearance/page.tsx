@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useTheme } from "../components/ThemeProvider";
 
 // Tipos para el tema
-type Theme = "light" | "dark" | "system";
+type _Theme = "light" | "dark" | "system";
 
 // Tipos para opciones avanzadas
 type FontSize = "small" | "medium" | "large";
