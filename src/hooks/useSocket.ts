@@ -67,6 +67,12 @@ export type TypingStatusType = {
   isTyping: boolean;
 };
 
+export type ReadReceiptType = {
+  userId: string;
+  conversationId: string;
+  messageIds: string[];
+};
+
 export type ConversationType = {
   id: string;
   name?: string;
@@ -88,7 +94,7 @@ interface UseSocketOptions {
   onUserOnline?: (users: UserType[]) => void;
   onTypingStatus?: (status: TypingStatusType) => void;
   onMessageStatus?: (status: { messageId: string; status: string }) => void;
-  onMessageRead?: (data: { messageId: string; conversationId?: string; readBy?: string }) => void;
+  onMessageRead?: (data: ReadReceiptType) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error | unknown) => void;
@@ -250,7 +256,7 @@ export default function useSocket(options: UseSocketOptions) {
       }
     });
     
-    socket.on('message_read', (data: { messageId: string; conversationId?: string; readBy?: string }) => {
+    socket.on('message_read', (data: ReadReceiptType) => {
       if (callbacksRef.current.onMessageRead) {
         callbacksRef.current.onMessageRead(data);
       }

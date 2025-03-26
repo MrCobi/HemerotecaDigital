@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useState, useEffect, useCallback } from "react";
+import { createContext, useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { API_ROUTES } from "@/src/config/api-routes";
 
@@ -8,12 +8,14 @@ import { API_ROUTES } from "@/src/config/api-routes";
 export interface UnreadMessagesContextType {
   unreadCount: number;
   updateUnreadCount: () => Promise<void>;
+  setUnreadCount: (count: number) => void;
 }
 
 // Crear el contexto con un valor inicial
 export const UnreadMessagesContext = createContext<UnreadMessagesContextType>({
   unreadCount: 0,
-  updateUnreadCount: async () => {}
+  updateUnreadCount: async () => {},
+  setUnreadCount: () => {}
 });
 
 // Proveedor del contexto
@@ -61,7 +63,8 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
     <UnreadMessagesContext.Provider
       value={{
         unreadCount,
-        updateUnreadCount
+        updateUnreadCount,
+        setUnreadCount
       }}
     >
       {children}

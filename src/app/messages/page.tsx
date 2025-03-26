@@ -1,6 +1,6 @@
 // src/app/messages/page.tsx
 "use client";
-import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback, useContext } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { API_ROUTES } from "@/src/config/api-routes";
@@ -19,6 +19,7 @@ import { CldImage } from "next-cloudinary";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/src/app/components/ui/dialog";
 import { useToast } from "@/src/app/components/ui/use-toast";
 import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
+import useSocket, { MessageType } from "@/src/hooks/useSocket";
 
 // Interfaces optimizadas
 interface User {
@@ -104,7 +105,7 @@ export default function MessagesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
-  const unreadMessagesContext = React.useContext(UnreadMessagesContext);
+  const unreadMessagesContext = useContext(UnreadMessagesContext);
   const { toast } = useToast();
 
   // Configuración
@@ -153,6 +154,103 @@ export default function MessagesPage() {
   const messagesDivRef = useRef<HTMLDivElement>(null);
   const newMessageInputRef = useRef<HTMLTextAreaElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Integración de Socket.io para actualizaciones en tiempo real
+  const { 
+    socketInstance,
+    connected,
+    error: socketError,
+    sendMessage: socketSendMessage,
+    joinConversation,
+    leaveConversation,
+    reconnect
+  } = useSocket({
+    userId: session?.user?.id,
+    username: session?.user?.name || session?.user?.username || 'Usuario',
+    onConnect: () => {
+      console.log('Socket conectado en la página de mensajes');
+      // Unirse automáticamente a todas las conversaciones actuales
+      if (conversations.length > 0 && session?.user?.id) {
+        conversations.forEach(conversation => {
+          joinConversation(conversation.id);
+        });
+      }
+    },
+    onDisconnect: () => {
+      console.log('Socket desconectado en la página de mensajes');
+      // Intentar reconectar automáticamente
+      setTimeout(() => {
+        if (session?.user?.id) {
+          reconnect();
+        }
+      }, 3000);
+    },
+    onError: (error) => {
+      console.error('Error en socket:', error);
+    },
+    onNewMessage: (message: MessageType) => {
+      console.log('Nuevo mensaje recibido en la página de mensajes:', message);
+      
+      // Actualizar la lista de conversaciones cuando llega un nuevo mensaje
+      if (message.conversationId) {
+        fetchConversations();
+        
+        // Actualizar el contador de mensajes no leídos
+        if (message.senderId !== session?.user?.id) {
+          refreshUnreadCounts();
+        }
+        
+        // Si la conversación está seleccionada, actualizar los mensajes
+        if (selectedConversation === message.conversationId) {
+          // La ventana de chat activa se encargará de actualizar sus mensajes
+          // No es necesario hacer nada aquí
+        } else {
+          // Reproducir sonido de notificación para nuevos mensajes cuando no está en la conversación
+          const audio = new Audio('/sounds/message-notification.mp3');
+          audio.play().catch(e => console.log('Error al reproducir sonido:', e));
+        }
+      } else if (message.senderId && message.receiverId) {
+        // Para mensajes directos que no tienen conversationId todavía
+        fetchConversations();
+      }
+    },
+    onMessageRead: (data) => {
+      // Actualizar contadores de no leídos cuando se marca un mensaje como leído
+      refreshUnreadCounts();
+      
+      // Si es relevante para la conversación actual, actualizar el estado
+      if (selectedConversation && data.conversationId === selectedConversation) {
+        // La ventana de chat se encargará de actualizar el estado de lectura
+      }
+    },
+    onTypingStatus: (data) => {
+      // Manejar indicador de escritura (se implementará en los componentes de chat)
+      console.log('Estado de escritura:', data);
+    }
+  });
+  
+  // Efecto para inicializar el socket y unirse a todas las conversaciones
+  useEffect(() => {
+    if (session?.user?.id && connected && conversations.length > 0) {
+      console.log('Iniciando conexiones de socket para todas las conversaciones');
+      conversations.forEach(conversation => {
+        joinConversation(conversation.id);
+      });
+    }
+  }, [session?.user?.id, connected, conversations, joinConversation]);
+
+  // Efecto para manejar la limpieza cuando se desmonta el componente
+  useEffect(() => {
+    return () => {
+      if (socketInstance && connected) {
+        // Salir de todas las conversaciones
+        conversations.forEach(conversation => {
+          leaveConversation(conversation.id);
+        });
+        console.log('Limpieza: saliendo de todas las conversaciones');
+      }
+    };
+  }, [socketInstance, connected, conversations, leaveConversation]);
   
   // Función para actualizar la información del grupo
   const updateGroupInfo = async (data: { name?: string, description?: string, imageUrl?: string }) => {
@@ -1596,6 +1694,110 @@ export default function MessagesPage() {
     }
   };
 
+  // Función para refrescar solo los contadores de mensajes no leídos
+  const refreshUnreadCounts = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const response = await fetch(`${API_ROUTES.messages.unreadCount}`);
+      if (!response.ok) throw new Error('Error al obtener contadores de mensajes no leídos');
+      
+      const data = await response.json();
+      
+      // Actualizar contexto global de mensajes no leídos
+      if (unreadMessagesContext) {
+        // Use the correct property from the context
+        unreadMessagesContext.setUnreadCount(data.totalUnread || 0);
+      }
+      
+      // Actualizar los contadores locales de las conversaciones
+      setConversations(prevConversations => 
+        prevConversations.map(conv => {
+          const unreadData = data.conversations?.find((c: any) => c.conversationId === conv.id);
+          return {
+            ...conv,
+            unreadCount: unreadData ? unreadData.count : conv.unreadCount || 0
+          };
+        })
+      );
+    } catch (error) {
+      console.error('Error al actualizar contadores de mensajes no leídos:', error);
+    }
+  }, [session?.user?.id, unreadMessagesContext]);
+
+  // Función para obtener todas las conversaciones
+  const fetchConversations = useCallback(async () => {
+    if (!session || !session.user || !session.user.id) return;
+
+    try {
+      setLoading(true);
+      
+      // Añadir timestamp para evitar caché
+      const timestamp = Date.now();
+      
+      // Obtener conversaciones
+      const conversationsRes = await fetch(
+        `${API_ROUTES.messages.conversations}?page=1&limit=${CONVERSATIONS_PER_PAGE}&t=${timestamp}`,
+        { cache: 'no-store' }
+      );
+      
+      if (!conversationsRes.ok) {
+        throw new Error(`Error al cargar conversaciones: ${conversationsRes.status}`);
+      }
+      
+      const convData = await processConvResponse(conversationsRes);
+      setConversations(convData);
+    } catch (error) {
+      console.error("Error loading data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [processConvResponse, CONVERSATIONS_PER_PAGE, session?.user?.id]);
+
+  // Efecto para cargar las conversaciones iniciales
+  useEffect(() => {
+    if (status === "authenticated" && session?.user?.id) {
+      fetchConversations();
+      
+      // Configurar el intervalo de actualización
+      const interval = setInterval(() => {
+        fetchConversations();
+      }, REFRESH_INTERVAL);
+      
+      return () => clearInterval(interval);
+    }
+  }, [status, session?.user?.id, fetchConversations, REFRESH_INTERVAL]);
+  
+  // Efecto para manejar el resize de la ventana
+  useEffect(() => {
+    const handleResize = () => setMobileView(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Efecto para unirse a las conversaciones activas a través de WebSocket
+  useEffect(() => {
+    if (connected && session?.user?.id) {
+      // Unirse a todas las conversaciones disponibles
+      conversations.forEach(conversation => {
+        if (conversation.id) {
+          console.log(`Uniéndose a la sala de la conversación: ${conversation.id}`);
+          joinConversation(conversation.id);
+        }
+      });
+      
+      return () => {
+        // Limpiar al desmontar
+        conversations.forEach(conversation => {
+          if (conversation.id) {
+            leaveConversation(conversation.id);
+          }
+        });
+      };
+    }
+  }, [connected, conversations, session?.user?.id, joinConversation, leaveConversation]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1617,7 +1819,7 @@ export default function MessagesPage() {
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={loadConversationsData}
+              onClick={fetchConversations}
               title="Actualizar conversaciones"
               aria-label="Actualizar conversaciones"
               className="rounded-full"
@@ -2381,7 +2583,7 @@ export default function MessagesPage() {
       onClose={() => setShowGroupManagementModal(false)} 
       conversationData={selectedConversationData} 
       currentUserId={session?.user?.id || ""} 
-      onConversationUpdate={(updatedData) => {
+      onConversationUpdate={(updatedData: Partial<ConversationData>) => {
         if (selectedConversationData) {
           // Actualizar el estado con conversión de tipos
           const newData = {

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { flushSync } from 'react-dom';
-import useSocket, { MessageType } from '@/src/hooks/useSocket';
+import useSocket, { MessageType, TypingStatusType, ReadReceiptType } from '@/src/hooks/useSocket';
 import { API_ROUTES } from '@/src/config/api-routes';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import VoiceMessageRecorder from './VoiceMessageRecorder';
@@ -77,6 +77,8 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimersRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const [isTyping, setIsTyping] = useState(false);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   
   // Estado para controlar la carga de mensajes
@@ -118,63 +120,212 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     setActive, 
     reconnect  
   } = useSocket({
-    userId: currentUserId,
-    username: session?.user?.name || session?.user?.username || undefined,
+    userId: currentUserId || "",
+    username: session?.user?.name || session?.user?.username || "",
     onConnect: () => {
       console.log('Socket conectado en GroupChatWindow');
       setSocketInitialized(true);
+      
+      // Si hay una conversación activa y estamos conectados, unirse a ella
+      if (conversation?.id && currentUserId) {
+        joinConversation(conversation.id);
+      }
     },
     onDisconnect: () => {
       console.log('Socket desconectado en GroupChatWindow');
+      setSocketInitialized(false);
+      
+      // Intentar reconectar automáticamente
+      setTimeout(() => {
+        if (currentUserId) {
+          reconnect();
+        }
+      }, 3000);
     },
     onError: (error) => {
-      console.error('Error en socket:', error);
+      console.error('Error en socket de GroupChat:', error);
+    },
+    onNewMessage: (message: MessageType) => {
+      // Solo procesar el mensaje si pertenece a esta conversación
+      if (message.conversationId === conversation?.id) {
+        console.log('Nuevo mensaje recibido en GroupChat:', message);
+        
+        // Convertir a formato de mensaje interno
+        const newMessage: Message = {
+          id: message.id,
+          content: message.content || '',
+          senderId: message.senderId,
+          createdAt: new Date(message.createdAt),
+          status: 'sent',
+          messageType: message.messageType,
+          mediaUrl: message.mediaUrl,
+          conversationId: message.conversationId
+        };
+        
+        // Añadir mensaje a la lista y actualizar estado
+        setMessages(prev => {
+          // Evitar duplicados
+          const exists = prev.some(msg => msg.id === newMessage.id || 
+                               (msg.tempId && msg.tempId === message.tempId));
+          if (exists) return prev;
+          
+          return [...prev, newMessage];
+        });
+        
+        // Si el mensaje no es del usuario actual, marcarlo como leído
+        if (message.senderId !== currentUserId) {
+          // Marcar el mensaje como leído en el servidor
+          if (message.id) {
+            socketMarkMessageAsRead({
+              messageId: message.id,
+              conversationId: conversation?.id
+            });
+          }
+          
+          // Reproducir sonido de notificación si no está en foco
+          if (document.visibilityState !== 'visible') {
+            const audio = new Audio('/sounds/message-notification.mp3');
+            audio.play().catch(e => console.log('Error al reproducir sonido:', e));
+          }
+        }
+        
+        // Scroll al fondo si el usuario está en la parte inferior
+        if (isAtBottom) {
+          scrollToBottom();
+        }
+      }
+    },
+    onTypingStatus: (data: TypingStatusType) => {
+      // Solo mostrar indicador de escritura si es del grupo actual
+      if (data.conversationId === conversation?.id && data.userId !== currentUserId) {
+        console.log('Usuario está escribiendo en el grupo:', data);
+        
+        // Buscar el nombre del usuario
+        const typingUser = conversation.participants.find(p => p.user.id === data.userId);
+        const typingUsername = typingUser?.user.name || typingUser?.user.username || 'Alguien';
+        
+        if (data.isTyping) {
+          // Actualizar el estado de quién está escribiendo
+          setTypingUsers(prev => {
+            // Si ya está en la lista, no modificar
+            if (prev.some(user => user === typingUsername)) return prev;
+            
+            // Añadir usuario a la lista
+            return [...prev, typingUsername];
+          });
+        } else {
+          // Quitar usuario de la lista de escritura
+          setTypingUsers(prev => prev.filter(user => user !== typingUsername));
+        }
+      }
+    },
+    onMessageRead: (data: ReadReceiptType) => {
+      // Actualizar el estado de los mensajes marcados como leídos en el grupo
+      if (data.conversationId === conversation?.id && data.userId !== currentUserId) {
+        console.log('Mensajes marcados como leídos en el grupo:', data);
+        
+        // Actualizar el estado de lectura de los mensajes
+        setMessages(prev => prev.map(msg => {
+          // Si el mensaje es nuestro y está en la lista de leídos, actualizarlo
+          if (msg.senderId === currentUserId && 
+              data.messageIds.includes(msg.id || '')) {
+            
+            // Añadir este usuario a la lista de lecturas si no existe
+            const currentReadBy = msg.readBy || [];
+            if (!currentReadBy.includes(data.userId)) {
+              return {
+                ...msg, 
+                readBy: [...currentReadBy, data.userId],
+                status: currentReadBy.length > 0 ? 'read' : 'delivered'
+              };
+            }
+          }
+          return msg;
+        }));
+      }
     }
   });
 
-  // Mantener un registro de qué conversaciones ya se han unido
-  const joinedConversationRef = useRef<string | null>(null);
-  
-  // Aquí implementarías la lógica específica del grupo
-  // (cargar mensajes, manejar sockets, etc.)
-  
-  // Manejar la unión a salas de conversación
+  // Efecto para manejar la unión a la conversación
   useEffect(() => {
     if (socketInitialized && conversation?.id && currentUserId && connected) {
-      socketInstance?.emit('identify', { 
-        userId: currentUserId, 
-        username: session?.user?.name || session?.user?.username || 'Usuario' 
-      });
+      console.log(`Uniéndose a la conversación de grupo: ${conversation.id}`);
+      joinConversation(conversation.id);
       
-      const timer = setTimeout(() => {
-        setSocketAuthenticated(true);
+      // Marcar esta conversación como activa
+      setActive(conversation.id);
+      
+      return () => {
+        console.log(`Saliendo de la conversación de grupo: ${conversation.id}`);
+        leaveConversation(conversation.id);
+      };
+    }
+  }, [socketInitialized, conversation?.id, currentUserId, connected, joinConversation, leaveConversation, setActive]);
+
+  // Efecto para manejar el estado de escritura
+  useEffect(() => {
+    if (!socketInitialized || !conversation?.id || !currentUserId) return;
+    
+    let typingTimer: NodeJS.Timeout | null = null;
+    
+    const handleKeyDown = () => {
+      // Evitar enviar muchas actualizaciones seguidas
+      if (!isTyping) {
+        socketUpdateTypingStatus({
+          userId: currentUserId,
+          conversationId: conversation.id,
+          isTyping: true
+        });
         
-        if (joinedConversationRef.current === conversation.id) {
-          console.log(`Ya estamos unidos al grupo: ${conversation.id}`);
-          return;
+        // Establecer estado local
+        setIsTyping(true);
+        
+        // Limpiar temporizador anterior si existe
+        if (typingTimerRef.current) {
+          clearTimeout(typingTimerRef.current);
         }
         
-        if (joinedConversationRef.current && joinedConversationRef.current !== conversation.id) {
-          console.log(`Saliendo del grupo anterior: ${joinedConversationRef.current}`);
-          leaveConversation(joinedConversationRef.current);
-        }
-        
-        console.log(`Uniéndose al grupo: ${conversation.id} con usuario ${currentUserId}`);
-        joinConversation(conversation.id);
-        joinedConversationRef.current = conversation.id;
-      }, 500);
-      
-      return () => clearTimeout(timer);
+        // Configurar temporizador para detener estado de escritura
+        typingTimerRef.current = setTimeout(() => {
+          socketUpdateTypingStatus({
+            userId: currentUserId,
+            conversationId: conversation.id,
+            isTyping: false
+          });
+          setIsTyping(false);
+        }, 2000);
+      }
+    };
+    
+    // Agregar event listener al input de mensaje
+    const messageInput = messageInputRef.current;
+    if (messageInput) {
+      messageInput.addEventListener('keydown', handleKeyDown);
     }
     
     return () => {
-      if (socketInitialized && joinedConversationRef.current && currentUserId) {
-        console.log(`Limpieza: saliendo del grupo: ${joinedConversationRef.current}`);
-        leaveConversation(joinedConversationRef.current);
-        joinedConversationRef.current = null;
+      if (messageInput) {
+        messageInput.removeEventListener('keydown', handleKeyDown);
       }
+      
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+        
+        // Asegurarse de enviar isTyping: false al desmontar
+        socketUpdateTypingStatus({
+          userId: currentUserId,
+          conversationId: conversation.id,
+          isTyping: false
+        });
+      }
+      
+      // Limpiar todos los temporizadores de escritura
+      Object.keys(typingTimersRef.current).forEach(userId => {
+        clearTimeout(typingTimersRef.current[userId]);
+        delete typingTimersRef.current[userId];
+      });
     };
-  }, [socketInitialized, conversation?.id, currentUserId, joinConversation, leaveConversation, connected, socketInstance, session]);
+  }, [socketInitialized, conversation?.id, currentUserId, isTyping, socketUpdateTypingStatus]);
   
   // Función para procesar mensajes
   const processMessages = useCallback((newMessages: Message[]) => {

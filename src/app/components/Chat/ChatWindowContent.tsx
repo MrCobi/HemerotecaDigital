@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { flushSync } from 'react-dom';
-import useSocket, { MessageType } from '@/src/hooks/useSocket';
+import useSocket, { MessageType, TypingStatusType, ReadReceiptType } from '@/src/hooks/useSocket';
 import { API_ROUTES } from '@/src/config/api-routes';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import VoiceMessageRecorder from './VoiceMessageRecorder';
@@ -612,12 +612,123 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     onConnect: () => {
       console.log('Socket conectado en ChatWindow');
       setSocketInitialized(true);
+      
+      // Si hay una conversación activa y estamos conectados, unirse a ella
+      if (conversationId && currentUserId) {
+        joinConversation(conversationId);
+      }
     },
     onDisconnect: () => {
       console.log('Socket desconectado en ChatWindow');
+      setSocketInitialized(false);
+      
+      // Intentar reconectar automáticamente
+      setTimeout(() => {
+        if (currentUserId) {
+          reconnect();
+        }
+      }, 3000);
     },
     onError: (error) => {
       console.error('Error en socket:', error);
+    },
+    onNewMessage: (message) => {
+      // Solo procesar el mensaje si pertenece a esta conversación
+      if (message.conversationId === conversationId || 
+          (message.senderId === otherUser?.id && message.receiverId === currentUserId) ||
+          (message.senderId === currentUserId && message.receiverId === otherUser?.id)) {
+        
+        console.log('Nuevo mensaje recibido en Chat:', message);
+        
+        // Convertir a formato de mensaje interno
+        const newMessage: Message = {
+          id: message.id,
+          content: message.content || '',
+          senderId: message.senderId,
+          createdAt: new Date(message.createdAt),
+          status: 'sent',
+          messageType: message.type,
+          mediaUrl: message.mediaUrl,
+          conversationId: message.conversationId
+        };
+        
+        // Añadir mensaje a la lista y actualizar estado
+        setMessages(prev => {
+          // Evitar duplicados
+          const exists = prev.some(msg => msg.id === newMessage.id || 
+                                 (msg.tempId && msg.tempId === message.tempId));
+          if (exists) return prev;
+          
+          return [...prev, newMessage];
+        });
+        
+        // Si el mensaje no es del usuario actual, marcarlo como leído
+        if (message.senderId !== currentUserId) {
+          // Marcar el mensaje como leído en el servidor
+          if (message.id) {
+            socketMarkMessageAsRead({
+              messageId: message.id,
+              conversationId: conversationId || undefined
+            });
+          }
+          
+          // Reproducir sonido de notificación si no está en foco
+          if (document.visibilityState !== 'visible') {
+            const audio = new Audio('/sounds/message-notification.mp3');
+            audio.play().catch(e => console.log('Error al reproducir sonido:', e));
+          }
+        }
+        
+        // Scroll al fondo si el usuario está en la parte inferior
+        if (isAtBottom) {
+          scrollToBottom();
+        }
+      }
+    },
+    onTypingStatus: (data) => {
+      // Solo mostrar indicador de escritura si es del usuario con el que estamos chateando
+      if (data.userId === otherUser?.id && 
+          (data.conversationId === conversationId || 
+           (!conversationId && data.receiverId === currentUserId))) {
+        
+        console.log('Usuario está escribiendo:', data);
+        
+        if (data.isTyping) {
+          setIsTyping(true);
+          // Limpiar cualquier temporizador anterior
+          if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+          }
+          
+          // Establecer un nuevo temporizador para ocultar el indicador después de 3 segundos
+          typingTimeoutRef.current = setTimeout(() => {
+            setIsTyping(false);
+          }, 3000);
+        } else {
+          setIsTyping(false);
+          if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+          }
+        }
+      }
+    },
+    onMessageRead: (data: ReadReceiptType) => {
+      // Actualizar el estado de los mensajes marcados como leídos
+      if ((data.conversationId === conversationId || 
+           (!conversationId && data.userId === otherUser?.id)) && 
+          data.userId !== currentUserId) {
+        
+        console.log('Mensajes marcados como leídos:', data);
+        
+        setMessages(prev => prev.map(msg => {
+          // Si el mensaje es nuestro y está en la lista de leídos, actualizarlo
+          if (msg.senderId === currentUserId && 
+              data.messageIds.includes(msg.id || '')) {
+            return {...msg, status: 'read'};
+          }
+          return msg;
+        }));
+      }
     }
   });
 
@@ -1444,6 +1555,9 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         isTyping: true 
       });
       
+      // Establecer estado local
+      setIsTyping(true);
+      
       // Limpiar timeout anterior si existe
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
@@ -1465,6 +1579,13 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     return () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
+        
+        // Asegurarse de enviar isTyping: false al desmontar
+        socketUpdateTypingStatus({
+          userId: currentUserId,
+          conversationId: safeConversationId,
+          isTyping: false
+        });
       }
     };
   }, [currentUserId, isTyping, otherUser?.id, socketInstance, socketInitialized]);
