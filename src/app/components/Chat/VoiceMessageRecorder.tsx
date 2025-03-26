@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import * as React from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
 import useAudioRecorder from '../../../hooks/useAudioRecorder';
 import { Send, Mic, Trash2, X, AlertCircle } from 'lucide-react';
 import { Session } from 'next-auth';
@@ -21,7 +22,7 @@ interface VoiceMessageRecorderProps {
   setUploadStatus: (status: 'idle' | 'uploading' | 'success' | 'error') => void;
 }
 
-const VoiceMessageRecorder = React.memo(({ 
+const VoiceMessageRecorder = memo(({ 
   onSend,
   onCancel,
   isVisible,
@@ -322,25 +323,25 @@ const VoiceMessageRecorder = React.memo(({
     );
   }, [error]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Solo para depuración - registrar cambios en audioURL
     console.log("Estado de audioURL actualizado:", audioURL);
   }, [audioURL]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Solo para depuración - registrar cambios en isRecording
     console.log("Estado de isRecording actualizado:", isRecording);
   }, [isRecording]);
 
   // Resetear el flag de detención manual cuando comienza una nueva grabación
-  useEffect(() => {
+  React.useEffect(() => {
     if (isRecording) {
       manuallyStoppedRef.current = false;
     }
   }, [isRecording]);
 
   // Asegurarnos de detectar cuando se detiene la grabación
-  useEffect(() => {
+  React.useEffect(() => {
     // Si estábamos grabando y ahora no estamos grabando, 
     // significa que la grabación ha terminado
     if (wasRecording.current && !isRecording && !manuallyStoppedRef.current) {
@@ -354,7 +355,7 @@ const VoiceMessageRecorder = React.memo(({
   }, [isRecording, handleStopRecording]);
 
   // Manejar la limpieza cuando el componente se desmonta
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       // Limpiar el timeout de cancelación si existe
       if (cancelTimeoutRef.current) {

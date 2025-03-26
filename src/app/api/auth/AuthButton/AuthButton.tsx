@@ -1,6 +1,6 @@
 "use client";
 import { useSession, signOut } from "next-auth/react";
-import React from "react";
+import * as React from "react";
 import Link from "next/link";
 import { Menu } from "@mui/material";
 import { CldImage } from 'next-cloudinary';
@@ -398,3 +398,4 @@ const AuthButton = () => {
 };
 
 export default AuthButton;
+

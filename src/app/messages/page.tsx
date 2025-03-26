@@ -38,9 +38,9 @@ interface Participant {
 
 interface ConversationData {
   id: string;
-  name?: string;
-  description?: string;
-  imageUrl?: string;
+  name?: string | null;
+  description?: string | null;
+  imageUrl?: string | null;
   isGroup: boolean;
   participants: Participant[];
   lastMessage?: Message;
@@ -421,9 +421,9 @@ export default function MessagesPage() {
             const processedGroup = {
               id: conv.id,
               isGroup: true,
-              name: conv.name || "Grupo sin nombre",
-              description: conv.description || "",
-              imageUrl: conv.imageUrl || null,
+              name: conv.name || undefined,
+              description: conv.description || undefined,
+              imageUrl: conv.imageUrl || undefined,
               lastMessage: conv.lastMessage ? {
                 ...conv.lastMessage,
                 createdAt: typeof conv.lastMessage.createdAt === 'string' ? 
@@ -2585,14 +2585,10 @@ export default function MessagesPage() {
       currentUserId={session?.user?.id || ""} 
       onConversationUpdate={(updatedData: Partial<ConversationData>) => {
         if (selectedConversationData) {
-          // Actualizar el estado con conversión de tipos
+          // Actualizar el estado con los nuevos datos
           const newData = {
             ...selectedConversationData,
-            ...updatedData,
-            // Convertir posibles null a undefined para cumplir con el tipo
-            name: updatedData.name === null ? undefined : updatedData.name || selectedConversationData.name,
-            description: updatedData.description === null ? undefined : updatedData.description || selectedConversationData.description,
-            imageUrl: updatedData.imageUrl === null ? undefined : updatedData.imageUrl || selectedConversationData.imageUrl
+            ...updatedData
           };
           
           setSelectedConversationData(newData);

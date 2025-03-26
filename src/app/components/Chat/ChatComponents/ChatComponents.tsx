@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday } from 'date-fns';
@@ -7,6 +7,7 @@ import { es } from 'date-fns/locale';
 import { Play, Pause, SkipForward, SkipBack } from 'lucide-react';
 import Image from 'next/image';
 import { CldImage } from 'next-cloudinary';
+import * as React from 'react';
 
 // Tipos para los mensajes y usuarios
 export type User = {
@@ -57,7 +58,7 @@ export const DateSeparator = ({ date }: { date: Date | string }) => {
 };
 
 // Componente Message separado para manejar cada mensaje individualmente
-export const MessageItem = React.memo(({ 
+export const MessageItem = memo(({ 
   message, 
   currentUserId,
   otherUser,

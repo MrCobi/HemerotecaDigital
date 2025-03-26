@@ -1,5 +1,5 @@
 // app/api/auth/signup/page.tsx
-import React from 'react';
+
 import SignUpForm from './_components/signup-form';
 import { Metadata } from 'next';
 

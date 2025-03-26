@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { fetchTopHeadlines } from "../services/NewsEverythingService";
 import { Article } from "../../interface/article";
 import Image from "next/image";

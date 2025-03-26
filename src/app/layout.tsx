@@ -1,7 +1,7 @@
 // src/app/layout.tsx
 import "./globals.css";
 import "./styles/mui-dark-mode.css"; // Importar estilos para MUI en modo oscuro
-import React from "react";
+import * as React from "react";
 import { SessionProvider } from "next-auth/react";
 import ClientLayout from "./ClientLayout";
 import { ToastProvider, ToastViewport } from "@/src/app/components/ui/toast";

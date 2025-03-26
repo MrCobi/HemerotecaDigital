@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
 interface EmptyTableProps {
@@ -43,3 +43,4 @@ export default function EmptyTable({
     </div>
   );
 }
+

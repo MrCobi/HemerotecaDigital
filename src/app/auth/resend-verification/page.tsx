@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { API_ROUTES } from "@/src/config/api-routes";
 import { useTheme } from "next-themes";

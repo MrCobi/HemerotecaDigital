@@ -47,10 +47,10 @@ type GroupConversation = {
 type Message = {
   id?: string;
   tempId?: string;
-  content: string | null;
+  content: string;
   senderId: string;
   createdAt: Date | string;
-  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error' | 'failed';
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   conversationId?: string;
   read?: boolean;
   readBy?: string[];
@@ -383,7 +383,14 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       // Verificar que el mensaje sea para este grupo
       if (message.conversationId === conversation.id) {
         console.log('Procesando mensaje para el grupo actual');
-        processMessages([message]);
+        
+        // Procesar el mensaje - asegurarse de que content no sea null
+        const validMessage: Message = {
+          ...message,
+          content: message.content || '' // Si es null, usar string vacío
+        };
+        
+        processMessages([validMessage]);
         
         // Auto-scroll si estamos en la parte inferior
         if (isAtBottom) {
@@ -646,8 +653,13 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         });
       }
       
-      // Procesar el mensaje
-      processMessages([message]);
+      // Procesar el mensaje - asegurarse de que content no sea null
+      const validMessage: Message = {
+        ...message,
+        content: message.content || '' // Si es null, usar string vacío
+      };
+      
+      processMessages([validMessage]);
       
       // Auto-scroll si estamos en la parte inferior
       if (isAtBottom) {
