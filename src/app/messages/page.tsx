@@ -5,16 +5,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { ChatWindowContent } from "@/src/app/components/Chat/ChatWindowContent";
-import GroupChatWindowContent from "@/src/app/components/Chat/GroupChatWindowContent";
+import { GroupChatWindowContent } from "@/src/app/components/Chat/GroupChatWindowContent";
 import GroupManagementModal from '../components/Chat/GroupManagementModal';
 import { MessageCircle, Search, MessageSquare, MessageSquarePlus, ArrowLeft, Users, Plus, X, Check, ImagePlus, Settings } from "lucide-react";
 import { Avatar } from "@/src/app/components/ui/avatar";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/app/components/ui/tabs";
+import { ScrollArea } from "@/src/app/components/ui/scroll-area";
+import { formatDistanceToNow } from 'date-fns';
+import { Skeleton } from "@/src/app/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
 import Image from "next/image";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 import { CldImage } from "next-cloudinary";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
 import { useToast } from "@/src/app/components/ui/use-toast";
 import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 import useSocket, { MessageType } from "@/src/hooks/useSocket";
@@ -34,6 +39,7 @@ interface Participant {
   user: User;
 }
 
+// Utiliza un tipo de índice más amplio para ser compatible con GroupManagementModal
 interface ConversationData {
   id: string;
   name?: string | null;
@@ -46,9 +52,10 @@ interface ConversationData {
   updatedAt?: string;
   unreadCount?: number;
   otherUser?: User;
+  [key: string]: any; // Utiliza 'any' para máxima compatibilidad
 }
 
-export interface Message {
+interface Message {
   id?: string;
   content: string | null;
   createdAt: Date | string;

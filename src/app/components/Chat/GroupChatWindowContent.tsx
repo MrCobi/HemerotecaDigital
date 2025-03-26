@@ -1,6 +1,6 @@
 "use client";
 import * as React from 'react'; 
-import {  useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
@@ -12,8 +12,6 @@ import { API_ROUTES } from '@/src/config/api-routes';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import VoiceMessageRecorder from './VoiceMessageRecorder';
 import { useToast } from '@/src/app/hooks/use-toast';
-import _Image from 'next/image';
-import _CldImage from 'next-cloudinary';
 
 // Reutiliza estos componentes de ChatWindowContent.tsx
 import { MessageItem } from './ChatComponents/ChatComponents';
@@ -60,7 +58,84 @@ type GroupChatWindowContentProps = {
   className?: string;
 };
 
-export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
+const MemoizedMessageItem = memo(MessageItem);
+
+const MessageList = memo(({ 
+  messages, 
+  currentUserId,
+  getMessageSender,
+  session,
+  isLoadingMore,
+  messagesEndRef
+}: { 
+  messages: Message[], 
+  currentUserId: string | undefined,
+  getMessageSender: (senderId: string) => User | null,
+  session: any,
+  isLoadingMore: boolean,
+  messagesEndRef: React.RefObject<HTMLDivElement | null>
+}) => {
+  return (
+    <div className="space-y-4">
+      {isLoadingMore && (
+        <div className="flex justify-center p-2">
+          <LoadingSpinner className="w-5 h-5 text-blue-500" />
+        </div>
+      )}
+      
+      {messages.map((message, index) => {
+        const showAvatar = 
+          index === 0 || 
+          messages[index - 1]?.senderId !== message.senderId;
+        
+        const showDateSeparator = index === 0 || !isSameDay(
+          new Date(message.createdAt), 
+          new Date(messages[index - 1]?.createdAt || Date.now())
+        );
+        
+        const sender = getMessageSender(message.senderId) || {
+          id: message.senderId,
+          name: 'Usuario desconocido',
+          image: null
+        };
+        
+        return (
+          <React.Fragment key={message.id || message.tempId || `${message.senderId}-${new Date(message.createdAt).getTime()}`}>
+            {showDateSeparator && (
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-gray-200" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-white px-2 text-sm text-gray-400">
+                    {new Date(message.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            <MessageItem 
+              message={message}
+              currentUserId={currentUserId || ''}
+              otherUser={sender}
+              showAvatar={showAvatar}
+              showDateSeparator={false} // Ya manejamos los separadores de fecha arriba
+              _index={index}
+              session={session}
+              isGroupChat={true}
+            />
+          </React.Fragment>
+        );
+      })}
+      
+      <div ref={messagesEndRef} />
+    </div>
+  );
+});
+
+MessageList.displayName = 'MessageList';
+
+const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   conversation,
   className,
 }) => {
@@ -71,7 +146,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isVoiceRecorderVisible, setIsVoiceRecorderVisible] = useState(false);
-  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const messagesEndRef = React.useRef<HTMLDivElement | null>(null);
   const chatContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
@@ -154,8 +229,6 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
           senderId: message.senderId,
           createdAt: new Date(message.createdAt),
           status: message.status as 'sending' | 'sent' | 'delivered' | 'read' | 'failed',
-          messageType: message.messageType,
-          mediaUrl: message.mediaUrl,
           conversationId: message.conversationId
         };
         
@@ -289,38 +362,42 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   const processMessages = useCallback((newMessages: Message[]) => {
     if (!newMessages || newMessages.length === 0) return;
     
-    // Filtrar mensajes para incluir solo los que corresponden a esta conversación
-    const filteredMessages = newMessages.filter(msg => {
-      return msg.conversationId === conversation?.id;
-    });
-    
-    setMessages(prev => {
+    setMessages(prevMessages => {
+      // Crear un mapa para deduplicación eficiente
       const messageMap = new Map<string, Message>();
       
-      prev.forEach(msg => {
-        if (msg.id) {
-          messageMap.set(msg.id, msg);
-        } else if (msg.tempId) {
-          messageMap.set(msg.tempId, msg);
+      // Añadir mensajes existentes al mapa
+      prevMessages.forEach(msg => {
+        const key = msg.id || msg.tempId || `${msg.senderId}-${new Date(msg.createdAt).getTime()}`;
+        messageMap.set(key, msg);
+      });
+      
+      // Añadir o actualizar nuevos mensajes
+      newMessages.forEach(msg => {
+        // Verificar que el mensaje pertenece a esta conversación
+        if (msg.conversationId !== conversation?.id) return;
+        
+        const key = msg.id || msg.tempId || `${msg.senderId}-${new Date(msg.createdAt).getTime()}`;
+        
+        // Si ya existe este mensaje (por ID o tempId), actualizar su estado
+        const existingMsg = messageMap.get(key);
+        if (existingMsg) {
+          // Actualizar propiedades manteniendo las existentes
+          messageMap.set(key, { ...existingMsg, ...msg });
+        } else {
+          // Añadir nuevo mensaje
+          messageMap.set(key, msg);
         }
       });
       
-      filteredMessages.forEach(msg => {
-        if (msg.id) {
-          if (msg.tempId && messageMap.has(msg.tempId)) {
-            messageMap.delete(msg.tempId);
-          }
-          messageMap.set(msg.id, msg);
-        } else if (msg.tempId && !messageMap.has(msg.tempId)) {
-          messageMap.set(msg.tempId, msg);
-        }
-      });
-      
-      return Array.from(messageMap.values()).sort((a, b) => {
+      // Convertir el mapa a array y ordenar por fecha
+      const uniqueMessages = Array.from(messageMap.values()).sort((a, b) => {
         const dateA = new Date(a.createdAt);
         const dateB = new Date(b.createdAt);
         return dateA.getTime() - dateB.getTime();
       });
+      
+      return uniqueMessages;
     });
   }, [conversation?.id]);
 
@@ -335,6 +412,13 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     }
   }, []);
 
+  // Actualizar vista cuando cambian los mensajes
+  useEffect(() => {
+    if (messages.length > 0 && !isLoadingMessages && isAtBottom) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [messages.length, isLoadingMessages, isAtBottom, scrollToBottom]);
+
   useEffect(() => {
     if (!socketInstance || !socketInitialized || !conversation?.id) return;
     
@@ -348,7 +432,10 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
         
         const validMessage: Message = {
           ...message,
-          content: message.content || '',
+          content: message.content || '', // Convert null content to empty string
+          createdAt: typeof message.createdAt === 'string' || message.createdAt instanceof Date 
+            ? message.createdAt 
+            : new Date().toISOString(),
           status: message.status as 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
         };
         
@@ -503,8 +590,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       
       console.log(`Cargando mensajes para ${groupId}`);
       
-      const response = await fetch(
-        `${API_ROUTES.messages.groupMessages}?conversationId=${groupId}&page=${nextPage}&limit=${pageSize}&nocache=${Date.now()}`, 
+      const response = await fetch(`${API_ROUTES.messages.groupMessages}?conversationId=${groupId}&page=${nextPage}&limit=${pageSize}&nocache=${Date.now()}`, 
         { 
           method: 'GET',
           headers: { 
@@ -629,145 +715,197 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     }
   };
 
+  // Memoizar el selector de usuarios para evitar cálculos repetidos
+  const getMessageSender = useCallback((senderId: string): User | null => {
+    if (!conversation?.participants) return null;
+    
+    const participant = conversation.participants.find(p => p.userId === senderId);
+    if (!participant) return null;
+    
+    return participant.user;
+  }, [conversation?.participants]);
+
   // Función para enviar mensajes al servidor y guardarlos en la base de datos
   const sendMessageToServer = async (message: Message) => {
     if (!message.conversationId) {
       throw new Error('ID de conversación no especificado');
     }
     
-    try {
-      const requestBody = {
-        content: message.content || '',
-        conversationId: message.conversationId,
-        mediaUrl: message.mediaUrl,
+    const groupId = message.conversationId.startsWith('group_') 
+      ? message.conversationId 
+      : `group_${message.conversationId}`;
+    
+    const response = await fetch(`${API_ROUTES.messages.groupMessages}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: message.content,
+        conversationId: groupId,
         messageType: message.messageType || 'text',
-        tempId: message.tempId || Date.now().toString(),
-        isGroupMessage: true
-      };
+        tempId: message.tempId
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Error al enviar el mensaje');
+    }
+    
+    const sentMessage = await response.json();
+    
+    const finalMessage: Message = {
+      ...sentMessage,
+      tempId: message.tempId,
+      status: 'sent',
+      messageType: sentMessage.messageType as 'text' | 'image' | 'voice' | 'file' | 'video'
+    };
+    
+    processMessages([finalMessage]);
+    
+    if (socketInstance && socketInitialized) {
+      const socketMessage = {
+        ...finalMessage,
+        id: finalMessage.id || finalMessage.tempId,
+        isGroupMessage: true,
+      } as MessageType & { isGroupMessage: boolean };
       
-      console.log("Enviando mensaje al servidor:", requestBody);
-      
-      const response = await fetch(`${API_ROUTES.messages.groupMessages}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al guardar el mensaje en la base de datos');
-      }
-      
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error al enviar mensaje al servidor:', error);
-      throw error;
+      console.log('Emitiendo mensaje por socket:', socketMessage);
+      socketInstance.emit('send_message', socketMessage);
+    }
+    
+    if (isAtBottom) {
+      setTimeout(scrollToBottom, 100);
     }
   };
 
-  // Manejar envío de mensajes
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || isSending || !conversation || !currentUserId) return;
+  // Memoizar el mensaje de estado de los usuarios escribiendo
+  const typingMessage = useMemo(() => {
+    if (typingUsers.length === 0) return null;
     
+    if (typingUsers.length === 1) {
+      return `${typingUsers[0]} está escribiendo...`;
+    } else if (typingUsers.length === 2) {
+      return `${typingUsers[0]} y ${typingUsers[1]} están escribiendo...`;
+    } else {
+      return 'Varias personas están escribiendo...';
+    }
+  }, [typingUsers]);
+
+  // Función para enviar un mensaje con memoización
+  const handleSendMessage = useCallback(async () => {
+    if (!newMessage.trim() && !isVoiceRecorderVisible) return;
+    
+    const trimmedMessage = newMessage.trim();
+    if (!trimmedMessage.length && !isVoiceRecorderVisible) {
+      return;
+    }
+    
+    setNewMessage('');
+    
+    if (isVoiceRecorderVisible) {
+      setIsVoiceRecorderVisible(false);
+      return; // La grabación de voz maneja su propio envío
+    }
+    
+    // Crear un ID temporal para seguimiento optimista
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    setIsSending(true);
     
     const tempMessage: Message = {
       tempId,
-      content: newMessage.trim(),
+      content: trimmedMessage,
       senderId: currentUserId || '',
       createdAt: new Date(),
       status: 'sending',
-      conversationId: conversation.id,
+      conversationId: conversation?.id,
       messageType: 'text'
     };
     
+    // Añadir mensaje optimista para UI inmediata
     processMessages([tempMessage]);
-    
-    setNewMessage('');
     
     try {
       setIsSending(true);
       
-      const groupId = conversation.id.startsWith('group_') 
-        ? conversation.id 
-        : `group_${conversation.id}`;
-      
-      const response = await fetch(`${API_ROUTES.messages.groupMessages}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: tempMessage.content,
-          conversationId: groupId,
-          messageType: 'text',
-          tempId
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al enviar el mensaje');
+      // Notificar que el usuario ha dejado de escribir
+      if (socketInstance && conversation?.id) {
+        socketUpdateTypingStatus({
+          conversationId: conversation.id,
+          isTyping: false
+        });
       }
       
-      const sentMessage = await response.json();
+      // Enviar mensaje al servidor
+      await sendMessageToServer(tempMessage);
       
-      const finalMessage: Message = {
-        ...sentMessage,
-        tempId,
-        status: 'sent',
-        messageType: sentMessage.messageType as 'text' | 'image' | 'voice' | 'file' | 'video'
-      };
-      
-      processMessages([finalMessage]);
-      
-      if (socketInstance && socketInitialized) {
-        const socketMessage = {
-          ...finalMessage,
-          id: finalMessage.tempId,
-          isGroupMessage: true,
-        } as MessageType & { isGroupMessage: boolean };
-        
-        console.log('Emitiendo mensaje por socket:', socketMessage);
-        socketInstance.emit('send_message', socketMessage);
-      }
-      
-      if (isAtBottom) {
-        setTimeout(scrollToBottom, 100);
+      // Limpiar campo y estado
+      if (messageInputRef.current) {
+        messageInputRef.current.focus();
       }
     } catch (error) {
-      console.error("Error al enviar mensaje:", error);
-      
-      const errorMessage: Message = {
-        ...tempMessage,
-        status: 'failed' as const
-      };
-      
-      processMessages([errorMessage]);
-      
+      console.error('Error al enviar mensaje:', error);
       toast({
-        title: "Error al enviar el mensaje",
-        description: error instanceof Error ? error.message : "Inténtalo de nuevo",
-        variant: "destructive",
+        title: 'Error al enviar mensaje',
+        description: 'Por favor, inténtalo de nuevo',
+        variant: 'destructive'
       });
       
-      setNewMessage(tempMessage.content || '');
+      // Restaurar mensaje en caso de error
+      setNewMessage(trimmedMessage);
     } finally {
       setIsSending(false);
     }
-  };
-  
-  // Función para obtener el remitente de un mensaje basado en el ID
-  const getMessageSender = (senderId: string): User | null => {
-    if (!conversation?.participants) return null;
+  }, [newMessage, isVoiceRecorderVisible, currentUserId, conversation?.id, processMessages, socketInstance, socketUpdateTypingStatus, sendMessageToServer, toast]);
+
+  // Actualizar los timers de typing con useEffect mejorado
+  useEffect(() => {
+    const typingTimers: Record<string, NodeJS.Timeout> = {};
     
-    const participant = conversation.participants.find(p => p.userId === senderId);
-    if (!participant) return null;
+    const cleanupTypingTimers = () => {
+      Object.values(typingTimers).forEach(timer => clearTimeout(timer));
+    };
     
-    const user = conversation.participants.find(u => u.userId === senderId);
-    return user?.user || null;
-  };
+    if (socketInstance && conversation?.id) {
+      // Configurar manejador para actualizaciones de typing
+      const handleTypingStatus = (data: TypingStatusType) => {
+        if (data.conversationId !== conversation.id || data.userId === currentUserId) return;
+        
+        const typingUser = conversation.participants.find(p => p.userId === data.userId);
+        if (!typingUser) return;
+        
+        const userName = typingUser.user.name || typingUser.user.username || 'Usuario';
+        
+        if (data.isTyping) {
+          setTypingUsers(prev => {
+            if (prev.includes(userName)) return prev;
+            return [...prev, userName];
+          });
+          
+          // Establecer un timeout para eliminar el estado de typing después de un tiempo
+          if (typingTimers[data.userId]) {
+            clearTimeout(typingTimers[data.userId]);
+          }
+          
+          typingTimers[data.userId] = setTimeout(() => {
+            setTypingUsers(prev => prev.filter(name => name !== userName));
+          }, 5000);
+        } else {
+          setTypingUsers(prev => prev.filter(name => name !== userName));
+          if (typingTimers[data.userId]) {
+            clearTimeout(typingTimers[data.userId]);
+            delete typingTimers[data.userId];
+          }
+        }
+      };
+      
+      socketInstance.on('typing_status', handleTypingStatus);
+      
+      return () => {
+        socketInstance.off('typing_status', handleTypingStatus);
+        cleanupTypingTimers();
+      };
+    }
+    
+    return cleanupTypingTimers;
+  }, [socketInstance, conversation?.id, conversation?.participants, currentUserId]);
 
   // Render principal del componente
   return (
@@ -780,71 +918,20 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
               <p className="mt-2 text-sm text-gray-500">Cargando mensajes...</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {isLoadingMore && (
-                <div className="flex justify-center p-2">
-                  <LoadingSpinner className="w-5 h-5 text-blue-500" />
-                </div>
-              )}
-              
-              {messages.map((message, index) => {
-                const _isCurrentUser = message.senderId === currentUserId;
-                const showAvatar = 
-                  index === 0 || 
-                  messages[index - 1]?.senderId !== message.senderId;
-                
-                const showDateSeparator = index === 0 || !isSameDay(
-                  new Date(message.createdAt), 
-                  new Date(messages[index - 1]?.createdAt || Date.now())
-                );
-                
-                const sender = getMessageSender(message.senderId) || {
-                  id: message.senderId,
-                  username: 'Usuario',
-                  name: 'Usuario',
-                  image: null
-                };
-                
-                return (
-                  <React.Fragment key={message.id || message.tempId || index}>
-                    <MessageItem 
-                      message={message}
-                      currentUserId={currentUserId || ''}
-                      otherUser={sender}
-                      showAvatar={showAvatar}
-                      showDateSeparator={showDateSeparator}
-                      _index={index}
-                      session={_session ? {
-                        user: {
-                          id: _session.user?.id || '',
-                          name: _session.user?.name || '',
-                          image: _session.user?.image || ''
-                        }
-                      } : {
-                        user: {
-                          id: '',
-                          name: '',
-                          image: ''
-                        }
-                      }}
-                      isGroupChat={true}
-                    />
-                  </React.Fragment>
-                );
-              })}
-              
-              <div ref={messagesEndRef} />
-            </div>
+            <MessageList 
+              messages={messages} 
+              currentUserId={currentUserId} 
+              getMessageSender={getMessageSender} 
+              session={_session}
+              isLoadingMore={isLoadingMore}
+              messagesEndRef={messagesEndRef}
+            />
           )}
         </div>
         
-        {typingUsers.length > 0 && (
+        {typingMessage && (
           <div className="px-4 py-1 text-xs text-gray-500 italic bg-white dark:bg-gray-800">
-            {typingUsers.length === 1 
-              ? `${typingUsers[0]} está escribiendo...` 
-              : typingUsers.length === 2 
-                ? `${typingUsers[0]} y ${typingUsers[1]} están escribiendo...` 
-                : `${typingUsers.length} personas están escribiendo...`}
+            {typingMessage}
           </div>
         )}
         
@@ -938,6 +1025,16 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
                 value={newMessage}
                 onChange={(e) => {
                   setNewMessage(e.target.value);
+                  
+                  // Enviar estado de escritura al servidor (con throttling)
+                  if (socketInstance && conversation?.id && currentUserId) {
+                    const isCurrentlyTyping = e.target.value.length > 0;
+                    
+                    socketUpdateTypingStatus({
+                      conversationId: conversation.id,
+                      isTyping: isCurrentlyTyping
+                    });
+                  }
                 }}
                 placeholder="Escribe un mensaje..."
                 className="min-h-10 max-h-32 resize-none flex-1"
@@ -970,4 +1067,4 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   );
 };
 
-export default GroupChatWindowContent;
+export { GroupChatWindowContent };
