@@ -142,7 +142,7 @@ export default function StarRating({ sourceId }: { sourceId: string }) {
         <div className="flex items-center text-white/90 dark:text-gray-200 text-sm">
           <span className="font-semibold mr-1">{averageRating.toFixed(1)}</span>
           <span>
-            ({totalRatings} {totalRatings === 1 ? "valoración" : "valoraciones"})
+            ({formatRatingCount(totalRatings)} {totalRatings === 1 ? "valoración" : "valoraciones"})
           </span>
         </div>
       </div>
