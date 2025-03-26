@@ -1,12 +1,17 @@
 // src/app/api/messages/group/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { withAuth } from "@/src/lib/auth-utils";
-import { ParticipantRole } from "@prisma/client";
+import { withAuth, AuthParams } from "../../../../lib/auth-utils";
 import crypto from 'crypto';
 
+interface Follow {
+  followerId: string;
+  followingId: string;
+}
+
 // Exportamos la ruta POST con autenticación
-export const POST = withAuth(async (req: any, { userId, user }: { userId: string, user: any }) => {
+export const POST = withAuth(async (req: Request, auth: AuthParams) => {
+  const { userId } = auth;
   try {
     // Convertir a NextRequest para acceder a json
     const request = req as unknown as NextRequest;
@@ -43,7 +48,7 @@ export const POST = withAuth(async (req: any, { userId, user }: { userId: string
     const userFollows = new Set<string>();
     const followsUser = new Set<string>();
     
-    follows.forEach((follow) => {
+    follows.forEach((follow: Follow) => {
       if (follow.followerId === userId) {
         userFollows.add(follow.followingId);
       }
@@ -86,13 +91,13 @@ export const POST = withAuth(async (req: any, { userId, user }: { userId: string
             {
               userId: userId,
               isAdmin: true,
-              role: ParticipantRole.admin
+              role: 'admin'
             },
             // Añadir al resto de participantes como miembros
             ...validParticipants.map((participantId: string) => ({
               userId: participantId,
               isAdmin: false,
-              role: ParticipantRole.member
+              role: 'member'
             }))
           ]
         }
@@ -141,8 +146,8 @@ export const POST = withAuth(async (req: any, { userId, user }: { userId: string
           participantIds: [userId, ...validParticipants],
           sender: {
             id: userId,
-            username: user.username || 'Usuario',
-            image: user.image
+            username: auth.user.username || 'Usuario',
+            image: auth.user.image
           },
           type: 'NEW_GROUP'
         }),

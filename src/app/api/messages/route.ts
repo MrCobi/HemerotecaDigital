@@ -13,8 +13,22 @@ interface User {
   // Add other fields as needed
 }
 
+// Define the message structure for socket notifications
+interface SocketMessage {
+  id: string;
+  content: string | null;
+  senderId: string;
+  senderName?: string | null;
+  senderImage?: string | null;
+  conversationId: string;
+  receiverId?: string;
+  createdAt: Date;
+  messageType?: string;
+  mediaUrl?: string | null;
+}
+
 // Function to notify socket server about new messages
-async function notifySocketServer(message: any) {
+async function notifySocketServer(message: SocketMessage) {
   try {
     const socketUrl = 'http://localhost:3001/webhook/new-message';
     const response = await fetch(socketUrl, {
@@ -66,13 +80,13 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
     }
 
     // Verificar si los usuarios se siguen mutuamente
-    const checkFollows = async (): Promise<boolean> => {
+    const checkFollowsMutual = async (senderId: string, receiverId: string): Promise<boolean> => {
       try {
         // Verificar que el remitente sigue al receptor
         const senderFollowsReceiver = await prisma.follow.findUnique({
           where: {
             followerId_followingId: {
-              followerId: userId,
+              followerId: senderId,
               followingId: receiverId,
             },
           }
@@ -83,7 +97,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
           where: {
             followerId_followingId: {
               followerId: receiverId,
-              followingId: userId,
+              followingId: senderId,
             },
           }
         });
@@ -100,13 +114,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
     };
 
     // Obtener o crear conversación entre usuarios
-    const getOrCreateConversation = async (follow: boolean): Promise<string> => {
-      console.log(`Buscando conversación entre ${userId} y ${receiverId}`);
-      return await getOrCreateConversationBetweenUsers(userId, receiverId, follow);
-    };
-
-    // Verificar si ya existe una conversación entre ambos usuarios
-    const getOrCreateConversationBetweenUsers = async (user1Id: string, user2Id: string, follow: boolean): Promise<string> => {
+    const getOrCreateConversationBetweenUsers = async (user1Id: string, user2Id: string, _follow: boolean): Promise<string> => {
       // Buscar una conversación existente entre los dos usuarios
       const existingConversation = await prisma.conversation.findFirst({
         where: {
@@ -149,7 +157,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
       }
     };
 
-    const mutualFollow = await checkFollows();
+    const mutualFollow = await checkFollowsMutual(userId, receiverId);
     if (!mutualFollow) {
       console.warn(`Advertencia: Los usuarios ${userId} y ${receiverId} no se siguen mutuamente, pero se permitirá el mensaje`);
       // Ya no devolvemos el error 403, permitimos el envío de mensajes temporalmente
@@ -491,17 +499,17 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
 });
 
 // Implementación correcta de GET usando withAuth como wrapper
-export const GET = withAuth(async (req: Request, { userId }: { userId: string }) => {
+export const GET = withAuth(async (request: Request, auth: { userId: string }) => {
   try {
-    const url = new URL(req.url);
+    const url = new URL(request.url);
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '20');
-    let conversationParam = url.searchParams.get('with');
+    const conversationParam = url.searchParams.get('with');
     
     // Calculamos el número de mensajes a omitir (skip)
     const skip = (page - 1) * limit;
     
-    console.log(`GET /api/messages - userId: ${userId}, param with: ${conversationParam}, page: ${page}, limit: ${limit}`);
+    console.log(`GET /api/messages - userId: ${auth.userId}, param with: ${conversationParam}, page: ${page}, limit: ${limit}`);
     
     // Validar que tenemos un parámetro 'with'
     if (!conversationParam || conversationParam.length === 0) {
@@ -535,20 +543,20 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
       console.log(`Identificado como posible ID de usuario: ${conversationId}`);
     }
     
-    console.log(`Buscando si el usuario ${userId} es participante de la conversación ${conversationId}`);
+    console.log(`Buscando si el usuario ${auth.userId} es participante de la conversación ${conversationId}`);
     
     // Verificar si el usuario es participante de esta conversación
     const isParticipant = await prisma.conversationParticipant.findFirst({
       where: {
-        userId: userId,
+        userId: auth.userId,
         conversationId: conversationId
       }
     });
     
-    console.log(`Verificación de participante: usuario ${userId}, conversación ${conversationId}, resultado: ${isParticipant ? 'sí es participante' : 'no es participante'}`);
+    console.log(`Verificación de participante: usuario ${auth.userId}, conversación ${conversationId}, resultado: ${isParticipant ? 'sí es participante' : 'no es participante'}`);
     
     if (!isParticipant) {
-      console.log(`Usuario ${userId} no es participante de la conversación ${conversationId}`);
+      console.log(`Usuario ${auth.userId} no es participante de la conversación ${conversationId}`);
       
       // Si es una solicitud directa de conversación por ID y el usuario no es participante
       if (isDirectConversationId) {
@@ -602,20 +610,20 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
         
         // La conversación existe pero el usuario no es participante,
         // lo añadimos automáticamente a la conversación
-        console.log(`Añadiendo al usuario ${userId} como participante de la conversación existente ${conversationId}`);
+        console.log(`Añadiendo al usuario ${auth.userId} como participante de la conversación existente ${conversationId}`);
         
         try {
           // Añadir al usuario actual como participante
           await prisma.conversationParticipant.create({
             data: {
-              userId: userId,
+              userId: auth.userId,
               conversationId: conversationId,
               isAdmin: false, // No es admin por defecto
               joinedAt: new Date()
             }
           });
           
-          console.log(`Usuario ${userId} añadido correctamente como participante`);
+          console.log(`Usuario ${auth.userId} añadido correctamente como participante`);
           
           // Ahora podemos obtener los mensajes normalmente
           const messages = await fetchMessagesByConversationId(conversationId, skip, limit);
@@ -645,7 +653,7 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
             {
               participants: {
                 some: {
-                  userId: userId
+                  userId: auth.userId
                 }
               }
             },
@@ -670,7 +678,7 @@ export const GET = withAuth(async (req: Request, { userId }: { userId: string })
         );
       } else {
         // No hay conversación entre estos usuarios aún
-        console.log(`No hay conversación entre ${userId} y ${conversationId}`);
+        console.log(`No hay conversación entre ${auth.userId} y ${conversationId}`);
         return new Response(
           JSON.stringify({ messages: [] }),
           { status: 200 }

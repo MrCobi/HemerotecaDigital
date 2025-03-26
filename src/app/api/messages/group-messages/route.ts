@@ -1,6 +1,6 @@
 // src/app/api/messages/group-messages/route.ts
 import prisma from "@/lib/db";
-import { withAuth } from "../../../../lib/auth-utils";
+import { withAuth, AuthParams } from "../../../../lib/auth-utils";
 import fetch from 'node-fetch';
 
 interface User {
@@ -10,8 +10,40 @@ interface User {
   email?: string | null;
 }
 
+interface SocketMessage {
+  id: string;
+  content: string | null;
+  senderId: string;
+  senderName?: string | null;
+  senderImage?: string | null;
+  conversationId: string;
+  createdAt: Date;
+  messageType?: string;
+  mediaUrl?: string | null;
+}
+
+// Definimos el tipo para DirectMessage basado en el modelo Prisma
+interface DirectMessage {
+  id: string;
+  content?: string | null;
+  mediaUrl?: string | null;
+  messageType?: string;
+  senderId: string;
+  receiverId?: string | null;
+  conversationId: string;
+  replyToId?: string | null;
+  read: boolean;
+  createdAt: Date;
+  tempId?: string | null;
+  sender?: {
+    id: string;
+    username?: string | null;
+    image?: string | null;
+  };
+}
+
 // Función para notificar al servidor de sockets sobre nuevos mensajes de grupo
-async function notifySocketServer(message: any) {
+async function notifySocketServer(message: SocketMessage) {
   try {
     const socketUrl = 'http://localhost:3001/webhook/new-message';
     const response = await fetch(socketUrl, {
@@ -37,7 +69,8 @@ async function notifySocketServer(message: any) {
 }
 
 // API endpoint para enviar mensajes a grupos
-export const POST = withAuth(async (request: Request, { userId, user }: { userId: string, user: User }) => {
+export const POST = withAuth(async (request: Request, auth: AuthParams) => {
+  const { userId } = auth;
   try {
     // Validación del cuerpo de la solicitud
     const { content, conversationId, messageType = 'text', mediaUrl, tempId } = await request.json();
@@ -164,7 +197,8 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
 });
 
 // API endpoint para obtener mensajes de un grupo
-export const GET = withAuth(async (request: Request, { userId }: { userId: string, user: User }) => {
+export const GET = withAuth(async (request: Request, auth: AuthParams) => {
+  const { userId } = auth;
   try {
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get('conversationId');
@@ -224,13 +258,13 @@ export const GET = withAuth(async (request: Request, { userId }: { userId: strin
     });
 
     // Marcar mensajes como leídos si son del otro usuario
-    const unreadMessages = messages.filter(msg => 
+    const unreadMessages = messages.filter((msg: DirectMessage) => 
       msg.senderId !== userId && !msg.read
     );
 
     if (unreadMessages.length > 0) {
       await prisma.$transaction(
-        unreadMessages.map(msg => 
+        unreadMessages.map((msg: DirectMessage) => 
           prisma.directMessage.update({
             where: { id: msg.id },
             data: { read: true }
@@ -247,7 +281,7 @@ export const GET = withAuth(async (request: Request, { userId }: { userId: strin
     });
 
     return new Response(JSON.stringify({
-      messages: messages.map(msg => ({
+      messages: messages.map((msg: DirectMessage) => ({
         id: msg.id,
         content: msg.content,
         senderId: msg.senderId,

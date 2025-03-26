@@ -336,7 +336,7 @@ export async function POST(request: NextRequest) {
     try {
       newConversation = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use'>) => {
         // 1. Crear la conversación
-        const conv = await tx.$executeRaw`
+        const _conv = await tx.$executeRaw`
           INSERT INTO conversations (id, is_group, created_at, updated_at)
           VALUES (CONCAT('conv_', UUID()), false, NOW(), NOW())
         `;

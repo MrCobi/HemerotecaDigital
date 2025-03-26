@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { revalidateTag } from "next/cache";
 import { withAuth } from "../../../lib/auth-utils";
-import { Prisma } from "@prisma/client";
 
 // GET para obtener todos los favoritos del usuario
 export const GET = withAuth(async (request: Request, { userId }: { userId: string }) => {
