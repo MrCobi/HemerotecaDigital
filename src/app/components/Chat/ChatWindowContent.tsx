@@ -41,7 +41,7 @@ type ChatWindowContentProps = {
   className?: string;
 };
 
-type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+type _MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 // Componente para mostrar separadores de fecha entre mensajes
 const DateSeparator = ({ date }: { date: Date | string }) => {
@@ -299,7 +299,7 @@ const VoiceMessagePlayer = React.memo(({
       }
       audio.src = '';
     };
-  }, [mediaUrl]);
+  }, [mediaUrl, isPlaying]);
   
   // Efecto separado para manejar la animación de forma independiente
   useEffect(() => {
@@ -559,7 +559,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   const [isAtBottom, setIsAtBottom] = useState(true);
   const _isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
   const [isTyping, setIsTyping] = useState(false);
-  const [peerIsTyping, setPeerIsTyping] = useState(false);
+  const [peerIsTyping, _setPeerIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const [_uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
@@ -579,8 +579,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   
   // Para prevenir solicitudes duplicadas
   const isFetchingRef = useRef(false);
-  
-  // Ref para rastrear cambios de conversación
+  const loadedRef = useRef(false);
   const lastConversationIdRef = useRef<string | null>(null);
   
   // Estado para el socket
@@ -803,7 +802,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   // Función para procesar y deduplicar mensajes
   const processMessages = useCallback((newMessages: Message[] | MessageType[]) => {
     // Evitar procesar mensajes vacíos
-    if (!newMessages || newMessages.length === 0) return messages;
+    if (!newMessages || newMessages.length === 0) return [];
     
     // Clonar el mapa actual para trabajar sobre una copia
     const updatedMap = new Map(messageMap);
@@ -860,9 +859,9 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     // Actualizar el mapa de mensajes (para referencia futura)
     setMessageMap(updatedMap);
     
-    // Aplicar nuevo estado solo si hay cambios
+    // Retornar los mensajes ordenados y filtrados
     return finalMessages;
-  }, [messageMap, currentUserId, otherUser?.id, actualConversationId, safeConversationId, messages]);
+  }, [messageMap, currentUserId, otherUser?.id, actualConversationId, safeConversationId]);
 
   // Actualizar el estado de mensajes cuando cambia el mapa
   React.useEffect(() => {
@@ -918,8 +917,13 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
 
   // Cargar mensajes cuando cambia la conversación o al iniciar
   React.useEffect(() => {
-    // No hacer nada si no hay ID de conversación o ya se están cargando
-    if (!safeConversationId || isFetchingRef.current) return;
+    // No hacer nada si no hay ID de conversación
+    if (!safeConversationId) return;
+
+    // Prevenir recargas innecesarias
+    if (safeConversationId === lastConversationIdRef.current && loadedRef.current) {
+      return;
+    }
     
     // Guardar el ID de conversación actual para detectar cambios
     const currentConversationId = safeConversationId;
@@ -930,6 +934,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       setHasMore(true);
       setMessages([]);
       setMessageMap(new Map());
+      loadedRef.current = false;
       lastConversationIdRef.current = safeConversationId;
     }
     
@@ -1057,13 +1062,15 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
             }
           }
           
-          // Procesar y combinar mensajes evitando duplicados
-          const combinedMessages = [...messages, ...fetchedMessages];
-          const uniqueMessages = processMessages(combinedMessages);
+          // Procesar los mensajes obtenidos
+          const combinedMessages = processMessages(fetchedMessages);
           
-          setMessages(uniqueMessages);
+          setMessages(combinedMessages);
           setHasMore(fetchedMessages.length === pageSize);
           setPage(pageNum);
+
+          // Marcar como cargado para prevenir recargas innecesarias
+          loadedRef.current = true;
         } else {
           console.error('Estructura de datos inesperada:', data);
           throw new Error('El servidor devolvió una estructura de datos inesperada');
@@ -1080,11 +1087,13 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       }
     };
     
-    fetchMessages();
+    if (!loadedRef.current || lastConversationIdRef.current !== safeConversationId) {
+      fetchMessages();
+    }
     
-    // Solo incluir safeConversationId como dependencia para evitar el bucle infinito
-    // Las otras variables las capturamos en el closure
-  }, [safeConversationId, hasMore, pageSize]);
+  // useEffect dependencies estables
+  }, [safeConversationId, pageSize, actualConversationId, currentUserId, 
+      otherUser?.id, leaveConversation, socketInstance, processMessages]);
 
   // Cargar más mensajes
   const _loadMoreMessages = async () => {
@@ -1180,7 +1189,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     return () => {
       socketInstance?.off('new_message', handleNewMessage);
     };
-  }, [socketInstance, safeConversationId, autoScrollEnabled, messages, processMessages]);
+  }, [socketInstance, safeConversationId, autoScrollEnabled, processMessages]);
 
   // Manejador de scroll para detectar si estamos en la parte inferior - versión unificada
   const handleScroll = () => {
@@ -1230,7 +1239,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         }
       }, 3000);
     }
-  }, [isTyping, socketInstance, socketInitialized, otherUser?.id, currentUserId]);
+  }, [isTyping, socketInstance, socketInitialized, otherUser?.id, currentUserId, safeConversationId, socketUpdateTypingStatus]);
 
   // Enviar un mensaje
   const sendMessage = async () => {
@@ -1255,9 +1264,9 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         conversationId: actualConversationId || undefined,
       };
       
-      // Añadir mensaje al estado local usando la función de procesamiento
-      const updatedMessages = processMessages([messageToSend]);
-      setMessages(updatedMessages);
+      // Añadir mensaje al estado local
+      processMessages([messageToSend]);
+      setMessages(prev => [...prev, messageToSend]);
       
       await sendMessageToServer(messageToSend, tempId);
     } catch (error) {
@@ -1363,190 +1372,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
   };
 
   // Actualizar estado de un mensaje
-  const _updateMessageStatus = (messageId: string, newStatus: MessageStatus) => {
-    // Buscar el mensaje en nuestro estado para actualizarlo
-    const messageToUpdate = messages.find(msg => msg.id === messageId || msg.tempId === messageId);
-    
-    // Solo actualizar si encontramos el mensaje
-    if (messageToUpdate) {
-      // Crear una versión actualizada del mensaje con el nuevo estado
-      const updatedMessage: Message = {
-        ...messageToUpdate,
-        status: newStatus
-      };
-      
-      // Procesar la actualización
-      processMessages([updatedMessage]);
-    }
-  };
-
-  // Manejar tecla Enter para enviar
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
-  // Cuando la conversación cambia, restablecer todo
-  React.useEffect(() => {
-    if (safeConversationId) {
-      setMessages([]);
-      setPage(1);
-      setHasMore(true);
-      setErrorLoadingMessages(null);
-      setPeerIsTyping(false);
-      setIsTyping(false);
-      setIsAtBottom(true);
-      
-      // Enfocar el input de mensaje
-      if (messageInputRef.current) {
-        messageInputRef.current.focus();
-      }
-    }
-  }, [safeConversationId]);
-
-  // Enviar estado de "escribiendo"
-  React.useEffect(() => {
-    if (!otherUser?.id || !socketInstance || !socketInitialized || !currentUserId) return;
-    
-    if (isTyping) {
-      socketUpdateTypingStatus({ 
-        conversationId: safeConversationId, 
-        isTyping: true 
-      });
-      
-      // Establecer estado local
-      setIsTyping(true);
-      
-      // Limpiar timeout anterior si existe
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      
-      // Establecer nuevo timeout para detener estado de "escribiendo" después de 3 segundos de inactividad
-      typingTimeoutRef.current = setTimeout(() => {
-        setIsTyping(false);
-        if (socketInstance && socketInitialized && currentUserId) {
-          socketUpdateTypingStatus({ 
-            conversationId: safeConversationId, 
-            isTyping: false 
-          });
-        }
-      }, 3000);
-    }
-    
-    return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-        
-        // Asegurarse de enviar isTyping: false al desmontar
-        socketUpdateTypingStatus({
-          conversationId: safeConversationId,
-          isTyping: false
-        });
-      }
-    };
-  }, [currentUserId, isTyping, otherUser?.id, socketInstance, socketInitialized]);
-
-  // Unir a conversación cuando el socket esté listo
-  React.useEffect(() => {
-    if (socketInitialized && safeConversationId) {
-      console.log(`Uniendo a conversación ${safeConversationId}`);
-      joinConversation(safeConversationId);
-    }
-  }, [socketInitialized, safeConversationId, joinConversation]);
-
-  // Añadir efecto para cargar el conversationId desde localStorage al inicio
-  React.useEffect(() => {
-    if (otherUser?.id && !actualConversationId && !conversationId) {
-      // Intentar cargar de localStorage
-      const savedConversationId = typeof window !== 'undefined' 
-        ? localStorage.getItem(`chat_conv_${otherUser.id}`)
-        : null;
-      
-      if (savedConversationId) {
-        console.log('Cargando conversationId desde localStorage:', savedConversationId);
-        setActualConversationId(savedConversationId);
-      }
-    }
-  }, [otherUser?.id, actualConversationId, conversationId]);
-
-  // Efecto para reconectar el socket automáticamente si se desconecta
-  React.useEffect(() => {
-    if (!connected && currentUserId) {
-      console.log('Socket desconectado, intentando reconectar...');
-      reconnect();
-    }
-  }, [connected, currentUserId, reconnect]);
-
-  // Efecto para notificar al servidor cuando el usuario está activo en la conversación
-  React.useEffect(() => {
-    // Solo ejecutar cuando cambia la conversación o se inicializa el socket
-    if (socketInitialized && safeConversationId) {
-      
-      // Marcar mensajes no leídos como leídos una sola vez cuando se inicia la conversación
-      const unreadMessages = messages.filter(m => 
-        m.senderId === otherUser?.id && 
-        !m.read && 
-        m.id
-      );
-      
-      if (unreadMessages.length > 0) {
-        console.log(`Marcando ${unreadMessages.length} mensajes como leídos`);
-        unreadMessages.forEach(message => {
-          if (message.id) {
-            // Añadir un retraso y verificación adicional de conexión para evitar errores de "socket no conectado"
-            setTimeout(() => {
-              if (socketInitialized && connected) {
-                socketMarkMessageAsRead({
-                  messageId: message.id as string,
-                  conversationId: (message.conversationId || safeConversationId) as string
-                });
-              } else {
-                console.log('Socket no inicializado o conectado. No se pudo marcar como leído:', message.id);
-              }
-            }, 500); // Pequeño retraso para dar tiempo a que el socket se conecte
-          }
-        });
-      }
-    }
-    
-    return () => {
-      if (socketInitialized) {
-        
-      }
-    };
-  }, [socketInitialized, safeConversationId, otherUser?.id, messages, socketMarkMessageAsRead]);
-
-  // Efecto para cargar el ID de conversación real desde localStorage al iniciar (una sola vez)
-  React.useEffect(() => {
-    if (typeof window !== 'undefined' && otherUser?.id && !actualConversationId) {
-      const savedConversationId = localStorage.getItem(`chat_conv_${otherUser.id}`);
-      if (savedConversationId) {
-        console.log(`Recuperando conversationId guardado: ${savedConversationId}`);
-        setActualConversationId(savedConversationId);
-      }
-    }
-  }, [otherUser?.id, actualConversationId]);
-
-  // Nueva función para añadir mensaje local de manera más eficiente
-  const addLocalMessage = React.useCallback((message: Message) => {
-    // Añadir el mensaje al mapa directamente
-    setMessageMap(prev => prev.set(message.id || message.tempId || '', message));
-    
-    // Devolver mensajes actualizados para uso inmediato
-    return Array.from(messageMap.values())
-      .concat([message])
-      .sort((a, b) => {
-        const dateA = new Date(a.createdAt);
-        const dateB = new Date(b.createdAt);
-        return dateA.getTime() - dateB.getTime();
-      });
-  }, [messageMap]);
-
-  // Función para actualizar mensaje local existente
-  const updateLocalMessage = React.useCallback((messageId: string, updates: Partial<Message>) => {
+  const _updateLocalMessage = React.useCallback((messageId: string, updates: Partial<Message>) => {
     setMessageMap(prevMap => {
       const newMap = new Map(prevMap);
       const existingMessage = newMap.get(messageId);
@@ -1648,8 +1474,8 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       };
       
       // Añadir mensaje al estado local
-      const updatedMessages = addLocalMessage(messageToSend);
-      setMessages(updatedMessages);
+      processMessages([messageToSend]);
+      setMessages(prev => [...prev, messageToSend]);
       
       // Enviar mensaje al servidor
       await sendMessageToServer(messageToSend, tempId);
@@ -1670,6 +1496,15 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  // Función para manejar teclas presionadas en el textarea
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enviar mensaje al presionar Enter (sin Shift)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevenir nueva línea
+      sendMessage();
     }
   };
 
