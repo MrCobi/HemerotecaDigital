@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/src/app/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/src/app/components/ui/dialog';
@@ -215,7 +215,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   };
   
   // Función para cargar los posibles participantes (seguidores mutuos)
-  const loadPossibleParticipants = async () => {
+  const loadPossibleParticipants = useCallback(async () => {
     if (!conversationData) return;
     
     try {
@@ -239,7 +239,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
         variant: "destructive",
       });
     }
-  };
+  }, [conversationData, toast]);
   
   // Cargar posibles participantes cuando se abre el modal
   useEffect(() => {
