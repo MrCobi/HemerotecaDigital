@@ -36,7 +36,7 @@ interface ChatWindowProps {
   isOpen: boolean;
   onClose: () => void;
   otherUser: User | null;
-  initialMessages?: Message[];
+  _initialMessages?: Message[];
   conversationId?: string;
 }
 
@@ -44,7 +44,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   isOpen,
   onClose,
   otherUser,
-  initialMessages = [],
+  _initialMessages = [],
   conversationId,
 }) => {
   const { data: session } = useSession();
@@ -53,7 +53,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [canSendMessages, setCanSendMessages] = useState<boolean | null>(null);
-  const [isCheckingRelationship, setIsCheckingRelationship] = useState(false);
+  const [_isCheckingRelationship, setIsCheckingRelationship] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -62,11 +62,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [peerIsTyping, setPeerIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
-
+  
   // Estado para controlar la carga de mensajes
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const [messagesLoaded, setMessagesLoaded] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [_messagesLoaded, setMessagesLoaded] = useState(false);
+  const [_showEmojiPicker, _setShowEmojiPicker] = useState(false);
 
   // Socket.io integration
   const {
@@ -655,7 +655,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   // Función para desplazarse al final del chat
-  const scrollToBottom = () => {
+  const _scrollToBottom = () => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
@@ -672,7 +672,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   // Cargar mensajes de la conversación cuando cambia la conversación o se abre la ventana
   // Usamos useCallback para evitar recrear esta función y causar efectos secundarios
-  const loadConversationMessages = useCallback(async () => {
+  const _loadConversationMessages = useCallback(async () => {
     if (!otherUser?.id || !currentUserId) return;
     
     setIsLoadingMessages(true);
@@ -783,7 +783,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   }, [otherUser?.id, currentUserId, hasMoreMessages, isLoadingMessages, messages]);
 
   // Función para manejar la carga de mensajes al hacer scroll hacia arriba
-  const handleLoadMore = () => {
+  const _handleLoadMore = () => {
     if (!isLoadingMessages && hasMoreMessages) {
       loadHistoricalMessages();
     }

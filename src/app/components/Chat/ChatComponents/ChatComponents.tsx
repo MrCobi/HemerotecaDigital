@@ -359,7 +359,7 @@ export const VoiceMessagePlayer = React.memo(({
       }
       audio.src = '';
     };
-  }, [mediaUrl]);
+  }, [mediaUrl, isPlaying]);
   
   // Efecto separado para manejar la animación de forma independiente
   useEffect(() => {
