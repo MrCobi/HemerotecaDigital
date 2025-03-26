@@ -1,22 +1,20 @@
 // src/app/messages/page.tsx
 "use client";
 import { useEffect, useState, useRef, useMemo, useCallback, useContext } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { ChatWindowContent } from "@/src/app/components/Chat/ChatWindowContent";
 import GroupChatWindowContent from "@/src/app/components/Chat/GroupChatWindowContent";
 import GroupManagementModal from '../components/Chat/GroupManagementModal';
-import { MessageCircle, Search, MessageSquare, MessageSquarePlus, ArrowLeft, Users, Plus, X, Check, ImagePlus, Settings, Trash, LogOut } from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback } from "@/src/app/components/ui/avatar";
+import { MessageCircle, Search, MessageSquare, MessageSquarePlus, ArrowLeft, Users, Plus, X, Check, ImagePlus, Settings } from "lucide-react";
+import { Avatar } from "@/src/app/components/ui/avatar";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
-import { Textarea } from "@/src/app/components/ui/textarea";
-import { Label } from "@/src/app/components/ui/label";
 import Image from "next/image";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 import { CldImage } from "next-cloudinary";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/src/app/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
 import { useToast } from "@/src/app/components/ui/use-toast";
 import { UnreadMessagesContext } from "@/src/app/contexts/UnreadMessagesContext";
 import useSocket, { MessageType } from "@/src/hooks/useSocket";
@@ -2377,10 +2375,16 @@ export default function MessagesPage() {
                   <div className="relative">
                     <div className={`h-24 w-24 rounded-full flex items-center justify-center overflow-hidden border-2 ${groupImagePreview ? 'border-blue-500' : 'border-gray-300 border-dashed'}`}>
                       {groupImagePreview ? (
-                        <img 
+                        <Image 
                           src={groupImagePreview} 
                           alt="Vista previa" 
+                          width={96} 
+                          height={96}
                           className="h-full w-full object-cover"
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
                         />
                       ) : (
                         <div className="text-gray-400 flex flex-col items-center justify-center">

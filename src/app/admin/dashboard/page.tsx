@@ -1,13 +1,9 @@
 "use client";
 
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import prisma from "@/lib/db";
 import { useEffect, useState } from "react";
 
 export default function AdminDashboard() {
-  const [session, setSession] = useState<any>(null);
   const [stats, setStats] = useState<{
     userCount: number;
     sourceCount: number;
@@ -43,8 +39,6 @@ export default function AdminDashboard() {
           window.location.href = '/acceso-denegado';
           return;
         }
-        
-        setSession(sessionData);
         
         // Fetch dashboard stats from an API endpoint
         const statsRes = await fetch('/api/admin/stats');

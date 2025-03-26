@@ -1,6 +1,5 @@
 // src/app/api/messages/group-messages/route.ts
 import prisma from "@/lib/db";
-import { messageEvents } from "../sse-messages/message-event-manager";
 import { withAuth } from "../../../../lib/auth-utils";
 import fetch from 'node-fetch';
 

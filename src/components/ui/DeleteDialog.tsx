@@ -30,7 +30,6 @@ interface DeleteDialogProps {
 }
 
 export default function DeleteDialog({
-  entityId,
   entityName,
   entityType = "el elemento",
   title,

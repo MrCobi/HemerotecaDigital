@@ -1,9 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import RatingsTable from "./RatingsTable";
-import ActionButton from "../components/ActionButton";
 import { useEffect, useState } from "react";
 
 export default function RatingsPage() {

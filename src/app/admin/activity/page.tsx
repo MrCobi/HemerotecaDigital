@@ -1,10 +1,9 @@
 "use client";
 
 import ActivityTable from "./ActivityTable";
-import { ActivityItem, User } from "./types";
+import { ActivityItem } from "./types";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 
 // Quitamos la exportación de metadata ya que no es compatible con componentes cliente
 // La metadata debe ir en un archivo separado como metadata.ts en la misma carpeta

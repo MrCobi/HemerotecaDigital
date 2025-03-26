@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useSession, signOut, signIn } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import { CldImage } from 'next-cloudinary';
 import { toast } from "sonner";
@@ -11,16 +11,14 @@ import {
   ArrowLeft,
   Camera,
   Loader2,
-  User as UserIcon,
   CheckCircle2,
-  Key,
   AlertCircle,
   Save,
 } from "lucide-react";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
 import { Label } from "@/src/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/src/app/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/app/components/ui/card";
 import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
 import { Textarea } from "@/src/app/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/app/components/ui/tabs";

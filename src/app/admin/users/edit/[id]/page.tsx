@@ -9,7 +9,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/src/app/
 import { Input } from "@/src/app/components/ui/input";
 import { Label } from "@/src/app/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/app/components/ui/select";
-import { Loader2, ArrowLeft, Save, ImageIcon } from "lucide-react";
+import { Loader2, ArrowLeft, Save } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
 import { toast } from "sonner";
 

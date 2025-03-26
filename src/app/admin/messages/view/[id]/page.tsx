@@ -6,7 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
-import { ArrowLeft, CheckCircle, Trash2, User, Users } from "lucide-react";
+import { ArrowLeft, CheckCircle, Trash2, Users } from "lucide-react";
 import { Button } from "@/src/app/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
 import { toast } from "sonner";
