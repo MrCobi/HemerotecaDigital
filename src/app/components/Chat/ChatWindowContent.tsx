@@ -920,7 +920,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     // No hacer nada si no hay ID de conversación
     if (!safeConversationId) return;
 
-    // Prevenir recargas innecesarias
+    // Prevenir recargas innecesarias con referencia estable
     if (safeConversationId === lastConversationIdRef.current && loadedRef.current) {
       return;
     }
@@ -937,6 +937,44 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       loadedRef.current = false;
       lastConversationIdRef.current = safeConversationId;
     }
+    
+    // Helper para manejar cuando no se encuentra la conversación
+    const handleConversationNotFound = () => {
+      // Limpiar la referencia en localStorage
+      if (typeof window !== 'undefined' && otherUser?.id) {
+        const storageKey = `chat_conv_${otherUser.id}`;
+        if (localStorage.getItem(storageKey)) {
+          console.log(`Eliminando referencia a conversación eliminada: ${actualConversationId}`);
+          localStorage.removeItem(storageKey);
+        }
+      }
+      
+      // Liberar recursos del socket si existe una conversación real
+      if (actualConversationId && socketInstance) {
+        console.log(`Saliendo de la sala de conversación: ${actualConversationId}`);
+        leaveConversation(actualConversationId);
+      }
+      
+      // Mostrar mensaje amigable
+      setErrorLoadingMessages('Esta conversación ya no existe. Por favor, vuelve a la lista de mensajes e inicia una nueva conversación.');
+      setMessages([]);
+    };
+    
+    // Construir parámetro "with" para API
+    const getWithParam = () => {
+      if (actualConversationId) {
+        // No modificar IDs que ya tengan prefijos
+        if (actualConversationId.startsWith('conv_') || actualConversationId.startsWith('group_')) {
+          return actualConversationId;
+        } else {
+          // Para IDs sin prefijo, añadir el prefijo 'conv_'
+          return `conv_${actualConversationId}`;
+        }
+      } else {
+        // Si no hay ID de conversación, usar ID del usuario
+        return safeConversationId;
+      }
+    };
     
     // Función para obtener mensajes
     const fetchMessages = async (pageNum = 1) => {
@@ -959,25 +997,9 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           throw new Error('Faltan datos necesarios para cargar mensajes');
         }
         
-        // Definir el parámetro 'with'
-        let withParam: string;
-        
-        // Si tenemos un ID de conversación real, añadimos el prefijo adecuado
-        if (actualConversationId) {
-          // No modificar IDs que ya tengan prefijos
-          if (actualConversationId.startsWith('conv_') || actualConversationId.startsWith('group_')) {
-            withParam = actualConversationId;
-          } else {
-            // Para IDs sin prefijo, añadir el prefijo 'conv_'
-            withParam = `conv_${actualConversationId}`;
-          }
-          console.log(`Consultando mensajes con ID de conversación: ${withParam}`);
-        } 
-        // Si no, usamos el ID del otro usuario directamente
-        else {
-          withParam = safeConversationId;
-          console.log(`Consultando mensajes con ID de usuario: ${withParam}`);
-        }
+        // Construir el parámetro 'with'
+        const withParam = getWithParam();
+        console.log(`Consultando mensajes con ID: ${withParam}`);
         
         const response = await fetch(
           `${API_ROUTES.messages.list}?with=${withParam}&page=${pageNum}&limit=${pageSize}&t=${Date.now()}`, 
@@ -990,26 +1012,7 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         // Si la respuesta indica que la conversación no existe (404)
         if (response.status === 404) {
           console.log('La conversación ya no existe en la base de datos');
-          
-          // Limpiar la referencia en localStorage
-          if (typeof window !== 'undefined' && otherUser?.id) {
-            const storageKey = `chat_conv_${otherUser.id}`;
-            if (localStorage.getItem(storageKey)) {
-              console.log(`Eliminando referencia a conversación eliminada: ${actualConversationId}`);
-              localStorage.removeItem(storageKey);
-            }
-          }
-          
-          // Liberar recursos del socket si existe una conversación real
-          if (actualConversationId && socketInstance) {
-            console.log(`Saliendo de la sala de conversación: ${actualConversationId}`);
-            leaveConversation(actualConversationId);
-          }
-          
-          // Mostrar mensaje amigable
-          setErrorLoadingMessages('Esta conversación ya no existe. Por favor, vuelve a la lista de mensajes e inicia una nueva conversación.');
-          setMessages([]);
-          
+          handleConversationNotFound();
           isFetchingRef.current = false;
           setIsLoadingMessages(false);
           return;
@@ -1063,12 +1066,12 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
           }
           
           // Procesar los mensajes obtenidos
-          const combinedMessages = processMessages(fetchedMessages);
+          const processedMessages = processMessages(fetchedMessages);
           
-          setMessages(combinedMessages);
+          setMessages(processedMessages);
           setHasMore(fetchedMessages.length === pageSize);
           setPage(pageNum);
-
+          
           // Marcar como cargado para prevenir recargas innecesarias
           loadedRef.current = true;
         } else {
@@ -1080,20 +1083,31 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         console.error('Error al cargar los mensajes:', error);
         setErrorLoadingMessages('No se pudieron cargar los mensajes. Inténtalo de nuevo.');
       } finally {
-        if (pageNum === 1 || !hasMore) {
-          setIsLoadingMessages(false);
-        }
+        setIsLoadingMessages(false);
         isFetchingRef.current = false;
       }
     };
     
+    // Solo cargar mensajes si no están ya cargados o si cambió la conversación
     if (!loadedRef.current || lastConversationIdRef.current !== safeConversationId) {
       fetchMessages();
     }
     
-  // useEffect dependencies estables
-  }, [safeConversationId, pageSize, actualConversationId, currentUserId, 
-      otherUser?.id, leaveConversation, socketInstance, processMessages]);
+    // Cleanup
+    return () => {
+      // Cleanup lógico para prevenir actualizaciones de estado en componentes desmontados
+    };
+    
+  }, [
+    safeConversationId, 
+    pageSize, 
+    actualConversationId, 
+    currentUserId, 
+    otherUser?.id, 
+    leaveConversation, 
+    socketInstance, 
+    processMessages
+  ]);
 
   // Cargar más mensajes
   const _loadMoreMessages = async () => {
