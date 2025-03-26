@@ -280,7 +280,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
                 <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setFavoriteToDelete(null)}>Cancelar</AlertDialogCancel>
                   <AlertDialogAction 
-                    onClick={(e) => {
+                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                       e.preventDefault();
                       handleDelete(favorite.id);
                     }}
@@ -299,7 +299,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
         );
       }
     }
-  ], [isDeleteDialogOpen, favoriteToDelete, categoryFilter, isDeleting]);
+  ], [isDeleteDialogOpen, favoriteToDelete, categoryFilter, isDeleting, handleDelete, uniqueCategories]);
 
   return (
     <div className="space-y-4">

@@ -302,7 +302,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
         },
       },
     ],
-    [isDeleting, handleDeleteComment]
+    [handleDeleteComment]
   );
 
   return (
