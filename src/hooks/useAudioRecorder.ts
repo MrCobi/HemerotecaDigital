@@ -128,7 +128,7 @@ export default function useAudioRecorder(): UseAudioRecorderReturn {
             console.log(`MediaRecorder iniciado con formato: ${mimeType || 'predeterminado'}`);
             break;
           }
-        } catch (e) {
+        } catch {
           console.log(`Formato ${mimeType} no soportado, probando siguiente...`);
         }
       }

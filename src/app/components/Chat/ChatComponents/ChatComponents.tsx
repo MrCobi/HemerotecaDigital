@@ -1,10 +1,9 @@
 "use client";
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
+import { Avatar } from '@/src/app/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { Play, Pause, SkipForward, SkipBack } from 'lucide-react';
+import { Play, Pause } from 'lucide-react';
 import Image from 'next/image';
 import { CldImage } from 'next-cloudinary';
 import * as React from 'react';

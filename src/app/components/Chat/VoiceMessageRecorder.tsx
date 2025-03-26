@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
+import { useState, useCallback, useMemo, useRef, memo } from 'react';
 import useAudioRecorder from '../../../hooks/useAudioRecorder';
 import { Send, Mic, Trash2, X, AlertCircle } from 'lucide-react';
 import { Session } from 'next-auth';
