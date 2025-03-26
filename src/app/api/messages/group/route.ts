@@ -91,13 +91,13 @@ export const POST = withAuth(async (req: Request, auth: AuthParams) => {
             {
               userId: userId,
               isAdmin: true,
-              role: 'admin'
+              role: 'admin' as const
             },
             // Añadir al resto de participantes como miembros
             ...validParticipants.map((participantId: string) => ({
               userId: participantId,
               isAdmin: false,
-              role: 'member'
+              role: 'member' as const
             }))
           ]
         }
@@ -115,7 +115,24 @@ export const POST = withAuth(async (req: Request, auth: AuthParams) => {
           }
         }
       }
-    });
+    }) as {
+      id: string;
+      name: string | null;
+      description: string | null;
+      imageUrl: string | null;
+      isGroup: boolean;
+      createdAt: Date;
+      updatedAt: Date;
+      creatorId: string | null;
+      participants: {
+        user: {
+          id: string;
+          username: string | null;
+          image: string | null;
+        };
+        role: string;
+      }[];
+    };
 
     // Formatear la respuesta
     const formattedGroup = {
@@ -124,12 +141,12 @@ export const POST = withAuth(async (req: Request, auth: AuthParams) => {
       description: group.description,
       imageUrl: group.imageUrl,
       isGroup: group.isGroup,
-      participants: group.participants.map((p: any) => ({
+      participants: group.participants ? group.participants.map((p: { user: { id: string; username?: string | null; image?: string | null; }; role: string; }) => ({
         id: p.user.id,
         username: p.user.username,
         image: p.user.image,
         role: p.role
-      }))
+      })) : []
     };
 
     // También intentar notificar por websocket si está disponible

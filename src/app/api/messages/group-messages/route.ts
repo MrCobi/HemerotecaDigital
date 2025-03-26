@@ -3,13 +3,6 @@ import prisma from "@/lib/db";
 import { withAuth, AuthParams } from "../../../../lib/auth-utils";
 import fetch from 'node-fetch';
 
-interface User {
-  id: string;
-  username?: string | null;
-  image?: string | null;
-  email?: string | null;
-}
-
 interface SocketMessage {
   id: string;
   content: string | null;

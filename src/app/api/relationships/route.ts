@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../lib/auth-utils";
-import { User } from "@prisma/client";
+import { User, Prisma } from "@prisma/client";
 
 // POST para seguir a un usuario
 export const POST = withAuth(async (req: Request, { userId, user: _user }: { userId: string, user: User }) => {
@@ -63,15 +63,16 @@ export const POST = withAuth(async (req: Request, { userId, user: _user }: { use
     // Registrar la actividad de "follow"
     await prisma.activityHistory.create({
       data: {
-        userId: userId,
+        user: {
+          connect: { id: userId }
+        },
         type: "follow",
-        sourceName: null,
-        targetName: followingUser.username || followingUser.name || "",
         targetId: followingId,
+        targetName: followingUser.username || followingUser.name || "",
         targetType: "user",
         details: `Comenzaste a seguir a ${followingUser.username || followingUser.name || ""}`,
         createdAt: new Date()
-      } as any
+      }
     });
 
     // Revalidar caché
@@ -180,15 +181,16 @@ export const DELETE = withAuth(async (req: Request, { userId, user: _user }: { u
     // Registrar la actividad de "unfollow"
     await prisma.activityHistory.create({
       data: {
-        userId: userId,
+        user: {
+          connect: { id: userId }
+        },
         type: "unfollow",
-        sourceName: null,
-        targetName: userExists.username || userExists.name || "",
         targetId: targetUserId,
+        targetName: userExists.username || userExists.name || "",
         targetType: "user",
         details: `Dejaste de seguir a ${userExists.username || userExists.name || ""}`,
         createdAt: new Date()
-      } as any
+      }
     });
 
     // Revalidar caché

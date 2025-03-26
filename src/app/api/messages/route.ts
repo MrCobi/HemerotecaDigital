@@ -21,8 +21,8 @@ interface SocketMessage {
   senderName?: string | null;
   senderImage?: string | null;
   conversationId: string;
-  receiverId?: string;
-  createdAt: Date;
+  receiverId?: string | null;
+  createdAt: Date | string;
   messageType?: string;
   mediaUrl?: string | null;
 }
@@ -114,7 +114,7 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
     };
 
     // Obtener o crear conversación entre usuarios
-    const getOrCreateConversationBetweenUsers = async (user1Id: string, user2Id: string, _follow: boolean): Promise<string> => {
+    const _getOrCreateConversationBetweenUsers = async (user1Id: string, user2Id: string, _follow: boolean): Promise<string> => {
       // Buscar una conversación existente entre los dos usuarios
       const existingConversation = await prisma.conversation.findFirst({
         where: {
@@ -324,25 +324,38 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
         // Si ocurre un error al crear, puede ser debido a una condición de carrera
         // Intentar buscar nuevamente el mensaje
         console.error("Error al crear mensaje, verificando si ya existe:", error);
-        const whereConditions: any[] = [
-          { 
+        
+        // Buscar por los criterios principales o por tempId si existe
+        const orConditions = [];
+        
+        // Criterio principal: senderId, receiverId, content reciente
+        if (userId && receiverId && existingConversationId) {
+          orConditions.push({
             AND: [
               { senderId: userId },
               { receiverId: receiverId },
-              { content: content },
+              { conversationId: existingConversationId },
               { createdAt: { gt: new Date(Date.now() - 60000) } }
             ]
-          }
-        ];
+          });
+        }
         
-        // Añadir condición de tempId solo si existe
+        // Criterio alternativo: por tempId si existe
         if (tempId) {
-          whereConditions.push({ tempId });
+          orConditions.push({ tempId });
+        }
+        
+        // Si no hay criterios válidos, usar un fallback para evitar errores
+        if (orConditions.length === 0) {
+          orConditions.push({
+            senderId: userId,
+            createdAt: { gt: new Date(Date.now() - 300000) }  // 5 minutos
+          });
         }
         
         const possibleDuplicate = await prisma.directMessage.findFirst({
           where: {
-            OR: whereConditions
+            OR: orConditions
           }
         });
         
@@ -819,7 +832,7 @@ async function getMessagesForConversation(conversationId: string, skip: number, 
     }
     
     // Las fechas en formato ISO para que se serialicen correctamente
-    const serializedMessages = messages.map((msg: any) => ({
+    const serializedMessages = messages.map((msg: { createdAt: Date | string; [key: string]: any }) => ({
       ...msg,
       createdAt: msg.createdAt instanceof Date ? msg.createdAt.toISOString() : msg.createdAt
     }));

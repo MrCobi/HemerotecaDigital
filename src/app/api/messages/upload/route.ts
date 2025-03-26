@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const resourceType = file.type.startsWith('audio/') ? 'video' : 'image';
     
     // Subir a Cloudinary
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _reject) => {
       // Stream a Cloudinary
       const uploadOptions = {
         public_id: `groups/${filename}`,
