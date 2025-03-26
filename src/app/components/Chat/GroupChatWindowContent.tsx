@@ -1,15 +1,12 @@
 "use client";
 import * as React from 'react'; // Fix React import
-import { useEffect, useRef, useState, useCallback } from 'react';
+import {  useState  } from 'react';
 import { useSession } from 'next-auth/react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { Send, X, Mic, MessageSquare } from 'lucide-react';
+import { Send, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, isToday, isYesterday, isSameDay } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { flushSync } from 'react-dom';
+import { isSameDay } from 'date-fns';
 import useSocket, { MessageType, TypingStatusType, ReadReceiptType } from '@/src/hooks/useSocket';
 import { API_ROUTES } from '@/src/config/api-routes';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';

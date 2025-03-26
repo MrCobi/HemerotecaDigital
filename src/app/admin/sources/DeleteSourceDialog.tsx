@@ -42,7 +42,7 @@ export default function DeleteSourceDialog({
   };
 
   return (
-    <AlertDialog open={isOpen} onOpenChange={(open) => !isDeleting && setIsOpen(open)}>
+    <AlertDialog open={isOpen} onOpenChange={({ open }: { open: boolean }) => !isDeleting && setIsOpen(open)}>
       <AlertDialogTrigger asChild>
         <Button
           variant="destructive"
@@ -57,7 +57,7 @@ export default function DeleteSourceDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
           <AlertDialogDescription>
-            Esta acción eliminará la fuente <strong>"{sourceName}"</strong> y no se puede deshacer.
+            Esta acción eliminará la fuente <strong>&quot;{sourceName}&quot;</strong> y no se puede deshacer.
             Todos los comentarios, valoraciones y favoritos asociados a esta fuente también serán eliminados.
           </AlertDialogDescription>
         </AlertDialogHeader>

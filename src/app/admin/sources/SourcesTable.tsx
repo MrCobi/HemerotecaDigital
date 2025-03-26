@@ -265,7 +265,7 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
         )
       }
     ],
-    [categoryFilter, uniqueCategories]
+    [categoryFilter, uniqueCategories, handleDeleteSource]
   );
 
   return (

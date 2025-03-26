@@ -245,11 +245,11 @@ export default function CreateUserPage() {
                 <div className="mb-6">
                   <CldUploadWidget
                     uploadPreset="hemeroteca_users"
-                    onSuccess={(result: any) => {
+                    onSuccess={(result: { info: { secure_url: string } }) => {
                       setImageUrl(result.info.secure_url);
                     }}
                   >
-                    {({ open }) => (
+                    {({ open }: { open: () => void }) => (
                       <Button
                         type="button"
                         variant="outline"
