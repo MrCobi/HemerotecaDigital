@@ -75,9 +75,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   const chatContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const _typingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-  const typingTimersRef = React.useRef<Record<string, NodeJS.Timeout>>({});
-  const [isTyping, setIsTyping] = useState(false);
+  const [isTyping, _setIsTyping] = useState(false);
   const messageInputRef = React.useRef<HTMLTextAreaElement>(null);
   
   // Estado para controlar la carga de mensajes
@@ -265,62 +263,25 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   useEffect(() => {
     if (!socketInitialized || !conversation?.id || !currentUserId) return;
     
-    let typingTimer: NodeJS.Timeout | null = null;
-    
-    const handleKeyDown = () => {
-      // Evitar enviar muchas actualizaciones seguidas
-      if (!isTyping) {
-        socketUpdateTypingStatus({
-          conversationId: conversation.id,
+    const updateTypingStatus = () => {
+      if (isTyping) {
+        socketUpdateTypingStatus({ 
+          conversationId: conversation.id, 
           isTyping: true
         });
-        
-        // Establecer estado local
-        setIsTyping(true);
-        
-        // Limpiar temporizador anterior si existe
-        if (typingTimer) {
-          clearTimeout(typingTimer);
-        }
-        
-        // Configurar temporizador para detener estado de escritura
-        typingTimer = setTimeout(() => {
-          socketUpdateTypingStatus({
-            conversationId: conversation.id,
-            isTyping: false
-          });
-          setIsTyping(false);
-        }, 2000);
       }
     };
     
-    // Agregar event listener al input de mensaje
-    const messageInput = messageInputRef.current;
-    if (messageInput) {
-      messageInput.addEventListener('keydown', handleKeyDown);
-    }
+    updateTypingStatus();
     
     return () => {
-      if (messageInput) {
-        messageInput.removeEventListener('keydown', handleKeyDown);
-      }
-      
-      if (typingTimer) {
-        clearTimeout(typingTimer);
-        
-        // Asegurarse de enviar isTyping: false al desmontar
-        socketUpdateTypingStatus({
-          conversationId: conversation.id,
+      // Al desmontar, actualizar el estado de "no escribiendo"
+      if (socketInitialized && isTyping) {
+        socketUpdateTypingStatus({ 
+          conversationId: conversation.id, 
           isTyping: false
         });
       }
-      
-      // Limpiar todos los temporizadores de escritura
-      const currentTimers = { ...typingTimersRef.current };
-      Object.keys(currentTimers).forEach(userId => {
-        clearTimeout(currentTimers[userId]);
-        delete typingTimersRef.current[userId];
-      });
     };
   }, [socketInitialized, conversation?.id, currentUserId, isTyping, socketUpdateTypingStatus]);
 
@@ -364,7 +325,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   }, [conversation?.id]);
 
   // Función para hacer scroll al final de los mensajes
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
       setIsAtBottom(true);
@@ -372,7 +333,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
       setIsAtBottom(true);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!socketInstance || !socketInitialized || !conversation?.id) return;
@@ -491,7 +452,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       isFetchingRef.current = false;
       setIsLoadingMessages(false);
     }
-  }, [pageSize, processMessages, setErrorLoadingMessages, setHasMore, setIsLoadingMessages, setMessages, setPage]);
+  }, [pageSize, processMessages, setErrorLoadingMessages, setHasMore, setIsLoadingMessages, setPage]);
 
   // Un efecto para cargar los mensajes iniciales cuando cambia la conversación
   useEffect(() => {
@@ -658,7 +619,7 @@ export const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
       socketInstance.off('new_message', handleNewMessage);
       socketInstance.off('new_group_message', handleNewMessage);
     };
-  }, [socketInstance, conversation?.id, autoScrollEnabled, currentUserId, processMessages, isAtBottom]);
+  }, [socketInstance, conversation?.id, autoScrollEnabled, currentUserId, processMessages, isAtBottom, scrollToBottom]);
 
   const handleScroll = () => {
     const element = chatContainerRef.current;
