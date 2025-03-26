@@ -274,7 +274,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       return <span className="text-muted-foreground text-sm italic">Sin contenido</span>;
     }
 
-    let contentPreview = message.content || "";
+    const contentPreview = message.content || "";
     
     if (message.mediaUrl) {
       switch (message.messageType) {
@@ -607,7 +607,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
     },
-  ], [isDeleteDialogOpen, messageToDelete, isDeleting, isMarkingAsRead, filterType]);
+  ], [isDeleteDialogOpen, messageToDelete, isDeleting, isMarkingAsRead, filterType, filterElement, handleDelete]);
 
   return (
     <div className="space-y-4">

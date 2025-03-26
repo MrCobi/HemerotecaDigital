@@ -41,7 +41,23 @@ export default function FollowsPage() {
         const data = await response.json();
         
         // Transformamos los resultados para añadir un id único a cada relación
-        const followsWithId = (data || []).map((follow: any) => ({
+        const followsWithId = (data || []).map((follow: {
+          followerId: string;
+          followingId: string;
+          createdAt: Date;
+          follower: {
+            id: string;
+            name: string | null;
+            email: string | null;
+            image: string | null;
+          };
+          following: {
+            id: string;
+            name: string | null;
+            email: string | null;
+            image: string | null;
+          };
+        }) => ({
           ...follow,
           id: `follow_${follow.followerId}_${follow.followingId}`
         }));
@@ -83,9 +99,9 @@ export default function FollowsPage() {
       );
       
       toast.success('Relación de seguimiento eliminada correctamente');
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error('Error al eliminar relación de seguimiento:', error);
-      toast.error(error.message || 'No se pudo eliminar la relación de seguimiento');
+      toast.error(error instanceof Error ? error.message : 'No se pudo eliminar la relación de seguimiento');
       throw error; // Re-lanzar el error para que el componente FollowsTable pueda manejar el estado de carga
     }
   };

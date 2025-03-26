@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { format } from "date-fns";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
 import { Trash2, User } from "lucide-react";
@@ -63,7 +63,7 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
   const endIndex = startIndex + rowsPerPage;
   const currentFollows = filteredFollows?.slice(startIndex, endIndex) || [];
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     try {
       setIsDeleting(true);
       
@@ -85,7 +85,7 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
       setIsDeleteDialogOpen(false);
       setFollowToDelete(null);
     }
-  };
+  }, [onDeleteFollow, setIsDeleting, setIsDeleteDialogOpen, setFollowToDelete]);
 
   // Función para renderizar la imagen del usuario
   const renderUserImage = (user: User | undefined | null, size: number = 32) => {
@@ -239,7 +239,7 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
         );
       },
     },
-  ], [isDeleteDialogOpen, followToDelete, isDeleting]);
+  ], [isDeleteDialogOpen, followToDelete, isDeleting, handleDelete]);
 
   return (
     <div className="space-y-4">

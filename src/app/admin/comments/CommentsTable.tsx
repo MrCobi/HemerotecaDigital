@@ -2,7 +2,7 @@
 
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import DataTable, { Column } from "../components/DataTable/DataTable";
@@ -89,7 +89,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
   };
 
   // Función para manejar la eliminación de un comentario
-  const handleDeleteComment = async (commentId: string): Promise<void> => {
+  const handleDeleteComment = useCallback(async (commentId: string): Promise<void> => {
     if (isDeleting) return;
     
     setIsDeleting(true);
@@ -147,7 +147,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [isDeleting, setComments, router]);
 
   const columns: Column<Comment>[] = useMemo(
     () => [

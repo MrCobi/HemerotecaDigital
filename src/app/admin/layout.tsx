@@ -13,7 +13,15 @@ export default function AdminLayout({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<{
+    user?: {
+      name?: string;
+      email?: string;
+      image?: string;
+      role?: string;
+    };
+    expires?: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -135,11 +143,11 @@ export default function AdminLayout({
         <div className="px-4 py-6 border-t border-gray-200 dark:border-gray-700 mt-6">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              {session.user.image ? (
+              {session?.user?.image ? (
                 <SafeImage 
                   className="h-10 w-10 rounded-full" 
                   src={session.user.image} 
-                  alt={session.user.name || "Administrator"}
+                  alt={session?.user?.name || "Administrator"}
                   width={40}
                   height={40}
                   fallbackSrc="/images/AvatarPredeterminado.webp"
@@ -147,13 +155,13 @@ export default function AdminLayout({
               ) : (
                 <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
                   <span className="text-white font-semibold text-sm">
-                    {session.user.name ? session.user.name.charAt(0).toUpperCase() : "A"}
+                    {session?.user?.name ? session.user.name.charAt(0).toUpperCase() : "A"}
                   </span>
                 </div>
               )}
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-foreground">{session.user.name || "Administrator"}</p>
+              <p className="text-sm font-medium text-foreground">{session?.user?.name || "Administrator"}</p>
               <p className="text-xs text-muted-foreground">Administrador</p>
             </div>
           </div>
@@ -173,8 +181,8 @@ export default function AdminLayout({
             </Link>
             
             <MobileMenu 
-              username={session.user.name || "Administrador"} 
-              userImage={session.user.image || `/images/AvatarPredeterminado.webp`} 
+              username={session?.user?.name || "Administrador"} 
+              userImage={session?.user?.image || `/images/AvatarPredeterminado.webp`} 
             />
           </div>
         </header>

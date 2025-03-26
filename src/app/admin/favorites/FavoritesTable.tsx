@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { format } from "date-fns";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
 import { ExternalLink, Trash2 } from "lucide-react";
@@ -95,7 +95,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
   const endIndex = startIndex + rowsPerPage;
   const currentFavorites = filteredFavorites.slice(startIndex, endIndex);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     try {
       setIsDeleting(true);
       const response = await fetch(`/api/admin/favorites/${id}`, {
@@ -127,7 +127,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [currentFavorites, currentPage, setIsDeleting, setLocalFavorites, setIsDeleteDialogOpen, setFavoriteToDelete]);
 
   const columns: Column<Favorite>[] = useMemo(() => [
     {
