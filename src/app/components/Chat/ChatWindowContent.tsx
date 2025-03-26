@@ -666,10 +666,17 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         if (message.senderId !== currentUserId) {
           // Marcar el mensaje como leído en el servidor
           if (message.id) {
-            socketMarkMessageAsRead({
-              messageId: message.id,
-              conversationId: conversationId || safeConversationId
-            });
+            // Añadir un retraso y verificación adicional de conexión para evitar errores de "socket no conectado"
+            setTimeout(() => {
+              if (socketInitialized && connected) {
+                socketMarkMessageAsRead({
+                  messageId: message.id as string,
+                  conversationId: (conversationId || safeConversationId) as string
+                });
+              } else {
+                console.log('Socket no inicializado o conectado. No se pudo marcar como leído:', message.id);
+              }
+            }, 500); // Pequeño retraso para dar tiempo a que el socket se conecte
           }
           
           // Reproducir sonido de notificación si no está en foco
@@ -1226,157 +1233,6 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     }
   }, [isTyping, socketInstance, socketInitialized, otherUser?.id, currentUserId]);
   
-  // Efecto para mantener activo el socket mientras el usuario está en la pantalla de chat
-  React.useEffect(() => {
-    // Marcar al usuario como activo al entrar al componente
-    if (currentUserId) {
-      // No desconectamos inmediatamente al salir, solo marcamos como inactivo
-    }
-    
-    // Si el socket está desconectado, intentar reconectar
-    if (currentUserId && !connected && reconnect) {
-      console.log('Socket no conectado, intentando reconectar...');
-      reconnect();
-    }
-    
-    // Ya no unimos directamente aquí, esto se maneja en el efecto específico arriba
-    
-    // Al desmontar el componente, marcar como inactivo
-    return () => {
-      if (currentUserId) {
-        // No desconectamos inmediatamente al salir, solo marcamos como inactivo
-      }
-      
-      // Ya no manejamos la salida de la conversación aquí
-    };
-  }, [socketInitialized, currentUserId, connected, reconnect]);
-
-  // Manejar los eventos del socket para nuevos mensajes
-  React.useEffect(() => {
-    // No hacer nada si no hay usuario actual, receptor o ID de conversación o si el socket no está autenticado
-    if (!currentUserId || !otherUser?.id || !safeConversationId || !socketAuthenticated) return;
-    
-    // Callback para manejar nuevos mensajes recibidos por el socket
-    const handleNewMessage = (message: any) => {
-      console.log('Nuevo mensaje recibido por socket:', message);
-      
-      // Verificar si el mensaje pertenece a esta conversación
-      const belongsToConversation = 
-        message.conversationId === actualConversationId || 
-        message.conversationId === safeConversationId ||
-        // Para mensajes directos sin ID de conversación
-        (!message.conversationId && (
-          (message.senderId === currentUserId && message.receiverId === otherUser?.id) ||
-          (message.senderId === otherUser?.id && message.receiverId === currentUserId)
-        ));
-      
-      if (!belongsToConversation) {
-        console.log('Mensaje ignorado: no pertenece a esta conversación');
-        return;
-      }
-      
-      // Si el mensaje es de otra persona, marcarlo como leído
-      if (message.senderId === otherUser?.id && !message.read && socketInstance) {
-        console.log('Marcando mensaje como leído:', message.id);
-        socketMarkMessageAsRead({
-          messageId: message.id as string,
-          conversationId: message.conversationId || safeConversationId
-        });
-      }
-      
-      // Procesar el nuevo mensaje con nuestra función de deduplicación
-      processMessages([message], messages);
-      
-      // Scroll automático a la parte inferior si el usuario está cerca del final
-      if (isAtBottom && messagesEndRef.current) {
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
-      }
-    };
-    
-    // Conectarse a los eventos del socket solo si el socket está inicializado
-    if (socketInitialized) {
-      console.log('Registrando handler para new_message en conversación', safeConversationId);
-      // Evitar conectarse múltiples veces
-      socketInstance?.off('new_message', handleNewMessage);
-      socketInstance?.on('new_message', handleNewMessage);
-    }
-    
-    // Limpieza al desmontar
-    return () => {
-      console.log('Eliminando handler para new_message');
-      socketInstance?.off('new_message', handleNewMessage);
-    };
-  }, [currentUserId, otherUser?.id, safeConversationId, actualConversationId, socketInitialized, isAtBottom, socketMarkMessageAsRead, socketInstance, socketAuthenticated]);
-  
-  // Nueva función para enviar mensaje de voz
-  const handleVoiceMessageSend = async (audioBlob: Blob) => {
-    try {
-      setIsSending(true);
-      
-      // Crear un FormData para subir el archivo
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'audio.webm');
-      
-      if (actualConversationId) {
-        formData.append('conversationId', actualConversationId);
-      }
-      
-      // Subir el archivo al servidor
-      const response = await fetch('/api/messages/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al subir el mensaje de voz');
-      }
-      
-      const { url } = await response.json();
-      
-      // Generar un ID temporal único
-      const tempId = Date.now().toString();
-      
-      // Crear el mensaje
-      const messageToSend: Message = {
-        content: '',
-        senderId: currentUserId || '',
-        receiverId: otherUser?.id,
-        createdAt: new Date(),
-        tempId,
-        status: 'sending',
-        mediaUrl: url,
-        messageType: 'voice',
-        conversationId: actualConversationId || undefined,
-      };
-      
-      // Añadir mensaje al estado local
-      const updatedMessages = addLocalMessage(messageToSend);
-      setMessages(updatedMessages);
-      
-      // Enviar mensaje al servidor
-      await sendMessageToServer(messageToSend, tempId);
-      
-      // Auto-scroll si estamos en la parte inferior
-      if (isAtBottom) {
-        setTimeout(scrollToBottom, 100);
-      }
-      
-      // Desactivar el grabador de voz
-      setIsVoiceRecorderVisible(false);
-    } catch (error) {
-      console.error('Error al enviar mensaje de voz:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo enviar el mensaje de voz',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSending(false);
-    }
-  };
-  
   // Enviar un mensaje
   const sendMessage = async () => {
     if (!newMessage.trim() || isSending || !otherUser || !canSendMessages) return;
@@ -1492,10 +1348,17 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     }
     
     console.log(`Marcando mensaje ${messageId} como leído`);
-    socketMarkMessageAsRead({
-      messageId: messageId,
-      conversationId: conversationId || safeConversationId
-    });
+    // Añadir un retraso y verificación adicional de conexión para evitar errores de "socket no conectado"
+    setTimeout(() => {
+      if (socketInitialized && connected) {
+        socketMarkMessageAsRead({
+          messageId: messageId as string,
+          conversationId: (conversationId || safeConversationId) as string
+        });
+      } else {
+        console.log('Socket no inicializado o conectado. No se pudo marcar como leído:', messageId);
+      }
+    }, 500); // Pequeño retraso para dar tiempo a que el socket se conecte
   };
   
   // Actualizar estado de un mensaje
@@ -1632,10 +1495,17 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
         console.log(`Marcando ${unreadMessages.length} mensajes como leídos`);
         unreadMessages.forEach(message => {
           if (message.id) {
-            socketMarkMessageAsRead({
-              messageId: message.id,
-              conversationId: message.conversationId || safeConversationId
-            });
+            // Añadir un retraso y verificación adicional de conexión para evitar errores de "socket no conectado"
+            setTimeout(() => {
+              if (socketInitialized && connected) {
+                socketMarkMessageAsRead({
+                  messageId: message.id as string,
+                  conversationId: (message.conversationId || safeConversationId) as string
+                });
+              } else {
+                console.log('Socket no inicializado o conectado. No se pudo marcar como leído:', message.id);
+              }
+            }, 500); // Pequeño retraso para dar tiempo a que el socket se conecte
           }
         });
       }
@@ -1746,6 +1616,73 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
       scrollToBottom();
     }
   }, [isLoadingMessages, messages.length]);
+
+  // Nueva función para enviar mensaje de voz
+  const handleVoiceMessageSend = async (audioBlob: Blob) => {
+    try {
+      setIsSending(true);
+      
+      // Crear un FormData para subir el archivo
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'audio.webm');
+      
+      if (actualConversationId) {
+        formData.append('conversationId', actualConversationId);
+      }
+      
+      // Subir el archivo al servidor
+      const response = await fetch('/api/messages/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al subir el mensaje de voz');
+      }
+      
+      const { url } = await response.json();
+      
+      // Generar un ID temporal único
+      const tempId = Date.now().toString();
+      
+      // Crear el mensaje
+      const messageToSend: Message = {
+        content: '',
+        senderId: currentUserId || '',
+        receiverId: otherUser?.id,
+        createdAt: new Date(),
+        tempId,
+        status: 'sending',
+        mediaUrl: url,
+        messageType: 'voice',
+        conversationId: actualConversationId || undefined,
+      };
+      
+      // Añadir mensaje al estado local
+      const updatedMessages = addLocalMessage(messageToSend);
+      setMessages(updatedMessages);
+      
+      // Enviar mensaje al servidor
+      await sendMessageToServer(messageToSend, tempId);
+      
+      // Auto-scroll si estamos en la parte inferior
+      if (isAtBottom) {
+        setTimeout(scrollToBottom, 100);
+      }
+      
+      // Desactivar el grabador de voz
+      setIsVoiceRecorderVisible(false);
+    } catch (error) {
+      console.error('Error al enviar mensaje de voz:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo enviar el mensaje de voz',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   return (
     <div className={cn("flex flex-col h-full max-h-full", className)}>
@@ -2029,3 +1966,5 @@ export const ChatWindowContent: React.FC<ChatWindowContentProps> = ({
     </div>
   );
 }
+
+export default ChatWindowContent;

@@ -690,6 +690,22 @@ export default function useSocket(options: UseSocketOptions) {
     activeConversations.current.delete(conversationId);
   }, [connected]);
 
+  const setActive = useCallback((conversationId: string) => {
+    if (!socketRef.current || !connected || !userId) {
+      console.warn('No se puede establecer conversación como activa: socket no conectado o userId no definido');
+      return false;
+    }
+    
+    console.log(`Estableciendo como activa la conversación: ${conversationId}`);
+    
+    // Añadir a conversaciones activas
+    activeConversations.current.add(conversationId);
+    
+    // Informar al servidor que esta es la conversación activa
+    socketRef.current.emit('set_active_conversation', { conversationId });
+    return true;
+  }, [connected, userId]);
+
   // Función para forzar reconexión
   const reconnect = useCallback(() => {
     console.log('Forzando reconexión del socket');
@@ -731,6 +747,7 @@ export default function useSocket(options: UseSocketOptions) {
     markMessageAsRead,
     joinConversation,
     leaveConversation,
+    setActive,
     reconnect,
     disconnect,
     socketInstance: socketRef.current,
