@@ -49,7 +49,10 @@ export function useAnimationSettings() {
  * @param enabledVariants Las variantes a usar cuando las animaciones están habilitadas
  * @param disabledVariants Las variantes a usar cuando las animaciones están deshabilitadas (normalmente sin animación)
  */
-export function useConditionalAnimation(enabledVariants: any, disabledVariants: any = {}) {
+export function useConditionalAnimation<T extends Record<string, unknown>>(
+  enabledVariants: T, 
+  disabledVariants: Partial<T> = {}
+) {
   const animationsEnabled = useAnimationSettings();
   return animationsEnabled ? enabledVariants : disabledVariants;
 }

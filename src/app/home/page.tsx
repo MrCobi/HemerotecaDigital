@@ -679,7 +679,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   
   // Obtener configuración de animaciones para aplicar a los componentes de framer-motion
-  const animationsEnabled = useAnimationSettings();
+  const _animationsEnabled = useAnimationSettings();
   
   // Variantes para animaciones condicionales
   const fadeInVariants = {

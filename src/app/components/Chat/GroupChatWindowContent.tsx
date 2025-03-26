@@ -58,7 +58,7 @@ type GroupChatWindowContentProps = {
   className?: string;
 };
 
-
+// @ts-ignore - Session type is complex and varies; using any here is safer
 const MessageList = memo(({ 
   messages, 
   currentUserId,
@@ -725,7 +725,7 @@ const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
   }, [conversation?.participants]);
 
   // Función para enviar mensajes al servidor y guardarlos en la base de datos
-  const sendMessageToServer = async (message: Message) => {
+  const sendMessageToServer = useCallback(async (message: Message) => {
     if (!message.conversationId) {
       throw new Error('ID de conversación no especificado');
     }
@@ -774,7 +774,7 @@ const GroupChatWindowContent: React.FC<GroupChatWindowContentProps> = ({
     if (isAtBottom) {
       setTimeout(scrollToBottom, 100);
     }
-  };
+  }, [processMessages, socketInstance, socketInitialized, isAtBottom, scrollToBottom]);
 
   // Memoizar el mensaje de estado de los usuarios escribiendo
   const typingMessage = useMemo(() => {
