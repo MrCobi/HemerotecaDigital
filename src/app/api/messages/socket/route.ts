@@ -10,7 +10,7 @@ export async function POST(request: Request): Promise<NextResponse>  {
   const authHeader = request.headers.get('Authorization');
   if (authHeader !== SOCKET_API_KEY) {
     console.error('Acceso no autorizado a la API de socket');
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
@@ -18,17 +18,11 @@ export async function POST(request: Request): Promise<NextResponse>  {
     
     // Validaciones básicas
     if (!content || content.trim() === '') {
-      return new Response(JSON.stringify({ error: 'Contenido del mensaje no puede estar vacío' }), { 
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return NextResponse.json({ error: 'Contenido del mensaje no puede estar vacío' }, { status: 400 });
     }
     
     if (!senderId || !receiverId) {
-      return new Response(JSON.stringify({ error: 'IDs de emisor y receptor son requeridos' }), { 
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return NextResponse.json({ error: 'IDs de emisor y receptor son requeridos' }, { status: 400 });
     }
     
     console.log(`API Socket: Guardando mensaje de ${senderId} para ${receiverId}`);
@@ -53,10 +47,7 @@ export async function POST(request: Request): Promise<NextResponse>  {
 
       if (existingMessage) {
         console.log(`Socket API: Mensaje duplicado detectado con tempId: ${tempId}. ID existente: ${existingMessage.id}`);
-        return new Response(JSON.stringify(existingMessage), { 
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return NextResponse.json(existingMessage, { status: 200 });
       }
     } else {
       // Si no hay tempId, verificar igualmente si existe un mensaje similar reciente
@@ -76,11 +67,39 @@ export async function POST(request: Request): Promise<NextResponse>  {
 
       if (existingMessage) {
         console.log(`Socket API: Mensaje similar reciente encontrado sin tempId. ID existente: ${existingMessage.id}`);
-        return new Response(JSON.stringify(existingMessage), { 
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return NextResponse.json(existingMessage, { status: 200 });
       }
+    }
+    
+    // Buscar o crear una conversación para estos usuarios
+    let conversation = await prisma.conversation.findFirst({
+      where: {
+        isGroup: false,
+        participants: {
+          every: {
+            userId: {
+              in: [senderId, receiverId],
+            },
+          },
+        },
+      },
+    });
+
+    // Si no existe la conversación, crearla
+    if (!conversation) {
+      conversation = await prisma.conversation.create({
+        data: {
+          isGroup: false,
+          participants: {
+            createMany: {
+              data: [
+                { userId: senderId },
+                { userId: receiverId },
+              ],
+            },
+          },
+        },
+      });
     }
     
     // Guardar el mensaje en la base de datos
@@ -89,7 +108,8 @@ export async function POST(request: Request): Promise<NextResponse>  {
         content,
         senderId,
         receiverId,
-        tempId
+        tempId,
+        conversationId: conversation.id,
       },
       select: {
         id: true,
@@ -98,7 +118,8 @@ export async function POST(request: Request): Promise<NextResponse>  {
         read: true,
         senderId: true,
         receiverId: true,
-        tempId: true
+        tempId: true,
+        conversationId: true
       }
     });
     
@@ -119,10 +140,6 @@ export async function POST(request: Request): Promise<NextResponse>  {
     return NextResponse.json(formattedMessage, { status: 201 });
   } catch (error) {
     console.error('Error al procesar mensaje desde socket:', error);
-    return new Response(JSON.stringify({ error: 'Error interno al procesar mensaje' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return NextResponse.json({ error: 'Error interno al procesar mensaje' }, { status: 500 });
   }
 }
-

@@ -45,45 +45,6 @@ export async function POST(request: Request): Promise<NextResponse>  {
       );
     }
 
-    // Buscar o crear el mensaje inicial
-    let lastMessage = await prisma.directMessage.findFirst({
-      where: {
-        OR: [
-          {
-            senderId: session.user.id,
-            receiverId: userId,
-          },
-          {
-            senderId: userId,
-            receiverId: session.user.id,
-          },
-        ],
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      include: {
-        sender: true,
-        receiver: true,
-      },
-    });
-
-    // Si no existe un mensaje, crear uno inicial
-    if (!lastMessage) {
-      lastMessage = await prisma.directMessage.create({
-        data: {
-          content: "¡Hola! He iniciado una conversación contigo.",
-          senderId: session.user.id,
-          receiverId: userId,
-          read: false,
-        },
-        include: {
-          sender: true,
-          receiver: true,
-        },
-      });
-    }
-
     // Obtener la información del otro usuario
     const otherUser = await prisma.user.findUnique({
       where: {
@@ -104,32 +65,115 @@ export async function POST(request: Request): Promise<NextResponse>  {
       );
     }
 
-    // Construir ID de conversación (ordenado para consistencia)
-    const conversationId = [session.user.id, userId].sort().join("-");
-
-    // Crear respuesta estructurada
-    const conversation = {
-      id: conversationId,
-      senderId: session.user.id,
-      receiverId: userId,
-      otherUser: otherUser,
-      lastMessage: {
-        id: lastMessage.id,
-        content: lastMessage.content,
-        createdAt: lastMessage.createdAt.toISOString(),
-        read: lastMessage.read,
-        senderId: lastMessage.senderId,
-        receiverId: lastMessage.receiverId,
+    // Buscar si ya existe una conversación entre estos usuarios
+    let conversation = await prisma.conversation.findFirst({
+      where: {
+        isGroup: false,
+        participants: {
+          every: {
+            userId: {
+              in: [session.user.id, userId],
+            },
+          },
+        },
       },
-      unreadCount: 0,
-      createdAt: lastMessage.createdAt.toISOString(),
-      updatedAt: new Date().toISOString(),
+      include: {
+        messages: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
+          include: {
+            sender: true,
+            receiver: true,
+          },
+        },
+      },
+    });
+
+    // Si no existe la conversación, crearla
+    if (!conversation) {
+      conversation = await prisma.conversation.create({
+        data: {
+          isGroup: false,
+          participants: {
+            createMany: {
+              data: [
+                { userId: session.user.id },
+                { userId: userId },
+              ],
+            },
+          },
+        },
+        include: {
+          messages: {
+            take: 1,
+            include: {
+              sender: true,
+              receiver: true,
+            },
+          },
+        },
+      });
+
+      // Crear mensaje inicial
+      await prisma.directMessage.create({
+        data: {
+          content: "¡Hola! He iniciado una conversación contigo.",
+          senderId: session.user.id,
+          receiverId: userId,
+          conversationId: conversation.id,
+          read: false,
+        },
+      });
+    }
+
+    // Obtener el último mensaje de la conversación
+    const lastMessage = await prisma.directMessage.findFirst({
+      where: {
+        conversationId: conversation.id,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        sender: true,
+        receiver: true,
+      },
+    });
+
+    // Calcular mensajes no leídos para el usuario actual
+    const unreadCount = await prisma.directMessage.count({
+      where: {
+        conversationId: conversation.id,
+        senderId: { not: session.user.id },
+        read: false,
+      },
+    });
+
+    // Construir respuesta estructurada
+    const response = {
+      conversation: {
+        id: conversation.id,
+        senderId: session.user.id,
+        receiverId: userId,
+        otherUser: otherUser,
+        lastMessage: lastMessage ? {
+          id: lastMessage.id,
+          content: lastMessage.content,
+          createdAt: lastMessage.createdAt.toISOString(),
+          read: lastMessage.read,
+          senderId: lastMessage.senderId,
+          receiverId: lastMessage.receiverId,
+        } : null,
+        unreadCount,
+        createdAt: conversation.createdAt.toISOString(),
+        updatedAt: conversation.updatedAt.toISOString(),
+      },
+      message: "Conversación iniciada correctamente",
     };
 
-    return NextResponse.json({
-      conversation,
-      message: "Conversación iniciada correctamente",
-    });
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Error creando conversación:", error);
     return NextResponse.json(

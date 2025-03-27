@@ -173,9 +173,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     console.log('HandleNewMessage iniciado para:', message.id || message.tempId, 'de', message.senderId, 'a', message.receiverId);
     
     // Asegurar que message.createdAt sea una cadena de fecha válida
-    if (typeof message.createdAt === 'object' && message.createdAt instanceof Date) {
-      message.createdAt = message.createdAt.toISOString();
-    } else if (typeof message.createdAt !== 'string') {
+    const msgCreatedAt = message.createdAt as string | object;
+    if (typeof msgCreatedAt === 'object' && msgCreatedAt !== null) {
+      try {
+        // Convertir cualquier objeto a string ISO
+        message.createdAt = new Date().toISOString();
+      } catch  {
+        // Si hay algún error, asignar la fecha actual
+        message.createdAt = new Date().toISOString();
+      }
+    } else if (typeof msgCreatedAt !== 'string') {
       message.createdAt = new Date().toISOString();
     }
     
@@ -372,7 +379,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       
       // Primero intenta enviar por Socket.io
       if (connected) {
-        const socketSuccess = sendSocketMessage(message);
+        // Asegurarnos de que createdAt sea siempre un string para compatibilidad con MessageType
+        const messageForSocket = {
+          ...message,
+          createdAt: typeof message.createdAt === 'string' 
+            ? message.createdAt 
+            : (message.createdAt && typeof message.createdAt === 'object' && 'toISOString' in message.createdAt 
+                ? (message.createdAt as Date).toISOString() 
+                : new Date().toISOString())
+        };
+        
+        const socketSuccess = sendSocketMessage(messageForSocket);
         if (socketSuccess) {
           console.log('Mensaje enviado exitosamente via Socket.io');
           messageSaved = true;
@@ -438,7 +455,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     updateMessageStatus(messageId, 'sending');
     
     // Reenviar a través de Socket.io
-    const success = sendSocketMessage(messageToResend);
+    const messageForSocket = {
+      ...messageToResend,
+      createdAt: typeof messageToResend.createdAt === 'string' 
+        ? messageToResend.createdAt 
+        : (messageToResend.createdAt && typeof messageToResend.createdAt === 'object' && 'toISOString' in messageToResend.createdAt
+            ? (messageToResend.createdAt as Date).toISOString() 
+            : new Date().toISOString())
+    };
+    
+    const success = sendSocketMessage(messageForSocket);
     
     if (!success) {
       updateMessageStatus(messageId, 'failed');

@@ -74,7 +74,7 @@ const _clearOldPendingMessages = () => {
 };
 
 // Define the MessageType interface for type safety
-interface MessageType {
+export interface MessageType {
   id?: string;
   tempId: string;
   content: string | null;

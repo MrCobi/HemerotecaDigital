@@ -77,7 +77,7 @@ function getActivityMessage(activity: ActivityHistory): string {
     case 'comment_reply':
       return `Respondiste a un comentario en "${activity.sourceName}"`;
     case 'follow':
-      return `Comenzaste a seguir a ${activity.userName}`;
+      return `Comenzaste a seguir a ${activity.targetName ?? 'un usuario'}`;
     default:
       return `Realizaste una acción: ${activity.type}`;
   }
