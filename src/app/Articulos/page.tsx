@@ -2,14 +2,14 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { fetchTopHeadlines } from "../services/NewsEverythingService";
 import { Article } from "../../interface/article";
-import Image from "next/image";
 import ArticleList from "@/src/app/components/Article/ArticleList";
-import NoArticlesError from "@/src/app/components/Article/NoArticlesError";
+import NoResultsFound from "@/src/app/components/Article/NoResultsFound";
 import ArticleForm from "@/src/app/components/Article/ArticleForm";
 import Pagination from "@/src/app/components/Article/Pagination";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import PageLoader from "@/src/app/components/PageLoader";
+import { useTheme } from "next-themes";
 
 const defaultSearchParams = {
   sources: "",
@@ -26,7 +26,6 @@ const Page = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [firstVisit, setFirstVisit] = useState(true);
-  const [imagePath, setImagePath] = useState("");
   const [searchParams, setSearchParams] = useState(defaultSearchParams);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -94,7 +93,6 @@ const Page = () => {
         setError(
           "No se han encontrado artículos. Busque por palabra clave o seleccione una fuente."
         );
-        setImagePath(getRandomImage());
         setFirstVisit(false);
         searchPerformed.current = false;
         return;
@@ -114,7 +112,6 @@ const Page = () => {
           setError(
             "No se han encontrado artículos. Intente una búsqueda diferente."
           );
-          setImagePath(getRandomImage());
           setFirstVisit(false);
         } else {
           setArticles(data.articles);
@@ -132,8 +129,7 @@ const Page = () => {
         }
       } catch (error) {
         console.error("Error searching articles:", error);
-        setError("Error fetching news");
-        setImagePath(getRandomImage());
+        setError("Error al buscar noticias. Por favor, inténtelo de nuevo.");
         setFirstVisit(false);
       } finally {
         setLoading(false);
@@ -186,11 +182,6 @@ const Page = () => {
     setTimeout(() => setLoading(false), 500);
   };
 
-  const getRandomImage = () =>
-    `/images/ArticuloError/ArticuloError${
-      Math.floor(Math.random() * 3) + 1
-    }.jpg`;
-
   // Mostrar pantalla de carga mientras se verifica la sesión
   if (status === "loading") {
     return (
@@ -224,19 +215,13 @@ const Page = () => {
           )}
           {!loading && error && (
             <div className="mt-8">
-              <NoArticlesError message={error} imagePath={imagePath} />
+              <NoResultsFound message={error} />
             </div>
           )}
 
           {!loading && firstVisit && articles.length === 0 && !error && (
             <div className="flex flex-col items-center justify-center min-h-[500px] bg-white/50 dark:bg-gray-800/50 rounded-2xl backdrop-blur-sm p-8 shadow-lg">
-              <Image
-                src="/images/PrimeraVista.png"
-                alt="No articles found"
-                width={300}
-                height={300}
-                className="animate-float"
-              />
+              <FirstVisitIcon />
               <h1 className="text-2xl sm:text-3xl font-bold text-blue-800 dark:text-blue-300 mt-6 text-center">
                 Empieza a buscar noticias
               </h1>
@@ -262,6 +247,76 @@ const Page = () => {
         </div>
       </div>
     </main>
+  );
+};
+
+// Componente de icono para primera visita
+const FirstVisitIcon = () => {
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  if (!mounted) return null;
+  
+  // Verificamos tanto theme como resolvedTheme para mayor confiabilidad
+  // También comprobamos si existe preferencia de color oscuro en el medio
+  const isDarkMode = theme === 'dark' || resolvedTheme === 'dark' || 
+    (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="250"
+      height="250"
+      viewBox="0 0 250 250"
+      className="animate-float drop-shadow-xl"
+    >
+      {/* Fondo circular */}
+      <circle cx="125" cy="125" r="100" fill={isDarkMode ? "#1e293b" : "#f0f9ff"} />
+      
+      {/* Periódico principal */}
+      <g transform="translate(85, 65) rotate(5)">
+        <rect x="0" y="0" width="100" height="130" rx="3" fill={isDarkMode ? "#475569" : "#ffffff"} stroke={isDarkMode ? "#94a3b8" : "#3b82f6"} strokeWidth="2" />
+        
+        {/* Titular */}
+        <rect x="10" y="10" width="80" height="8" rx="2" fill={isDarkMode ? "#94a3b8" : "#3b82f6"} />
+        
+        {/* Líneas de texto */}
+        <rect x="10" y="25" width="80" height="3" rx="1" fill={isDarkMode ? "#64748b" : "#93c5fd"} />
+        <rect x="10" y="33" width="75" height="3" rx="1" fill={isDarkMode ? "#64748b" : "#93c5fd"} />
+        <rect x="10" y="41" width="80" height="3" rx="1" fill={isDarkMode ? "#64748b" : "#93c5fd"} />
+        
+        {/* Imagen */}
+        <rect x="10" y="50" width="80" height="40" rx="2" fill={isDarkMode ? "#1e293b" : "#dbeafe"} />
+        
+        {/* Más líneas de texto */}
+        <rect x="10" y="100" width="80" height="3" rx="1" fill={isDarkMode ? "#64748b" : "#93c5fd"} />
+        <rect x="10" y="108" width="70" height="3" rx="1" fill={isDarkMode ? "#64748b" : "#93c5fd"} />
+        <rect x="10" y="116" width="80" height="3" rx="1" fill={isDarkMode ? "#64748b" : "#93c5fd"} />
+      </g>
+      
+      {/* Periódico en segundo plano */}
+      <g transform="translate(60, 75) rotate(-5)">
+        <rect x="0" y="0" width="100" height="130" rx="3" fill={isDarkMode ? "#334155" : "#f8fafc"} stroke={isDarkMode ? "#64748b" : "#60a5fa"} strokeWidth="2" />
+      </g>
+      
+      {/* Lupa */}
+      <g transform="translate(160, 90) rotate(15)">
+        <circle cx="25" cy="25" r="20" fill="none" stroke={isDarkMode ? "#38bdf8" : "#2563eb"} strokeWidth="6" />
+        <line x1="40" y1="40" x2="60" y2="60" stroke={isDarkMode ? "#38bdf8" : "#2563eb"} strokeWidth="6" strokeLinecap="round" />
+      </g>
+      
+      {/* Estrellas/destellos */}
+      <g fill={isDarkMode ? "#38bdf8" : "#3b82f6"}>
+        <circle cx="55" cy="65" r="4" />
+        <circle cx="180" cy="150" r="3" />
+        <circle cx="65" cy="185" r="5" />
+        <circle cx="190" cy="75" r="4" />
+      </g>
+    </svg>
   );
 };
 
