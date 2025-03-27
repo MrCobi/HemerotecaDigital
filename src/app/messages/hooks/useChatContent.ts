@@ -178,8 +178,23 @@ export function useChatContent(
     onMessageStatus: (status: { messageId: string; status: string; tempId?: string }) => {
       if (status.tempId) {
         // Actualizar el estado de un mensaje temporal cuando llega su confirmación
-        setMessages(prevMessages => 
-          prevMessages.map(msg => {
+        setMessages(prevMessages => {
+          // Primero verificar si el mensaje ya existe con el messageId (puede haber duplicados)
+          const existingMessageIndex = prevMessages.findIndex(m => m.id === status.messageId);
+          const tempMessageIndex = prevMessages.findIndex(m => 
+            m.id === status.tempId || (m.tempId && m.tempId === status.tempId)
+          );
+          
+          // Si ya existe un mensaje con el ID final y también tenemos un mensaje temporal
+          if (existingMessageIndex !== -1 && tempMessageIndex !== -1 && existingMessageIndex !== tempMessageIndex) {
+            // Eliminar el mensaje temporal y mantener solo el confirmado
+            const updatedMessages = [...prevMessages];
+            updatedMessages.splice(tempMessageIndex, 1);
+            return updatedMessages;
+          }
+          
+          // Solo actualizar el mensaje temporal a confirmado
+          return prevMessages.map(msg => {
             // Si es el mensaje temporal que estamos buscando
             if (msg.id === status.tempId || (msg.tempId && msg.tempId === status.tempId)) {
               // Actualizar sus propiedades manteniendo el tipo Message
@@ -191,8 +206,8 @@ export function useChatContent(
               };
             }
             return msg;
-          })
-        );
+          });
+        });
       }
     }
   });
@@ -393,6 +408,7 @@ export function useChatContent(
     const formattedMessage: Message = {
       id: message.id,
       tempId: message.tempId,
+      conversationId: message.conversationId as string || conversationId || '',
       content: message.content || '',
       createdAt: message.createdAt ? new Date(message.createdAt as string) : new Date(),
       read: Boolean(message.read),
@@ -409,11 +425,21 @@ export function useChatContent(
 
     // Actualizar la lista de mensajes
     setMessages(prevMessages => {
+      // Verificar si ya existe un mensaje confirmado con el mismo ID
+      const confirmedIndex = message.id ? 
+        prevMessages.findIndex(m => m.id === message.id && !m.tempId) : -1;
+      
+      if (confirmedIndex !== -1) {
+        // Si ya existe un mensaje confirmado con este ID, no añadir duplicado
+        return prevMessages;
+      }
+      
       // Verificar si ya existe un mensaje temporal que debemos reemplazar
       const tempIndex = prevMessages.findIndex(m => 
         // Buscar por tempId o por un ID temporal (que empiece con "temp-")
-        m.tempId === formattedMessage.tempId || 
-        (m.id && formattedMessage.tempId && m.id.toString() === formattedMessage.tempId) ||
+        (formattedMessage.tempId && m.tempId === formattedMessage.tempId) || 
+        (formattedMessage.tempId && m.id === formattedMessage.tempId) ||
+        (formattedMessage.id && m.tempId === formattedMessage.id) ||
         (formattedMessage.id && m.id && typeof m.id === 'string' && m.id.startsWith('temp-') && 
           m.content === formattedMessage.content && m.senderId === formattedMessage.senderId)
       );
@@ -425,6 +451,28 @@ export function useChatContent(
         return updatedMessages;
       }
 
+      // Verificar si este mensaje ya existe en la lista (por contenido y remitente)
+      const duplicateIndex = prevMessages.findIndex(m => 
+        m.content === formattedMessage.content && 
+        m.senderId === formattedMessage.senderId &&
+        Math.abs(new Date(m.createdAt).getTime() - new Date(formattedMessage.createdAt).getTime()) < 5000
+      );
+      
+      if (duplicateIndex !== -1) {
+        // Actualizar el mensaje existente en vez de añadir uno nuevo
+        const updatedMessages = [...prevMessages];
+        // Mantener el ID del mensaje actual si el nuevo es temporal
+        const finalId = formattedMessage.id?.toString().startsWith('temp-') ? 
+          updatedMessages[duplicateIndex].id : formattedMessage.id;
+          
+        updatedMessages[duplicateIndex] = { 
+          ...updatedMessages[duplicateIndex],
+          ...formattedMessage,
+          id: finalId,
+        };
+        return updatedMessages;
+      }
+
       // Si no hay mensaje temporal para reemplazar, añadir el nuevo
       return [...prevMessages, formattedMessage];
     });
@@ -433,7 +481,7 @@ export function useChatContent(
     if (message.senderId !== session?.user?.id && message.conversationId) {
       markConversationAsRead();
     }
-  }, [session?.user?.id, markConversationAsRead]);
+  }, [session?.user?.id, markConversationAsRead, conversationId]);
 
   // Preparar carga de imagen
   const handleImageChange = useCallback((file: File | null) => {
