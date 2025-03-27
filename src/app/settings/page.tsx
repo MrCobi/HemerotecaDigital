@@ -19,7 +19,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteRequested, setDeleteRequested] = useState(false);
+  const [deleteRequested, _setDeleteRequested] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {

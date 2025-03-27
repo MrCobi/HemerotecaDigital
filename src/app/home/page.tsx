@@ -18,11 +18,10 @@ import {
   ArrowRight,
   Heart,
   MessageSquare,
-  Minus,
-  Plus,
   User2,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
@@ -42,6 +41,7 @@ import { fetchArticulosDestacados } from "@/lib/api";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { CldImage } from 'next-cloudinary';
 import { useAnimationSettings, useConditionalAnimation, useConditionalTransition } from "../hooks/useAnimationSettings";
+import { Popover, PopoverTrigger, PopoverContent } from "@/src/app/components/ui/popover";
 
 interface Activity {
   id: string;
@@ -279,6 +279,7 @@ const TrendsSection = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("api");
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -352,41 +353,106 @@ const TrendsSection = () => {
 
   return (
     <Card className="border border-gray-200 dark:border-gray-700 shadow-sm">
-      <CardHeader className="pb-2">
-        <div className="flex flex-col space-y-1.5">
-          <CardTitle className="text-xl font-bold text-gray-800 dark:text-white flex items-center">
-            <TrendingUp className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
+      <CardHeader className="pb-1 sm:pb-2">
+        <div className="flex flex-col space-y-1">
+          <CardTitle className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white flex items-center">
+            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 text-blue-600 dark:text-blue-400" />
             Tendencias
           </CardTitle>
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
-            className="w-full mt-2"
+            className="w-full mt-1 sm:mt-2"
           >
-            <TabsList className="grid w-full grid-cols-3 bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden">
+            <TabsList className="hidden sm:grid w-full grid-cols-3 bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden">
               <TabsTrigger
                 value="api"
-                className="text-gray-700 dark:text-gray-300 py-2 px-1 text-sm"
+                className="data-[state=active]:bg-blue-100 dark:data-[state=active]:bg-blue-800/50 data-[state=active]:text-blue-700 dark:data-[state=active]:text-blue-300 text-gray-700 dark:text-gray-300 py-1.5 sm:py-2 px-0.5 sm:px-1 text-xs sm:text-sm overflow-hidden"
               >
                 Noticias
               </TabsTrigger>
               <TabsTrigger
                 value="favorites"
-                className="text-gray-700 dark:text-gray-300 py-2 px-1 text-sm"
+                className="data-[state=active]:bg-blue-100 dark:data-[state=active]:bg-blue-800/50 data-[state=active]:text-blue-700 dark:data-[state=active]:text-blue-300 text-gray-700 dark:text-gray-300 py-1.5 sm:py-2 px-0.5 sm:px-1 text-xs sm:text-sm overflow-hidden"
               >
                 Favoritos
               </TabsTrigger>
               <TabsTrigger
                 value="comments"
-                className="text-gray-700 dark:text-gray-300 py-2 px-1 text-sm"
+                className="data-[state=active]:bg-blue-100 dark:data-[state=active]:bg-blue-800/50 data-[state=active]:text-blue-700 dark:data-[state=active]:text-blue-300 text-gray-700 dark:text-gray-300 py-1.5 sm:py-2 px-0.5 sm:px-1 text-xs sm:text-sm overflow-hidden"
               >
                 Comentarios
               </TabsTrigger>
             </TabsList>
+            
+            {/* Alternativa móvil - solo muestra la categoría activa con selector */}
+            <div className="sm:hidden w-full mb-1">
+              <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800/90 rounded-md p-1.5">
+                <div className="flex items-center">
+                  {activeTab === "api" && <TrendingUp className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 mr-1.5" />}
+                  {activeTab === "favorites" && <Heart className="h-3.5 w-3.5 text-red-500 mr-1.5" />}
+                  {activeTab === "comments" && <MessageSquare className="h-3.5 w-3.5 text-green-500 mr-1.5" />}
+                  
+                  <span className="font-medium text-xs text-gray-800 dark:text-gray-200">
+                    {activeTab === "api" && "Noticias"}
+                    {activeTab === "favorites" && "Favoritos"}
+                    {activeTab === "comments" && "Comentarios"}
+                  </span>
+                </div>
+                
+                <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 p-1 -mt-1 -mr-2 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+                    <div className="space-y-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className={`w-full justify-start ${activeTab === "api" ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""}`}
+                        onClick={() => {
+                          setActiveTab("api");
+                          setIsPopoverOpen(false);
+                        }}
+                      >
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        Noticias
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className={`w-full justify-start ${activeTab === "favorites" ? "bg-red-50 dark:bg-red-900/20 text-red-500" : ""}`}
+                        onClick={() => {
+                          setActiveTab("favorites");
+                          setIsPopoverOpen(false);
+                        }}
+                      >
+                        <Heart className="h-4 w-4 mr-2" />
+                        Favoritos
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className={`w-full justify-start ${activeTab === "comments" ? "bg-green-50 dark:bg-green-900/20 text-green-500" : ""}`}
+                        onClick={() => {
+                          setActiveTab("comments");
+                          setIsPopoverOpen(false);
+                        }}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Comentarios
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
           </Tabs>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2 pt-2 pb-4 px-4">
+      <CardContent className="space-y-1.5 sm:space-y-2 pt-1 sm:pt-2 pb-3 sm:pb-4 px-3 sm:px-4">
         {activeTab === "api" && (
           <>
             {trends.api.length === 0 ? (
@@ -405,21 +471,21 @@ const TrendsSection = () => {
               trends.api.map((trend, i) => (
                 <div
                   key={i}
-                  className="p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
+                  className="py-2 px-2 sm:p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
                   onClick={() => handleTrendClick(trend, "api")}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3">
                       <span className="bg-blue-100 dark:bg-blue-900/30 p-1 rounded">
-                        <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
                       </span>
-                      <span className="text-sm font-medium line-clamp-1 text-gray-800 dark:text-gray-200">
+                      <span className="text-xs sm:text-sm font-medium line-clamp-1 text-gray-800 dark:text-gray-200">
                         {trend.title}
                       </span>
                     </div>
                     <Badge
                       variant="outline"
-                      className="text-blue-600 dark:text-blue-400"
+                      className="text-blue-600 dark:text-blue-400 text-xs px-1 sm:px-2 py-0 h-5"
                     >
                       Nuevo
                     </Badge>
@@ -448,19 +514,19 @@ const TrendsSection = () => {
               trends.favorites.map((trend, i) => (
                 <div
                   key={i}
-                  className="p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
+                  className="py-2 px-2 sm:p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
                   onClick={() => handleTrendClick(trend, "favorite")}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Heart className="h-5 w-5 text-red-500" />
-                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
+                      <span className="text-xs sm:text-sm font-medium line-clamp-1 text-gray-800 dark:text-gray-200">
                         {trend.sourceName}
                       </span>
                     </div>
                     <Badge
                       variant="outline"
-                      className="bg-blue-100 dark:bg-blue-900/30 text-red-500"
+                      className="bg-blue-100 dark:bg-blue-900/30 text-red-500 text-xs px-1 sm:px-2 py-0 h-5"
                     >
                       {trend.count} ♥
                     </Badge>
@@ -489,19 +555,19 @@ const TrendsSection = () => {
               trends.comments.map((trend, i) => (
                 <div
                   key={i}
-                  className="p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
+                  className="py-2 px-2 sm:p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
                   onClick={() => handleTrendClick(trend, "comment")}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <MessageSquare className="h-5 w-5 text-green-500" />
-                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                      <span className="text-xs sm:text-sm font-medium line-clamp-1 text-gray-800 dark:text-gray-200">
                         {trend.sourceName}
                       </span>
                     </div>
                     <Badge
                       variant="outline"
-                      className="bg-blue-100 dark:bg-blue-900/30 text-green-500"
+                      className="bg-blue-100 dark:bg-blue-900/30 text-green-500 text-xs px-1 sm:px-2 py-0 h-5"
                     >
                       {trend.count} 💬
                     </Badge>
@@ -837,25 +903,36 @@ export default function HomePage() {
     const totalPages = Math.min(calculatedTotalPages, maxPages);
 
     return (
-      <div className="flex justify-center gap-2 mt-4">
-        <Button
-          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          disabled={currentPage === 1}
-        >
-          Anterior
-        </Button>
-
-        <span className="flex items-center px-4 text-sm">
-          Página {currentPage} de {totalPages}
-          {calculatedTotalPages > maxPages && " (máximo)"}
-        </span>
-
-        <Button
-          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-          disabled={currentPage === totalPages}
-        >
-          Siguiente
-        </Button>
+      <div className="flex justify-center items-center mt-4 w-full">
+        <div className="flex w-full max-w-xs rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className={`flex justify-center items-center py-2 px-3 w-1/4 ${
+              currentPage === 1
+                ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
+            } transition-colors`}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          
+          <div className="flex justify-center items-center py-2 px-3 flex-1 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-center font-medium text-gray-700 dark:text-gray-300">
+            Página {currentPage} de {totalPages}
+          </div>
+          
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className={`flex justify-center items-center py-2 px-3 w-1/4 ${
+              currentPage === totalPages
+                ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
+            } transition-colors`}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
       </div>
     );
   };
@@ -893,10 +970,10 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20">
+    <main className="min-h-screen overflow-x-hidden bg-gradient-to-br from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20">
       <section
         id="hero-section"
-        className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-900 dark:from-gray-800 dark:to-gray-900 text-white"
+        className="relative overflow-x-hidden bg-gradient-to-br from-blue-600 to-indigo-900 dark:from-gray-800 dark:to-gray-900 text-white"
       >
         <div className="absolute inset-0 z-0 overflow-hidden">
           {decorativeElements.map((element, index) => (
@@ -913,8 +990,8 @@ export default function HomePage() {
               }}
             />
           ))}
-          <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-blue-500/5 dark:bg-blue-400/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 dark:bg-indigo-400/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2"></div>
+          <div className="absolute top-0 left-0 w-1/4 h-1/4 bg-blue-500/5 dark:bg-blue-400/5 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 right-0 w-1/4 h-1/4 bg-indigo-500/5 dark:bg-indigo-400/5 rounded-full blur-3xl"></div>
         </div>
 
         <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 flex flex-col justify-center">
@@ -1035,8 +1112,8 @@ export default function HomePage() {
         className="py-12 sm:py-16 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 dark:from-blue-900/30 dark:to-indigo-900/30 relative"
       >
         <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-blue-500/5 dark:bg-blue-400/5 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 dark:bg-indigo-400/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2"></div>
+          <div className="absolute top-0 left-0 w-1/2 h-1/2 bg-blue-500/5 dark:bg-blue-400/5 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 dark:bg-indigo-400/5 rounded-full blur-3xl"></div>
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1249,7 +1326,7 @@ export default function HomePage() {
                 }
               }}
               className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 rounded-full p-2 shadow-lg z-10 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
-              style={{ marginLeft: "-15px" }}
+              style={{ left: "5px" }}
             >
               <ChevronLeft className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </button>
@@ -1260,7 +1337,7 @@ export default function HomePage() {
                 }
               }}
               className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 rounded-full p-2 shadow-lg z-10 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
-              style={{ marginRight: "-15px" }}
+              style={{ right: "5px" }}
             >
               <ChevronRight className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </button>
@@ -1279,9 +1356,9 @@ export default function HomePage() {
             >
               <Card className="border-blue-100 dark:border-blue-900/30 h-full">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-xl font-bold text-gray-800 dark:text-white flex items-center">
-                    <Clock className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
-                    Actividad Reciente de Usuarios Seguidos
+                  <CardTitle className="text-base xs:text-lg sm:text-xl font-bold text-gray-800 dark:text-white flex flex-wrap items-center">
+                    <Clock className="h-4 w-4 xs:h-5 xs:w-5 mr-1.5 sm:mr-2 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                    <span className="leading-tight">Actividad Reciente de Usuarios Seguidos</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1317,11 +1394,11 @@ export default function HomePage() {
                       {followingActivity.map((activity) => (
                         <div
                           key={activity.id}
-                          className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl shadow-sm transition-all duration-300 hover:shadow-md"
+                          className="p-2.5 sm:p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md mb-2"
                         >
-                          <div className="flex items-center space-x-3">
+                          <div className="flex items-start space-x-2">
                             <div className="flex-shrink-0">
-                              <Avatar className="h-10 w-10">
+                              <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
                                 {activity.user.image && (activity.user.image.includes('cloudinary') || 
                                 (!activity.user.image.startsWith('/') && !activity.user.image.startsWith('http'))) ? (
                                   <CldImage
@@ -1331,7 +1408,7 @@ export default function HomePage() {
                                     height={40}
                                     crop="fill"
                                     gravity="face"
-                                    className="h-10 w-10 rounded-full"
+                                    className="h-8 w-8 sm:h-10 sm:w-10 rounded-full"
                                     onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                                       const target = e.target as HTMLImageElement;
                                       target.src = "/images/AvatarPredeterminado.webp";
@@ -1343,7 +1420,7 @@ export default function HomePage() {
                                     alt={activity.user.name || "Usuario"}
                                     width={40}
                                     height={40}
-                                    className="h-10 w-10 rounded-full"
+                                    className="h-8 w-8 sm:h-10 sm:w-10 rounded-full"
                                     onError={(e) => {
                                       const target = e.target as HTMLImageElement;
                                       target.src = "/images/AvatarPredeterminado.webp";
@@ -1352,104 +1429,77 @@ export default function HomePage() {
                                 )}
                               </Avatar>
                             </div>
-                            <div className="flex-shrink-0">
-                              {(() => {
-                                switch (activity.type) {
-                                  case "favorite_added":
-                                    return (
-                                      <Heart className="h-5 w-5 text-red-500 fill-red-500" />
-                                    );
-                                  case "favorite_removed":
-                                    return (
-                                      <Heart className="h-5 w-5 text-red-500" />
-                                    );
-                                  case "comment":
-                                    return (
-                                      <MessageSquare className="h-5 w-5 text-green-500" />
-                                    );
-                                  case "rating_added":
-                                    return (
-                                      <div className="relative flex items-center justify-center">
-                                        <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-                                        <Plus className="h-3 w-3 absolute -top-1 -right-1 text-yellow-500" />
-                                      </div>
-                                    );
-                                  case "rating_removed":
-                                    return (
-                                      <div className="relative flex items-center justify-center">
-                                        <Star className="h-5 w-5 text-purple-500" />
-                                        <Minus className="h-3 w-3 absolute -top-1 -right-1 text-purple-500" />
-                                      </div>
-                                    );
-                                  case "follow":
-                                    return (
-                                      <User2 className="h-5 w-5 text-blue-500" />
-                                    );
-                                  case "unfollow":
-                                    return (
-                                      <User2 className="h-5 w-5 text-red-500" />
-                                    );
-                                  case "comment_reply":
-                                    return (
-                                      <MessageSquare className="h-5 w-5 text-green-500" />
-                                    );
-                                  case "comment_deleted":
-                                    return (
-                                      <MessageSquare className="h-5 w-5 text-red-500" />
-                                    );
-                                  case "favorite":
-                                    return (
-                                      <Heart className="h-5 w-5 text-red-500 fill-red-500" />
-                                    );
-                                  default:
-                                    return null;
-                                }
-                              })()}
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-800 dark:text-gray-200">
-                                <span className="font-medium">
+                            
+                            <div className="flex flex-col space-y-1">
+                              <div className="flex items-center space-x-1.5">
+                                <span className="font-medium text-xs sm:text-sm text-gray-800 dark:text-white truncate max-w-[100px] sm:max-w-none">
                                   {activity.user.username}
-                                </span>{" "}
-                                <span className="text-gray-600 dark:text-gray-400">
+                                </span>
+                                <span className="flex-shrink-0">
                                   {(() => {
                                     switch (activity.type) {
                                       case "favorite_added":
-                                        return "agregó un favorito";
+                                      case "favorite":
+                                        return <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500" />;
                                       case "favorite_removed":
-                                        return "eliminó un favorito";
+                                        return <Heart className="h-3.5 w-3.5 text-red-500" />;
                                       case "comment":
-                                        return "comentó en";
+                                      case "comment_reply":
+                                        return <MessageSquare className="h-3.5 w-3.5 text-green-500" />;
+                                      case "rating_added":
+                                        return <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />;
+                                      case "rating_removed":
+                                        return <Star className="h-3.5 w-3.5 text-purple-500" />;
+                                      case "follow":
+                                        return <User2 className="h-3.5 w-3.5 text-blue-500" />;
+                                      case "unfollow":
+                                        return <User2 className="h-3.5 w-3.5 text-red-500" />;
+                                      case "comment_deleted":
+                                        return <MessageSquare className="h-3.5 w-3.5 text-red-500" />;
+                                      default:
+                                        return null;
+                                    }
+                                  })()}
+                                </span>
+                                <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+                                  {(() => {
+                                    switch (activity.type) {
+                                      case "favorite_added":
+                                      case "favorite":
+                                        return "agregó favorito";
+                                      case "favorite_removed":
+                                        return "eliminó favorito";
+                                      case "comment":
+                                        return "comentó";
                                       case "rating_added":
                                         return "calificó";
                                       case "rating_removed":
-                                        return "eliminó la valoración de";
+                                        return "quitó calificación";
                                       case "follow":
-                                        return "comenzó a seguir a";
+                                        return "siguió a";
                                       case "unfollow":
-                                        return "dejó de seguir a";
+                                        return "dejó de seguir";
                                       case "comment_reply":
-                                        return "respondió a un comentario en";
+                                        return "respondió";
                                       case "comment_deleted":
-                                        return "eliminó un comentario en";
-                                      case "favorite":
-                                        return "agregó un favorito";
+                                        return "eliminó comentario";
                                       default:
                                         return "";
                                     }
                                   })()}
-                                </span>{" "}
-                                <span className="font-medium text-blue-600 dark:text-blue-400">
-                                  {activity.sourceName || activity.targetName || ""}
                                 </span>
+                              </div>
+                              
+                              <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 truncate max-w-[170px] sm:max-w-none">
+                                {activity.sourceName || activity.targetName || ""}
                               </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              
+                              <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
                                 {new Date(activity.createdAt).toLocaleString(
                                   "es-ES",
                                   {
                                     day: "numeric",
-                                    month: "long",
-                                    year: "numeric",
+                                    month: "short",
                                     hour: "2-digit",
                                     minute: "2-digit",
                                   }

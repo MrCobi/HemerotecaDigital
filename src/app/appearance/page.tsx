@@ -3,7 +3,6 @@
 import React, { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import Image from 'next/image';
 
 // Utilizamos dynamic import para evitar el error durante el prerender
 const AppearanceSettings = dynamic(
