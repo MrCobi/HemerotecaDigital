@@ -104,6 +104,20 @@ const decorativeElements = [
 ];
 
 const categoryMappings = {
+  "general": {
+    spanish: "General",
+    lightImage: "/images/categories/general-light.webp",
+    darkImage: "/images/categories/general-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=2069&auto=format&fit=crop",
+    color: "from-gray-600 to-gray-800"
+  },
+  "business": {
+    spanish: "Negocios",
+    lightImage: "/images/categories/business-light.webp",
+    darkImage: "/images/categories/business-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?q=80&w=2069&auto=format&fit=crop",
+    color: "from-emerald-600 to-green-600"
+  },
   "technology": {
     spanish: "Tecnología",
     lightImage: "/images/categories/technology-light.webp",
@@ -111,19 +125,19 @@ const categoryMappings = {
     fallbackImage: "https://images.unsplash.com/photo-1488229297570-58520851e868?q=80&w=2069&auto=format&fit=crop",
     color: "from-blue-600 to-indigo-600"
   },
-  "politics": {
-    spanish: "Política",
-    lightImage: "/images/categories/politics-light.webp",
-    darkImage: "/images/categories/politics-dark.webp",
-    fallbackImage: "https://images.unsplash.com/photo-1575320181282-9afab399332c?q=80&w=2070&auto=format&fit=crop",
-    color: "from-red-600 to-orange-600"
+  "sports": {
+    spanish: "Deportes",
+    lightImage: "/images/categories/sports-light.webp",
+    darkImage: "/images/categories/sports-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=2070&auto=format&fit=crop",
+    color: "from-yellow-600 to-amber-600"
   },
-  "science": {
-    spanish: "Ciencia",
-    lightImage: "/images/categories/science-light.webp",
-    darkImage: "/images/categories/science-dark.webp",
-    fallbackImage: "https://images.unsplash.com/photo-1623493308303-53f46fd1ed5c?q=80&w=2013&auto=format&fit=crop",
-    color: "from-green-600 to-teal-600"
+  "entertainment": {
+    spanish: "Entretenimiento",
+    lightImage: "/images/categories/entertainment-light.webp",
+    darkImage: "/images/categories/entertainment-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1603739903239-8b6e64c3b185?q=80&w=2071&auto=format&fit=crop",
+    color: "from-pink-600 to-rose-600"
   },
   "health": {
     spanish: "Salud",
@@ -132,12 +146,19 @@ const categoryMappings = {
     fallbackImage: "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?q=80&w=2070&auto=format&fit=crop",
     color: "from-purple-600 to-pink-600"
   },
-  "sports": {
-    spanish: "Deportes",
-    lightImage: "/images/categories/sports-light.webp",
-    darkImage: "/images/categories/sports-dark.webp",
-    fallbackImage: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=2070&auto=format&fit=crop",
-    color: "from-yellow-600 to-amber-600"
+  "science": {
+    spanish: "Ciencia",
+    lightImage: "/images/categories/science-light.webp",
+    darkImage: "/images/categories/science-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1582719471384-894fbb16e074?q=80&w=2070&auto=format&fit=crop",
+    color: "from-green-600 to-teal-600"
+  },
+  "politics": {
+    spanish: "Política",
+    lightImage: "/images/categories/politics-light.webp",
+    darkImage: "/images/categories/politics-dark.webp",
+    fallbackImage: "https://images.unsplash.com/photo-1575320181282-9afab399332c?q=80&w=2070&auto=format&fit=crop",
+    color: "from-red-600 to-orange-600"
   },
   "economy": {
     spanish: "Economía",
@@ -190,17 +211,7 @@ const getCategoryImage = (englishCategory: string, isDarkMode: boolean): string 
     return `https://source.unsplash.com/random/300x200?${encodeURIComponent(englishCategory)}`;
   }
   
-  // Si estamos en modo oscuro y hay imagen para modo oscuro
-  if (isDarkMode && mapping.darkImage) {
-    return mapping.darkImage;
-  }
-  
-  // Si estamos en modo claro o no hay imagen para modo oscuro
-  if (mapping.lightImage) {
-    return mapping.lightImage;
-  }
-  
-  // Imagen de respaldo
+  // Usar siempre las imágenes fallback hasta que tengamos las imágenes locales
   return mapping.fallbackImage || `https://source.unsplash.com/random/300x200?${encodeURIComponent(englishCategory)}`;
 };
 
