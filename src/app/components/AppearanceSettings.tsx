@@ -21,9 +21,9 @@ export function AppearanceSettings() {
   const [fontFamily, setFontFamily] = useState<FontFamily>("sans");
   const [contentDensity, setContentDensity] = useState<ContentDensity>("comfortable");
   const [enableAnimations, setEnableAnimations] = useState(true);
-
-  // Función para aplicar los cambios - usando useCallback para evitar recreaciones
-  const applyChanges = useCallback(() => {
+  
+  // Función para aplicar los cambios al DOM
+  const applyChangesToDOM = useCallback(() => {
     if (typeof document === "undefined") return;
     
     // Aplicar tamaño de fuente
@@ -39,39 +39,58 @@ export function AppearanceSettings() {
     document.documentElement.dataset.animations = enableAnimations ? "true" : "false";
   }, [fontSize, fontFamily, contentDensity, enableAnimations]);
 
-  // Aseguramos que el componente está montado para evitar problemas de hidratación
+  // Función para guardar en localStorage
+  const saveToLocalStorage = useCallback(() => {
+    if (typeof window === "undefined") return;
+    
+    localStorage.setItem("hemopress-font-size", fontSize);
+    localStorage.setItem("hemopress-font-family", fontFamily);
+    localStorage.setItem("hemopress-content-density", contentDensity);
+    localStorage.setItem("hemopress-animations", String(enableAnimations));
+  }, [fontSize, fontFamily, contentDensity, enableAnimations]);
+
+  // Efecto para cargar inicialmente - solo se ejecuta una vez
   useEffect(() => {
     setMounted(true);
     
     // Cargar preferencias guardadas
     if (typeof window !== "undefined") {
+      // Recuperar valores almacenados
       const savedFontSize = localStorage.getItem("hemopress-font-size") as FontSize | null;
       const savedFontFamily = localStorage.getItem("hemopress-font-family") as FontFamily | null;
       const savedContentDensity = localStorage.getItem("hemopress-content-density") as ContentDensity | null;
       const savedEnableAnimations = localStorage.getItem("hemopress-animations");
       
+      // Configurar estados con valores almacenados o predeterminados
       if (savedFontSize) setFontSize(savedFontSize);
       if (savedFontFamily) setFontFamily(savedFontFamily);
       if (savedContentDensity) setContentDensity(savedContentDensity);
       if (savedEnableAnimations !== null) setEnableAnimations(savedEnableAnimations === "true");
-      
-      // Aplicar cambios
-      applyChanges();
     }
-  }, [applyChanges]);
-
-  // Guardamos las preferencias cuando cambian
+  }, []); // Sin dependencias - solo se ejecuta en el montaje
+  
+  // Efecto para aplicar cambios al DOM cuando los valores cambian
   useEffect(() => {
-    if (mounted && typeof window !== "undefined") {
-      localStorage.setItem("hemopress-font-size", fontSize);
-      localStorage.setItem("hemopress-font-family", fontFamily);
-      localStorage.setItem("hemopress-content-density", contentDensity);
-      localStorage.setItem("hemopress-animations", String(enableAnimations));
-      
-      // Aplicar cambios
-      applyChanges();
+    if (mounted) {
+      applyChangesToDOM();
     }
-  }, [fontSize, fontFamily, contentDensity, enableAnimations, applyChanges, mounted]);
+  }, [applyChangesToDOM, mounted]);
+  
+  // Efecto para guardar en localStorage cuando los valores cambian
+  useEffect(() => {
+    if (mounted) {
+      saveToLocalStorage();
+    }
+  }, [saveToLocalStorage, mounted]);
+
+  // Función para restablecer valores predeterminados
+  const resetToDefaults = useCallback(() => {
+    setFontSize("medium");
+    setFontFamily("sans");
+    setContentDensity("comfortable");
+    setEnableAnimations(true);
+    setTheme("system");
+  }, []);
 
   if (!mounted) {
     return null;
@@ -284,14 +303,7 @@ export function AppearanceSettings() {
           </Link>
           
           <button
-            onClick={() => {
-              // Resetear a valores por defecto
-              setFontSize("medium");
-              setFontFamily("sans");
-              setContentDensity("comfortable");
-              setEnableAnimations(true);
-              setTheme("system");
-            }}
+            onClick={resetToDefaults}
             className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
           >
             Restablecer valores predeterminados

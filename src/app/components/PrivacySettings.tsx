@@ -22,45 +22,33 @@ export function PrivacySettings({ initialSettings }: {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center space-x-2">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={settings.showFavorites}
-          className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ${settings.showFavorites ? 'bg-blue-500 dark:bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
-          onClick={() => handleChange("showFavorites", !settings.showFavorites)}
-        >
-          <span className={`pointer-events-none flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-lg ring-0 transition-transform ${settings.showFavorites ? 'translate-x-5' : 'translate-x-0.5'}`}>
-            {settings.showFavorites && (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            )}
+      <div className="flex items-center mb-4">
+        <label className="inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            className="sr-only peer"
+            checked={settings.showFavorites}
+            onChange={() => handleChange("showFavorites", !settings.showFavorites)}
+          />
+          <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+          <span className="ms-3 text-sm font-medium text-gray-900 dark:text-white">
+            Mostrar mis periódicos favoritos públicamente
           </span>
-        </button>
-        <label className="text-gray-700 dark:text-blue-200 text-sm cursor-pointer" onClick={() => handleChange("showFavorites", !settings.showFavorites)}>
-          Mostrar mis periódicos favoritos públicamente
         </label>
       </div>
       
-      <div className="flex items-center space-x-2">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={settings.showActivity}
-          className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ${settings.showActivity ? 'bg-blue-500 dark:bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
-          onClick={() => handleChange("showActivity", !settings.showActivity)}
-        >
-          <span className={`pointer-events-none flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-lg ring-0 transition-transform ${settings.showActivity ? 'translate-x-5' : 'translate-x-0.5'}`}>
-            {settings.showActivity && (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            )}
+      <div className="flex items-center">
+        <label className="inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            className="sr-only peer"
+            checked={settings.showActivity}
+            onChange={() => handleChange("showActivity", !settings.showActivity)}
+          />
+          <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+          <span className="ms-3 text-sm font-medium text-gray-900 dark:text-white">
+            Mostrar mi actividad reciente públicamente
           </span>
-        </button>
-        <label className="text-gray-700 dark:text-blue-200 text-sm cursor-pointer" onClick={() => handleChange("showActivity", !settings.showActivity)}>
-          Mostrar mi actividad reciente públicamente
         </label>
       </div>
     </div>
