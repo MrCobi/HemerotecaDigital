@@ -43,6 +43,7 @@ interface GroupManagementModalProps {
   onClose: () => void;
   conversationData: ConversationData | null;
   currentUserId: string;
+  isAdmin: boolean;
   onConversationUpdate: (updatedData: Partial<ConversationData>) => void;
   onDeleteGroup?: () => void;
   onLeaveGroup?: () => void;
@@ -53,6 +54,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   onClose,
   conversationData,
   currentUserId,
+  isAdmin,
   onConversationUpdate,
   onDeleteGroup,
   onLeaveGroup
@@ -316,7 +318,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   
   // Función para eliminar un participante
   const handleRemoveParticipant = async (userId: string) => {
-    if (!conversationData || !isGroupAdmin || userId === currentUserId) return;
+    if (!conversationData || !isAdmin || userId === currentUserId) return;
     
     try {
       setIsUpdatingGroup(true);
@@ -352,7 +354,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   
   // Función para eliminar el grupo
   const handleDeleteGroup = async () => {
-    if (!conversationData || !isGroupAdmin) return;
+    if (!conversationData || !isAdmin) return;
     
     if (window.confirm('¿Estás seguro de que quieres eliminar este grupo? Esta acción no se puede deshacer.')) {
       try {
@@ -470,7 +472,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
                   </AvatarFallback>
                 )}
               </Avatar>
-              {isGroupAdmin && (
+              {isAdmin && (
                 <Button 
                   variant="secondary" 
                   size="icon" 
@@ -491,10 +493,10 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
                 value={groupNameEdit}
                 onChange={(e) => setGroupNameEdit(e.target.value)}
                 placeholder="Nombre del grupo"
-                disabled={!isGroupAdmin || isUpdatingGroup}
+                disabled={!isAdmin || isUpdatingGroup}
                 className="flex-1"
               />
-              {isGroupAdmin && (
+              {isAdmin && (
                 <Button 
                   size="sm" 
                   onClick={handleUpdateGroupName}
@@ -515,10 +517,10 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
                 value={groupDescriptionEdit}
                 onChange={(e) => setGroupDescriptionEdit(e.target.value)}
                 placeholder="Descripción del grupo"
-                disabled={!isGroupAdmin || isUpdatingGroup}
+                disabled={!isAdmin || isUpdatingGroup}
                 className="min-h-[80px]"
               />
-              {isGroupAdmin && (
+              {isAdmin && (
                 <Button 
                   size="sm" 
                   onClick={handleUpdateGroupDescription}
@@ -536,7 +538,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
           <div>
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-sm font-medium">Participantes ({conversationData?.participants.length || 0})</h3>
-              {isGroupAdmin && (
+              {isAdmin && (
                 <Button 
                   size="sm" 
                   variant="outline" 
@@ -582,7 +584,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
                       )}
                     </div>
                   </div>
-                  {isGroupAdmin && participant.userId !== currentUserId && (
+                  {isAdmin && participant.userId !== currentUserId && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
@@ -601,7 +603,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
           {/* Acciones del grupo */}
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex flex-col space-y-2">
-              {isGroupAdmin ? (
+              {isAdmin ? (
                 <Button 
                   variant="destructive" 
                   onClick={handleDeleteGroup}

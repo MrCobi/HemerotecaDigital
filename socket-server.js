@@ -304,21 +304,52 @@ io.on('connection', (socket) => {
   socket.on('send_message', async (message) => {
     try {
       console.log('Recibido mensaje para enviar:', message);
-      const savedMessage = await prisma.directMessage.create({
-        data: {
-          content: message.content,
-          senderId: message.senderId,
-          receiverId: message.receiverId,
-          conversationId: message.conversationId,
-          messageType: message.messageType || 'text',
-          mediaUrl: message.mediaUrl || null
-        },
-        include: { sender: true }
-      });
-
-      console.log('Mensaje guardado en la BD:', savedMessage);
+      
+      // Verificar si es un reintento (mensaje con tempId ya existente)
+      let savedMessage;
+      
+      if (message.tempId) {
+        // Buscar si el mensaje con este tempId ya existe
+        const existingMessage = await prisma.directMessage.findFirst({
+          where: {
+            OR: [
+              { tempId: message.tempId },
+              // También buscar por el id si está disponible
+              ...(message.id ? [{ id: message.id }] : [])
+            ]
+          },
+          include: { sender: true }
+        });
+        
+        if (existingMessage) {
+          console.log(`Se encontró mensaje existente con tempId: ${message.tempId}`);
+          savedMessage = existingMessage;
+        }
+      }
+      
+      // Si no existe o no tiene tempId, crear nuevo mensaje
+      if (!savedMessage) {
+        savedMessage = await prisma.directMessage.create({
+          data: {
+            content: message.content,
+            senderId: message.senderId,
+            receiverId: message.receiverId,
+            conversationId: message.conversationId,
+            messageType: message.messageType || 'text',
+            mediaUrl: message.mediaUrl || null,
+            tempId: message.tempId || null
+          },
+          include: { sender: true }
+        });
+        console.log('Mensaje guardado en la BD:', savedMessage);
+      }
       
       // Emitir al remitente
+      socket.emit('message_ack', {
+        messageId: savedMessage.id,
+        tempId: message.tempId,
+        status: 'sent'
+      });
       socket.emit('new_message', savedMessage);
       console.log(`Mensaje emitido al remitente (${savedMessage.senderId})`);
 

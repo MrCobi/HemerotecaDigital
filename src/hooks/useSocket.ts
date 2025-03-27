@@ -41,60 +41,35 @@ const stopHeartbeat = () => {
 
 // Funciones para mensajes pendientes
 const getPendingMessages = (): Record<string, any>[] => {
-  try {
-    return JSON.parse(localStorage.getItem('pendingMessages') || '[]');
-  } catch (error) {
-    console.error('Error al recuperar mensajes pendientes:', error);
-    return [];
-  }
+  // No se almacenan mensajes pendientes, siempre retorna array vacío
+  return [];
+};
+
+// Función para limpiar todos los mensajes pendientes
+const clearAllPendingMessages = () => {
+  // No hay necesidad de hacer nada ya que no se almacenan mensajes
+  console.log('[Socket] No hay mensajes pendientes que limpiar (desactivado)');
+};
+
+// Función para limpiar mensajes de una conversación específica
+const clearConversationPendingMessages = (conversationId: string) => {
+  // No hay necesidad de hacer nada ya que no se almacenan mensajes
+  console.log(`[Socket] No hay mensajes pendientes que limpiar para la conversación (desactivado)`);
 };
 
 const storePendingMessage = (message: Record<string, any>) => {
-  try {
-    const pendingMessages = getPendingMessages();
-    
-    // Añadir timestamp para control de edad
-    const messageWithTimestamp = {
-      ...message,
-      _queuedAt: Date.now(),
-      _attempts: (message._attempts || 0) + 1
-    };
-    
-    // No guardar más de 100 mensajes para evitar problemas de almacenamiento
-    const updatedMessages = [messageWithTimestamp, ...pendingMessages.slice(0, 99)];
-    localStorage.setItem('pendingMessages', JSON.stringify(updatedMessages));
-  } catch (error) {
-    console.error('Error al guardar mensaje pendiente:', error);
-  }
+  // No se almacenan mensajes pendientes
+  console.log('[Socket] Almacenamiento de mensajes desactivado, no se guardará el mensaje pendiente');
 };
 
 const removePendingMessage = (messageId: string) => {
-  try {
-    const pendingMessages = getPendingMessages();
-    const filteredMessages = pendingMessages.filter(
-      (msg) => msg.id !== messageId && msg.tempId !== messageId
-    );
-    localStorage.setItem('pendingMessages', JSON.stringify(filteredMessages));
-  } catch (error) {
-    console.error('Error al eliminar mensaje pendiente:', error);
-  }
+  // No hay necesidad de hacer nada ya que no se almacenan mensajes
+  console.log('[Socket] No hay mensajes pendientes que eliminar (desactivado)');
 };
 
 const clearOldPendingMessages = () => {
-  try {
-    const pendingMessages = getPendingMessages();
-    const now = Date.now();
-    const oneDayMs = 24 * 60 * 60 * 1000;
-    
-    // Eliminar mensajes con más de un día
-    const freshMessages = pendingMessages.filter(
-      (msg) => !msg._queuedAt || (now - msg._queuedAt < oneDayMs)
-    );
-    
-    localStorage.setItem('pendingMessages', JSON.stringify(freshMessages));
-  } catch (error) {
-    console.error('Error al limpiar mensajes antiguos:', error);
-  }
+  // No hay necesidad de hacer nada ya que no se almacenan mensajes
+  console.log('[Socket] No hay mensajes antiguos que limpiar (desactivado)');
 };
 
 export type MessageType = {
@@ -449,18 +424,43 @@ export default function useSocket(options: UseSocketOptions) {
     if (pendingMessages.length > 0) {
       console.log(`[Socket] Encontrados ${pendingMessages.length} mensajes pendientes`);
       
-      // Enviar mensajes con un pequeño retraso entre ellos
-      pendingMessages.forEach((message, index) => {
-        setTimeout(() => {
-          if (socketRef.current && socketRef.current.connected) {
-            // Solo reenviar si el mensaje es del usuario actual
-            if (message.senderId === userId) {
-              console.log(`[Socket] Reenviando mensaje pendiente:`, message);
-              socketRef.current.emit('send_message', message);
+      // Añadir un retraso inicial para asegurar que la conexión está estable
+      setTimeout(() => {
+        // Enviar mensajes con un pequeño retraso entre ellos
+        pendingMessages.forEach((message, index) => {
+          setTimeout(() => {
+            if (socketRef.current && socketRef.current.connected) {
+              // Solo reenviar si el mensaje es del usuario actual Y si el usuario confirma el reenvío
+              if (message.senderId === userId) {
+                const confirmReenvio = localStorage.getItem('autoResendMessages') === 'true';
+                
+                // Solo reenviar automáticamente si el usuario ha habilitado esta opción
+                if (confirmReenvio) {
+                  console.log(`[Socket] Reenviando mensaje pendiente:`, message);
+                  
+                  // Asegurarse de que el mensaje tenga un ID temporal si no tiene uno
+                  const messageToSend = {
+                    ...message,
+                    tempId: message.tempId || `temp-${Date.now()}-${index}`,
+                    _retryAttempt: (message._retryAttempt || 0) + 1
+                  };
+                  
+                  // Limitar los reintentos
+                  if (messageToSend._retryAttempt <= 3) {
+                    socketRef.current.emit('send_message', messageToSend);
+                  } else {
+                    console.log(`[Socket] Demasiados intentos de reenvío para el mensaje:`, messageToSend);
+                    // Opcionalmente, eliminar del almacenamiento
+                    removePendingMessage(messageToSend.tempId || '');
+                  }
+                } else {
+                  console.log(`[Socket] Mensaje pendiente no reenviado automáticamente:`, message);
+                }
+              }
             }
-          }
-        }, index * 300); // 300ms entre mensajes para no saturar
-      });
+          }, index * 500); // 500ms entre mensajes para no saturar
+        });
+      }, 1000); // Esperar 1 segundo después de la conexión para empezar a enviar
     }
   }, [connected, userId]);
 
@@ -756,7 +756,9 @@ export default function useSocket(options: UseSocketOptions) {
     pendingMessages: {
       get: getPendingMessages,
       process: processPendingMessages,
-      remove: removePendingMessage
+      remove: removePendingMessage,
+      clearAll: clearAllPendingMessages,
+      clearConversation: clearConversationPendingMessages
     }
   };
 }
