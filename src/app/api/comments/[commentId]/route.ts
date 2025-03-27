@@ -2,7 +2,7 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+
 
 export async function DELETE(
     request: Request,
@@ -31,7 +31,7 @@ export async function DELETE(
                 return NextResponse.json({ error: "Comentario no encontrado" }, { status: 404 });
             }
 
-            const _result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+            const _result = await prisma.$transaction(async (tx) => {
                 // 1. Obtener comentario con fuente relacionada
                 const comment = await tx.comment.findUnique({
                     where: { id: commentId },

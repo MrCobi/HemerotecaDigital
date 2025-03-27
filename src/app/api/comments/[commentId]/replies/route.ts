@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
-import { Prisma } from "@prisma/client";
+
 
 export async function POST(
   request: Request,
@@ -30,7 +30,7 @@ export async function POST(
       );
     }
 
-    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const result = await prisma.$transaction(async (tx) => {
       // 1. Verificar comentario padre y fuente
       const parentComment = await tx.comment.findUnique({
         where: { id: commentId }, // Corregido: Usar `commentId` en lugar de `id`

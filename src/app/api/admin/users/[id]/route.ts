@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from 'bcryptjs';
+import { Role } from "@prisma/client";
 
 // Función auxiliar para verificar si el usuario es administrador
 async function isAdmin() {
@@ -79,7 +80,7 @@ export async function PATCH(
       username: string;
       email: string;
       image?: string;
-      role: string;
+      role: Role;
       bio?: string;
       showActivity?: boolean;
       showFavorites?: boolean;
@@ -89,7 +90,7 @@ export async function PATCH(
       username: body.username,
       email: body.email,
       image: body.image, // No establecer imagen predeterminada automáticamente
-      role: body.role,
+      role: body.role as Role,
       bio: body.bio,
     };
     

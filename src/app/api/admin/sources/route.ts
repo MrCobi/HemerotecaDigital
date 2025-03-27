@@ -8,7 +8,7 @@ interface SourceWithCounts {
   name: string;
   description: string;
   url: string;
-  imageUrl: string;
+  imageUrl: string | null;
   category: string;
   language: string;
   country: string;
@@ -126,4 +126,3 @@ export async function POST(req: NextRequest): Promise<NextResponse>  {
     );
   }
 }
-

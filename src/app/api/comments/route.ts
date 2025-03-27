@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../lib/auth-utils";
-import { Prisma } from "@prisma/client";
+
 
 export const POST = withAuth(async (request: Request, { userId }: { userId: string }) => {
   try {
@@ -25,7 +25,7 @@ export const POST = withAuth(async (request: Request, { userId }: { userId: stri
     }
 
     // Transacción atómica
-    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const result = await prisma.$transaction(async (tx) => {
       // 1. Verificar existencia de la fuente
       const sourceExists = await tx.source.findUnique({
         where: { id: sourceId },

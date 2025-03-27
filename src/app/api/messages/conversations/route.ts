@@ -2,7 +2,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
-import { PrismaClient } from "@prisma/client";
+
 
 interface _ConversationPair {
   user1: string;
@@ -334,7 +334,7 @@ export async function POST(request: NextRequest): Promise<NextResponse>  {
     // Crear nueva conversación con transacción correcta
     let newConversation;
     try {
-      newConversation = await prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use'>) => {
+      newConversation = await prisma.$transaction(async (tx) => {
         // 1. Crear la conversación
         const _conv = await tx.$executeRaw`
           INSERT INTO conversations (id, is_group, created_at, updated_at)
