@@ -112,7 +112,7 @@ export function useMessagesState() {
               updatedAt: conv.updatedAt || conv.createdAt || new Date().toISOString(),
               unreadCount: conv.unreadCount || 0,
               participants: Array.isArray(conv.participants) 
-                ? conv.participants.map((participant: any) => {
+                ? conv.participants.map((participant: { userId?: string; id?: string; user?: User } | Participant) => {
                     // Si ya es un objeto Participant, lo devolvemos tal cual
                     if ('userId' in participant && 'role' in participant) {
                       return participant as Participant;
@@ -120,9 +120,14 @@ export function useMessagesState() {
                     // Si es un objeto User, lo convertimos a Participant
                     return {
                       id: participant.id || crypto.randomUUID(),
-                      userId: participant.id,
+                      userId: participant.userId || participant.id || '',
                       role: 'member' as const,
-                      user: participant
+                      user: {
+                        id: participant.id || participant.userId || '',
+                        username: (participant.user && participant.user.username) || '',
+                        name: (participant.user && participant.user.name) || '',
+                        image: (participant.user && participant.user.image) || null
+                      }
                     };
                   })
                 : [],
@@ -385,7 +390,7 @@ export function useMessagesState() {
             });
           }, 1000);
         }
-      } catch (error) {
+      } catch {
         console.log(`Error al cargar la conversación ${conversationId}, puede ser nueva o estar siendo procesada`);
       }
     }

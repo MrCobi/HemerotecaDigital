@@ -4,13 +4,13 @@ import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { Send, Image as ImageIcon, X, ArrowUp } from 'lucide-react';
+import { Image as ImageIcon, X, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
-import VoiceMessageRecorder from './VoiceMessageRecorder';
 import { useToast } from '@/src/app/components/ui/use-toast';
-import { Message, ConversationData } from '@/src/app/messages/types';
+import { Message, ConversationData, User } from '@/src/app/messages/types';
+import Image from 'next/image';
 
 // Importar el hook personalizado
 import { useChatContent } from '@/src/app/messages/hooks/useChatContent';
@@ -20,7 +20,7 @@ type OptimizedChatWindowProps = {
   conversationId: string | null;
   className?: string;
   currentUserId?: string;
-  onUserProfileClick?: (user: any) => void;
+  _onUserProfileClick?: (user: User) => void;
 };
 
 // Componente para mostrar separadores de fecha entre mensajes
@@ -63,7 +63,7 @@ const MessageItem = React.memo(({
 }: { 
   message: Message, 
   currentUserId: string,
-  otherUser: any,
+  otherUser: User | null | undefined,
   showAvatar: boolean,
   showDateSeparator: boolean,
   currentUserImage: string | null | undefined,
@@ -84,7 +84,7 @@ const MessageItem = React.memo(({
         {!isCurrentUser && showAvatar && (
           <Avatar className="h-8 w-8 flex-shrink-0">
             {otherUser?.image ? (
-              <AvatarImage src={otherUser.image} alt={otherUser.username || 'Usuario'} />
+              <AvatarImage src={otherUser.image} alt={otherUser?.username || 'Usuario'} />
             ) : (
               <AvatarFallback>
                 {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
@@ -104,10 +104,12 @@ const MessageItem = React.memo(({
           >
             {message.messageType === 'image' && message.imageUrl && (
               <div className="mb-2">
-                <img 
+                <Image 
                   src={message.imageUrl} 
                   alt="Imagen adjunta" 
                   className="max-w-full rounded-lg"
+                  width={300}
+                  height={200}
                   loading="lazy"
                 />
               </div>
@@ -155,10 +157,10 @@ export default function OptimizedChatWindow({
   conversationId,
   className,
   currentUserId,
-  onUserProfileClick,
+  _onUserProfileClick,
 }: OptimizedChatWindowProps) {
   const { data: session } = useSession();
-  const { toast } = useToast();
+  const { toast: _toast } = useToast();
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   
   // Usar el hook personalizado para manejar la lógica del chat
@@ -166,7 +168,7 @@ export default function OptimizedChatWindow({
     messages,
     loading,
     error,
-    hasMoreMessages,
+    hasMoreMessages: _hasMoreMessages,
     newMessageContent,
     sendingMessage,
     imageToSend,
@@ -176,7 +178,7 @@ export default function OptimizedChatWindow({
     setNewMessageContent,
     handleSendMessage,
     handleImageChange,
-    loadMoreMessages,
+    loadMoreMessages: _loadMoreMessages,
     handleScroll,
     
     messagesEndRef,
@@ -199,201 +201,187 @@ export default function OptimizedChatWindow({
     imageInputRef.current?.click();
   };
 
-  // Manejar envío con Enter
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
+  // Obtener el otro usuario de la conversación
+  const otherUser = React.useMemo(() => {
+    if (!conversation || !conversation.participants) return null;
+    const participant = conversation.participants.find(user => user.id !== currentUserId);
+    if (!participant) return null;
+    return participant as unknown as User; // Type cast to match the expected User type
+  }, [conversation, currentUserId]);
 
-  // Calcular si mostrar avatar y separador de fecha para cada mensaje
-  const getMessageRenderProps = (message: Message, index: number, allMessages: Message[]) => {
-    // Mostrar avatar solo en el último mensaje de una secuencia del mismo remitente
-    const nextMessage = allMessages[index + 1];
-    const showAvatar = !nextMessage || nextMessage.senderId !== message.senderId;
-    
-    // Mostrar separador de fecha cuando cambia el día
-    const currentDate = new Date(message.createdAt);
-    const prevMessage = allMessages[index - 1];
-    const showDateSeparator = !prevMessage || 
-      !isSameDay(currentDate, new Date(prevMessage.createdAt));
-    
-    return { showAvatar, showDateSeparator };
-  };
+  // Mostrar un mensaje si no hay conversación seleccionada
+  if (!conversationId || !conversation) {
+    return (
+      <div className={cn("flex flex-col h-full justify-center items-center p-4 text-gray-500", className)}>
+        <div className="text-center space-y-2">
+          <p>Selecciona una conversación para comenzar a chatear</p>
+        </div>
+      </div>
+    );
+  }
 
+  // Mostrar un mensaje de error si hay uno
+  if (error) {
+    return (
+      <div className={cn("flex flex-col h-full justify-center items-center p-4", className)}>
+        <div className="text-center space-y-2 text-red-500">
+          <p>Error: {error}</p>
+          <Button
+            onClick={() => window.location.reload()}
+            variant="outline"
+          >
+            Reintentar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Mostrar un indicador de carga si está cargando
+  if (loading && !messages.length) {
+    return (
+      <div className={cn("flex flex-col h-full justify-center items-center p-4", className)}>
+        <LoadingSpinner className="h-8 w-8 mb-2" />
+        <p>Cargando mensajes...</p>
+      </div>
+    );
+  }
+
+  // Renderizar la interfaz principal de chat
   return (
     <div className={cn("flex flex-col h-full", className)}>
-      {/* Header con información del otro usuario o grupo */}
-      {conversation && (
-        <div className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700">
-          <Avatar className="h-10 w-10 mr-3">
-            {conversation.isGroup ? (
-              <>
-                {conversation.imageUrl ? (
-                  <AvatarImage src={conversation.imageUrl} alt={conversation.name || 'Grupo'} />
-                ) : (
-                  <AvatarFallback>
-                    {conversation.name?.charAt(0).toUpperCase() || 'G'}
-                  </AvatarFallback>
-                )}
-              </>
-            ) : (
-              <>
-                {conversation.otherUser?.image ? (
-                  <AvatarImage src={conversation.otherUser.image} alt={conversation.otherUser.username || 'Usuario'} />
-                ) : (
-                  <AvatarFallback>
-                    {conversation.otherUser?.username?.charAt(0).toUpperCase() || 'U'}
-                  </AvatarFallback>
-                )}
-              </>
-            )}
-          </Avatar>
-          <div>
-            <h3 className="font-semibold">
-              {conversation.isGroup 
-                ? conversation.name
-                : conversation.otherUser?.username || 'Usuario'}
-            </h3>
-            {conversation.isGroup && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {conversation.participants?.length || 0} participantes
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-      
+      {/* Cabecera de la conversación */}
+      <div className="flex items-center p-3 border-b dark:border-gray-700">
+        <Avatar className="h-8 w-8 mr-2">
+          {otherUser?.image ? (
+            <AvatarImage src={otherUser.image} alt={otherUser?.username || 'Usuario'} />
+          ) : (
+            <AvatarFallback>
+              {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
+            </AvatarFallback>
+          )}
+        </Avatar>
+        <span className="font-medium">{otherUser?.username || 'Usuario'}</span>
+      </div>
+
       {/* Contenedor de mensajes */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto p-3 space-y-2"
         onScroll={handleScroll}
       >
-        {/* Indicador de carga para más mensajes */}
-        {loading && hasMoreMessages && (
-          <div className="flex justify-center">
-            <LoadingSpinner size="small" />
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col justify-center items-center text-gray-500">
+            <p>No hay mensajes. Comienza la conversación ahora!</p>
           </div>
+        ) : (
+          messages.map((message, index) => {
+            const previousMessage = index > 0 ? messages[index - 1] : null;
+            const sameDay = previousMessage 
+              ? isSameDay(new Date(message.createdAt), new Date(previousMessage.createdAt))
+              : false;
+            const showDateSeparator = !sameDay;
+            
+            // Determinar si debemos mostrar el avatar (último mensaje de una secuencia)
+            const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
+            const isLastInSequence = !nextMessage || nextMessage.senderId !== message.senderId;
+            
+            return (
+              <MessageItem
+                key={message.id}
+                message={message}
+                currentUserId={currentUserId || ''}
+                otherUser={otherUser}
+                showAvatar={isLastInSequence}
+                showDateSeparator={showDateSeparator}
+                currentUserImage={session?.user?.image || null}
+                currentUserName={session?.user?.name || null}
+              />
+            );
+          })
         )}
-        
-        {/* Mensajes */}
-        {messages.map((message, index) => {
-          const { showAvatar, showDateSeparator } = 
-            getMessageRenderProps(message, index, messages);
-          
-          // Crear key única basada en id, tempId e índice
-          const uniqueKey = message.id 
-            ? `msg-${message.id}-${index}` 
-            : `temp-${message.tempId || Date.now()}-${index}`;
-          
-          return (
-            <MessageItem
-              key={uniqueKey}
-              message={message}
-              currentUserId={currentUserId || session?.user?.id || ''}
-              otherUser={conversation?.otherUser || conversation?.participants?.[0]?.user}
-              showAvatar={showAvatar}
-              showDateSeparator={showDateSeparator}
-              currentUserImage={session?.user?.image}
-              currentUserName={session?.user?.name || session?.user?.username}
-            />
-          );
-        })}
-        
-        {/* Mensaje de error */}
-        {error && (
-          <div className="bg-red-100 text-red-800 p-2 rounded-md text-center">
-            {error}
-          </div>
-        )}
-        
-        {/* Sin mensajes */}
-        {!loading && messages.length === 0 && !error && (
-          <div className="flex flex-col items-center justify-center h-32 text-gray-500">
-            <p>Aún no hay mensajes.</p>
-            <p className="text-sm">¡Sé el primero en decir hola!</p>
-          </div>
-        )}
-        
-        {/* Referencia al final para scroll */}
         <div ref={messagesEndRef} />
       </div>
-      
-      {/* Input para escribir mensajes */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-        {/* Previsualización de imagen */}
-        {imagePreview && (
-          <div className="relative mb-2 inline-block">
-            <img 
+
+      {/* Previsualización de imagen */}
+      {imagePreview && (
+        <div className="p-2 border-t dark:border-gray-700">
+          <div className="relative inline-block">
+            <Image 
               src={imagePreview} 
               alt="Vista previa" 
-              className="max-h-32 rounded-md"
+              className="max-h-40 max-w-full rounded-lg"
+              width={150}
+              height={150}
             />
             <button
+              className="absolute top-1 right-1 bg-gray-800 bg-opacity-70 rounded-full p-1 text-white"
               onClick={() => handleImageChange(null)}
-              className="absolute top-1 right-1 bg-gray-800 bg-opacity-70 rounded-full p-1"
             >
-              <X size={16} className="text-white" />
+              <X size={16} />
             </button>
-            {uploadProgress > 0 && uploadProgress < 100 && (
-              <div className="absolute bottom-0 left-0 w-full h-1 bg-gray-200">
-                <div 
-                  className="h-full bg-blue-500" 
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            )}
           </div>
-        )}
-        
+          {uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="mt-1">
+              <div className="h-1 bg-gray-200 rounded">
+                <div 
+                  className="h-1 bg-blue-500 rounded" 
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+              <span className="text-xs text-gray-500">{uploadProgress}%</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Área de entrada de mensaje */}
+      <div className="p-3 border-t dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex items-end gap-2">
-          <Textarea
-            value={newMessageContent}
-            onChange={handleTextChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Escribe un mensaje..."
-            className="min-h-[4rem] resize-none flex-1"
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={openFileSelector}
+            disabled={sendingMessage}
+          >
+            <ImageIcon size={20} />
+          </Button>
+          
+          <input
+            type="file"
+            ref={imageInputRef}
+            className="hidden"
+            accept="image/*"
+            onChange={handleFileSelect}
             disabled={sendingMessage}
           />
           
-          <div className="flex flex-col gap-2">
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              onClick={openFileSelector}
-              disabled={sendingMessage}
-              title="Adjuntar imagen"
-            >
-              <ImageIcon size={20} />
-            </Button>
-            
-            <Button
-              type="button"
-              size="icon"
-              onClick={handleSendMessage}
-              disabled={(!newMessageContent.trim() && !imageToSend) || sendingMessage}
-              title="Enviar mensaje"
-            >
-              {sendingMessage ? (
-                <LoadingSpinner size="small" />
-              ) : (
-                <ArrowUp size={20} />
-              )}
-            </Button>
-          </div>
+          <Textarea
+            value={newMessageContent}
+            onChange={handleTextChange}
+            placeholder="Escribe un mensaje..."
+            className="flex-1 min-h-[40px] max-h-[160px]"
+            disabled={sendingMessage}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (newMessageContent.trim() || imageToSend) {
+                  handleSendMessage();
+                }
+              }
+            }}
+          />
+          
+          <Button
+            type="button"
+            size="icon"
+            disabled={(!newMessageContent.trim() && !imageToSend) || sendingMessage}
+            onClick={() => handleSendMessage()}
+          >
+            {sendingMessage ? <LoadingSpinner className="h-5 w-5" /> : <ArrowUp size={20} />}
+          </Button>
         </div>
-        
-        {/* Input oculto para seleccionar archivos */}
-        <input
-          type="file"
-          ref={imageInputRef}
-          onChange={handleFileSelect}
-          accept="image/*"
-          className="hidden"
-        />
       </div>
     </div>
   );

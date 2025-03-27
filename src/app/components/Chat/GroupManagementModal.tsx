@@ -65,7 +65,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   // Estados locales
   const [groupNameEdit, setGroupNameEdit] = useState("");
   const [groupDescriptionEdit, setGroupDescriptionEdit] = useState("");
-  const [isGroupAdmin, setIsGroupAdmin] = useState(false);
+  const [_isGroupAdmin, setIsGroupAdmin] = useState(false);
   const [isUpdatingGroup, setIsUpdatingGroup] = useState(false);
   const [showAddParticipantsModal, setShowAddParticipantsModal] = useState(false);
   const [possibleParticipants, setPossibleParticipants] = useState<User[]>([]);

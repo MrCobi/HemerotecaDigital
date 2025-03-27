@@ -17,7 +17,7 @@ interface NewMessageModalProps {
   onClose: () => void;
   mutualFollowers: User[];
   onUserSelect: (user: User) => void;
-  currentUserId: string;
+  _currentUserId: string;
   isCreatingConversation: boolean;
 }
 
@@ -26,7 +26,7 @@ const NewMessageModal = React.memo(({
   onClose,
   mutualFollowers,
   onUserSelect,
-  currentUserId,
+  _currentUserId,
   isCreatingConversation
 }: NewMessageModalProps) => {
   // Estado local para la búsqueda
@@ -182,7 +182,7 @@ const NewMessageModal = React.memo(({
             ) : (
               <div className="py-8 text-center text-gray-500">
                 {searchTerm ? (
-                  <p>No se encontraron usuarios con "{searchTerm}"</p>
+                  <p>No se encontraron usuarios con &quot;{searchTerm}&quot;</p>
                 ) : (
                   <p>No tienes seguidores mutuos</p>
                 )}

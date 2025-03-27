@@ -27,6 +27,26 @@ export function useChatContent(
   const loadingMoreRef = useRef(false);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
+  // Función para desplazarse al final de los mensajes
+  const scrollToBottom = useCallback(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messagesEndRef]);
+
+  // Marcar conversación como leída
+  const markConversationAsRead = useCallback(async () => {
+    if (!conversationId || !session?.user?.id) return;
+    
+    try {
+      await fetch(`/api/messages/read/${conversationId}`, {
+        method: 'PUT',
+      });
+    } catch (error) {
+      console.error('Error al marcar conversación como leída:', error);
+    }
+  }, [conversationId, session?.user?.id]);
+
   // Socket para mensajes en tiempo real
   const { 
     connected, 
@@ -66,11 +86,11 @@ export function useChatContent(
   });
 
   // Cargar mensajes
-  const fetchMessages = useCallback(async (reset = false) => {
+  const fetchMessages = useCallback(async () => {
     if (!conversationId || !session?.user?.id || loadingMoreRef.current) return;
     
-    const pageToLoad = reset ? 1 : page;
-    if (reset) {
+    const pageToLoad = firstLoadRef.current ? 1 : page;
+    if (firstLoadRef.current) {
       setPage(1);
       setHasMoreMessages(true);
     }
@@ -90,23 +110,24 @@ export function useChatContent(
       const data = await response.json();
       
       // Formatear mensajes
-      const formattedMessages = data.messages.map((msg: any) => ({
+      const formattedMessages = data.messages.map((msg: Partial<Message>) => ({
         id: msg.id,
-        content: msg.content,
-        createdAt: new Date(msg.createdAt),
+        content: msg.content || '',
+        createdAt: new Date(msg.createdAt as string),
         read: Boolean(msg.read),
-        senderId: msg.senderId,
-        sender: msg.sender || {
-          id: msg.senderId,
-          username: msg.senderUsername || 'Usuario',
-          image: msg.senderImage || null,
+        senderId: msg.senderId as string,
+        sender: {
+          id: msg.senderId as string,
+          username: msg.sender ? (msg.sender as { username?: string | null }).username || 'Usuario' : 'Usuario',
+          image: msg.sender ? (msg.sender as { image?: string | null }).image || '/placeholders/user.png' : '/placeholders/user.png',
         },
         messageType: msg.messageType || 'text',
         imageUrl: msg.imageUrl,
+        status: msg.status || 'sent',
       }));
       
       // Actualizar estado
-      if (reset) {
+      if (firstLoadRef.current) {
         setMessages(formattedMessages);
       } else {
         setMessages(prev => [...formattedMessages, ...prev]);
@@ -122,7 +143,7 @@ export function useChatContent(
       }
       
       // Incrementar página para próxima carga
-      if (!reset) {
+      if (!firstLoadRef.current) {
         setPage(prev => prev + 1);
       }
       
@@ -133,7 +154,7 @@ export function useChatContent(
       setLoading(false);
       loadingMoreRef.current = false;
     }
-  }, [conversationId, page, session?.user?.id]);
+  }, [conversationId, page, session?.user?.id, markConversationAsRead]);
 
   // Cargar participantes del grupo
   const fetchParticipants = useCallback(async () => {
@@ -161,20 +182,6 @@ export function useChatContent(
       console.error('Error fetching participants:', error);
     }
   }, [conversationId, conversation]);
-
-  // Marcar conversación como leída
-  const markConversationAsRead = useCallback(async (conversationId?: string) => {
-    if (!conversationId || !session?.user?.id) return;
-    
-    try {
-      await fetch(`/api/messages/read?senderId=${conversationId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-    } catch (error) {
-      console.error('Error marking conversation as read:', error);
-    }
-  }, [session?.user?.id]);
 
   // Enviar mensaje de texto
   const sendTextMessage = useCallback(async () => {
@@ -231,7 +238,7 @@ export function useChatContent(
     } finally {
       setSendingMessage(false);
     }
-  }, [conversationId, session?.user, newMessageContent, connected, sendMessage]);
+  }, [conversationId, session?.user, newMessageContent, connected, sendMessage, scrollToBottom]);
 
   // Enviar mensaje con imagen
   const sendImageMessage = useCallback(async () => {
@@ -266,7 +273,7 @@ export function useChatContent(
           // Éxito
           console.log('Imagen enviada correctamente');
           // Recargar mensajes para mostrar la imagen
-          fetchMessages(true);
+          fetchMessages();
           // Limpiar estado
           setNewMessageContent('');
           setImageToSend(null);
@@ -303,23 +310,23 @@ export function useChatContent(
   }, [imageToSend, sendImageMessage, sendTextMessage]);
 
   // Añadir nuevo mensaje recibido
-  const addNewMessage = useCallback((message: any) => {
+  const addNewMessage = useCallback((message: Partial<Message>) => {
     // Formatear el mensaje
     const formattedMessage: Message = {
       id: message.id,
       tempId: message.tempId,
-      content: message.content,
-      createdAt: new Date(message.createdAt),
+      content: message.content || '',
+      createdAt: message.createdAt ? new Date(message.createdAt as string) : new Date(),
       read: Boolean(message.read),
-      senderId: message.senderId,
-      sender: message.sender || {
-        id: message.senderId,
-        username: message.senderUsername || 'Usuario',
-        image: message.senderImage || null,
+      senderId: message.senderId as string,
+      sender: {
+        id: message.senderId as string,
+        username: message.sender ? (message.sender as { username?: string | null }).username || 'Usuario' : 'Usuario',
+        image: message.sender ? (message.sender as { image?: string | null }).image || '/placeholders/user.png' : '/placeholders/user.png',
       },
       messageType: message.messageType || 'text',
       imageUrl: message.mediaUrl,
-      status: (message.status || 'sent') as Message['status']
+      status: message.status || 'sent',
     };
 
     // Actualizar la lista de mensajes
@@ -346,7 +353,7 @@ export function useChatContent(
 
     // Si el mensaje es del otro participante, marcar conversación como leída
     if (message.senderId !== session?.user?.id && message.conversationId) {
-      markConversationAsRead(message.conversationId);
+      markConversationAsRead();
     }
   }, [session?.user?.id, markConversationAsRead]);
 
@@ -372,13 +379,6 @@ export function useChatContent(
     }
   }, [hasMoreMessages, loading, fetchMessages]);
 
-  // Desplazar al final de la conversación
-  const scrollToBottom = useCallback(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, []);
-
   // Manejar scroll para cargar más mensajes
   const handleScroll = useCallback(() => {
     const container = messagesContainerRef.current;
@@ -394,7 +394,7 @@ export function useChatContent(
   useEffect(() => {
     if (conversationId) {
       firstLoadRef.current = true;
-      fetchMessages(true);
+      fetchMessages();
       fetchParticipants();
       
       // Unirse a la conversación por socket

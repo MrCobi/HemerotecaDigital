@@ -4,11 +4,11 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/src/app/components/ui/button";
-import { Loader2, MessageSquare, MessageSquarePlus, Users, MessageCircle, Plus } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
+import { Loader2, MessageSquarePlus, Users, MessageCircle, Plus } from "lucide-react";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import NewMessageModal from "../components/Chat/NewMessageModal";
-import CreateGroupModal from "../components/Chat/CreateGroupModal";
+import _NewMessageModal from "../components/Chat/NewMessageModal";
+import _CreateGroupModal from "../components/Chat/CreateGroupModal";
 import Image from "next/image";
 import { useMessagesState } from "./hooks/useMessagesState";
 import MessageContainer from "../components/Chat/MessageContainer";
@@ -16,7 +16,7 @@ import GroupManagementModal from '../components/Chat/GroupManagementModal';
 import { MessageService } from "./services/messageService";
 import { FilterType, User, Participant, Conversation, CombinedItem } from "./types";
 import { Input } from "@/src/app/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/src/app/components/ui/avatar";
+import { Avatar } from "@/src/app/components/ui/avatar";
 import { useToast } from "@/src/app/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
 
@@ -91,10 +91,10 @@ export default function MessagesPage() {
   // Estados para modales
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showAddParticipantsModal, setShowAddParticipantsModal] = useState(false);
+  const [_showProfileModal, _setShowProfileModal] = useState(false);
+  const [_showAddParticipantsModal, setShowAddParticipantsModal] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
-  const [selectedUserProfile, setSelectedUserProfile] = useState<User | null>(null);
+  const [_selectedUserProfile, _setSelectedUserProfile] = useState<User | null>(null);
   const [createGroupState, setCreateGroupState] = useState<{
     name: string;
     description: string;
@@ -374,7 +374,7 @@ export default function MessagesPage() {
   }, []);
 
   // Función para añadir participantes al grupo existente
-  const handleAddParticipantsToGroup = useCallback(async (participantIds: string[]) => {
+  const _handleAddParticipantsToGroup = useCallback(async (participantIds: string[]) => {
     if (!selectedConversationData || participantIds.length === 0) return;
     
     try {
@@ -657,14 +657,15 @@ export default function MessagesPage() {
           {selectedConversation && selectedConversationData ? (
             <MessageContainer
               key={selectedConversation}
-              selectedConversation={selectedConversation}
-              selectedConversationData={selectedConversationData}
-              onBackClick={mobileView ? () => deselectConversation() : () => {}}
-              onSettingsClick={
+              _selectedConversation={selectedConversation}
+              _selectedConversationData={selectedConversationData}
+              _onBackClick={mobileView ? () => deselectConversation() : () => {}}
+              _onSettingsClick={
                 selectedConversationData.isGroup ? () => toggleGroupManagementModal() : () => {}
               }
-              loading={false}
-              isMobileView={mobileView}
+              _loading={false}
+              _isMobileView={mobileView}
+              _currentUserId={session?.user?.id}
             />
           ) : (
             <EmptyState

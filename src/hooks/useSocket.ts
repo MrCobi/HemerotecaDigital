@@ -40,7 +40,7 @@ const stopHeartbeat = () => {
 };
 
 // Funciones para mensajes pendientes
-const getPendingMessages = (): Record<string, any>[] => {
+const getPendingMessages = (): Record<string, unknown>[] => {
   // No se almacenan mensajes pendientes, siempre retorna array vacío
   return [];
 };
@@ -52,46 +52,43 @@ const clearAllPendingMessages = () => {
 };
 
 // Función para limpiar mensajes de una conversación específica
-const clearConversationPendingMessages = (conversationId: string) => {
+const clearConversationPendingMessages = (_conversationId: string) => {
   // No hay necesidad de hacer nada ya que no se almacenan mensajes
   console.log(`[Socket] No hay mensajes pendientes que limpiar para la conversación (desactivado)`);
 };
 
-const storePendingMessage = (message: Record<string, any>) => {
+const _storePendingMessage = (_message: Record<string, unknown>) => {
   // No se almacenan mensajes pendientes
   console.log('[Socket] Almacenamiento de mensajes desactivado, no se guardará el mensaje pendiente');
 };
 
-const removePendingMessage = (messageId: string) => {
+const removePendingMessage = (_messageId: string) => {
   // No hay necesidad de hacer nada ya que no se almacenan mensajes
-  console.log('[Socket] No hay mensajes pendientes que eliminar (desactivado)');
+  console.log(`[Socket] No hay mensajes pendientes que eliminar (desactivado)`);
 };
 
-const clearOldPendingMessages = () => {
+// Función para limpiar mensajes pendientes antiguos
+const _clearOldPendingMessages = () => {
   // No hay necesidad de hacer nada ya que no se almacenan mensajes
   console.log('[Socket] No hay mensajes antiguos que limpiar (desactivado)');
 };
 
-export type MessageType = {
+// Define the MessageType interface for type safety
+interface MessageType {
   id?: string;
-  tempId?: string;
+  tempId: string;
   content: string | null;
   senderId: string;
   receiverId?: string;
   conversationId?: string;
+  createdAt: string;
   mediaUrl?: string;
   messageType?: 'text' | 'image' | 'voice' | 'file' | 'video';
-  createdAt: Date | string;
-  read?: boolean;
-  sender?: {
-    id: string;
-    username: string | null;
-    name?: string | null;
-    image?: string | null;
-  };
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
-  retries?: number;
-};
+  read?: boolean;
+  // Extension property for retry tracking that's not part of the server model
+  _retryAttempt?: number;
+}
 
 export type UserType = {
   userId: string;
@@ -138,6 +135,19 @@ interface UseSocketOptions {
   onError?: (error: Error | unknown) => void;
 }
 
+// Helper function to get message status with type safety
+function getMessageStatus(message: Record<string, unknown>): MessageType['status'] | undefined {
+  const status = message.status as string | undefined;
+  if (status === "sending" || 
+      status === "sent" || 
+      status === "delivered" || 
+      status === "read" || 
+      status === "failed") {
+    return status;
+  }
+  return undefined;
+}
+
 export default function useSocket(options: UseSocketOptions) {
   const {
     userId,
@@ -153,8 +163,8 @@ export default function useSocket(options: UseSocketOptions) {
   } = options;
 
   const [connected, setConnected] = useState(false);
-  const [error, setError] = useState<Error | unknown>(null);
-  const [onlineUsers, setOnlineUsers] = useState<UserType[]>([]);
+  const [_error, _setError] = useState<Error | unknown>(null);
+  const [_onlineUsers, _setOnlineUsers] = useState<UserType[]>([]);
 
   // Use a properly typed ref for the socket that points to the global instance
   const socketRef = useRef<Socket | null>(null);
@@ -171,7 +181,7 @@ export default function useSocket(options: UseSocketOptions) {
   });
 
   // Estado para mensajes en proceso de envío
-  const [messagesInFlight, setMessagesInFlight] = useState<Record<string, boolean>>({});
+  const [_messagesInFlight, setMessagesInFlight] = useState<Record<string, boolean>>({});
   const messageRetryTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
   
   // Variables para la estrategia de backoff
@@ -209,7 +219,7 @@ export default function useSocket(options: UseSocketOptions) {
   ]);
 
   // Estado de actividad del usuario
-  const [isActive, setIsActive] = useState(true);
+  const [isActive, _setIsActive] = useState(true);
   const inactivityTimeout = useRef<NodeJS.Timeout | null>(null);
   const activeConversations = useRef<Set<string>>(new Set());
   
@@ -220,7 +230,9 @@ export default function useSocket(options: UseSocketOptions) {
     }
     
     // Al comenzar, marcamos como activos sin usar setState
-    isActive && userId && socketRef.current?.emit('user_active', { active: true });
+    if (isActive && userId && socketRef.current) {
+      socketRef.current.emit('user_active', { active: true });
+    }
     
     // Configurar nuevo timer sin usar setState
     inactivityTimeout.current = setTimeout(() => {
@@ -229,12 +241,70 @@ export default function useSocket(options: UseSocketOptions) {
         console.log('Usuario inactivo por 60 segundos');
         // Enviar evento de inactividad sin cambiar estado
         socketRef.current.emit('user_active', { active: false });
-        
-        // Al terminar, configuramos otro timer sin usar setState
-        resetInactivityTimer();
       }
-    }, 60000); // 60 segundos
-  }, [userId, isActive]);
+    }, 60000); // 60 segundos de inactividad
+  }, [isActive, userId]);
+
+  // Define the function implementation to process pending messages
+  function processPendingMessagesImpl(socketRef: React.MutableRefObject<Socket | null>, connected: boolean, userId: string | null) {
+    if (!socketRef.current || !connected) return;
+    
+    // Obtener mensajes pendientes
+    const pendingMessages = getPendingMessages();
+    
+    if (pendingMessages.length > 0) {
+      console.log(`[Socket] Procesando ${pendingMessages.length} mensajes pendientes...`);
+      
+      // Procesar mensajes con un retraso para evitar saturación
+      setTimeout(() => {
+        pendingMessages.forEach((message, index) => {
+          setTimeout(() => {
+            if (socketRef.current && socketRef.current.connected) {
+              // Solo reenviar si el socket aún está conectado
+              const conversationId = message.conversationId as string | undefined;
+              const senderId = message.senderId as string | undefined;
+              
+              if (conversationId && senderId) {
+                console.log(`[Socket] Reenviando mensaje pendiente:`, message);
+                
+                // Crear un objeto de mensaje compatible con MessageType
+                const typedMessage: MessageType = {
+                  id: message.id as string | undefined,
+                  tempId: (message.tempId as string) || `temp-${Date.now()}-${index}`,
+                  content: (message.content as string) || "",
+                  senderId: (message.senderId as string) || userId || "",
+                  conversationId: message.conversationId as string | undefined,
+                  receiverId: message.receiverId as string | undefined,
+                  createdAt: (message.createdAt as string) || new Date().toISOString(),
+                  status: getMessageStatus(message) || "sending",
+                  _retryAttempt: (((message._retryAttempt as number) || 0) + 1)
+                };
+                
+                // Limitar los reintentos
+                const retryAttempt = typedMessage._retryAttempt || 0;
+                if (retryAttempt <= 3) {
+                  socketRef.current.emit('send_message', typedMessage);
+                } else {
+                  console.log(`[Socket] Demasiados intentos de reenvío para el mensaje:`, typedMessage);
+                  // Opcionalmente, eliminar del almacenamiento
+                  if (typedMessage.tempId) {
+                    removePendingMessage(typedMessage.tempId);
+                  }
+                }
+              } else {
+                console.log(`[Socket] Mensaje pendiente no reenviado automáticamente:`, message);
+              }
+            }
+          }, index * 500); // 500ms entre mensajes para no saturar
+        });
+      }, 1000); // Esperar 1 segundo después de la conexión para empezar a enviar
+    }
+  };
+
+  // Usar una referencia para la función processPendingMessages
+  const processPendingMessages = useCallback(() => {
+    processPendingMessagesImpl(socketRef, connected, userId || null);
+  }, [connected, userId]); 
 
   // Configurar manejadores de eventos del socket
   const setupEventHandlers = useCallback(() => {
@@ -355,7 +425,7 @@ export default function useSocket(options: UseSocketOptions) {
         callbacksRef.current.onMessageRead(data);
       }
     });
-  }, [userId, username]);
+  }, [processPendingMessages, userId, username]);
 
   // Función para inicializar el socket
   const initSocket = useCallback(() => {
@@ -368,6 +438,14 @@ export default function useSocket(options: UseSocketOptions) {
       socketRef.current = globalSocket;
       setupEventHandlers();
       setConnected(true);
+      
+      // Procesar mensajes pendientes
+      processPendingMessages();
+      
+      if (callbacksRef.current.onConnect) {
+        callbacksRef.current.onConnect();
+      }
+      
       return;
     }
     
@@ -404,68 +482,10 @@ export default function useSocket(options: UseSocketOptions) {
     setupEventHandlers();
     connectionAttemptInProgress = false;
     reconnectAttempts.current = 0;
-  }, [userId, setupEventHandlers, instanceId]);
-
-  // Procesar mensajes pendientes cuando se conecta
-  const processPendingMessages = useCallback(() => {
-    if (!socketRef.current || !connected || !userId) {
-      console.log('[Socket] No se pueden procesar mensajes pendientes: socket desconectado');
-      return;
-    }
-    
-    console.log('[Socket] Procesando mensajes pendientes...');
-    
-    // Limpiar mensajes antiguos
-    clearOldPendingMessages();
-    
-    // Obtener mensajes pendientes
-    const pendingMessages = getPendingMessages();
-    
-    if (pendingMessages.length > 0) {
-      console.log(`[Socket] Encontrados ${pendingMessages.length} mensajes pendientes`);
-      
-      // Añadir un retraso inicial para asegurar que la conexión está estable
-      setTimeout(() => {
-        // Enviar mensajes con un pequeño retraso entre ellos
-        pendingMessages.forEach((message, index) => {
-          setTimeout(() => {
-            if (socketRef.current && socketRef.current.connected) {
-              // Solo reenviar si el mensaje es del usuario actual Y si el usuario confirma el reenvío
-              if (message.senderId === userId) {
-                const confirmReenvio = localStorage.getItem('autoResendMessages') === 'true';
-                
-                // Solo reenviar automáticamente si el usuario ha habilitado esta opción
-                if (confirmReenvio) {
-                  console.log(`[Socket] Reenviando mensaje pendiente:`, message);
-                  
-                  // Asegurarse de que el mensaje tenga un ID temporal si no tiene uno
-                  const messageToSend = {
-                    ...message,
-                    tempId: message.tempId || `temp-${Date.now()}-${index}`,
-                    _retryAttempt: (message._retryAttempt || 0) + 1
-                  };
-                  
-                  // Limitar los reintentos
-                  if (messageToSend._retryAttempt <= 3) {
-                    socketRef.current.emit('send_message', messageToSend);
-                  } else {
-                    console.log(`[Socket] Demasiados intentos de reenvío para el mensaje:`, messageToSend);
-                    // Opcionalmente, eliminar del almacenamiento
-                    removePendingMessage(messageToSend.tempId || '');
-                  }
-                } else {
-                  console.log(`[Socket] Mensaje pendiente no reenviado automáticamente:`, message);
-                }
-              }
-            }
-          }, index * 500); // 500ms entre mensajes para no saturar
-        });
-      }, 1000); // Esperar 1 segundo después de la conexión para empezar a enviar
-    }
-  }, [connected, userId]);
+  }, [userId, setupEventHandlers, instanceId, processPendingMessages]);
 
   // Manejar reconexión con backoff exponencial
-  const handleReconnect = useCallback(() => {
+  const _handleReconnect = useCallback(() => {
     if (reconnectTimeout.current) {
       clearTimeout(reconnectTimeout.current);
     }
@@ -480,45 +500,28 @@ export default function useSocket(options: UseSocketOptions) {
     
     console.log(`[Socket] Intentando reconectar en ${delay}ms (intento ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
     
+    reconnectAttempts.current++;
+    
+    // Programar próximo intento
     reconnectTimeout.current = setTimeout(() => {
-      reconnectAttempts.current++;
-      
-      // Intentar reconexión solo si el usuario sigue en la página de chat
-      if (isActive && userId) {
+      if (isActive) {
         initSocket();
       }
     }, delay);
-  }, [userId, isActive, initSocket]);
+  }, [isActive, initSocket]);
 
-  // Verificar conexión y mostrar mensajes pendientes cada vez que cambian las dependencias
+  // Configurar y limpiar el socket
   useEffect(() => {
-    if (connected && userId) {
-      processPendingMessages();
-    }
-  }, [connected, userId, processPendingMessages]);
-
-  // Reconectar cuando el navegador vuelve a estar online
-  useEffect(() => {
-    const handleOnline = () => {
-      console.log('[Socket] Navegador online, intentando reconectar...');
-      if (userId && socketRef.current && !socketRef.current.connected) {
-        initSocket();
-      }
-    };
+    console.log(`[Socket] Inicializando hook useSocket para usuario: ${userId || 'no autenticado'}`);
     
-    window.addEventListener('online', handleOnline);
+    // Capturar el valor de instanceId al principio del efecto
+    const currentInstanceId = instanceId.current;
     
-    return () => {
-      window.removeEventListener('online', handleOnline);
-    };
-  }, [userId, initSocket]);
-
-  // Initialize socket connection
-  useEffect(() => {
-    if (!userId) return;
-    
-    console.log(`[Socket ${instanceId.current}] Inicializando socket para usuario ${userId}`);
+    // Conectar socket
     initSocket();
+    
+    // Configurar eventos 
+    setupEventHandlers();
     
     // Escuchar eventos de actividad para reiniciar timer sin provocar rerenderizados
     const handleActivity = () => {
@@ -532,8 +535,13 @@ export default function useSocket(options: UseSocketOptions) {
     window.addEventListener('keydown', handleActivity);
     window.addEventListener('click', handleActivity);
     
+    // Establecer temporizador de inactividad
+    resetInactivityTimer();
+    
     return () => {
-      // Limpiar listeners de eventos
+      console.log(`[Socket] Limpiando hook de socket`);
+      
+      // Eliminar listeners de actividad
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('keydown', handleActivity);
       window.removeEventListener('click', handleActivity);
@@ -545,12 +553,21 @@ export default function useSocket(options: UseSocketOptions) {
       }
       
       // No desconectamos el socket global para mantener la conexión
-      console.log(`[Socket ${instanceId.current}] Componente desmontado, manteniendo conexión global`);
+      console.log(`[Socket ${currentInstanceId}] Componente desmontado, manteniendo conexión global`);
     };
-  }, [userId, setupEventHandlers, resetInactivityTimer, initSocket, instanceId]);
+  }, [userId, setupEventHandlers, resetInactivityTimer, initSocket]);
+
+  // Prefixed with underscore since it's currently unused
+  const _handleSocketError = useCallback((errorData: Error | unknown) => {
+    console.error('[Socket] Error:', errorData);
+    
+    if (callbacksRef.current.onError) {
+      callbacksRef.current.onError(errorData);
+    }
+  }, []);
 
   // Función para programar reintento de mensaje
-  const scheduleMessageRetry = useCallback((message: any, attempt: number = 0) => {
+  const scheduleMessageRetry = useCallback((message: MessageType, attempt: number = 0) => {
     const messageId = message.id || message.tempId;
     if (!messageId) return;
     
@@ -597,52 +614,28 @@ export default function useSocket(options: UseSocketOptions) {
   }, [connected, maxRetries]);
 
   // Funciones para interactuar con el socket
-  const sendMessage = useCallback((message: Omit<MessageType, 'createdAt'>) => {
-    // Asegurarse de que hay un id o tempId
-    const messageWithId = {
-      ...message,
-      tempId: message.tempId || message.id || crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      status: 'sending'
-    };
-    
-    const messageId = messageWithId.id || messageWithId.tempId;
-    
-    // Almacenar en pendientes antes de intentar enviar
-    storePendingMessage(messageWithId);
-    
-    // Registrar que estamos intentando enviar este mensaje
-    setMessagesInFlight(prev => ({
-      ...prev,
-      [messageId]: true
-    }));
-    
+  const sendMessage = useCallback((message: Partial<MessageType>) => {
     if (!socketRef.current || !connected) {
-      console.error(`[Socket] No se puede enviar mensaje: socket no conectado`);
-      
-      // Programar reintentos si no hay conexión
-      scheduleMessageRetry(messageWithId);
-      
-      // Informar del estado
-      if (callbacksRef.current.onMessageStatus) {
-        callbacksRef.current.onMessageStatus({
-          messageId,
-          status: 'queued'
-        });
-      }
-      
       return false;
     }
-
+    
     resetInactivityTimer();
-    console.log(`[Socket] Enviando mensaje:`, messageWithId);
+    
+    const messageWithId = {
+      ...message,
+      tempId: message.tempId || `temp-${Date.now()}`,
+      senderId: message.senderId || userId,
+      createdAt: message.createdAt || new Date().toISOString(),
+      status: "sending"
+    };
+    
     socketRef.current.emit('send_message', messageWithId);
     
     // Programar reintento en caso de que no recibamos confirmación
-    scheduleMessageRetry(messageWithId);
+    scheduleMessageRetry(messageWithId as MessageType);
     
     return true;
-  }, [connected, scheduleMessageRetry, resetInactivityTimer]);
+  }, [connected, scheduleMessageRetry, resetInactivityTimer, userId]);
 
   const updateTypingStatus = useCallback(({ conversationId, isTyping }: { conversationId?: string; isTyping: boolean }) => {
     if (!socketRef.current || !connected) {
@@ -735,13 +728,36 @@ export default function useSocket(options: UseSocketOptions) {
     
     console.log(`[Socket ${instanceId.current}] Inicialización automática`);
     initSocket();
-  }, [userId, initSocket, instanceId]);
+  }, [initSocket, instanceId, userId]);
+
+  // Verificar conexión y mostrar mensajes pendientes cada vez que cambian las dependencias
+  useEffect(() => {
+    if (connected && userId) {
+      processPendingMessages();
+    }
+  }, [connected, processPendingMessages, userId]);
+
+  // Reconectar cuando el navegador vuelve a estar online
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[Socket] Navegador online, intentando reconectar...');
+      if (socketRef.current && !socketRef.current.connected) {
+        initSocket();
+      }
+    };
+    
+    window.addEventListener('online', handleOnline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [initSocket, userId]);
 
   // Return the interface
   return {
     connected,
-    error,
-    onlineUsers,
+    error: _error,
+    onlineUsers: _onlineUsers,
     sendMessage,
     updateTypingStatus,
     markMessageAsRead,

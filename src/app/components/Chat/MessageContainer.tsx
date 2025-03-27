@@ -1,12 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, Settings } from 'lucide-react';
-import { Button } from "@/src/app/components/ui/button";
-import { Avatar } from "@/src/app/components/ui/avatar";
-import { CldImage } from "next-cloudinary";
-import Image from "next/image";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 
 // Importar correctamente el componente optimizado
@@ -15,32 +10,32 @@ import OptimizedChatWindow from "./OptimizedChatWindow";
 import { ConversationData, User } from '@/src/app/messages/types';
 
 interface MessageContainerProps {
-  selectedConversation?: string | null;
-  selectedConversationData?: ConversationData | null;
-  conversation?: ConversationData;
-  onBackClick: () => void;
-  onSettingsClick: () => void;
-  onUserProfileClick?: (user: User) => void;
-  loading?: boolean;
-  isMobileView?: boolean;
-  currentUserId?: string;
+  _selectedConversation?: string | null;
+  _selectedConversationData?: ConversationData | null;
+  _conversation?: ConversationData;
+  _onBackClick: () => void;
+  _onSettingsClick: () => void;
+  _onUserProfileClick?: (user: User) => void;
+  _loading?: boolean;
+  _isMobileView?: boolean;
+  _currentUserId?: string;
 }
 
 const MessageContainer = React.memo(({
-  selectedConversation,
-  selectedConversationData,
-  conversation,
-  onBackClick,
-  onSettingsClick,
-  onUserProfileClick,
-  loading = false,
-  isMobileView = false,
-  currentUserId
+  _selectedConversation,
+  _selectedConversationData,
+  _conversation,
+  _onBackClick,
+  _onSettingsClick,
+  _onUserProfileClick,
+  _loading = false,
+  _isMobileView = false,
+  _currentUserId
 }: MessageContainerProps) => {
-  const { data: session } = useSession();
+  const { data: _session } = useSession();
   
   // Si no hay conversación seleccionada o estamos en modo móvil sin conversación, mostrar mensaje
-  if (!selectedConversation || (isMobileView && !selectedConversation)) {
+  if (!_selectedConversation || (_isMobileView && !_selectedConversation)) {
     return (
       <div className="flex-1 bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
         <div className="text-center">
@@ -59,7 +54,7 @@ const MessageContainer = React.memo(({
   }
 
   // Si está cargando, mostrar spinner
-  if (loading) {
+  if (_loading) {
     return (
       <div className="flex-1 bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
         <LoadingSpinner className="w-8 h-8 text-blue-500" />
@@ -69,7 +64,7 @@ const MessageContainer = React.memo(({
   }
 
   // Si no hay datos de conversación pero hay ID, mostrar error
-  if (selectedConversation && !selectedConversationData) {
+  if (_selectedConversation && !_selectedConversationData) {
     return (
       <div className="flex-1 bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
         <div className="text-center">
@@ -87,20 +82,20 @@ const MessageContainer = React.memo(({
     );
   }
 
-  // En este punto, sabemos que selectedConversationData no es null
-  const conversationData = selectedConversationData!;
+  // En este punto, sabemos que _selectedConversationData no es null
+  const conversationData = _selectedConversationData!;
   // Determinar si la conversación es un grupo
   const isGroup = conversationData.isGroup;
-  const isRealGroup = isGroup && conversationData.participants && conversationData.participants.length > 0;
+  const _isRealGroup = isGroup && conversationData.participants && conversationData.participants.length > 0;
 
   return (
     <div className="flex-1 flex flex-col">
       {/* Conversación */}
       <OptimizedChatWindow 
-        conversationId={selectedConversation} 
+        conversationId={_selectedConversation} 
         conversation={conversationData}
-        currentUserId={currentUserId || session?.user?.id || ""}
-        onUserProfileClick={onUserProfileClick}
+        currentUserId={_currentUserId || _session?.user?.id || ""}
+        _onUserProfileClick={_onUserProfileClick}
         className="h-full"
       />
     </div>

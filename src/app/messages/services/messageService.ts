@@ -1,5 +1,5 @@
 // src/app/messages/services/messageService.ts
-import { ConversationData, Message, User, Participant } from '../types';
+import { ConversationData, User } from '../types';
 
 /**
  * Servicio centralizado para operaciones relacionadas con mensajes
@@ -11,7 +11,7 @@ export class MessageService {
    * @param limit Número máximo de conversaciones a obtener
    * @returns Lista de conversaciones
    */
-  static async fetchConversations(limit = 15): Promise<any> {
+  static async fetchConversations(limit = 15): Promise<ConversationData[]> {
     try {
       const response = await fetch(
         `/api/messages/conversations?limit=${limit}`
@@ -22,9 +22,9 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error('Error fetching conversations:', error);
-      throw error;
+    } catch (_e) {
+      console.error('Error fetching conversations:', _e);
+      throw _e;
     }
   }
 
@@ -33,7 +33,7 @@ export class MessageService {
    * @param conversationId ID de la conversación
    * @returns Datos de la conversación
    */
-  static async fetchConversationById(conversationId: string): Promise<any> {
+  static async fetchConversationById(conversationId: string): Promise<ConversationData> {
     try {
       const response = await fetch(`/api/messages/conversations/${conversationId}`);
       
@@ -42,20 +42,44 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error(`Error fetching conversation ${conversationId}:`, error);
-      throw error;
+    } catch (_e) {
+      console.error(`Error fetching conversation ${conversationId}:`, _e);
+      throw _e;
     }
   }
 
   /**
    * Obtiene los mensajes de una conversación
    * @param conversationId ID de la conversación
-   * @param page Número de página
+   * @param page Número de página (para paginación)
    * @param limit Número de mensajes por página
    * @returns Lista de mensajes
    */
-  static async fetchMessages(conversationId: string, page = 1, limit = 20): Promise<any> {
+  static async fetchMessages(
+    conversationId: string, 
+    page = 1, 
+    limit = 20
+  ): Promise<{ 
+    messages: Array<{
+      id: string;
+      content: string | null;
+      createdAt: string;
+      read: boolean;
+      senderId: string;
+      senderUsername?: string;
+      senderImage?: string;
+      sender?: {
+        id: string;
+        username?: string | null;
+        name?: string | null;
+        image?: string | null;
+      };
+      messageType?: 'text' | 'image' | 'voice' | 'file' | 'video';
+      imageUrl?: string;
+      status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+    }>; 
+    hasMore: boolean;
+  }> {
     try {
       const response = await fetch(
         `/api/messages/conversations/${conversationId}/messages?page=${page}&limit=${limit}`
@@ -66,9 +90,9 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      throw error;
+    } catch (_e) {
+      console.error('Error fetching messages:', _e);
+      throw _e;
     }
   }
 
@@ -77,7 +101,7 @@ export class MessageService {
    * @param receiverId ID del usuario con quien crear la conversación
    * @returns Datos de la nueva conversación
    */
-  static async createConversation(receiverId: string): Promise<any> {
+  static async createConversation(receiverId: string): Promise<ConversationData> {
     try {
       const response = await fetch('/api/messages/conversations', {
         method: 'POST',
@@ -90,9 +114,9 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error('Error creating conversation:', error);
-      throw error;
+    } catch (_e) {
+      console.error('Error creating conversation:', _e);
+      throw _e;
     }
   }
 
@@ -105,9 +129,9 @@ export class MessageService {
       await fetch(`/api/messages/conversations/${conversationId}/read`, {
         method: 'POST'
       });
-    } catch (error) {
-      console.error('Error marking conversation as read:', error);
-      throw error;
+    } catch (_e) {
+      console.error('Error marking conversation as read:', _e);
+      throw _e;
     }
   }
 
@@ -117,7 +141,24 @@ export class MessageService {
    * @param content Contenido del mensaje
    * @returns Datos del mensaje enviado
    */
-  static async sendTextMessage(conversationId: string, content: string): Promise<any> {
+  static async sendTextMessage(conversationId: string, content: string): Promise<{
+    id: string;
+    content: string;
+    createdAt: string;
+    read: boolean;
+    senderId: string;
+    senderUsername?: string;
+    senderImage?: string;
+    sender?: {
+      id: string;
+      username?: string | null;
+      name?: string | null;
+      image?: string | null;
+    };
+    messageType?: 'text' | 'image' | 'voice' | 'file' | 'video';
+    imageUrl?: string;
+    status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  }> {
     try {
       const response = await fetch(`/api/messages/conversations/${conversationId}/messages`, {
         method: 'POST',
@@ -130,9 +171,9 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error('Error sending message:', error);
-      throw error;
+    } catch (_e) {
+      console.error('Error sending message:', _e);
+      throw _e;
     }
   }
 
@@ -149,7 +190,24 @@ export class MessageService {
     file: File, 
     content?: string,
     onProgress?: (progress: number) => void
-  ): Promise<any> {
+  ): Promise<{
+    id: string;
+    content: string | null;
+    createdAt: string;
+    read: boolean;
+    senderId: string;
+    senderUsername?: string;
+    senderImage?: string;
+    sender?: {
+      id: string;
+      username?: string | null;
+      name?: string | null;
+      image?: string | null;
+    };
+    messageType?: 'text' | 'image' | 'voice' | 'file' | 'video';
+    imageUrl?: string;
+    status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  }> {
     return new Promise((resolve, reject) => {
       const formData = new FormData();
       formData.append('file', file);
@@ -163,9 +221,9 @@ export class MessageService {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `/api/messages/conversations/${conversationId}/upload`, true);
       
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && onProgress) {
-          const progress = Math.round((event.loaded / event.total) * 100);
+      xhr.upload.onprogress = (_e) => {
+        if (_e.lengthComputable && onProgress) {
+          const progress = Math.round((_e.loaded / _e.total) * 100);
           onProgress(progress);
         }
       };
@@ -174,9 +232,29 @@ export class MessageService {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const data = JSON.parse(xhr.responseText);
-            resolve(data);
-          } catch (e) {
-            resolve({ success: true });
+            resolve({
+              id: data.id || '',
+              content: data.content || null,
+              createdAt: data.createdAt || new Date().toISOString(),
+              read: data.read || false,
+              senderId: data.senderId || '',
+              senderUsername: data.senderUsername,
+              senderImage: data.senderImage,
+              sender: data.sender,
+              messageType: data.messageType || 'image',
+              imageUrl: data.imageUrl || data.mediaUrl,
+              status: data.status || 'sent'
+            });
+          } catch {
+            resolve({
+              id: '',
+              content: null,
+              createdAt: new Date().toISOString(),
+              read: false,
+              senderId: '',
+              messageType: 'image',
+              status: 'sent'
+            });
           }
         } else {
           reject(new Error(`Error uploading image: ${xhr.status}`));
@@ -205,8 +283,8 @@ export class MessageService {
       
       const data = await response.json();
       return data.count || 0;
-    } catch (error) {
-      console.error('Error fetching unread count:', error);
+    } catch (_e) {
+      console.error('Error fetching unread count:', _e);
       return 0;
     }
   }
@@ -224,8 +302,8 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error('Error fetching mutual followers:', error);
+    } catch (_e) {
+      console.error('Error fetching mutual followers:', _e);
       return [];
     }
   }
@@ -244,7 +322,7 @@ export class MessageService {
       image?: File;
     },
     onProgress?: (progress: number) => void
-  ): Promise<any> {
+  ): Promise<ConversationData> {
     try {
       // Si hay una imagen, primero la subimos para obtener la URL
       let imageUrl = undefined;
@@ -292,9 +370,9 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error('Error creating group:', error);
-      throw error;
+    } catch (_e) {
+      console.error('Error creating group:', _e);
+      throw _e;
     }
   }
 
@@ -304,7 +382,7 @@ export class MessageService {
    * @param updates Campos a actualizar
    * @returns Datos actualizados del grupo
    */
-  static async updateGroup(groupId: string, updates: Partial<ConversationData>): Promise<any> {
+  static async updateGroup(groupId: string, updates: Partial<ConversationData>): Promise<ConversationData> {
     try {
       const response = await fetch(`/api/messages/groups/${groupId}`, {
         method: 'PATCH',
@@ -317,18 +395,18 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error('Error updating group:', error);
-      throw error;
+    } catch (_e) {
+      console.error('Error updating group:', _e);
+      throw _e;
     }
   }
 
   /**
-   * Elimina un grupo
+   * Elimina un grupo de conversación
    * @param groupId ID del grupo
    * @returns Respuesta de la API
    */
-  static async deleteGroup(groupId: string): Promise<any> {
+  static async deleteGroup(groupId: string): Promise<{ success?: boolean }> {
     try {
       const response = await fetch(`/api/messages/groups/${groupId}`, {
         method: 'DELETE'
@@ -339,18 +417,18 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error('Error deleting group:', error);
-      throw error;
+    } catch (_e) {
+      console.error('Error deleting group:', _e);
+      throw _e;
     }
   }
 
   /**
-   * Sale de un grupo
+   * Permite al usuario abandonar un grupo
    * @param groupId ID del grupo
    * @returns Respuesta de la API
    */
-  static async leaveGroup(groupId: string): Promise<any> {
+  static async leaveGroup(groupId: string): Promise<{ success?: boolean }> {
     try {
       const response = await fetch(`/api/messages/groups/${groupId}/leave`, {
         method: 'POST'
@@ -361,9 +439,9 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error('Error leaving group:', error);
-      throw error;
+    } catch (_e) {
+      console.error('Error leaving group:', _e);
+      throw _e;
     }
   }
 
@@ -373,7 +451,7 @@ export class MessageService {
    * @param participantIds IDs de los usuarios a añadir
    * @returns Respuesta de la API
    */
-  static async addGroupParticipants(groupId: string, participantIds: string[]): Promise<any> {
+  static async addGroupParticipants(groupId: string, participantIds: string[]): Promise<{ success?: boolean }> {
     try {
       const response = await fetch(`/api/messages/groups/${groupId}/participants`, {
         method: 'POST',
@@ -386,9 +464,9 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error('Error adding participants:', error);
-      throw error;
+    } catch (_e) {
+      console.error('Error adding participants:', _e);
+      throw _e;
     }
   }
 
@@ -398,7 +476,7 @@ export class MessageService {
    * @param participantId ID del participante a eliminar
    * @returns Respuesta de la API
    */
-  static async removeGroupParticipant(groupId: string, participantId: string): Promise<any> {
+  static async removeGroupParticipant(groupId: string, participantId: string): Promise<{ success?: boolean }> {
     try {
       const response = await fetch(`/api/messages/groups/${groupId}/participants/${participantId}`, {
         method: 'DELETE'
@@ -409,9 +487,9 @@ export class MessageService {
       }
       
       return await response.json();
-    } catch (error) {
-      console.error('Error removing participant:', error);
-      throw error;
+    } catch (_e) {
+      console.error('Error removing participant:', _e);
+      throw _e;
     }
   }
 
@@ -419,14 +497,14 @@ export class MessageService {
    * Actualiza la imagen de un grupo
    * @param groupId ID del grupo
    * @param image Archivo de imagen
-   * @param onProgress Callback para el progreso de la carga
-   * @returns Promise que se resuelve cuando la carga se completa
+   * @param onProgress Función de callback para el progreso de carga
+   * @returns Promesa con la respuesta
    */
-  static updateGroupImage(
+  static async updateGroupImage(
     groupId: string, 
     image: File,
     onProgress?: (progress: number) => void
-  ): Promise<any> {
+  ): Promise<{ success?: boolean; imageUrl?: string }> {
     return new Promise((resolve, reject) => {
       const formData = new FormData();
       formData.append('image', image);
@@ -434,10 +512,10 @@ export class MessageService {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `/api/messages/groups/${groupId}/image`, true);
       
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && onProgress) {
-          const progress = Math.round((event.loaded / event.total) * 100);
-          onProgress(progress);
+      xhr.upload.onprogress = (_e) => {
+        if (_e.lengthComputable && onProgress) {
+          const percentComplete = Math.round((_e.loaded / _e.total) * 100);
+          onProgress(percentComplete);
         }
       };
       
@@ -446,7 +524,7 @@ export class MessageService {
           try {
             const data = JSON.parse(xhr.responseText);
             resolve(data);
-          } catch (e) {
+          } catch {
             resolve({ success: true });
           }
         } else {
@@ -455,9 +533,15 @@ export class MessageService {
       };
       
       xhr.onerror = () => {
-        reject(new Error('Network error during image upload'));
+        if (onProgress) onProgress(0);
+        reject(new Error('Error en la conexión'));
       };
-      
+
+      xhr.onabort = () => {
+        if (onProgress) onProgress(0);
+        reject(new Error('Carga cancelada'));
+      };
+
       xhr.send(formData);
     });
   }
