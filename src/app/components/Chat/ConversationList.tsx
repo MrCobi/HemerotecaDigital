@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Avatar } from "@/src/app/components/ui/avatar";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
@@ -27,7 +27,7 @@ interface ConversationListProps {
   selectedFilter: 'all' | 'private' | 'group';
   generalSearchTerm: string;
   onSearchChange: (term: string) => void;
-  session: any;
+  session: Record<string, any>;
   showHeader?: boolean;
   showFilters?: boolean;
 }
@@ -35,11 +35,11 @@ interface ConversationListProps {
 interface ConversationItemProps {
   item: CombinedItem;
   isSelected: boolean;
-  onSelect: (item: any) => void;
-  currentUserId: string;
+  onSelect: (item: Conversation | User) => void;
+  _currentUserId: string;
 }
 
-const ConversationItem = ({ item, isSelected, onSelect, currentUserId }: ConversationItemProps) => {
+const ConversationItem = ({ item, isSelected, onSelect, _currentUserId }: ConversationItemProps) => {
   const isGroup = item.isConversation ? (item.data as Conversation).isGroup : false;
   const isConversation = item.isConversation;
   const user = isConversation ? (item.data as Conversation).otherUser : item.data as User;
@@ -417,8 +417,14 @@ const ConversationList = React.memo(({
               key={item.id}
               item={item}
               isSelected={selectedConversation === item.id}
-              onSelect={item.isConversation ? onConversationSelect : onUserSelect}
-              currentUserId={session?.user?.id || ''}
+              onSelect={(itemData: Conversation | User) => {
+                if (item.isConversation) {
+                  onConversationSelect(itemData as Conversation);
+                } else {
+                  onUserSelect(itemData as User);
+                }
+              }}
+              _currentUserId={session?.user?.id || ''}
             />
           ))
         ) : (
