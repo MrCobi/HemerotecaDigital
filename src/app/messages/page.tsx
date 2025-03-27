@@ -58,7 +58,7 @@ const LoadingSpinner = ({ size = "medium" }: { size?: "small" | "medium" | "larg
   
   return (
     <div className="flex items-center justify-center">
-      <Loader2 className={`animate-spin text-blue-500 ${sizeClasses[size]}`} />
+      <div className={`animate-spin rounded-full border-t-2 border-b-2 border-blue-500 dark:border-blue-400 ${sizeClasses[size]}`}></div>
     </div>
   );
 };
@@ -71,8 +71,8 @@ const EmptyState = ({ icon, title, description, action }: {
   action?: React.ReactNode;
 }) => (
   <div className="flex h-full w-full flex-col items-center justify-center p-6">
-    <div className="mb-4">{icon}</div>
-    <h2 className="mb-2 text-xl font-semibold">{title}</h2>
+    <div className="mb-4 text-blue-500 dark:text-blue-400">{icon}</div>
+    <h2 className="mb-2 text-xl font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
     <p className="mb-6 text-center text-gray-500 dark:text-gray-400">{description}</p>
     {action && <div>{action}</div>}
   </div>
@@ -444,11 +444,8 @@ export default function MessagesPage() {
   // Renderizado condicional para la vista móvil
   if (status === "loading") {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <div className="text-center">
-          <h2 className="mb-2 text-xl font-semibold">Cargando mensajes...</h2>
-          <p className="text-gray-500 dark:text-gray-400">Espera un momento mientras accedemos a tus conversaciones</p>
-        </div>
+      <div className="flex h-screen w-full items-center justify-center bg-white dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 dark:border-blue-400"></div>
       </div>
     );
   }
@@ -460,9 +457,9 @@ export default function MessagesPage() {
 
   // Renderizado principal
   return (
-    <div className="flex h-screen flex-col bg-white dark:bg-gray-950">
+    <div className="flex h-screen flex-col bg-white dark:bg-gray-900">
       {/* Cabecera de la página */}
-      <header className="border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
+      <header className="border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Mensajes</h1>
           
@@ -472,6 +469,7 @@ export default function MessagesPage() {
               size="sm"
               onClick={handleNewMessageClick}
               title="Nuevo mensaje"
+              className={`border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800`}
             >
               <MessageSquarePlus className="mr-1 h-4 w-4" />
               <span className="hidden sm:inline">Mensaje</span>
@@ -482,6 +480,7 @@ export default function MessagesPage() {
               size="sm"
               onClick={handleCreateGroupClick}
               title="Crear grupo"
+              className={`border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800`}
             >
               <Users className="mr-1 h-4 w-4" />
               <span className="hidden sm:inline">Grupo</span>
@@ -496,6 +495,7 @@ export default function MessagesPage() {
                 refreshUnreadCounts();
               }}
               title="Actualizar conversaciones"
+              className={`border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" 
                 stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -513,31 +513,31 @@ export default function MessagesPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Lista de conversaciones (oculta en móvil cuando hay una conversación seleccionada) */}
         {(!mobileView || !selectedConversation) && (
-          <div className="flex flex-col w-full h-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-800">
+          <div className="flex flex-col w-full h-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-700">
             {/* Filtros de conversación únicos */}
-            <div className="flex space-x-1 border-b border-gray-200 p-2 dark:border-gray-800">
+            <div className="flex space-x-1 border-b border-gray-200 p-2 dark:border-gray-700">
               <Button
-                variant={selectedFilter === 'all' ? 'default' : 'ghost'}
+                variant={selectedFilter === 'all' ? 'default' : 'outline'}
                 size="sm"
-                className="flex-1"
+                className={`flex-1 ${selectedFilter === 'all' ? 'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700' : 'border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800'}`}
                 onClick={() => setSelectedFilter('all')}
               >
                 Todos
               </Button>
               
               <Button
-                variant={selectedFilter === 'private' ? 'default' : 'ghost'}
+                variant={selectedFilter === 'private' ? 'default' : 'outline'}
                 size="sm"
-                className="flex-1"
+                className={`flex-1 ${selectedFilter === 'private' ? 'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700' : 'border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800'}`}
                 onClick={() => setSelectedFilter('private')}
               >
-                Directos
+                Privados
               </Button>
               
               <Button
-                variant={selectedFilter === 'group' ? 'default' : 'ghost'}
+                variant={selectedFilter === 'group' ? 'default' : 'outline'}
                 size="sm"
-                className="flex-1"
+                className={`flex-1 ${selectedFilter === 'group' ? 'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700' : 'border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800'}`}
                 onClick={() => setSelectedFilter('group')}
               >
                 Grupos
@@ -545,7 +545,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Campo de búsqueda directo sin pasar por ConversationList */}
-            <div className="p-2 border-b border-gray-200 dark:border-gray-800">
+            <div className="p-2 border-b border-gray-200 dark:border-gray-700">
               <Input
                 value={generalSearchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGeneralSearchTerm(e.target.value)}
@@ -570,7 +570,7 @@ export default function MessagesPage() {
                   return (
                     <div
                       key={item.id}
-                      className={`p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer flex items-start space-x-3 ${selectedConversation === item.id ? "bg-blue-50 dark:bg-gray-700" : ""}`}
+                      className={`p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer flex items-start space-x-3 ${selectedConversation === item.id ? "bg-blue-50 dark:bg-gray-800" : ""}`}
                       onClick={() => {
                         if (isConversation && conversation) {
                           selectConversation(conversation.id);
@@ -641,7 +641,7 @@ export default function MessagesPage() {
                 <div className="h-full flex items-center justify-center p-4">
                   <div className="text-center text-gray-500 dark:text-gray-400">
                     <p className="mb-2">No hay conversaciones disponibles</p>
-                    <Button variant="outline" onClick={handleNewMessageClick}>
+                    <Button variant="outline" onClick={handleNewMessageClick} className={`border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800`}>
                       <MessageSquarePlus className="mr-2 h-4 w-4" /> 
                       Iniciar nueva conversación
                     </Button>
@@ -669,11 +669,11 @@ export default function MessagesPage() {
             />
           ) : (
             <EmptyState
-              icon={<MessageCircle className="h-12 w-12 text-gray-400" />}
+              icon={<MessageCircle className="h-12 w-12 text-blue-500 dark:text-blue-400" />}
               title="Selecciona una conversación"
               description="Elige una conversación de la lista o inicia una nueva para comenzar a chatear."
               action={
-                <Button onClick={handleNewMessageClick}>
+                <Button onClick={handleNewMessageClick} className={`bg-blue-500 hover:bg-blue-600 text-white dark:bg-blue-600 dark:hover:bg-blue-700`}>
                   <MessageSquarePlus className="mr-2 h-4 w-4" />
                   Nuevo mensaje
                 </Button>
@@ -685,9 +685,9 @@ export default function MessagesPage() {
       
       {/* Modal para nuevo mensaje */}
       <Dialog open={showNewMessageModal} onOpenChange={setShowNewMessageModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md dark:bg-gray-800">
           <DialogHeader>
-            <DialogTitle>Nuevo mensaje</DialogTitle>
+            <DialogTitle className="dark:text-gray-100">Nuevo mensaje</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4">
@@ -695,7 +695,7 @@ export default function MessagesPage() {
               <input
                 type="text"
                 placeholder="Buscar usuarios..."
-                className="w-full rounded-md border border-gray-300 p-2 pr-10 dark:border-gray-700 dark:bg-gray-800"
+                className="w-full rounded-md border border-gray-300 p-2 pr-10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                 value={generalSearchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGeneralSearchTerm(e.target.value)}
               />
@@ -809,7 +809,7 @@ export default function MessagesPage() {
               <input
                 type="text"
                 placeholder="Nombre del grupo"
-                className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800"
+                className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                 value={createGroupState.name}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreateGroupState(prev => ({ ...prev, name: e.target.value }))}
               />
@@ -821,7 +821,7 @@ export default function MessagesPage() {
               </label>
               <textarea
                 placeholder="Descripción del grupo"
-                className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800"
+                className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                 value={createGroupState.description}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCreateGroupState(prev => ({ ...prev, description: e.target.value }))}
               />
@@ -835,7 +835,7 @@ export default function MessagesPage() {
               <input
                 type="text"
                 placeholder="Buscar usuarios..."
-                className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800"
+                className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                 value={generalSearchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                   setGeneralSearchTerm(e.target.value);
@@ -953,12 +953,14 @@ export default function MessagesPage() {
                 variant="outline"
                 onClick={() => setShowCreateGroupModal(false)}
                 disabled={createGroupState.isCreating}
+                className={`border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800`}
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleCreateGroup}
                 disabled={!createGroupState.name || createGroupState.participants.length === 0 || createGroupState.isCreating}
+                className={`bg-blue-500 hover:bg-blue-600 text-white dark:bg-blue-600 dark:hover:bg-blue-700`}
               >
                 {createGroupState.isCreating ? 'Creando...' : 'Crear grupo'}
               </Button>
