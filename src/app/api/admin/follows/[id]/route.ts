@@ -17,8 +17,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const { id: followId } = await params;
 
+    // Verificar si el ID tiene el formato correcto (followerId_followingId)
+    const [followerId, followingId] = followId.split('_');
+    
+    if (!followerId || !followingId) {
+      return NextResponse.json({ error: "Formato de ID incorrecto" }, { status: 400 });
+    }
+
     const follow = await prisma.follow.findUnique({
-      where: { id: followId },
+      where: {
+        followerId_followingId: {
+          followerId,
+          followingId
+        }
+      },
       include: {
         follower: {
           select: {
@@ -71,9 +83,21 @@ export async function DELETE(
   try {
     const { id: followId } = await params;
 
+    // Verificar si el ID tiene el formato correcto (followerId_followingId)
+    const [followerId, followingId] = followId.split('_');
+    
+    if (!followerId || !followingId) {
+      return NextResponse.json({ error: "Formato de ID incorrecto" }, { status: 400 });
+    }
+
     // Verificar que el seguimiento existe
     const follow = await prisma.follow.findUnique({
-      where: { id: followId }
+      where: {
+        followerId_followingId: {
+          followerId,
+          followingId
+        }
+      }
     });
 
     if (!follow) {
@@ -82,24 +106,13 @@ export async function DELETE(
 
     // Eliminar el seguimiento
     await prisma.follow.delete({
-      where: { id: followId },
+      where: {
+        followerId_followingId: {
+          followerId,
+          followingId
+        }
+      },
     });
-
-    // Actualizar contadores de followers y following
-    await prisma.user.update({
-      where: { id: follow.followerId },
-      data: {
-        followingCount: { decrement: 1 }
-      }
-    });
-
-    await prisma.user.update({
-      where: { id: follow.followingId },
-      data: {
-        followersCount: { decrement: 1 }
-      }
-    });
-
     return NextResponse.json({ message: "Seguimiento eliminado correctamente" });
   } catch (error) {
     console.error("Error al eliminar seguimiento:", error);

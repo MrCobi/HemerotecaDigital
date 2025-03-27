@@ -245,8 +245,10 @@ export default function CreateUserPage() {
                 <div className="mb-6">
                   <CldUploadWidget
                     uploadPreset="hemeroteca_users"
-                    onSuccess={(result: { info: { secure_url: string } }) => {
-                      setImageUrl(result.info.secure_url);
+                    onSuccess={(result) => {
+                      if (result.info && typeof result.info === 'object' && 'secure_url' in result.info) {
+                        setImageUrl(result.info.secure_url as string);
+                      }
                     }}
                   >
                     {({ open }: { open: () => void }) => (

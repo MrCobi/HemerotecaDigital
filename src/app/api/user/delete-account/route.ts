@@ -11,7 +11,7 @@ function generateToken() {
   return randomBytes(32).toString("hex");
 }
 
-export async function POST(_req: NextRequest) {
+export async function POST(_req: NextRequest): Promise<NextResponse>  {
   try {
     const session = await auth();
 
@@ -86,3 +86,4 @@ export async function POST(_req: NextRequest) {
     await prisma.$disconnect();
   }
 }
+

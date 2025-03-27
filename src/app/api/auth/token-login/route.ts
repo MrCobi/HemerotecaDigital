@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import jwt from "jsonwebtoken";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse>  {
   try {
     const { token } = await request.json();
     
@@ -61,3 +61,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }
+

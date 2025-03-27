@@ -4,7 +4,7 @@ import prisma from "@/lib/db";
 // Esta es una ruta de compatibilidad transitoria que redirige 
 // las solicitudes a la API actualizada en /api/sources
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<NextResponse>  {
   try {
     // Extraer los IDs de fuentes del cuerpo de la solicitud
     const body = await req.json();
@@ -46,3 +46,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

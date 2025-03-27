@@ -273,7 +273,7 @@ export async function GET(_request: NextRequest) {
 }
 
 // Versión final corregida usando transacciones adecuadas
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse>  {
   try {
     const session = await auth();
     if (!session?.user?.id) {

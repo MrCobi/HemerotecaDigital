@@ -9,7 +9,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse>  {
   try {
     const data = await req.formData();
     const file: File | null = data.get('file') as unknown as File;
@@ -74,3 +74,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Error al procesar el archivo' }, { status: 500 });
   }
 }
+

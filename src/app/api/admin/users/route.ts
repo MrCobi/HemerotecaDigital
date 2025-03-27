@@ -53,7 +53,7 @@ export async function GET() {
 }
 
 // POST: Crear un nuevo usuario
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse>  {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
   }
@@ -121,3 +121,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

@@ -11,7 +11,7 @@ const resetPasswordSchema = z.object({
 });
 
 // Endpoint para solicitar el reseteo de contraseña
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse>  {
   try {
     // Extraer y validar el email del body
     const body = await req.json();
@@ -86,3 +86,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

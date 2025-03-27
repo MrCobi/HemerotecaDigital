@@ -83,30 +83,30 @@ export async function GET(req: NextRequest) {
       type: string;
       userId: string;
       createdAt: Date;
-      sourceName?: string;
-      sourceId?: string;
-      targetName?: string;
-      targetId?: string;
-      targetType?: string;
-      details?: string;
+      sourceName: string | null;
+      sourceId: string | null;
+      targetName: string | null;
+      targetId: string | null;
+      targetType: string | null;
+      details: string | null;
       user?: {
         id: string;
         name: string | null;
-        username: string;
-        image: string | null;
+        username: string | null;
         email: string;
+        image: string | null;
       };
     }) => ({
       id: activity.id,
       type: activity.type,
       userId: activity.userId,
       createdAt: activity.createdAt,
-      sourceName: activity.sourceName,
-      sourceId: activity.sourceId,
-      targetName: activity.targetName,
-      targetId: activity.targetId,
-      targetType: activity.targetType,
-      details: activity.details,
+      sourceName: activity.sourceName ?? undefined,
+      sourceId: activity.sourceId ?? undefined,
+      targetName: activity.targetName ?? undefined,
+      targetId: activity.targetId ?? undefined,
+      targetType: activity.targetType ?? undefined,
+      details: activity.details ?? undefined,
       user: activity.user
     }));
 

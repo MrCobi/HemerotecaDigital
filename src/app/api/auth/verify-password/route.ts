@@ -10,7 +10,7 @@ import { auth } from "@/auth";
  * para validar que la contraseña actual proporcionada sea correcta antes
  * de permitir cambios en datos sensibles.
  */
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse>  {
   try {
     console.log("Iniciando verificación de contraseña");
     // Verificar la autenticación del usuario que hace la solicitud
@@ -93,3 +93,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

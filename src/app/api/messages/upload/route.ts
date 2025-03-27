@@ -10,7 +10,7 @@ cloudinary.config({
   secure: true,
 });
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse>  {
   try {
     const session = await auth();
     if (!session?.user) {
@@ -78,3 +78,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }
+

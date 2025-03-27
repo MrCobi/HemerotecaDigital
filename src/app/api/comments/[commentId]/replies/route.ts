@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ commentId: string }> }
-) {
+): Promise<NextResponse> {
   const { commentId } = await params; // Corregido: Extraer `commentId` directamente de los parámetros
   const session = await auth();
 

@@ -51,7 +51,7 @@ export async function GET() {
 }
 
 // POST: Crear un nuevo seguimiento (como administrador)
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse>  {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
   }
@@ -155,8 +155,9 @@ export async function POST(req: NextRequest) {
         data: {
           userId: body.followerId,
           type: "FOLLOW",
-          targetUserId: body.followingId,
-          targetUsername: followingExists.username || followingExists.name
+          targetId: body.followingId,
+          targetName: followingExists.username || followingExists.name,
+          targetType: "USER"
         }
       });
     } catch (error) {

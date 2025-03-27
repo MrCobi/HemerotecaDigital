@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { NextResponse } from "next/server";
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse>  {
   try {
     const session = await auth();
     if (!session?.user) {

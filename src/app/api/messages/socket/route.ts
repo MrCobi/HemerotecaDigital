@@ -5,7 +5,7 @@ import prisma from "@/lib/db";
 // Clave de autorización para peticiones desde el servidor de socket
 const SOCKET_API_KEY = 'Socket-Internal-Auth-00123';
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse>  {
   // Verificación de autorización para el servidor de socket
   const authHeader = request.headers.get('Authorization');
   if (authHeader !== SOCKET_API_KEY) {
@@ -125,3 +125,4 @@ export async function POST(request: Request) {
     });
   }
 }
+

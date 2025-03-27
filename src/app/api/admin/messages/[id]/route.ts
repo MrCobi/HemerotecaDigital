@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
+import { MessageType } from "@prisma/client";
 
 // Función auxiliar para verificar si el usuario es administrador
 async function isAdmin() {
@@ -9,13 +10,16 @@ async function isAdmin() {
 }
 
 // GET: Obtener detalles de un mensaje por ID
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
   }
 
   try {
-    const { id: messageId } = params;
+    const { id: messageId } = await context.params;
 
     const message = await prisma.directMessage.findUnique({
       where: { id: messageId },
@@ -105,14 +109,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // PATCH: Actualizar información de un mensaje (marcar como leído)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
   }
 
   try {
-    const { id: messageId } = params;
+    const { id: messageId } = await context.params;
     const body = await req.json();
 
     // Validar que el mensaje existe
@@ -135,7 +139,7 @@ export async function PATCH(
     const updateData: {
       read?: boolean;
       content?: string;
-      messageType?: string;
+      messageType?: MessageType;
       mediaUrl?: string;
     } = {};
     
@@ -227,14 +231,14 @@ export async function PATCH(
 // DELETE: Eliminar un mensaje
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
   }
 
   try {
-    const { id: messageId } = params;
+    const { id: messageId } = await context.params;
 
     // Verificar que el mensaje existe
     const message = await prisma.directMessage.findUnique({

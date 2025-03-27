@@ -42,7 +42,7 @@ export default function DeleteSourceDialog({
   };
 
   return (
-    <AlertDialog open={isOpen} onOpenChange={({ open }: { open: boolean }) => !isDeleting && setIsOpen(open)}>
+    <AlertDialog open={isOpen} onOpenChange={(open: boolean) => !isDeleting && setIsOpen(open)}>
       <AlertDialogTrigger asChild>
         <Button
           variant="destructive"
