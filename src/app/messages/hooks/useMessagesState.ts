@@ -296,8 +296,8 @@ export function useMessagesState() {
       // Actualizar contador de mensajes no leídos
       if (existingConv.unreadCount && existingConv.unreadCount > 0) {
         try {
-          await fetch(`/api/messages/conversations/${conversationId}/read`, {
-            method: 'POST'
+          await fetch(`/api/messages/read/${conversationId}`, {
+            method: 'PUT'
           });
           
           // Actualizar lista de conversaciones

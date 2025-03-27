@@ -26,6 +26,7 @@ export function useChatContent(
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const loadingMoreRef = useRef(false);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const readStatusRef = useRef<Record<string, boolean>>({});
 
   // Función para desplazarse al final de los mensajes
   const scrollToBottom = useCallback(() => {
@@ -39,13 +40,124 @@ export function useChatContent(
     if (!conversationId || !session?.user?.id) return;
     
     try {
-      await fetch(`/api/messages/read/${conversationId}`, {
+      // Verificar si ya está marcada como leída usando el ref
+      if (readStatusRef.current && readStatusRef.current[conversationId]) {
+        return; // Ya está marcada como leída, evitamos peticiones duplicadas
+      }
+      
+      // Marcar localmente como leída antes de la petición
+      if (!readStatusRef.current) readStatusRef.current = {};
+      readStatusRef.current[conversationId] = true;
+      
+      // Usar una petición no bloqueante
+      fetch(`/api/messages/read/${conversationId}`, {
         method: 'PUT',
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      }).catch(error => {
+        console.error('Error al marcar conversación como leída:', error);
+        // En caso de error, revertimos el estado local
+        if (readStatusRef.current) {
+          readStatusRef.current[conversationId] = false;
+        }
       });
     } catch (error) {
       console.error('Error al marcar conversación como leída:', error);
     }
   }, [conversationId, session?.user?.id]);
+
+  // Cargar mensajes
+  const fetchMessages = useCallback(async () => {
+    if (!conversationId || !session?.user?.id || loadingMoreRef.current) return;
+    
+    const pageToLoad = firstLoadRef.current ? 1 : page;
+    if (firstLoadRef.current) {
+      setPage(1);
+      setHasMoreMessages(true);
+    }
+    
+    try {
+      setLoading(true);
+      loadingMoreRef.current = true;
+      
+      const response = await fetch(`/api/messages?with=${conversationId}&page=${pageToLoad}&limit=${MESSAGE_PAGE_SIZE}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar mensajes');
+      }
+      
+      const data = await response.json();
+      
+      // Verificar si hay más mensajes para cargar
+      if (data.messages.length < MESSAGE_PAGE_SIZE) {
+        setHasMoreMessages(false);
+      }
+      
+      // Si es la primera carga, reemplazar mensajes
+      if (firstLoadRef.current) {
+        setMessages(data.messages);
+        firstLoadRef.current = false;
+        
+        // Después de cargar, marcar como leído (solo si no está ya marcada)
+        if (!readStatusRef.current || !readStatusRef.current[conversationId]) {
+          markConversationAsRead();
+        }
+      } else {
+        // Sino, agregar al principio (son mensajes más antiguos)
+        setMessages(prevMessages => [...data.messages, ...prevMessages]);
+      }
+      
+      if (pageToLoad === 1) {
+        scrollToBottom();
+      }
+      
+      if (pageToLoad > 1) {
+        setPage(pageToLoad + 1);
+      } else {
+        setPage(2); // Siguiente página a cargar
+      }
+    } catch (error) {
+      console.error('Error al cargar mensajes:', error);
+      setError('No se pudieron cargar los mensajes. Inténtalo de nuevo más tarde.');
+    } finally {
+      setLoading(false);
+      loadingMoreRef.current = false;
+    }
+  }, [conversationId, session?.user?.id, page, scrollToBottom, markConversationAsRead]);
+
+  // Cargar participantes de la conversación
+  const fetchParticipants = useCallback(async () => {
+    if (!conversationId || !session?.user?.id) return;
+    
+    try {
+      // Usar los participantes de la propia conversación si están disponibles
+      if (conversation && conversation.participants) {
+        setParticipants(conversation.participants);
+        return;
+      }
+      
+      // Si no hay conversación o no tiene participantes, intentar cargarlos desde la API de mensajes
+      const response = await fetch(`/api/messages?with=${conversationId}&page=1&limit=1`);
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar participantes');
+      }
+      
+      const data = await response.json();
+      if (data.conversation && data.conversation.participants) {
+        setParticipants(data.conversation.participants);
+      }
+    } catch (error) {
+      console.error('Error al cargar participantes:', error);
+    }
+  }, [conversationId, session?.user?.id, conversation]);
 
   // Socket para mensajes en tiempo real
   const { 
@@ -85,103 +197,69 @@ export function useChatContent(
     }
   });
 
-  // Cargar mensajes
-  const fetchMessages = useCallback(async () => {
-    if (!conversationId || !session?.user?.id || loadingMoreRef.current) return;
-    
-    const pageToLoad = firstLoadRef.current ? 1 : page;
-    if (firstLoadRef.current) {
-      setPage(1);
-      setHasMoreMessages(true);
+  // Efecto para unirse/salir de la conversación
+  useEffect(() => {
+    if (conversationId && connected && session?.user?.id) {
+      // Usar un ID estable para evitar reconexiones innecesarias
+      const stableConversationId = conversationId;
+      
+      // Solo unirse si es una nueva conversación o la primera carga
+      joinConversation(stableConversationId);
+      
+      // Limpiar al desmontar o cambiar de conversación
+      return () => {
+        leaveConversation(stableConversationId);
+      };
     }
-    
-    try {
-      setLoading(true);
-      loadingMoreRef.current = true;
-      
-      const response = await fetch(
-        `/api/messages?with=${conversationId}&page=${pageToLoad}&limit=${MESSAGE_PAGE_SIZE}`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Error cargando mensajes: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Formatear mensajes
-      const formattedMessages = data.messages.map((msg: Partial<Message>) => ({
-        id: msg.id,
-        content: msg.content || '',
-        createdAt: new Date(msg.createdAt as string),
-        read: Boolean(msg.read),
-        senderId: msg.senderId as string,
-        sender: {
-          id: msg.senderId as string,
-          username: msg.sender ? (msg.sender as { username?: string | null }).username || 'Usuario' : 'Usuario',
-          image: msg.sender ? (msg.sender as { image?: string | null }).image || '/placeholders/user.png' : '/placeholders/user.png',
-        },
-        messageType: msg.messageType || 'text',
-        imageUrl: msg.imageUrl,
-        status: msg.status || 'sent',
-      }));
-      
-      // Actualizar estado
-      if (firstLoadRef.current) {
-        setMessages(formattedMessages);
-      } else {
-        setMessages(prev => [...formattedMessages, ...prev]);
-      }
-      
-      // Actualizar si hay más mensajes
-      setHasMoreMessages(formattedMessages.length >= MESSAGE_PAGE_SIZE);
-      
-      // Si es primera carga y hay mensajes, marcar como leídos
-      if (firstLoadRef.current && formattedMessages.length > 0) {
-        markConversationAsRead();
-        firstLoadRef.current = false;
-      }
-      
-      // Incrementar página para próxima carga
-      if (!firstLoadRef.current) {
-        setPage(prev => prev + 1);
-      }
-      
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      setError('Error al cargar los mensajes. Inténtalo de nuevo más tarde.');
-    } finally {
-      setLoading(false);
-      loadingMoreRef.current = false;
-    }
-  }, [conversationId, page, session?.user?.id, markConversationAsRead]);
+  }, [conversationId, connected, session?.user?.id, joinConversation, leaveConversation]);
 
-  // Cargar participantes del grupo
-  const fetchParticipants = useCallback(async () => {
-    if (!conversationId || !conversation?.isGroup) return;
+  // Efecto para cargar mensajes y manejar el cambio de conversación
+  useEffect(() => {
+    if (!conversationId || !session?.user?.id) return;
     
-    try {
-      // Usar participantes ya disponibles en los datos de la conversación si existen
-      if (conversation.participants && conversation.participants.length > 0) {
-        const users = conversation.participants.map(p => p.user);
-        setParticipants(users);
-        return;
+    // Prevenir cargas duplicadas o innecesarias
+    const currentConvId = conversationId;
+    firstLoadRef.current = true;
+    
+    // Evitar múltiples cargas
+    const controller = new AbortController();
+    const loadData = async () => {
+      try {
+        if (!readStatusRef.current) readStatusRef.current = {};
+        
+        // Solo cargar si no hemos cargado ya para esta conversación
+        if (messages.length === 0 || messages[0]?.conversationId !== currentConvId) {
+          await fetchMessages();
+        }
+        
+        // Solo cargar participantes si es necesario
+        if (!readStatusRef.current[currentConvId]) {
+          await fetchParticipants();
+        }
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          console.error('Error cargando datos:', error);
+        }
       }
-      
-      // Si no están en los datos de la conversación, cargarlos desde la API
-      const response = await fetch(`/api/messages/conversations/${conversationId}/participants`);
-      
-      if (!response.ok) {
-        throw new Error(`Error cargando participantes: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      setParticipants(data);
-      
-    } catch (error) {
-      console.error('Error fetching participants:', error);
-    }
-  }, [conversationId, conversation]);
+    };
+    
+    // Usar un pequeño timeout para evitar cargas repetidas
+    const timeoutId = setTimeout(() => {
+      loadData();
+    }, 100);
+    
+    // Limpiar estado
+    setNewMessageContent('');
+    setImageToSend(null);
+    setImagePreview(null);
+    setUploadProgress(0);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+      // No limpiamos el readStatusRef para mantener el cache entre cambios
+    };
+  }, [conversationId, session?.user?.id]);  // Eliminamos fetchMessages y fetchParticipants de las dependencias
 
   // Enviar mensaje de texto
   const sendTextMessage = useCallback(async () => {
@@ -389,33 +467,6 @@ export function useChatContent(
       loadMoreMessages();
     }
   }, [hasMoreMessages, loading, loadMoreMessages]);
-
-  // Efecto para cargar mensajes cuando cambia la conversación
-  useEffect(() => {
-    if (conversationId) {
-      firstLoadRef.current = true;
-      fetchMessages();
-      fetchParticipants();
-      
-      // Unirse a la conversación por socket
-      if (connected) {
-        joinConversation(conversationId);
-      }
-      
-      // Limpiar estado
-      setNewMessageContent('');
-      setImageToSend(null);
-      setImagePreview(null);
-      setUploadProgress(0);
-      
-      // Limpieza al cambiar de conversación
-      return () => {
-        if (connected && conversationId) {
-          leaveConversation(conversationId);
-        }
-      };
-    }
-  }, [conversationId, connected, joinConversation, leaveConversation, fetchMessages, fetchParticipants]);
 
   // Efecto para desplazar al final al cargar inicialmente
   useEffect(() => {

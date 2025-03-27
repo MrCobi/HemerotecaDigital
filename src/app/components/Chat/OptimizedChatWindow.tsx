@@ -288,7 +288,7 @@ export default function OptimizedChatWindow({
             
             return (
               <MessageItem
-                key={message.id}
+                key={`${message.id || message.tempId}-${index}`}
                 message={message}
                 currentUserId={currentUserId || ''}
                 otherUser={otherUser}

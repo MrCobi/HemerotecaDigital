@@ -454,7 +454,7 @@ export default function MessagesPage() {
   }
 
   if (status === "unauthenticated") {
-    router.push("/login");
+    router.push("/api/auth/signin");
     return null;
   }
 
