@@ -78,7 +78,9 @@ export const POST = withAuth(async (request: Request, { userId, user: _user }: {
           },
           type: value === 0 ? "rating_removed" : "rating_added",
           sourceName: source.name,
-          sourceId: sourceId,
+          source: {
+            connect: { id: sourceId }
+          },
           targetName: null,
           targetId: null,
           targetType: null,
