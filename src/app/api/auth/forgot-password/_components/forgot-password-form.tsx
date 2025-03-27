@@ -68,15 +68,15 @@ export default function ForgotPasswordForm() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800 p-4 relative overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 p-4 relative overflow-hidden">
       {/* Elementos decorativos */}
-      <div className="absolute top-20 left-20 w-32 h-32 bg-gradient-to-br from-amber-300 to-orange-400 rounded-full opacity-60 blur-xl"></div>
-      <div className="absolute bottom-20 right-20 w-40 h-40 bg-gradient-to-tr from-blue-400 to-indigo-500 rounded-full opacity-60 blur-xl"></div>
-      <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-gradient-to-br from-pink-300 to-purple-400 rounded-full opacity-40 blur-xl"></div>
+      <div className="absolute top-20 left-20 w-32 h-32 bg-gradient-to-br from-amber-300 to-orange-400 dark:from-amber-400/20 dark:to-orange-500/20 rounded-full opacity-60 blur-xl"></div>
+      <div className="absolute bottom-20 right-20 w-40 h-40 bg-gradient-to-tr from-blue-400 to-blue-500 dark:from-blue-500/20 dark:to-blue-600/20 rounded-full opacity-60 blur-xl"></div>
+      <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-gradient-to-br from-pink-300 to-purple-400 dark:from-pink-400/20 dark:to-purple-500/20 rounded-full opacity-40 blur-xl"></div>
 
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden z-10">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800/80 rounded-2xl shadow-xl overflow-hidden z-10">
         <div className="px-8 pt-8 pb-6 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 mb-4">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-8 w-8 text-white"
@@ -95,7 +95,7 @@ export default function ForgotPasswordForm() {
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
             Recupera tu contraseña
           </h2>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">
+          <p className="text-gray-600 dark:text-blue-200 mt-2">
             Ingresa tu correo electrónico y te enviaremos instrucciones para restablecer tu contraseña.
           </p>
         </div>
@@ -113,7 +113,7 @@ export default function ForgotPasswordForm() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">
+                    <FormLabel className="text-gray-700 dark:text-gray-200 font-medium">
                       Tu correo electrónico
                     </FormLabel>
                     <FormControl>
@@ -121,7 +121,7 @@ export default function ForgotPasswordForm() {
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 text-gray-400"
+                            className="h-5 w-5 text-gray-400 dark:text-blue-300"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -138,11 +138,11 @@ export default function ForgotPasswordForm() {
                           type="email"
                           placeholder="ej. usuario@correo.com"
                           {...field}
-                          className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all"
+                          className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800/70 dark:text-white dark:placeholder-blue-200/70 transition-all"
                         />
                       </div>
                     </FormControl>
-                    <FormMessage className="text-red-500 text-sm" />
+                    <FormMessage className="text-red-500 dark:text-red-400 text-sm" />
                   </FormItem>
                 )}
               />
@@ -150,7 +150,7 @@ export default function ForgotPasswordForm() {
               {/* Botón de Enviar */}
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg hover:shadow-xl"
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-400 dark:hover:to-blue-500 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg hover:shadow-xl"
                 disabled={isPending}
               >
                 {isPending ? (
@@ -181,11 +181,12 @@ export default function ForgotPasswordForm() {
                   "Enviar instrucciones"
                 )}
               </Button>
-              <div className="text-center mt-6 text-sm text-gray-600 dark:text-gray-400">
+              
+              <div className="text-center mt-6 text-sm text-gray-600 dark:text-blue-200">
                 ¿Recordaste tu contraseña?{" "}
                 <Link
                   href="/api/auth/signin"
-                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                  className="text-blue-600 hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200 font-medium"
                 >
                   Volver al login
                 </Link>
@@ -194,9 +195,9 @@ export default function ForgotPasswordForm() {
           </Form>
         </div>
 
-        <div className="px-8 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-100 dark:border-gray-700">
+        <div className="px-8 py-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800">
           <div className="flex items-center justify-center space-x-4">
-            <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center text-xs text-gray-500 dark:text-blue-200">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-4 w-4 mr-1"
@@ -212,6 +213,24 @@ export default function ForgotPasswordForm() {
                 />
               </svg>
               Conexión segura
+            </div>
+            <div className="h-4 border-r border-gray-300 dark:border-gray-700"></div>
+            <div className="flex items-center text-xs text-gray-500 dark:text-blue-200">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4 mr-1"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                />
+              </svg>
+              Verificación por correo
             </div>
           </div>
         </div>
