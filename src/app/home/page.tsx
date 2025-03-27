@@ -753,7 +753,8 @@ export default function HomePage() {
   const itemsPerPage = 5;
   const [categories, setCategories] = useState<string[]>([]);
   const [featuredArticles, setFeaturedArticles] = useState<Article[]>([]);
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [windowWidth, setWindowWidth] = useState(0);
   
   // Obtener configuración de animaciones para aplicar a los componentes de framer-motion
   const _animationsEnabled = useAnimationSettings();
@@ -772,7 +773,87 @@ export default function HomePage() {
   const animationVariants = useConditionalAnimation(fadeInVariants, noAnimationVariants);
   const animationTransition = useConditionalTransition(0.5);
 
-  const horizontalScroll = useHorizontalScroll();
+  const horizontalScroll = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  // Función para desplazar a la izquierda (una tarjeta)
+  const scrollLeftHandler = () => {
+    if (horizontalScroll.current) {
+      // El ancho de cada tarjeta (280px) + el gap entre tarjetas (16px)
+      const itemWidth = 280 + 16; // 16px es el valor aproximado del gap-4 en Tailwind
+      const scrollAmount = itemWidth; // Avanzar exactamente 1 tarjeta
+      const currentScroll = horizontalScroll.current.scrollLeft;
+      animateScroll(currentScroll, currentScroll - scrollAmount);
+    }
+  };
+
+  // Función para desplazar a la derecha (una tarjeta)
+  const scrollRightHandler = () => {
+    if (horizontalScroll.current) {
+      // El ancho de cada tarjeta (280px) + el gap entre tarjetas (16px)
+      const itemWidth = 280 + 16; // 16px es el valor aproximado del gap-4 en Tailwind
+      const scrollAmount = itemWidth; // Avanzar exactamente 1 tarjeta
+      const currentScroll = horizontalScroll.current.scrollLeft;
+      animateScroll(currentScroll, currentScroll + scrollAmount);
+    }
+  };
+
+  // Función de animación para el desplazamiento suave
+  const animateScroll = (from: number, to: number) => {
+    const duration = 400; // duración en milisegundos
+    const start = performance.now();
+    
+    const animate = (time: number) => {
+      const elapsed = time - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = easeInOutCubic(progress);
+      const currentPosition = from + (to - from) * easeProgress;
+      
+      if (horizontalScroll.current) {
+        horizontalScroll.current.scrollLeft = currentPosition;
+      }
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    requestAnimationFrame(animate);
+  };
+
+  // Función de easing para un desplazamiento más natural
+  const easeInOutCubic = (t: number): number => {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  };
+
+  // Handlers para arrastrar en ordenador
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (horizontalScroll.current) {
+      setIsDragging(true);
+      setStartX(e.pageX - horizontalScroll.current.offsetLeft);
+      setScrollLeft(horizontalScroll.current.scrollLeft);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    
+    if (horizontalScroll.current) {
+      const x = e.pageX - horizontalScroll.current.offsetLeft;
+      const walk = (x - startX) * 1.5; // Velocidad de desplazamiento
+      horizontalScroll.current.scrollLeft = scrollLeft - walk;
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
 
   useEffect(() => {
     const loadStats = async () => {
@@ -896,6 +977,25 @@ export default function HomePage() {
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    // Solo ejecutar en el cliente
+    if (typeof window !== 'undefined') {
+      // Establecer el ancho inicial
+      setWindowWidth(window.innerWidth);
+      
+      // Función para actualizar el ancho cuando cambia
+      const handleResize = () => {
+        setWindowWidth(window.innerWidth);
+      };
+      
+      // Agregar listener
+      window.addEventListener('resize', handleResize);
+      
+      // Limpiar listener
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
+
   const PaginationControls = () => {
     // Limitar a un máximo de 10 páginas
     const maxPages = 10;
@@ -971,6 +1071,18 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-gradient-to-br from-white via-blue-50 to-blue-100 dark:from-gray-900 dark:via-blue-900/30 dark:to-blue-800/20">
+      <style jsx global>{`
+        /* Ocultar scrollbar para Chrome, Safari y Opera */
+        .scrollbar-none::-webkit-scrollbar {
+          display: none;
+        }
+        
+        /* Ocultar scrollbar para IE, Edge y Firefox */
+        .scrollbar-none {
+          -ms-overflow-style: none;  /* IE y Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
+      `}</style>
       <section
         id="hero-section"
         className="relative overflow-x-hidden bg-gradient-to-br from-blue-600 to-indigo-900 dark:from-gray-800 dark:to-gray-900 text-white"
@@ -1010,11 +1122,11 @@ export default function HomePage() {
             </p>
 
             <div className="relative max-w-2xl z-20">
-              <div className="flex relative">
+              <div className="flex relative w-full">
                 <Input
                   type="text"
-                  placeholder="Buscar por título o palabra clave..."
-                  className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white dark:text-white placeholder:text-blue-200 dark:placeholder:text-gray-300 focus-visible:ring-white/30 focus-visible:border-white/30 pr-12 py-4 sm:py-5" 
+                  placeholder={windowWidth < 640 ? "Buscar..." : "Buscar artículos..."}
+                  className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white dark:text-white placeholder:text-blue-200 dark:placeholder:text-gray-300 focus-visible:ring-white/30 focus-visible:border-white/30 pr-12 py-4 sm:py-5 text-sm sm:text-base" 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -1270,11 +1382,13 @@ export default function HomePage() {
             className="relative"
           >
             <div
-              ref={horizontalScroll.scrollRef}
-              className="flex gap-4 overflow-x-auto scrollbar-thin scrollbar-thumb-blue-500 scrollbar-track-transparent pb-6 snap-x snap-mandatory"
-              onMouseDown={horizontalScroll.onMouseDown}
-              onMouseUp={horizontalScroll.onMouseUp}
-              onMouseMove={horizontalScroll.onMouseMove}
+              ref={horizontalScroll}
+              className="flex gap-4 overflow-x-auto scrollbar-none pb-6 snap-x snap-mandatory cursor-grab active:cursor-grabbing select-none"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              onMouseDown={handleMouseDown}
+              onMouseUp={handleMouseUp}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
             >
               {categories.map((category, i) => {
                 const englishCategory = category.toLowerCase();
@@ -1299,7 +1413,7 @@ export default function HomePage() {
                       }}
                     />
                     <div className={`absolute inset-0 bg-gradient-to-t ${gradientClass} opacity-70`} />
-                    <div className="absolute bottom-0 left-0 right-0 p-5">
+                    <div className="absolute bottom-0 left-0 right-0 p-5 select-none">
                       <h3 className="text-xl font-bold text-white">
                         {spanishCategory}
                       </h3>
@@ -1317,30 +1431,28 @@ export default function HomePage() {
                 </motion.div>
               )})}
             </div>
-
-            {/* Botones de navegación */}
-            <button
-              onClick={() => {
-                if (horizontalScroll.scrollRef.current) {
-                  horizontalScroll.scrollRef.current.scrollLeft -= 350;
-                }
-              }}
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 rounded-full p-2 shadow-lg z-10 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
-              style={{ left: "5px" }}
-            >
-              <ChevronLeft className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </button>
-            <button
-              onClick={() => {
-                if (horizontalScroll.scrollRef.current) {
-                  horizontalScroll.scrollRef.current.scrollLeft += 350;
-                }
-              }}
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 rounded-full p-2 shadow-lg z-10 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
-              style={{ right: "5px" }}
-            >
-              <ChevronRight className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </button>
+            
+            {/* Controles de navegación */}
+            <div className="flex justify-center mt-4 space-x-2">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-8 w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200"
+                onClick={scrollLeftHandler}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="sr-only">Anterior</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-8 w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200"
+                onClick={scrollRightHandler}
+              >
+                <ChevronRight className="h-4 w-4" />
+                <span className="sr-only">Siguiente</span>
+              </Button>
+            </div>
           </motion.div>
         </div>
       </section>
