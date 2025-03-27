@@ -230,13 +230,13 @@ const StatItem = ({
 
   return (
     <Card className="overflow-hidden border-blue-100 dark:border-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300 hover:shadow-md">
-      <CardContent className="p-6 flex items-center space-x-4">
-        <div className="rounded-full p-3 bg-blue-100/50 dark:bg-blue-900/30">
+      <CardContent className="p-3 sm:p-4 md:p-6 flex items-center space-x-3 sm:space-x-4">
+        <div className="rounded-full p-2 sm:p-3 bg-blue-100/50 dark:bg-blue-900/30">
           {icon}
         </div>
         <div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{label}</p>
+          <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 dark:text-gray-100">
             {isVisible ? count : 0}
           </p>
         </div>
@@ -917,31 +917,27 @@ export default function HomePage() {
           <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 dark:bg-indigo-400/5 rounded-full blur-3xl transform translate-x-1/2 translate-y-1/2"></div>
         </div>
 
-        <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 flex flex-col justify-center">
+        <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 flex flex-col justify-center">
           <motion.div
             initial={animationVariants.hidden}
             animate={animationVariants.visible}
             transition={animationTransition}
             className="max-w-3xl"
           >
-            <h1 className="text-2xl sm:text-3xl font-bold text-white dark:text-white mb-4 sm:mb-6 leading-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white dark:text-white mb-3 sm:mb-4 leading-tight">
               Bienvenido, {session?.user?.name || "Investigador"}
             </h1>
-            <p className="text-sm sm:text-base md:text-lg text-blue-100 dark:text-gray-200 mb-6 sm:mb-8 max-w-2xl">
+            <p className="text-sm sm:text-base text-blue-100 dark:text-gray-200 mb-5 sm:mb-6 max-w-2xl">
               Continúa explorando nuestra colección de documentos y descubre
               nuevas perspectivas de las noticias.
             </p>
 
             <div className="relative max-w-2xl z-20">
-              {" "}
-              {/* Añade z-index alto */}
               <div className="flex relative">
-                {" "}
-                {/* Contenedor relativo */}
                 <Input
                   type="text"
                   placeholder="Buscar por título o palabra clave..."
-                  className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white dark:text-white placeholder:text-blue-200 dark:placeholder:text-gray-300 focus-visible:ring-white/30 focus-visible:border-white/30 pr-12 py-5" // Añade padding
+                  className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white dark:text-white placeholder:text-blue-200 dark:placeholder:text-gray-300 focus-visible:ring-white/30 focus-visible:border-white/30 pr-12 py-4 sm:py-5" 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -951,17 +947,17 @@ export default function HomePage() {
                   }}
                 />
                 <Button 
-                  className="ml-2 bg-white dark:bg-gray-200 text-blue-600 dark:text-blue-800 hover:bg-blue-50 dark:hover:bg-gray-300 absolute right-0 top-1/2 -translate-y-1/2 z-20"
+                  className="ml-2 bg-white dark:bg-gray-200 text-blue-600 dark:text-blue-800 hover:bg-blue-50 dark:hover:bg-gray-300 absolute right-1 top-1/2 -translate-y-1/2 z-20"
                   onClick={() => {
                     if (searchQuery.trim()) {
                       router.push(`/Articulos?q=${encodeURIComponent(searchQuery.trim())}`);
                     }
                   }}
                 >
-                  <Search className="h-5 w-5" /> {/* Icono más grande */}
+                  <Search className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               </div>
-              <div className="flex items-center mt-2 text-sm text-blue-200 dark:text-gray-300 relative z-10">
+              <div className="flex items-center mt-2 text-xs sm:text-sm text-blue-200 dark:text-gray-300 relative z-10">
                 <Link href="/Articulos" passHref legacyBehavior>
                   <Button
                     variant="link"
@@ -992,17 +988,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="stats-section" className="py-12 sm:py-16 relative z-10">
+      <section id="stats-section" className="py-8 sm:py-12 lg:py-16 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={animationVariants.hidden}
             animate={animationVariants.visible}
             transition={animationTransition}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6"
+            className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6"
           >
             {[
               {
-                icon: <BookOpen className="h-6 w-6 text-blue-600" />,
+                icon: <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />,
                 label: "Interacciones",
                 value: userStats.totalInteractions,
               },
@@ -1012,12 +1008,12 @@ export default function HomePage() {
                 value: userStats.favoriteCount,
               },
               {
-                icon: <History className="h-6 w-6 text-green-600" />,
+                icon: <History className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />,
                 label: "Actividad Reciente",
                 value: userStats.activityCount,
               },
               {
-                icon: <Calendar className="h-6 w-6 text-purple-600" />,
+                icon: <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />,
                 label: "Días Activo",
                 value: userStats.activeDays,
               },
