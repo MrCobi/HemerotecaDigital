@@ -77,11 +77,17 @@ export default function HomePage() {
   const { data: session } = useSession();
   const { setTheme } = useTheme();
 
-  // Aplicar el tema según la preferencia del sistema
+  // Aplicar solo el tema según la preferencia del sistema (claro/oscuro) en la página de inicio
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       setTheme(systemPrefersDark ? 'dark' : 'light');
+      
+      // Eliminar cualquier clase o atributo personalizado que pudiera afectar a la apariencia
+      document.documentElement.removeAttribute("data-font-size");
+      document.documentElement.removeAttribute("data-font-family");
+      document.documentElement.removeAttribute("data-content-density");
+      document.documentElement.removeAttribute("data-animations");
     }
   }, [setTheme]);
 
@@ -121,13 +127,13 @@ export default function HomePage() {
   return (
     <main className="min-h-screen dark:bg-blue-950">
       {/* Hero Section */}
-      <section className="relative min-h-[70vh] sm:min-h-[70vh] w-full overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-900 dark:from-blue-900 dark:to-indigo-950">
+      <section className="relative min-h-[85vh] sm:min-h-[75vh] w-full overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-900 dark:from-blue-900 dark:to-indigo-950">
         {/* Background decorative elements */}
         <div className="absolute inset-0 overflow-hidden">
           {decorativeElements.map((element, i) => (
             <div
               key={i}
-              className="absolute hidden sm:block"
+              className="absolute opacity-30 sm:opacity-100" // Mostrar en móviles pero con menor opacidad
               style={{
                 left: element.left,
                 top: element.top,
@@ -139,27 +145,27 @@ export default function HomePage() {
             />
           ))}
           {/* Additional depth circles - Responsive sizes */}
-          <div className="absolute top-8 sm:top-1/4 right-[10%] w-16 h-16 sm:w-24 sm:h-24 md:w-40 md:h-40 bg-gradient-to-tr from-purple-400/20 to-pink-500/20 rounded-full opacity-40 blur-lg animate-pulse"></div>
-          <div className="absolute top-16 sm:bottom-1/3 left-[15%] w-20 h-20 sm:w-32 sm:h-32 md:w-48 md:h-48 bg-gradient-to-br from-blue-300/20 to-cyan-400/20 rounded-full opacity-40 blur-lg animate-pulse"></div>
+          <div className="absolute top-10 sm:top-1/4 right-[10%] w-12 h-12 sm:w-24 sm:h-24 md:w-40 md:h-40 bg-gradient-to-tr from-purple-400/20 to-pink-500/20 rounded-full opacity-30 sm:opacity-40 blur-lg animate-pulse"></div>
+          <div className="absolute top-20 sm:bottom-1/3 left-[15%] w-16 h-16 sm:w-32 sm:h-32 md:w-48 md:h-48 bg-gradient-to-br from-blue-300/20 to-cyan-400/20 rounded-full opacity-30 sm:opacity-40 blur-lg animate-pulse"></div>
         </div>
 
         {/* Hero content */}
-        <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-center pt-16 sm:pt-0">
+        <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-center pt-20 pb-10 sm:pt-28 md:pt-36 lg:pt-32 sm:pb-0">
           <div
             className={`max-w-3xl mx-auto sm:mx-0 transition-all duration-1000 ease-out ${
               isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
             }`}
           >
-            <p className="text-blue-300 dark:text-blue-200 font-medium mb-2 sm:mb-3 tracking-wider uppercase text-base">
+            <p className="text-blue-300 dark:text-blue-200 font-medium mb-3 sm:mb-3 tracking-wider uppercase text-sm sm:text-base">
               Archivo histórico digital
             </p>
-            <h1 className="text-4xl font-bold text-white mb-4 sm:mb-6 leading-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 sm:mb-6 leading-tight">
               Descubre el Mundo{" "}
               <span className="block mt-1 sm:mt-2">
                 de las Noticias Históricas
               </span>
             </h1>
-            <p className="text-base text-gray-200 dark:text-blue-200 mb-6 sm:mb-8 max-w-2xl">
+            <p className="text-sm sm:text-base text-gray-200 dark:text-blue-200 mb-6 sm:mb-8 max-w-2xl">
               Explora nuestra vasta colección de artículos, periódicos y documentos
               históricos digitalizados que abarcan más de cinco décadas de
               historia.
@@ -167,7 +173,7 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Button
                 size="lg"
-                className="w-full sm:w-auto bg-white dark:bg-blue-100 text-blue-600 dark:text-blue-900 hover:bg-gray-100 dark:hover:bg-blue-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1 hover:scale-105 transition-all duration-300 text-base"
+                className="w-full sm:w-auto bg-white dark:bg-blue-100 text-blue-600 dark:text-blue-900 hover:bg-gray-100 dark:hover:bg-blue-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1 hover:scale-105 transition-all duration-300 text-sm sm:text-base"
                 onClick={() => router.push("/api/auth/signin")}
               >
                 Iniciar Sesión
@@ -175,7 +181,7 @@ export default function HomePage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="w-full sm:w-auto text-white dark:text-blue-200 border-white dark:border-blue-200 hover:bg-white/10 dark:hover:bg-blue-800/30 text-base"
+                className="w-full sm:w-auto text-white dark:text-blue-200 border-white dark:border-blue-200 hover:bg-white/10 dark:hover:bg-blue-800/30 text-sm sm:text-base"
                 onClick={() => router.push("/api/auth/signup")}
               >
                 Registrarse
@@ -189,10 +195,10 @@ export default function HomePage() {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 ${
+              className={`h-1 sm:h-2 rounded-full transition-all duration-300 ${
                 i === 0
-                  ? "w-6 sm:w-8 bg-blue-400"
-                  : "w-1.5 sm:w-2 bg-white/60 dark:bg-blue-800/60"
+                  ? "w-4 sm:w-8 bg-blue-400"
+                  : "w-1 sm:w-2 bg-white/60 dark:bg-blue-800/60"
               }`}
             />
           ))}
@@ -202,7 +208,7 @@ export default function HomePage() {
       {/* Stats Section */}
       <section
         id="stats-section"
-        className="py-12 bg-gradient-to-r from-blue-600 to-indigo-900 dark:from-blue-900 dark:to-indigo-950 text-white relative overflow-hidden"
+        className="py-8 sm:py-12 bg-gradient-to-r from-blue-600 to-indigo-900 dark:from-blue-900 dark:to-indigo-950 text-white relative overflow-hidden"
       >
         {/* Background blur effects for depth */}
         <div className="absolute inset-0">
@@ -212,7 +218,7 @@ export default function HomePage() {
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Stats grid - Responsive layout */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-6 lg:gap-8">
             {[
               { value: 10000, label: "Artículos" },
               { value: 50, label: "Años de historia" },
@@ -277,7 +283,7 @@ export default function HomePage() {
                 <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 dark:from-blue-400 dark:to-indigo-500 flex items-center justify-center text-white font-bold mb-4">
                   {step.number}
                 </div>
-                <h3 className="text-base font-bold text-gray-800 dark:text-white mb-4">
+                <h3 className="text-base font-bold text-gray-800 dark:text-white mb-2">
                   {step.title}
                 </h3>
                 <p className="text-base text-gray-600 dark:text-blue-200">{step.description}</p>
