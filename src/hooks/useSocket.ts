@@ -337,6 +337,19 @@ export default function useSocket(options: UseSocketOptions) {
           startHeartbeat(socket);
         }
         
+        // Unirse a todas las conversaciones activas después de reconectar
+        if (activeConversations.current.size > 0) {
+          console.log(`[Socket] Reconectando a ${activeConversations.current.size} conversaciones activas`);
+          
+          // Dar tiempo para que la conexión se establezca completamente antes de unirse a salas
+          setTimeout(() => {
+            activeConversations.current.forEach(conversationId => {
+              socket.emit('join_conversation', { conversationId, userId });
+              console.log(`[Socket] Reconectado a conversación: ${conversationId}`);
+            });
+          }, 500);
+        }
+        
         // Procesar mensajes pendientes
         processPendingMessages();
       }
@@ -360,11 +373,19 @@ export default function useSocket(options: UseSocketOptions) {
     
     // Evento de mensaje nuevo - sin actualizar estados adicionales
     socket.on('new_message', (message: MessageType) => {
-      const shouldProcessMessage = message.receiverId === userId || 
-        (message.conversationId && activeConversations.current.has(message.conversationId));
+      console.log(`[Socket] Mensaje nuevo recibido:`, message);
+      
+      const shouldProcessMessage = 
+        message.receiverId === userId || 
+        (message.conversationId && activeConversations.current.has(message.conversationId)) ||
+        // También procesar mensajes de salas a las que pertenecemos aunque no los tengamos en activeConversations
+        (message.conversationId && message.conversationId.startsWith('conv_'));
       
       if (shouldProcessMessage && callbacksRef.current.onNewMessage) {
+        console.log(`[Socket] Procesando nuevo mensaje para UI`);
         callbacksRef.current.onNewMessage(message);
+      } else {
+        console.log(`[Socket] Mensaje no procesado, no pertenece a una conversación activa`);
       }
     });
     
@@ -509,6 +530,51 @@ export default function useSocket(options: UseSocketOptions) {
       }
     }, delay);
   }, [isActive, initSocket]);
+
+  // Función para unirse a una conversación (sala de chat)
+  const joinConversation = useCallback((conversationId: string) => {
+    if (!socketRef.current || !conversationId) return;
+    
+    console.log(`[Socket] Intentando unirse a la conversación: ${conversationId}`);
+    
+    // Verificar si la conexión está activa
+    if (!socketRef.current.connected) {
+      console.log(`[Socket] Socket no conectado, iniciando conexión para unirse a ${conversationId}`);
+      
+      // Intentar establecer conexión si no está conectado
+      socketRef.current.connect();
+      
+      // Registrar la conversación para unirse después de la conexión
+      activeConversations.current.add(conversationId);
+      
+      return;
+    }
+    
+    // Emitir el evento para unirse a la sala
+    socketRef.current.emit('join_conversation', { conversationId, userId });
+    
+    // Registrar en las conversaciones activas
+    activeConversations.current.add(conversationId);
+    
+    console.log(`[Socket] Unido a la conversación: ${conversationId}, Total: ${activeConversations.current.size}`);
+  }, [userId]);
+
+  // Función para salir de una conversación (sala de chat)
+  const leaveConversation = useCallback((conversationId: string) => {
+    if (!socketRef.current || !conversationId) return;
+    
+    console.log(`[Socket] Saliendo de la conversación: ${conversationId}`);
+    
+    // Emitir el evento para salir de la sala solo si está conectado
+    if (socketRef.current.connected) {
+      socketRef.current.emit('leave_conversation', { conversationId, userId });
+    }
+    
+    // Eliminar de las conversaciones activas
+    activeConversations.current.delete(conversationId);
+    
+    console.log(`[Socket] Fuera de la conversación: ${conversationId}, Restantes: ${activeConversations.current.size}`);
+  }, [userId]);
 
   // Configurar y limpiar el socket
   useEffect(() => {
@@ -658,30 +724,6 @@ export default function useSocket(options: UseSocketOptions) {
     socketRef.current.emit('mark_read', { messageId, conversationId });
     return true;
   }, [connected, resetInactivityTimer]);
-
-  const joinConversation = useCallback((conversationId: string) => {
-    if (!socketRef.current || !connected || !userId) {
-      console.warn('No se puede unir a la conversación: socket no conectado o userId no definido');
-      return;
-    }
-    
-    console.log(`Uniéndose a la conversación: ${conversationId}`);
-    
-    // Solo enviamos el conversationId, el servidor obtendrá el userId del socket
-    socketRef.current.emit('join_conversation', { conversationId });
-    activeConversations.current.add(conversationId);
-    return true;
-  }, [connected, userId]);
-
-  const leaveConversation = useCallback((conversationId: string) => {
-    if (!socketRef.current || !connected) {
-      return;
-    }
-    
-    // Solo enviamos el conversationId, el servidor obtendrá el userId del socket
-    socketRef.current.emit('leave_conversation', { conversationId });
-    activeConversations.current.delete(conversationId);
-  }, [connected]);
 
   const setActive = useCallback((conversationId: string) => {
     if (!socketRef.current || !connected || !userId) {

@@ -36,35 +36,44 @@ export function useChatContent(
   }, [messagesEndRef]);
 
   // Marcar conversación como leída
-  const markConversationAsRead = useCallback(async () => {
-    if (!conversationId || !session?.user?.id) return;
+  const markConversationAsRead = useCallback(async (conversationIdToMark: string) => {
+    if (!conversationIdToMark || !session?.user?.id) return;
     
     try {
-      // Verificar si ya está marcada como leída usando el ref
-      if (readStatusRef.current && readStatusRef.current[conversationId]) {
-        return; // Ya está marcada como leída, evitamos peticiones duplicadas
-      }
-      
-      // Marcar localmente como leída antes de la petición
-      if (!readStatusRef.current) readStatusRef.current = {};
-      readStatusRef.current[conversationId] = true;
-      
-      // Usar una petición no bloqueante
-      fetch(`/api/messages/read/${conversationId}`, {
-        method: 'PUT',
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
-      }).catch(error => {
-        console.error('Error al marcar conversación como leída:', error);
-        // En caso de error, revertimos el estado local
-        if (readStatusRef.current) {
-          readStatusRef.current[conversationId] = false;
-        }
+      const response = await fetch(`/api/messages/read/${conversationIdToMark}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store'
       });
+      
+      if (response.ok) {
+        // Actualizar estado local
+        if (readStatusRef.current) {
+          readStatusRef.current[conversationIdToMark] = true;
+        }
+      }
     } catch (error) {
       console.error('Error al marcar conversación como leída:', error);
+    }
+  }, [session?.user?.id]);
+  
+  // Marcar un mensaje específico como leído
+  const markMessageAsRead = useCallback(async (messageId: string) => {
+    if (!messageId || !conversationId || !session?.user?.id) return;
+    
+    try {
+      const response = await fetch(`/api/messages/${messageId}/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store'
+      });
+      
+      if (response.ok) {
+        // Actualizar estado local si es necesario
+        console.log(`[useChatContent] Mensaje ${messageId} marcado como leído`);
+      }
+    } catch (error) {
+      console.error('Error al marcar mensaje como leído:', error);
     }
   }, [conversationId, session?.user?.id]);
 
@@ -107,7 +116,7 @@ export function useChatContent(
         
         // Después de cargar, marcar como leído (solo si no está ya marcada)
         if (!readStatusRef.current || !readStatusRef.current[conversationId]) {
-          markConversationAsRead();
+          markConversationAsRead(conversationId);
         }
       } else {
         // Sino, agregar al principio (son mensajes más antiguos)
@@ -169,6 +178,7 @@ export function useChatContent(
     userId: session?.user?.id,
     username: session?.user?.name || session?.user?.username || 'Usuario',
     onNewMessage: (message) => {
+      console.log('[useChatContent] Recibido nuevo mensaje:', message);
       if (message.conversationId === conversationId) {
         // Añadir mensaje a la lista, reemplazando cualquier mensaje temporal si existe
         addNewMessage(message);
@@ -176,6 +186,7 @@ export function useChatContent(
     },
     // El servidor ahora envía message_ack con tempId incluido
     onMessageStatus: (status: { messageId: string; status: string; tempId?: string }) => {
+      console.log('[useChatContent] Recibido status update:', status);
       if (status.tempId) {
         // Actualizar el estado de un mensaje temporal cuando llega su confirmación
         setMessages(prevMessages => {
@@ -185,28 +196,64 @@ export function useChatContent(
             m.id === status.tempId || (m.tempId && m.tempId === status.tempId)
           );
           
+          console.log(`[useChatContent] Actualización de estado - existingIndex: ${existingMessageIndex}, tempIndex: ${tempMessageIndex}`);
+          
           // Si ya existe un mensaje con el ID final y también tenemos un mensaje temporal
           if (existingMessageIndex !== -1 && tempMessageIndex !== -1 && existingMessageIndex !== tempMessageIndex) {
             // Eliminar el mensaje temporal y mantener solo el confirmado
+            console.log(`[useChatContent] Eliminando mensaje temporal duplicado`);
             const updatedMessages = [...prevMessages];
             updatedMessages.splice(tempMessageIndex, 1);
+            
+            // También actualizar el mensaje confirmado con el estado más reciente
+            updatedMessages[existingMessageIndex] = {
+              ...updatedMessages[existingMessageIndex],
+              status: status.status as Message['status']
+            };
+            
             return updatedMessages;
           }
           
-          // Solo actualizar el mensaje temporal a confirmado
-          return prevMessages.map(msg => {
-            // Si es el mensaje temporal que estamos buscando
-            if (msg.id === status.tempId || (msg.tempId && msg.tempId === status.tempId)) {
-              // Actualizar sus propiedades manteniendo el tipo Message
-              return { 
-                ...msg, 
-                id: status.messageId, 
-                status: status.status as Message['status'], 
-                tempId: undefined 
-              };
-            }
-            return msg;
-          });
+          // Si solo tenemos el mensaje temporal, actualizarlo con el ID confirmado
+          if (tempMessageIndex !== -1) {
+            console.log(`[useChatContent] Actualizando mensaje temporal a confirmado`);
+            const updatedMessages = [...prevMessages];
+            updatedMessages[tempMessageIndex] = {
+              ...updatedMessages[tempMessageIndex],
+              id: status.messageId,
+              status: status.status as Message['status'],
+              tempId: undefined
+            };
+            return updatedMessages;
+          }
+          
+          // Si solo tenemos el mensaje con ID confirmado, actualizar su estado
+          if (existingMessageIndex !== -1) {
+            console.log(`[useChatContent] Actualizando estado de mensaje existente`);
+            const updatedMessages = [...prevMessages];
+            updatedMessages[existingMessageIndex] = {
+              ...updatedMessages[existingMessageIndex],
+              status: status.status as Message['status']
+            };
+            return updatedMessages;
+          }
+          
+          // Si ninguno de los casos anteriores, mantener los mensajes sin cambios
+          return prevMessages;
+        });
+      } else if (status.messageId) {
+        // Este es un caso para actualizaciones de estado sin tempId (ej: marcado como leído)
+        setMessages(prevMessages => {
+          const messageIndex = prevMessages.findIndex(m => m.id === status.messageId);
+          if (messageIndex === -1) return prevMessages;
+          
+          console.log(`[useChatContent] Actualizando estado de mensaje directo (sin tempId)`);
+          const updatedMessages = [...prevMessages];
+          updatedMessages[messageIndex] = {
+            ...updatedMessages[messageIndex],
+            status: status.status as Message['status']
+          };
+          return updatedMessages;
         });
       }
     }
@@ -215,18 +262,32 @@ export function useChatContent(
   // Efecto para unirse/salir de la conversación
   useEffect(() => {
     if (conversationId && connected && session?.user?.id) {
+      console.log(`[useChatContent] Uniendo a conversación: ${conversationId}`);
       // Usar un ID estable para evitar reconexiones innecesarias
       const stableConversationId = conversationId;
       
-      // Solo unirse si es una nueva conversación o la primera carga
+      // Unirse a la conversación
       joinConversation(stableConversationId);
       
-      // Limpiar al desmontar o cambiar de conversación
+      // Cargar mensajes iniciales
+      fetchMessages();
+      
+      // Obtener participantes si es necesario
+      if (!participants || participants.length === 0) {
+        fetchParticipants();
+      }
+      
+      // Limpiar al desmontar
       return () => {
+        console.log(`[useChatContent] Saliendo de conversación: ${stableConversationId}`);
         leaveConversation(stableConversationId);
       };
     }
-  }, [conversationId, connected, session?.user?.id, joinConversation, leaveConversation]);
+    
+    // Deshabilitamos la regla de exhaustive-deps porque solo queremos
+    // que este efecto se ejecute cuando cambie conversationId o connected
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, connected, session?.user?.id]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -404,84 +465,64 @@ export function useChatContent(
 
   // Añadir nuevo mensaje recibido
   const addNewMessage = useCallback((message: Partial<Message>) => {
-    // Formatear el mensaje
-    const formattedMessage: Message = {
-      id: message.id,
-      tempId: message.tempId,
-      conversationId: message.conversationId as string || conversationId || '',
-      content: message.content || '',
-      createdAt: message.createdAt ? new Date(message.createdAt as string) : new Date(),
-      read: Boolean(message.read),
-      senderId: message.senderId as string,
-      sender: {
-        id: message.senderId as string,
-        username: message.sender ? (message.sender as { username?: string | null }).username || 'Usuario' : 'Usuario',
-        image: message.sender ? (message.sender as { image?: string | null }).image || '/placeholders/user.png' : '/placeholders/user.png',
-      },
-      messageType: message.messageType || 'text',
-      imageUrl: message.mediaUrl,
-      status: message.status || 'sent',
-    };
-
-    // Actualizar la lista de mensajes
     setMessages(prevMessages => {
-      // Verificar si ya existe un mensaje confirmado con el mismo ID
-      const confirmedIndex = message.id ? 
-        prevMessages.findIndex(m => m.id === message.id && !m.tempId) : -1;
-      
-      if (confirmedIndex !== -1) {
-        // Si ya existe un mensaje confirmado con este ID, no añadir duplicado
-        return prevMessages;
-      }
-      
-      // Verificar si ya existe un mensaje temporal que debemos reemplazar
-      const tempIndex = prevMessages.findIndex(m => 
-        // Buscar por tempId o por un ID temporal (que empiece con "temp-")
-        (formattedMessage.tempId && m.tempId === formattedMessage.tempId) || 
-        (formattedMessage.tempId && m.id === formattedMessage.tempId) ||
-        (formattedMessage.id && m.tempId === formattedMessage.id) ||
-        (formattedMessage.id && m.id && typeof m.id === 'string' && m.id.startsWith('temp-') && 
-          m.content === formattedMessage.content && m.senderId === formattedMessage.senderId)
-      );
-
-      // Si encontramos un mensaje temporal para reemplazar
-      if (tempIndex !== -1) {
-        const updatedMessages = [...prevMessages];
-        updatedMessages[tempIndex] = { ...formattedMessage, status: 'sent' as Message['status'] };
-        return updatedMessages;
-      }
-
-      // Verificar si este mensaje ya existe en la lista (por contenido y remitente)
-      const duplicateIndex = prevMessages.findIndex(m => 
-        m.content === formattedMessage.content && 
-        m.senderId === formattedMessage.senderId &&
-        Math.abs(new Date(m.createdAt).getTime() - new Date(formattedMessage.createdAt).getTime()) < 5000
+      // Comprobar si ya existe un mensaje con el mismo ID o tempId
+      const existingMessageIndex = prevMessages.findIndex(m => 
+        (message.id && m.id === message.id) || 
+        (message.tempId && (m.id === message.tempId || m.tempId === message.tempId))
       );
       
-      if (duplicateIndex !== -1) {
-        // Actualizar el mensaje existente en vez de añadir uno nuevo
+      // Log para depuración
+      console.log(`[useChatContent] addNewMessage - mensaje existente: ${existingMessageIndex !== -1}, tempId: ${message.tempId}, id: ${message.id}`);
+      
+      // Si ya existe, actualizarlo
+      if (existingMessageIndex !== -1) {
         const updatedMessages = [...prevMessages];
-        // Mantener el ID del mensaje actual si el nuevo es temporal
-        const finalId = formattedMessage.id?.toString().startsWith('temp-') ? 
-          updatedMessages[duplicateIndex].id : formattedMessage.id;
-          
-        updatedMessages[duplicateIndex] = { 
-          ...updatedMessages[duplicateIndex],
-          ...formattedMessage,
-          id: finalId,
+        // Actualizar propiedades pero mantener las que no vienen en el mensaje nuevo
+        updatedMessages[existingMessageIndex] = {
+          ...updatedMessages[existingMessageIndex],
+          ...message,
+          // Si el mensaje tiene ID confirmado, eliminar el tempId
+          tempId: message.id ? undefined : updatedMessages[existingMessageIndex].tempId || message.tempId
         };
         return updatedMessages;
       }
-
-      // Si no hay mensaje temporal para reemplazar, añadir el nuevo
-      return [...prevMessages, formattedMessage];
+      
+      // Crear objeto de mensaje completo
+      const newMessage: Message = {
+        id: message.id || message.tempId || `temp-${Date.now()}`,
+        content: message.content || '',
+        senderId: message.senderId || '',
+        receiverId: message.receiverId,
+        conversationId: message.conversationId || conversationId || '',
+        createdAt: message.createdAt || new Date().toISOString(),
+        read: message.read || false,
+        status: message.status || 'sending',
+        mediaUrl: message.mediaUrl,
+        messageType: message.messageType || 'text',
+        sender: message.sender,
+        tempId: !message.id ? (message.tempId || `temp-${Date.now()}`) : undefined
+      };
+      
+      // Si el mensaje es de otro usuario, marcarlo como leído si la conversación está abierta
+      if (newMessage.senderId !== session?.user?.id && conversationId && newMessage.id) {
+        markMessageAsRead(newMessage.id);
+      }
+      
+      // Agregar mensaje al principio si es más reciente o al final si es más antiguo
+      const sortedMessages = [...prevMessages, newMessage].sort((a, b) => {
+        // Ordenar por createdAt
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
+      
+      return sortedMessages;
     });
-
-    // Si el mensaje es del otro participante, marcar conversación como leída
-    if (message.senderId !== session?.user?.id && message.conversationId) {
-      markConversationAsRead();
+    
+    // Si es un mensaje recibido, marcar la conversación como leída
+    if (message.senderId !== session?.user?.id && conversationId) {
+      markConversationAsRead(conversationId);
     }
-  }, [session?.user?.id, markConversationAsRead, conversationId]);
+  }, [conversationId, markConversationAsRead, markMessageAsRead, session?.user?.id]);
 
   // Preparar carga de imagen
   const handleImageChange = useCallback((file: File | null) => {

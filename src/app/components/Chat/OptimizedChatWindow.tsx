@@ -72,6 +72,25 @@ const MessageItem = React.memo(({
   const isCurrentUser = message.senderId === currentUserId;
   const messageDate = new Date(message.createdAt);
   
+  // Función para determinar el texto de estado del mensaje
+  const getMessageStatusText = () => {
+    if (!isCurrentUser) return null;
+    
+    // Usar propiedad 'status' si está disponible, o 'read' como fallback
+    if (message.status) {
+      switch (message.status) {
+        case 'sending': return 'Enviando...';
+        case 'sent': return 'Enviado';
+        case 'delivered': return 'Entregado';
+        case 'read': return 'Leído';
+        case 'failed': return 'Error';
+        default: return 'Enviado';
+      }
+    } else {
+      return message.read ? 'Leído' : 'Enviado';
+    }
+  };
+  
   return (
     <>
       {showDateSeparator && (
@@ -127,7 +146,7 @@ const MessageItem = React.memo(({
             
             {isCurrentUser && (
               <span className="ml-2">
-                {message.read ? 'Leído' : 'Enviado'}
+                {getMessageStatusText()}
               </span>
             )}
           </div>
