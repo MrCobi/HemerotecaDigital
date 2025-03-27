@@ -205,7 +205,7 @@ const getCategoryGradient = (englishCategory: string): string => {
   return categoryMappings[englishCategory.toLowerCase() as keyof typeof categoryMappings]?.color || "from-blue-600 to-indigo-600";
 };
 
-const getCategoryImage = (englishCategory: string, isDarkMode: boolean): string => {
+const getCategoryImage = (englishCategory: string, _isDarkMode: boolean): string => {
   const mapping = categoryMappings[englishCategory.toLowerCase() as keyof typeof categoryMappings];
   if (!mapping) {
     return `https://source.unsplash.com/random/300x200?${encodeURIComponent(englishCategory)}`;
