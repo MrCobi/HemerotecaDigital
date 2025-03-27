@@ -53,10 +53,14 @@ export async function DELETE(
                 // 3. Registrar en historial antes de eliminar
                 await tx.activityHistory.create({
                     data: {
-                      userId: session.user.id,
+                      user: {
+                        connect: { id: session.user.id }
+                      },
                       type: "comment_deleted",
                       sourceName: comment.source?.name || "Fuente desconocida",
-                      sourceId: comment.sourceId,
+                      source: comment.sourceId ? {
+                        connect: { id: comment.sourceId }
+                      } : undefined,
                       targetName: null,
                       targetId: null,
                       targetType: null,
@@ -110,5 +114,5 @@ export async function DELETE(
         }
     }
 
-    await deleteComment(commentId, session);
+    return await deleteComment(commentId, session);
 }
