@@ -213,7 +213,7 @@ export function useChatContent(
     }
   }, [conversationId, connected, session?.user?.id, joinConversation, leaveConversation]);
 
-  // Efecto para cargar mensajes y manejar el cambio de conversación
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!conversationId || !session?.user?.id) return;
     
@@ -259,7 +259,7 @@ export function useChatContent(
       controller.abort();
       // No limpiamos el readStatusRef para mantener el cache entre cambios
     };
-  }, [conversationId, session?.user?.id]);  // Eliminamos fetchMessages y fetchParticipants de las dependencias
+  }, [conversationId, session?.user?.id]);  
 
   // Enviar mensaje de texto
   const sendTextMessage = useCallback(async () => {
