@@ -4,12 +4,12 @@ import { fetchTopHeadlines } from "../services/NewsEverythingService";
 import { Article } from "../../interface/article";
 import Image from "next/image";
 import ArticleList from "@/src/app/components/Article/ArticleList";
-import Loading from "../components/Loading";
 import NoArticlesError from "@/src/app/components/Article/NoArticlesError";
 import ArticleForm from "@/src/app/components/Article/ArticleForm";
 import Pagination from "@/src/app/components/Article/Pagination";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import PageLoader from "@/src/app/components/PageLoader";
 
 const defaultSearchParams = {
   sources: "",
@@ -194,8 +194,8 @@ const Page = () => {
   // Mostrar pantalla de carga mientras se verifica la sesión
   if (status === "loading") {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Loading />
+      <div className="flex justify-center items-center h-screen bg-white dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 dark:border-blue-400"></div>
       </div>
     );
   }
@@ -219,7 +219,7 @@ const Page = () => {
 
           {loading && (
             <div className="flex justify-center items-center min-h-[400px]">
-              <Loading />
+              <PageLoader />
             </div>
           )}
           {!loading && error && (
