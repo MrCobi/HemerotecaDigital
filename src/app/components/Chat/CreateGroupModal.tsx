@@ -11,7 +11,7 @@ import Image from "next/image";
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 import { Textarea } from "@/src/app/components/ui/textarea";
 
-import { User, Participant, GroupCreationState } from '@/src/app/messages/types';
+import { User, GroupCreationState } from '@/src/app/messages/types';
 
 interface CreateGroupModalProps {
   isOpen: boolean;
@@ -23,7 +23,7 @@ interface CreateGroupModalProps {
   onParticipantToggle: (user: User) => void;
   onGroupImageChange: (file: File | null) => void;
   onCreateGroup: () => void;
-  currentUserId: string;
+  _currentUserId: string;
 }
 
 const CreateGroupModal = React.memo(({
@@ -36,7 +36,7 @@ const CreateGroupModal = React.memo(({
   onParticipantToggle,
   onGroupImageChange,
   onCreateGroup,
-  currentUserId
+  _currentUserId
 }: CreateGroupModalProps) => {
   // Estados locales
   const [searchTerm, setSearchTerm] = useState('');
@@ -99,7 +99,7 @@ const CreateGroupModal = React.memo(({
         const reader = new FileReader();
         reader.onload = (e) => {
           if (e.target?.result) {
-            const previewUrl = e.target.result as string;
+            const _previewUrl = e.target.result as string;
             // Actualizar imagen y previsualización
             onGroupImageChange(file);
           }
@@ -122,10 +122,16 @@ const CreateGroupModal = React.memo(({
           <div className="flex justify-center">
             <div className="relative h-24 w-24 cursor-pointer" onClick={handleImageUpload}>
               {groupState.imagePreview ? (
-                <img 
+                <CldImage 
                   src={groupState.imagePreview} 
                   alt="Previsualización"
-                  className="h-full w-full object-cover rounded-full" 
+                  width={96}
+                  height={96}
+                  className="h-full w-full object-cover rounded-full"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/AvatarPredeterminado.webp";
+                  }}
                 />
               ) : (
                 <div className="h-full w-full rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">

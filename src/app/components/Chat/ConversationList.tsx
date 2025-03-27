@@ -27,7 +27,13 @@ interface ConversationListProps {
   selectedFilter: 'all' | 'private' | 'group';
   generalSearchTerm: string;
   onSearchChange: (term: string) => void;
-  session: Record<string, any>;
+  session: {
+    user?: {
+      id?: string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
   showHeader?: boolean;
   showFilters?: boolean;
 }
@@ -424,7 +430,7 @@ const ConversationList = React.memo(({
                   onUserSelect(itemData as User);
                 }
               }}
-              _currentUserId={session?.user?.id || ''}
+              _currentUserId={session.user?.id || ''}
             />
           ))
         ) : (
