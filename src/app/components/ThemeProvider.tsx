@@ -1,24 +1,35 @@
 "use client";
 
 import { createContext, useState, useEffect, useContext, useCallback } from "react";
+import { usePathname } from "next/navigation";
 
 type Theme = "light" | "dark" | "system";
 
 interface ThemeContextType {
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  forcedTheme?: Theme;
+  systemTheme?: "light" | "dark";
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("system");
+  const [systemTheme, setSystemTheme] = useState<"light" | "dark">(
+    typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light"
+  );
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname();
+  const isHomePage = pathname === "/";
 
   // Función para aplicar el tema según preferencia del sistema
   const applySystemTheme = useCallback(() => {
     if (typeof window !== "undefined") {
       const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      setSystemTheme(prefersDark ? "dark" : "light");
       document.documentElement.classList.toggle("dark", prefersDark);
       document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
       document.documentElement.style.colorScheme = prefersDark ? "dark" : "light";
@@ -59,36 +70,51 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Cambiar el tema y guardarlo
   const changeTheme = (newTheme: Theme) => {
     setTheme(newTheme);
-    if (typeof window !== "undefined") {
+    
+    // No guardar el tema en localStorage si estamos en la página principal
+    if (typeof window !== "undefined" && !isHomePage) {
       localStorage.setItem("hemopress-theme", newTheme);
     }
+    
     applyTheme(newTheme);
   };
 
-  // Cargar el tema guardado cuando el componente se monta
+  // Cargar el tema cuando el componente se monta
   useEffect(() => {
     setMounted(true);
     
     if (typeof window !== "undefined") {
-      const savedTheme = localStorage.getItem("hemopress-theme") as Theme | null;
-      if (savedTheme) {
-        setTheme(savedTheme);
-        applyTheme(savedTheme);
-      } else {
-        // Si no hay tema guardado, usar preferencia del sistema
+      // En la página principal, usar siempre el tema del sistema
+      if (isHomePage) {
+        console.log("HomePage: Forzando tema del sistema");
         setTheme("system");
         applySystemTheme();
+        
+        // Configurar listener para cambios en tiempo real
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = () => {
+          console.log("Cambio detectado en preferencia del sistema en HomePage");
+          applySystemTheme();
+        };
+        
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+      } 
+      // En otras páginas, cargar el tema guardado
+      else {
+        const savedTheme = localStorage.getItem("hemopress-theme") as Theme | null;
+        if (savedTheme) {
+          console.log("Cargando tema guardado:", savedTheme);
+          setTheme(savedTheme);
+          applyTheme(savedTheme);
+        } else {
+          console.log("No hay tema guardado, usando sistema");
+          setTheme("system");
+          applySystemTheme();
+        }
       }
     }
-    
-    // Asegurarse de aplicar el tema cuando la aplicación se rehidrata
-    return () => {
-      if (typeof window !== "undefined") {
-        const matchMedia = window.matchMedia("(prefers-color-scheme: dark)");
-        matchMedia.removeEventListener("change", () => applySystemTheme());
-      }
-    };
-  }, [applyTheme, applySystemTheme]);
+  }, [applyTheme, applySystemTheme, isHomePage]);
 
   // Evitar problema de hidratación
   if (!mounted) {
@@ -96,7 +122,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme: changeTheme }}>
+    <ThemeContext.Provider 
+      value={{ 
+        theme, 
+        setTheme: changeTheme,
+        systemTheme,
+        forcedTheme: isHomePage ? "system" : undefined 
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );

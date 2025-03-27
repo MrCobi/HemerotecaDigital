@@ -5,7 +5,6 @@ import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useTheme } from "next-themes";
 
 // Pre-calculated positions for decorative elements
 const decorativeElements = [
@@ -75,21 +74,6 @@ export default function HomePage() {
     timeline: false,
   });
   const { data: session } = useSession();
-  const { setTheme } = useTheme();
-
-  // Aplicar solo el tema según la preferencia del sistema (claro/oscuro) en la página de inicio
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setTheme(systemPrefersDark ? 'dark' : 'light');
-      
-      // Eliminar cualquier clase o atributo personalizado que pudiera afectar a la apariencia
-      document.documentElement.removeAttribute("data-font-size");
-      document.documentElement.removeAttribute("data-font-family");
-      document.documentElement.removeAttribute("data-content-density");
-      document.documentElement.removeAttribute("data-animations");
-    }
-  }, [setTheme]);
 
   // Redirección si el usuario ya ha iniciado sesión
   useEffect(() => {
