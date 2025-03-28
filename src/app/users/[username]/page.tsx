@@ -17,14 +17,12 @@ import {
   Plus,
   ExternalLink,
 } from "lucide-react";
-import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 import { Source } from "@/src/interface/source";
 import Link from "next/link";
 import { Button } from "@/src/app/components/ui/button";
 import { FollowButton } from "@/src/app/components/FollowButton";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { CldImage } from 'next-cloudinary';
-import Loading from "@/src/app/components/Loading";
 
 type Activity = {
   id: string;
@@ -136,15 +134,13 @@ export default function UserProfilePage() {
   }, [username, session?.user?.id]);
 
   // Mostrar pantalla de carga mientras se verifica la sesión
-  if (status === "loading") {
+  if (status === "loading" || loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Loading />
+      <div className="flex justify-center items-center h-screen bg-white dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 dark:border-blue-400"></div>
       </div>
     );
   }
-
-  if (loading) return <LoadingSpinner />;
 
   if (!userData?.user) {
     return (
