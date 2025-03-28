@@ -12,7 +12,6 @@ import { Search, Users } from "lucide-react";
 import { Button } from "@/src/app/components/ui/button";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { useRouter } from "next/navigation";
-import Loading from "@/src/app/components/Loading";
 import { useAnimationSettings, useConditionalAnimation, useConditionalTransition } from "../hooks/useAnimationSettings";
 
 type Stats = {
@@ -195,8 +194,8 @@ export default function ExplorePage() {
   // Mostrar pantalla de carga mientras se verifica la sesión
   if (status === "loading") {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Loading />
+      <div className="flex justify-center items-center h-screen bg-white dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 dark:border-blue-400"></div>
       </div>
     );
   }
@@ -238,8 +237,8 @@ export default function ExplorePage() {
             </div>
 
             <div className="w-full md:w-96 relative">
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-300 pointer-events-none">
-                <Search className="h-4 w-4" />
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none z-10">
+                <Search className="h-5 w-5 text-blue-500 dark:text-blue-400" />
               </div>
               <Input
                 type="text"
@@ -252,13 +251,8 @@ export default function ExplorePage() {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <Skeleton
-                  key={i}
-                  className="h-[220px] w-full rounded-xl bg-muted/50"
-                />
-              ))}
+            <div className="flex justify-center items-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 dark:border-blue-400"></div>
             </div>
           ) : users.length === 0 ? (
             <motion.div
