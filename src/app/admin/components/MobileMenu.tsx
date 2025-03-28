@@ -17,6 +17,10 @@ export default function MobileMenu({
     setIsOpen(!isOpen);
   };
 
+  const closeMenu = () => {
+    setIsOpen(false);
+  };
+
   return (
     <div className="md:hidden">
       <button
@@ -68,37 +72,37 @@ export default function MobileMenu({
           
           <nav className="px-4 py-2">
             <div className="space-y-1 mb-4">
-              <Link href="/admin/dashboard" className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
+              <Link href="/admin/dashboard" onClick={closeMenu} className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
                 Dashboard
               </Link>
-              <Link href="/admin/users" className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
+              <Link href="/admin/users" onClick={closeMenu} className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
                 Usuarios
               </Link>
             </div>
 
             <div className="space-y-1 mb-4">
-              <Link href="/admin/sources" className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
+              <Link href="/admin/sources" onClick={closeMenu} className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
                 Fuentes
               </Link>
-              <Link href="/admin/comments" className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
+              <Link href="/admin/comments" onClick={closeMenu} className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
                 Comentarios
               </Link>
-              <Link href="/admin/ratings" className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
+              <Link href="/admin/ratings" onClick={closeMenu} className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
                 Valoraciones
               </Link>
-              <Link href="/admin/favorites" className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
+              <Link href="/admin/favorites" onClick={closeMenu} className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
                 Favoritos
               </Link>
             </div>
 
             <div className="space-y-1">
-              <Link href="/admin/messages" className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
+              <Link href="/admin/messages" onClick={closeMenu} className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
                 Mensajes
               </Link>
-              <Link href="/admin/activity" className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
+              <Link href="/admin/activity" onClick={closeMenu} className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
                 Actividad
               </Link>
-              <Link href="/admin/follows" className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
+              <Link href="/admin/follows" onClick={closeMenu} className="block px-4 py-2 text-sm font-medium rounded-md hover:bg-primary/10 transition-colors">
                 Seguidores
               </Link>
             </div>
