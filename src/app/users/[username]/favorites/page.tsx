@@ -160,28 +160,28 @@ export default function UserFavoritesPage() {
     <div className="min-h-screen">
       {/* Header con la información del usuario */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
-            <Heart className="h-8 w-8 mr-2 text-red-500" />
+        <div className="flex flex-col items-center text-center sm:text-left gap-4 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center">
+            <Heart className="h-6 w-6 sm:h-8 sm:w-8 mr-2 text-red-500 flex-shrink-0" />
             {userData ? (
-              <span>Periódicos favoritos de {userData.name || username}</span>
+              <span className="truncate">Periódicos favoritos de {userData.name || username}</span>
             ) : (
               <span>Cargando información del usuario...</span>
             )}
           </h1>
-          <div className="flex space-x-2">
+          <div className="flex flex-col sm:flex-row gap-2 self-center">
             {userData && (
               <Link href={`/users/${username}`}>
-                <Button variant="outline" className="flex items-center">
+                <Button variant="outline" className="flex items-center text-sm whitespace-nowrap">
                   <User className="h-4 w-4 mr-2" />
                   Perfil de {username}
                 </Button>
               </Link>
             )}
             <Link href="/sources">
-              <Button variant="outline" className="flex items-center">
-                <ExternalLink className="h-4 w-4 ml-2" />
+              <Button variant="outline" className="flex items-center text-sm whitespace-nowrap">
                 Explorar periódicos
+                <ExternalLink className="h-4 w-4 ml-2" />
               </Button>
             </Link>
           </div>
