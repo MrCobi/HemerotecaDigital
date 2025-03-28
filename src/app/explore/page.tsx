@@ -42,6 +42,7 @@ export default function ExplorePage() {
     Record<string, boolean>
   >({});
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [windowWidth, setWindowWidth] = useState(0);
 
   // Obtener el estado de las animaciones
   const animationsEnabled = useAnimationSettings();
@@ -60,6 +61,22 @@ export default function ExplorePage() {
   // Usar el hook con los argumentos necesarios
   const animationVariants = useConditionalAnimation(fadeInVariants, noAnimationVariants);
   const animationTransition = useConditionalTransition(0.3);
+
+  // Detectar el ancho de pantalla en el cliente
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+    
+    // Configuración inicial
+    handleResize();
+    
+    // Evento de cambio de tamaño
+    window.addEventListener('resize', handleResize);
+    
+    // Limpieza
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Verificación de autenticación
   useEffect(() => {
@@ -292,46 +309,93 @@ export default function ExplorePage() {
 
               {totalPages > 1 && (
                 <motion.div 
-                  className="flex justify-center gap-3 mt-6"
+                  className="flex justify-center items-center gap-1 mt-8"
                   initial={animationVariants.hidden}
                   animate={animationVariants.visible}
                   transition={{ ...animationTransition, delay: 0.2 }}
                 >
-                  <Button
+                  {/* Primera página - Oculto en móviles */}
+                  <motion.button
+                    whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+                    whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+                    className="h-8 w-8 sm:h-9 sm:w-9 hidden sm:flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 relative z-10"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                  >
+                    <span className="text-xs sm:text-sm font-bold">&lt;&lt;</span>
+                  </motion.button>
+                  
+                  {/* Botón Anterior */}
+                  <motion.button
+                    whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+                    whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+                    className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 relative z-10"
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 transition-all duration-200"
-                    variant="outline"
-                    size="sm"
                   >
-                    Anterior
-                  </Button>
-                  <div className="flex items-center gap-2">
-                    {Array.from({ length: totalPages }).map((_, idx) => (
-                      <motion.button
-                        key={idx}
-                        onClick={() => setCurrentPage(idx + 1)}
-                        className={`h-8 w-8 flex items-center justify-center rounded-md transition-all duration-200 ${
-                          currentPage === idx + 1
-                            ? "bg-blue-600 text-white dark:bg-blue-700 shadow-sm"
-                            : "bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30"
-                        }`}
-                        whileHover={animationsEnabled ? { scale: 1.05 } : {}}
-                        whileTap={animationsEnabled ? { scale: 0.95 } : {}}
-                      >
-                        {idx + 1}
-                      </motion.button>
-                    ))}
+                    <span className="text-xs sm:text-sm font-bold">&lt;</span>
+                  </motion.button>
+
+                  {/* Números de página - Adaptativo según ancho de pantalla */}
+                  <div className="inline-flex items-center relative z-10 space-x-1">
+                    {Array.from({ length: Math.min(totalPages, windowWidth < 640 ? 3 : 5) }).map((_, i) => {
+                      // Calcular el número de página basado en la posición actual
+                      let pageNum;
+                      const maxVisiblePages = windowWidth < 640 ? 3 : 5;
+                      
+                      if (totalPages <= maxVisiblePages) {
+                        // Si hay menos páginas que el máximo visible, mostrar todas secuencialmente
+                        pageNum = i + 1;
+                      } else if (currentPage <= Math.ceil(maxVisiblePages / 2)) {
+                        // Si estamos en las primeras páginas
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - Math.floor(maxVisiblePages / 2)) {
+                        // Si estamos en las últimas páginas
+                        pageNum = totalPages - maxVisiblePages + 1 + i;
+                      } else {
+                        // Si estamos en páginas intermedias
+                        pageNum = currentPage - Math.floor(maxVisiblePages / 2) + i;
+                      }
+
+                      return (
+                        <motion.button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+                          whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+                          className={`h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-md transition-all duration-200 ${
+                            currentPage === pageNum
+                              ? "bg-blue-600 text-white dark:bg-blue-700 shadow-sm"
+                              : "bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                          }`}
+                        >
+                          {pageNum}
+                        </motion.button>
+                      );
+                    })}
                   </div>
-                  <Button
+                  
+                  {/* Botón Siguiente */}
+                  <motion.button
+                    whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+                    whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+                    className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 relative z-10"
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 transition-all duration-200"
-                    variant="outline"
-                    size="sm"
                   >
-                    Siguiente
-                  </Button>
+                    <span className="text-xs sm:text-sm font-bold">&gt;</span>
+                  </motion.button>
+                  
+                  {/* Última página - Oculto en móviles */}
+                  <motion.button
+                    whileHover={animationsEnabled ? { scale: 1.05 } : {}}
+                    whileTap={animationsEnabled ? { scale: 0.95 } : {}}
+                    className="h-8 w-8 sm:h-9 sm:w-9 hidden sm:flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 relative z-10"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <span className="text-xs sm:text-sm font-bold">&gt;&gt;</span>
+                  </motion.button>
                 </motion.div>
               )}
             </>
