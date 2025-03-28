@@ -23,8 +23,6 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Heart,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -411,7 +409,7 @@ export default function SourcesPage({
                   disabled={currentPage === 1}
                   className="w-8 h-8 sm:w-10 sm:h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
                 >
-                  <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="text-xs sm:text-sm font-bold">&lt;&lt;</span>
                 </Button>
               </motion.div>
               
@@ -507,7 +505,7 @@ export default function SourcesPage({
                   disabled={currentPage === totalPages}
                   className="w-8 h-8 sm:w-10 sm:h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
                 >
-                  <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="text-xs sm:text-sm font-bold">&gt;&gt;</span>
                 </Button>
               </motion.div>
             </div>
