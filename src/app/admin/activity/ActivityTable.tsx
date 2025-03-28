@@ -244,6 +244,20 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
       accessorKey: "source",
       header: "Fuente",
       cell: (activity: ActivityItem) => {
+        // Para actividades de follow/unfollow, mostrar el usuario seguido/dejado de seguir
+        if ((activity.type === 'follow' || activity.type === 'unfollow') && activity.targetName && activity.targetType === 'user') {
+          return (
+            <div className="flex items-center">
+              <span className="text-indigo-600 dark:text-indigo-400 font-medium">
+                {activity.targetName}
+              </span>
+              <span className="text-xs text-muted-foreground ml-2">
+                {activity.type === 'follow' ? '(Usuario seguido)' : '(Dejado de seguir)'}
+              </span>
+            </div>
+          );
+        }
+        
         // Primero intentamos usar sourceName si está disponible
         if (activity.sourceName) {
           // Si tenemos sourceId (contenido en targetId cuando es de tipo source)
