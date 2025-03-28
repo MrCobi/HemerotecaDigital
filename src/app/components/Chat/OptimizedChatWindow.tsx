@@ -342,7 +342,7 @@ export default function OptimizedChatWindow({
             
             // Determinar si debemos mostrar el avatar (último mensaje de una secuencia)
             const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
-            const isLastInSequence = !nextMessage || nextMessage.senderId !== message.senderId;
+            const _isLastInSequence = !nextMessage || nextMessage.senderId !== message.senderId;
             
             return (
               <MessageItem

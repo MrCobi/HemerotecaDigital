@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import ForgotPasswordForm from "./_components/forgot-password-form";
 import { useSearchParams } from "next/navigation";
-import { Metadata } from 'next';
+
 
 // Configuración clave para resolver el error
 export const dynamic = 'force-dynamic';

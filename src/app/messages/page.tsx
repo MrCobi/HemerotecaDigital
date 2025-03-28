@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/src/app/components/ui/button";
-import { Loader2, MessageSquarePlus, Users, MessageCircle, Plus } from "lucide-react";
+import { MessageSquarePlus, Users, MessageCircle, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import _NewMessageModal from "../components/Chat/NewMessageModal";

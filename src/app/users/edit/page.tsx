@@ -18,7 +18,7 @@ import {
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
 import { Label } from "@/src/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/app/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/src/app/components/ui/card";
 import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
 import { Textarea } from "@/src/app/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/app/components/ui/tabs";
@@ -400,12 +400,49 @@ export default function EditProfilePage() {
                           className="object-cover"
                           sizes="(max-width: 768px) 100vw, 144px"
                         />
+                      ) : formData.image && formData.image.includes('cloudinary') ? (
+                        // Si la imagen tiene un formato de Cloudinary público (URL completa)
+                        <CldImage
+                          src={formData.image}
+                          alt={formData.name || "Avatar"}
+                          width={144}
+                          height={144}
+                          crop="fill"
+                          gravity="face"
+                          className="object-cover"
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
+                      ) : formData.image && !formData.image.startsWith('/') && !formData.image.startsWith('http') ? (
+                        // Si la imagen es un public_id de Cloudinary (sin https:// o /)
+                        <CldImage
+                          src={formData.image}
+                          alt={formData.name || "Avatar"}
+                          width={144}
+                          height={144}
+                          crop="fill"
+                          gravity="face"
+                          className="object-cover"
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
                       ) : (
-                        <div className="h-full w-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 dark:text-blue-300">
-                          <span className="text-2xl font-medium">
-                            {formData.name.charAt(0)?.toUpperCase() || "U"}
-                          </span>
-                        </div>
+                        // Para imágenes locales o fallback
+                        <Image
+                          src={formData.image || "/images/AvatarPredeterminado.webp"}
+                          alt={formData.name || "Avatar"}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, 144px"
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "/images/AvatarPredeterminado.webp";
+                          }}
+                        />
                       )}
                     </div>
                     <label
