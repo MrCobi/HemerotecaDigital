@@ -60,9 +60,9 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex min-h-screen bg-background">
       {/* Sidebar de navegación */}
-      <aside className="w-64 bg-white dark:bg-gray-800 shadow-md hidden md:block">
+      <aside className="w-64 bg-white dark:bg-gray-800 shadow-md hidden md:block h-screen sticky top-0">
         <div className="p-6">
           <Link href="/admin/dashboard" className="flex items-center space-x-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -169,7 +169,7 @@ export default function AdminLayout({
       </aside>
 
       {/* Contenido principal */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col">
         {/* Barra superior para móviles */}
         <header className="bg-white dark:bg-gray-800 shadow-sm z-10 md:hidden">
           <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
@@ -188,7 +188,7 @@ export default function AdminLayout({
         </header>
 
         {/* Contenido de la página */}
-        <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900">
           {children}
         </main>
       </div>

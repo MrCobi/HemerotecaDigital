@@ -48,14 +48,13 @@ function DeleteUserDialog({ userId, userName, onDelete }: DeleteUserDialogProps)
   return (
     <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
       <AlertDialogTrigger asChild>
-        <Button
-          variant="destructive"
-          size="icon"
-          className="h-8 w-8"
+        <button
+          className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
           title="Eliminar usuario"
         >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+          <Trash2 className="h-3.5 w-3.5" />
+          <span className="ml-1 text-xs truncate">Borrar</span>
+        </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -189,14 +188,14 @@ export default function UsersTable({ users }: UsersTableProps) {
       header: "Usuario",
       cell: (user: User) => (
         <div className="flex items-center">
-          <div className="h-10 w-10 flex-shrink-0 rounded-full bg-muted flex items-center justify-center mr-3">
+          <div className="flex-shrink-0 mr-3">
             {user.image ? (
               <Image
                 src={user.image}
                 alt={user.name || "Avatar"}
-                width={40}
-                height={40}
-                className="h-10 w-10 rounded-full object-cover"
+                width={36}
+                height={36}
+                className="rounded-full object-cover"
                 priority
                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                   const target = e.target as HTMLImageElement;
@@ -207,16 +206,16 @@ export default function UsersTable({ users }: UsersTableProps) {
               <Image
                 src="/images/AvatarPredeterminado.webp"
                 alt={user.name || "Avatar"}
-                width={40}
-                height={40}
-                className="h-10 w-10 rounded-full object-cover"
+                width={36}
+                height={36}
+                className="rounded-full object-cover"
                 priority
               />
             )}
           </div>
           <div>
             <div className="font-medium text-foreground">{user.name}</div>
-            <div className="text-sm text-muted-foreground">{user.email}</div>
+            <div className="text-xs text-muted-foreground">{user.email}</div>
           </div>
         </div>
       )
@@ -267,12 +266,12 @@ export default function UsersTable({ users }: UsersTableProps) {
       cell: (user: User) => (
         <div className="flex items-center">
           <div
-            className={`w-2.5 h-2.5 rounded-full mr-2 ${user.emailVerified
+            className={`w-2 h-2 rounded-full mr-2 ${user.emailVerified
                 ? "bg-green-500"
                 : "bg-amber-500"
               }`}
           ></div>
-          <span className="text-sm">
+          <span className="text-xs">
             {user.emailVerified ? "Verificado" : "Pendiente"}
           </span>
         </div>
@@ -284,7 +283,7 @@ export default function UsersTable({ users }: UsersTableProps) {
       cell: (user: User) => {
         const date = new Date(user.createdAt);
         return (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             {format(date, "dd MMM yyyy")}
           </div>
         );
@@ -294,20 +293,22 @@ export default function UsersTable({ users }: UsersTableProps) {
       accessorKey: "actions",
       header: "Acciones",
       cell: (user: User) => (
-        <div className="flex space-x-2">
-          <Link
+        <div className="flex items-center justify-start gap-1.5">
+          <Link 
             href={`/admin/users/view/${user.id}`}
-            className="inline-flex items-center text-primary hover:text-primary/80 font-medium transition-colors text-sm bg-primary/10 hover:bg-primary/20 px-2 py-1 rounded-md"
+            className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
+            title="Ver perfil"
           >
-            <User className="w-4 h-4 mr-1" />
-            Perfil
+            <User className="h-3.5 w-3.5" />
+            <span className="ml-1 text-xs truncate">Perfil</span>
           </Link>
-          <Link
+          <Link 
             href={`/admin/users/edit/${user.id}`}
-            className="inline-flex items-center text-amber-600 hover:text-amber-700 font-medium transition-colors text-sm bg-amber-100 hover:bg-amber-200 px-2 py-1 rounded-md dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-800/50"
+            className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800/40 transition-colors"
+            title="Editar usuario"
           >
-            <Edit className="w-4 h-4 mr-1" />
-            Editar
+            <Edit className="h-3.5 w-3.5" />
+            <span className="ml-1 text-xs truncate">Editar</span>
           </Link>
           <DeleteUserDialog
             userId={user.id}

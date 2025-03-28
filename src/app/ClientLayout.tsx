@@ -31,7 +31,7 @@ export default function ClientLayout({
           </Suspense>
         </main>
 
-        <footer className="bg-gradient-to-br from-blue-600 to-indigo-700 dark:from-blue-900 dark:to-indigo-950 text-white py-6 sm:py-8 mt-auto">
+        <footer className="bg-gradient-to-br from-blue-600 to-indigo-700 dark:from-blue-900 dark:to-indigo-950 text-white py-6 sm:py-8 w-full">
           <div className="border-blue-400/20 dark:border-blue-800/20 text-center text-sm text-blue-100 px-4">
             <p> 2025 Hemeroteca Digital. Todos los derechos reservados.</p>
           </div>

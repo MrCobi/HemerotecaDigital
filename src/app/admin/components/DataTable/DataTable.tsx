@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import TableFilter from "../TableFilter";
 import RowsPerPageSelector from "../RowsPerPageSelector";
@@ -47,6 +47,18 @@ export default function DataTable<T>({
   onRowClick
 }: DataTableProps<T>) {
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const toggleRowExpand = (index: number) => {
     setExpandedRows((prev) => ({
@@ -54,6 +66,17 @@ export default function DataTable<T>({
       [index]: !prev[index]
     }));
   };
+
+  const isMobileView = windowWidth < 768;
+  const isTabletView = windowWidth >= 768 && windowWidth < 1080;
+
+  const getTabletVisibleColumns = () => {
+    if (windowWidth < 850) return 3; 
+    if (windowWidth < 950) return 4; 
+    return 5; 
+  };
+
+  const tabletVisibleColumns = getTabletVisibleColumns();
 
   const renderMobileRow = (item: T, index: number) => {
     const isExpanded = expandedRows[index] || false;
@@ -67,8 +90,7 @@ export default function DataTable<T>({
           )}
           onClick={() => onRowClick?.(item)}
         >
-          <div className="flex justify-between items-center mb-2">
-            {/* Primera columna como principal */}
+          <div className="flex justify-between items-center mb-3">
             <div className="font-medium">{columns[0].cell(item)}</div>
             
             <button
@@ -91,15 +113,42 @@ export default function DataTable<T>({
             </button>
           </div>
           
-          {/* Segunda columna siempre visible */}
-          {columns.length > 1 && (
-            <div className="text-sm text-muted-foreground mb-2">
-              {columns[1].cell(item)}
+          <div className="flex flex-col gap-2 mb-3">
+            {columns.length > 1 && (
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium text-muted-foreground">
+                  {typeof columns[1].header === "string" ? columns[1].header : "Rol"}:
+                </div>
+                <div>{columns[1].cell(item)}</div>
+              </div>
+            )}
+          
+            {columns.length > 2 && (
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium text-muted-foreground">
+                  {typeof columns[2].header === "string" ? columns[2].header : "Estado"}:
+                </div>
+                <div>{columns[2].cell(item)}</div>
+              </div>
+            )}
+            
+            {columns.length > 3 && (
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium text-muted-foreground">
+                  {typeof columns[3].header === "string" ? columns[3].header : "Registro"}:
+                </div>
+                <div>{columns[3].cell(item)}</div>
+              </div>
+            )}
+          </div>
+          
+          {columns.length > 4 && (
+            <div className="flex flex-row justify-center space-x-2 mt-3 pt-3 border-t border-border">
+              {columns[4].cell(item)}
             </div>
           )}
           
-          {/* Columnas expandidas */}
-          {isExpanded && columns.slice(2).map((column, colIndex) => (
+          {isExpanded && columns.length > 5 && columns.slice(5).map((column, colIndex) => (
             <div key={colIndex} className="mt-3 pt-3 border-t border-border">
               <div className="text-xs font-medium text-muted-foreground uppercase mb-1">
                 {typeof column.header === "string" ? column.header : `Columna ${colIndex + 3}`}
@@ -112,10 +161,82 @@ export default function DataTable<T>({
     );
   };
 
+  const renderTabletRow = (item: T, index: number) => {
+    const isExpanded = expandedRows[index] || false;
+    
+    return (
+      <div 
+        className={cn(
+          "p-4 border-b border-border hover:bg-muted/50 transition-colors bg-transparent",
+          onRowClick && "cursor-pointer"
+        )}
+        onClick={() => onRowClick?.(item)}
+      >
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex-1">
+            {columns[0].cell(item)}
+          </div>
+          
+          <button
+            type="button"
+            className="ml-2 p-1 rounded-full hover:bg-muted transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleRowExpand(index);
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className={`h-5 w-5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+        
+        {/* Información visible siempre */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-2">
+          {columns.slice(1, 4).map((column, idx) => (
+            <div key={idx} className="flex flex-col">
+              <div className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                {typeof column.header === "string" ? column.header : `Columna ${idx + 1}`}
+              </div>
+              <div>{column.cell(item)}</div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Acciones - solo visible cuando está expandido */}
+        {isExpanded && columns.length > 4 && (
+          <div className="flex flex-row justify-end space-x-2 mt-2 pt-3 border-t border-border">
+            {columns[4].cell(item)}
+          </div>
+        )}
+        
+        {/* Otras columnas - solo visibles cuando está expandido */}
+        {isExpanded && columns.length > 5 && (
+          <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-3">
+            {columns.slice(5).map((column, colIndex) => (
+              <div key={colIndex} className="flex flex-col">
+                <div className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                  {typeof column.header === "string" ? column.header : `Columna ${colIndex + 5}`}
+                </div>
+                <div>{column.cell(item)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className={cn("bg-card dark:bg-background rounded-md shadow-sm", className)}>
       <div className="p-4 border-b border-border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card dark:bg-transparent">
-        <div className="w-full sm:w-64">
+        <div className="w-full">
           <TableFilter 
             onFilterChange={onFilterChange} 
             placeholder={filterPlaceholder}
@@ -123,77 +244,93 @@ export default function DataTable<T>({
           />
         </div>
         
-        {/* Elementos de filtro adicionales de las columnas */}
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap gap-4 w-full">
           {columns
             .filter(column => column.filterElement)
             .map((column, index) => (
-              <div key={index}>
+              <div key={index} className="w-full sm:w-auto">
                 {column.filterElement}
               </div>
             ))
           }
         </div>
         
-        <RowsPerPageSelector 
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={onRowsPerPageChange}
-        />
+        <div className="w-full sm:w-auto">
+          <RowsPerPageSelector 
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={onRowsPerPageChange}
+          />
+        </div>
       </div>
       
       {data.length > 0 ? (
         <>
-          {/* Tabla para pantallas medianas y grandes */}
-          <div className="w-full hidden md:block">
-            <table className="w-full table-fixed bg-transparent">
-              <thead className="bg-muted/30">
-                <tr>
-                  {columns.map((column, index) => (
-                    <th
-                      key={index}
-                      className={cn(
-                        "px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider",
-                        column.className
-                      )}
-                    >
-                      {column.header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="bg-transparent divide-y divide-border">
-                {data.map((item, rowIndex) => (
-                  <tr 
-                    key={rowIndex} 
-                    className={cn(
-                      "hover:bg-muted/50 transition-colors",
-                      onRowClick && "cursor-pointer"
-                    )}
-                    onClick={() => onRowClick?.(item)}
-                  >
-                    {columns.map((column, colIndex) => (
-                      <td
-                        key={colIndex}
+          {/* Tabla para escritorio (≥1080px) */}
+          <div className="rounded-md border hidden lg:block">
+            <div className="relative w-full">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    {columns.map((column, index) => (
+                      <th
+                        key={index}
                         className={cn(
-                          "px-6 py-4 break-words",
-                          column.className
+                          "px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide",
+                          column.className,
+                          index === 0 ? "w-[35%] lg:w-[30%]" : "", 
+                          index === 1 ? "w-[15%] lg:w-[15%]" : "", 
+                          index === 2 ? "w-[15%] lg:w-[15%]" : "", 
+                          index === 3 ? "w-[15%] lg:w-[15%]" : "", 
+                          index === 4 ? "w-[20%] lg:w-[25%] xl:w-[25%]" : ""  
                         )}
                       >
-                        {column.cell(item)}
-                      </td>
+                        {column.header}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.map((item, rowIndex) => (
+                    <tr 
+                      key={rowIndex} 
+                      className="border-b border-border hover:bg-muted/10"
+                      onClick={() => onRowClick?.(item)}
+                    >
+                      {columns.map((column, colIndex) => (
+                        <td
+                          key={colIndex}
+                          className={cn(
+                            "px-2 py-3",
+                            column.className,
+                            // Dar más espacio a la columna de acciones en pantallas entre 1024px y 1122px
+                            colIndex === 4 ? "lg:!min-w-[220px] xl:!min-w-0" : ""
+                          )}
+                        >
+                          {column.cell(item)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
           
-          {/* Vista para móviles */}
-          <div className="md:hidden">
+          {/* Vista para tablets (768px-1080px) */}
+          <div className="md:block lg:hidden">
+            {data.map((item, index) => (
+              <div key={index}>
+                {renderTabletRow(item, index)}
+              </div>
+            ))}
+          </div>
+          
+          {/* Vista para móviles (<768px) */}
+          <div className="block md:hidden">
             {data.map((item, index) => renderMobileRow(item, index))}
           </div>
           
-          <div className="border-t border-border bg-transparent">
+          <div className="border-t border-border bg-transparent p-2 sm:p-4">
             <Pagination 
               currentPage={currentPage} 
               totalPages={totalPages} 
