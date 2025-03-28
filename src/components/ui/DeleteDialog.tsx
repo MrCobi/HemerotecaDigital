@@ -65,14 +65,13 @@ export default function DeleteDialog({
     <AlertDialog open={isOpen} onOpenChange={(open) => !isDeleting && setIsOpen(open)}>
       <AlertDialogTrigger asChild>
         {children || (
-          <Button
-            variant="destructive"
-            size={buttonSize}
-            className="inline-flex items-center text-sm px-2 py-1 rounded-md"
+          <button
+            className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
+            title={`Eliminar ${entityType}`}
           >
-            <Trash className="w-4 h-4 mr-1" />
-            {buttonLabel}
-          </Button>
+            <Trash className="h-3.5 w-3.5" />
+            <span className="ml-1 text-xs truncate">{buttonLabel}</span>
+          </button>
         )}
       </AlertDialogTrigger>
       <AlertDialogContent>

@@ -274,12 +274,14 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
         id: "actions",
         cell: (comment: Comment) => {
           return (
-            <div className="flex justify-end space-x-2">
+            <div className="flex items-center justify-start gap-1.5">
               <Link
                 href={`/admin/comments/view/${comment.id}`}
-                className={buttonVariants({ variant: "outline", size: "sm" })}
+                className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
+                title="Ver comentario"
               >
-                Ver
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span className="ml-1 text-xs truncate">Ver</span>
               </Link>
               {!comment.isDeleted && (
                 <DeleteDialog 
@@ -288,14 +290,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
                   entityType="el comentario"
                   onDelete={() => handleDeleteComment(comment.id)}
                   consequenceText="Esta acción no eliminará físicamente el comentario, sino que lo marcará como eliminado."
-                >
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </DeleteDialog>
+                />
               )}
             </div>
           );

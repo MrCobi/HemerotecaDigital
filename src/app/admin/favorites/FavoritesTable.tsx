@@ -253,23 +253,24 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
       id: "actions",
       cell: (favorite: Favorite) => {
         return (
-          <div className="flex justify-end space-x-2">
+          <div className="flex items-center justify-start gap-1.5">
             <Link
               href={`/sources/${favorite.source.id}`}
-              className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-offset-background transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
+              title="Ver fuente"
             >
-              Ver fuente
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span className="ml-1 text-xs truncate">Ver</span>
             </Link>
+            <button
+              className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
+              title="Eliminar favorito"
+              onClick={() => setFavoriteToDelete(favorite.id)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span className="ml-1 text-xs truncate">Eliminar</span>
+            </button>
             <AlertDialog open={isDeleteDialogOpen && favoriteToDelete === favorite.id} onOpenChange={setIsDeleteDialogOpen}>
-              <AlertDialogTrigger asChild>
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
-                  onClick={() => setFavoriteToDelete(favorite.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>

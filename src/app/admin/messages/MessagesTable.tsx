@@ -546,36 +546,37 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
           <div className="flex justify-end space-x-2">
             <Link
               href={`/admin/messages/view/${message.id}`}
-              className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-offset-background transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
+              title="Ver mensaje"
             >
-              <Eye className="h-3.5 w-3.5 mr-1" />
-              Ver
+              <Eye className="h-3.5 w-3.5" />
+              <span className="ml-1 text-xs truncate">Ver</span>
             </Link>
             {!message.read && (
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={() => handleMarkAsRead(message.id)}
                 disabled={isMarkingAsRead === message.id}
-                className="inline-flex items-center rounded-md bg-green-100 px-2 py-1 text-xs font-medium text-green-800 ring-offset-background transition-colors hover:bg-green-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors"
+                title="Marcar como leído"
               >
                 {isMarkingAsRead === message.id ? (
                   <div className="h-3.5 w-3.5 mr-1 animate-spin rounded-full border-b-2 border-green-800"></div>
                 ) : (
-                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                  <CheckCircle className="h-3.5 w-3.5" />
                 )}
-                Marcar leído
-              </Button>
+                <span className="ml-1 text-xs truncate">Marcar leído</span>
+              </button>
             )}
             <AlertDialog open={isDeleteDialogOpen && messageToDelete === message.id} onOpenChange={setIsDeleteDialogOpen}>
               <AlertDialogTrigger asChild>
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
+                <button 
+                  className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
+                  title="Eliminar mensaje"
                   onClick={() => setMessageToDelete(message.id)}
                 >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span className="ml-1 text-xs truncate">Borrar</span>
+                </button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>

@@ -90,7 +90,7 @@ export default function SourcesPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4 py-8">
       <div className="sm:flex sm:items-center sm:justify-between mb-8">
         <h1 className="text-3xl font-bold text-foreground">Gestión de Fuentes</h1>
         <Link 

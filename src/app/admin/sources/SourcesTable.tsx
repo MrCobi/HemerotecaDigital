@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Source } from "@/src/interface/source";
 import DataTable, { Column } from "../components/DataTable/DataTable";
-import { ExternalLink, Edit, Star } from "lucide-react";
+import { ExternalLink, Edit, Star, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import DeleteDialog from "@/src/components/ui/DeleteDialog";
@@ -209,16 +209,56 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
       {
         header: "Ubicación",
         accessorKey: "location",
-        cell: (source) => (
-          <div>
-            <div className="text-sm font-medium">
-              {source.country}
+        cell: (source) => {
+          // Mapeo de códigos de país a nombres completos
+          const countryNames: {[key: string]: string} = {
+            'us': 'USA',
+            'uk': 'Reino Unido',
+            'es': 'España',
+            'fr': 'Francia',
+            'it': 'Italia',
+            'de': 'Alemania',
+            'au': 'Australia',
+            'ca': 'Canadá',
+            'mx': 'México',
+            'br': 'Brasil',
+            'ar': 'Argentina',
+            'cn': 'China',
+            'jp': 'Japón',
+            'in': 'India',
+            'ru': 'Rusia',
+            'sa': 'Arabia Saudí'
+          };
+          
+          // Mapeo de códigos de idioma a nombres completos
+          const languageNames: {[key: string]: string} = {
+            'en': 'Inglés',
+            'es': 'Español',
+            'fr': 'Francés',
+            'it': 'Italiano',
+            'de': 'Alemán',
+            'pt': 'Portugués',
+            'ru': 'Ruso',
+            'zh': 'Chino',
+            'ja': 'Japonés',
+            'ar': 'Árabe',
+            'hi': 'Hindi'
+          };
+          
+          const countryName = countryNames[source.country.toLowerCase()] || source.country;
+          const languageName = languageNames[source.language.toLowerCase()] || source.language;
+          
+          return (
+            <div>
+              <div className="text-sm font-medium">
+                {countryName}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {languageName}
+              </div>
             </div>
-            <div className="text-xs text-muted-foreground">
-              {source.language}
-            </div>
-          </div>
-        )
+          );
+        }
       },
       {
         header: "Creado",
@@ -238,21 +278,23 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
         header: "Acciones",
         accessorKey: "actions",
         cell: (source) => (
-          <div className="flex space-x-2">
+          <div className="flex items-center justify-start gap-1.5 flex-wrap">
             <Link
               href={`/sources/${source.id}`}
-              className="inline-flex items-center text-primary hover:text-primary/80 font-medium transition-colors text-sm bg-primary/10 hover:bg-primary/20 px-2 py-1 rounded-md"
+              className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
               target="_blank"
+              title="Ver fuente"
             >
-              <ExternalLink className="w-4 h-4 mr-1" />
-              Ver
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span className="ml-1 text-xs truncate">Ver</span>
             </Link>
             <Link
               href={`/admin/sources/edit/${source.id}`}
-              className="inline-flex items-center text-amber-600 hover:text-amber-700 font-medium transition-colors text-sm bg-amber-100 hover:bg-amber-200 px-2 py-1 rounded-md dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-800/50"
+              className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800/40 transition-colors"
+              title="Editar fuente"
             >
-              <Edit className="w-4 h-4 mr-1" />
-              Editar
+              <Edit className="h-3.5 w-3.5" />
+              <span className="ml-1 text-xs truncate">Editar</span>
             </Link>
             <DeleteDialog
               entityId={source.id}
