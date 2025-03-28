@@ -2,7 +2,6 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useCallback } from "react";
-import { UserCard } from "@/src/app/components/UserCard";
 import { FollowButton } from "@/src/app/components/FollowButton";
 import { Skeleton } from "@/src/app/components/ui/skeleton";
 import { useToast } from "@/src/app/components/ui/use-toast";
@@ -13,6 +12,9 @@ import { Button } from "@/src/app/components/ui/button";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { useRouter } from "next/navigation";
 import { useAnimationSettings, useConditionalAnimation, useConditionalTransition } from "../hooks/useAnimationSettings";
+import Image from 'next/image';
+import Link from 'next/link';
+import { UserCard } from "@/src/app/components/UserCard";
 
 type Stats = {
   followers?: number;
