@@ -62,13 +62,13 @@ const AuthButton = () => {
       <div className="relative">
         <motion.button
           onClick={handleMenu}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white shadow-sm transition-colors duration-200"
+          className="flex items-center gap-1.5 xs:gap-2 px-2 xs:px-3 py-1.5 sm:py-2 rounded-lg bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white shadow-sm transition-colors duration-200"
           initial={buttonVariants.initial}
           whileHover={buttonVariants.hover}
           whileTap={buttonVariants.tap}
         >
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white/20">
+          <div className="flex items-center gap-1.5 xs:gap-2">
+            <div className="w-7 h-7 xs:w-8 xs:h-8 rounded-full overflow-hidden border-2 border-white/20">
               {session.user.image && (session.user.image.includes('cloudinary') || 
               (!session.user.image.startsWith('/') && !session.user.image.startsWith('http'))) ? (
                 <CldImage
@@ -125,15 +125,15 @@ const AuthButton = () => {
               )}
             </div>
             <div className="flex flex-col items-start">
-              <span className="text-sm font-medium text-white">
+              <span className="text-xs xs:text-sm font-medium text-white truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none">
                 {session.user?.name || "Usuario"}
               </span>
-              <span className="text-xs text-gray-200">
+              <span className="text-[10px] xs:text-xs text-gray-200 truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none">
                 {session.user?.email || ""}
               </span>
             </div>
             <motion.svg
-              className="w-4 h-4 text-gray-200 ml-2"
+              className="w-3 h-3 xs:w-4 xs:h-4 text-gray-200 ml-0.5 xs:ml-1 sm:ml-2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -171,6 +171,13 @@ const AuthButton = () => {
           }}
           classes={{
             list: "py-1",
+          }}
+          sx={{
+            "& .MuiMenu-paper": {
+              maxWidth: "calc(100vw - 16px)",
+              width: "auto",
+              minWidth: "200px"
+            }
           }}
         >
           <div className="bg-white dark:bg-gray-800 rounded-lg">
@@ -374,10 +381,10 @@ const AuthButton = () => {
   }
 
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-2 xs:gap-3">
       <Link href="/api/auth/signin" passHref>
         <motion.button 
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-700 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-colors"
+          className="px-2 xs:px-3 sm:px-4 py-1.5 sm:py-2 text-xs xs:text-sm font-medium text-white bg-blue-600 dark:bg-blue-700 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-colors"
           whileHover={animationsEnabled ? { scale: 1.05 } : {}}
           whileTap={animationsEnabled ? { scale: 0.95 } : {}}
         >
@@ -386,7 +393,7 @@ const AuthButton = () => {
       </Link>
       <Link href="/api/auth/signup" passHref>
         <motion.button 
-          className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800 border border-blue-600 dark:border-blue-500 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-colors"
+          className="px-2 xs:px-3 sm:px-4 py-1.5 sm:py-2 text-xs xs:text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800 border border-blue-600 dark:border-blue-500 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-colors"
           whileHover={animationsEnabled ? { scale: 1.05 } : {}}
           whileTap={animationsEnabled ? { scale: 0.95 } : {}}
         >
@@ -398,4 +405,3 @@ const AuthButton = () => {
 };
 
 export default AuthButton;
-
