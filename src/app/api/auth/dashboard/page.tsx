@@ -46,6 +46,19 @@ export default function DashboardPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalActivities, setTotalActivities] = useState(0);
   const itemsPerPage = 5;
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+
+  // Detectar cambio en el tamaño de la ventana
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   const displayedFavorites =
     favoriteSources.length > 6 ? favoriteSources.slice(0, 5) : favoriteSources;
@@ -203,26 +216,94 @@ export default function DashboardPage() {
     const maxTotalItems = 5 * itemsPerPage;
     const effectiveTotalItems = Math.min(totalActivities, maxTotalItems);
     const totalPages = Math.ceil(effectiveTotalItems / itemsPerPage);
+    // Consideramos pantalla pequeña por debajo de 480px
+    const isMobile = windowWidth < 480;
 
     return (
-      <div className="flex justify-center gap-2 mt-4">
-        <Button
+      <div className="flex justify-center items-center gap-2 mt-6 overflow-hidden">
+        {/* Primera página - Oculto en móviles */}
+        {!isMobile && (
+          <button
+            className="h-9 w-9 flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200"
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage === 1}
+          >
+            <span className="text-sm font-bold">&lt;&lt;</span>
+          </button>
+        )}
+        
+        {/* Botón Anterior */}
+        <button
+          className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200"
           onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
           disabled={currentPage === 1}
         >
-          Anterior
-        </Button>
+          <span className="text-xs sm:text-sm font-bold">&lt;</span>
+        </button>
 
-        <span className="flex items-center px-4 text-sm">
-          Página {currentPage} de {totalPages}
-        </span>
+        {isMobile ? (
+          // Versión móvil - Solo página actual
+          <span className="h-8 w-8 flex items-center justify-center bg-blue-600 text-white dark:bg-blue-700 rounded-md font-medium">
+            {currentPage}
+          </span>
+        ) : (
+          // Versión escritorio - Números de página
+          <div className="inline-flex items-center space-x-1">
+            {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
+              // Calcular el número de página basado en la posición actual
+              let pageNum;
+              const maxVisiblePages = 5;
+              
+              if (totalPages <= maxVisiblePages) {
+                // Si hay menos páginas que el máximo visible, mostrar todas secuencialmente
+                pageNum = i + 1;
+              } else if (currentPage <= Math.ceil(maxVisiblePages / 2)) {
+                // Si estamos en las primeras páginas
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - Math.floor(maxVisiblePages / 2)) {
+                // Si estamos en las últimas páginas
+                pageNum = totalPages - maxVisiblePages + 1 + i;
+              } else {
+                // Si estamos en páginas intermedias
+                pageNum = currentPage - Math.floor(maxVisiblePages / 2) + i;
+              }
 
-        <Button
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`h-9 w-9 flex items-center justify-center rounded-md transition-all duration-200 ${
+                    currentPage === pageNum
+                      ? "bg-blue-600 text-white dark:bg-blue-700 shadow-sm"
+                      : "bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        
+        {/* Botón Siguiente */}
+        <button
+          className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200"
           onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
           disabled={currentPage === totalPages}
         >
-          Siguiente
-        </Button>
+          <span className="text-xs sm:text-sm font-bold">&gt;</span>
+        </button>
+        
+        {/* Última página - Oculto en móviles */}
+        {!isMobile && (
+          <button
+            className="h-9 w-9 flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200"
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={currentPage === totalPages}
+          >
+            <span className="text-sm font-bold">&gt;&gt;</span>
+          </button>
+        )}
       </div>
     );
   };
@@ -301,7 +382,7 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative">
         {/* Mobile Header */}
         <div className="lg:hidden flex items-center justify-between mb-6">
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/home" className="flex items-center space-x-2">
             <div className="relative w-10 h-10">
               <Image
                 src="/images/default_periodico.jpg"
@@ -587,28 +668,28 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="flex items-center justify-center sm:justify-start p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl backdrop-blur-sm border border-blue-100/50 dark:border-blue-800/50 shadow-sm hover:shadow transition-shadow">
+                        <div className="flex items-center justify-center sm:justify-start p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl backdrop-blur-sm border border-blue-100/50 dark:border-blue-800/50 shadow-sm hover:shadow transition-shadow w-full sm:max-w-[48%]">
                           <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-800/50 mr-3">
                             <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                           </div>
-                          <div>
+                          <div className="flex-1 min-w-0">
                             <p className="text-xs text-blue-600/70 dark:text-blue-400/70 font-medium">
                               Email
                             </p>
-                            <p className="text-gray-700 dark:text-gray-300 font-medium truncate max-w-[200px] sm:max-w-[250px]">
+                            <p className="text-gray-700 dark:text-gray-300 font-medium truncate">
                               {user?.email}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center justify-center sm:justify-start p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl backdrop-blur-sm border border-blue-100/50 dark:border-blue-800/50 shadow-sm hover:shadow transition-shadow">
+                        <div className="flex items-center justify-center sm:justify-start p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl backdrop-blur-sm border border-blue-100/50 dark:border-blue-800/50 shadow-sm hover:shadow transition-shadow w-full sm:max-w-[48%]">
                           <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-800/50 mr-3">
                             <User2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                           </div>
-                          <div>
+                          <div className="flex-1 min-w-0">
                             <p className="text-xs text-blue-600/70 dark:text-blue-400/70 font-medium">
                               Rol
                             </p>
-                            <p className="text-gray-700 dark:text-gray-300 font-medium">
+                            <p className="text-gray-700 dark:text-gray-300 font-medium truncate">
                               {user?.role || "Usuario"}
                             </p>
                           </div>
