@@ -144,11 +144,9 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
           <option value="comment_reply">Respuestas</option>
           <option value="comment_deleted">Comentarios eliminados</option>
           <option value="rating_added">Valoraciones</option>
-          <option value="rating_removed">Valoraciones eliminadas</option>
-          <option value="favorite">Favoritos</option>
+          <option value="rating_deleted">Valoraciones eliminadas</option>
           <option value="favorite_added">Favoritos agregados</option>
           <option value="favorite_removed">Favoritos eliminados</option>
-          <option value="login">Inicios de sesión</option>
           <option value="follow">Seguimientos</option>
           <option value="unfollow">Dejar de seguir</option>
         </select>
