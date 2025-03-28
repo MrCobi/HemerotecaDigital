@@ -83,6 +83,23 @@ export default function SourcesPage({
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [windowWidth, setWindowWidth] = useState(0);
+
+  // Detectar el ancho de pantalla solo en el lado del cliente
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+    
+    // Configuración inicial
+    handleResize();
+    
+    // Evento de cambio de tamaño
+    window.addEventListener('resize', handleResize);
+    
+    // Limpieza
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     setIsLoaded(true);
@@ -372,7 +389,7 @@ export default function SourcesPage({
 
         {showPagination && totalSources > sourcesPerPage && (
           <motion.div 
-            className="mt-12 flex flex-col items-center space-y-4"
+            className="mt-12 flex flex-col items-center space-y-4 px-2"
             initial={animationVariants.hidden}
             animate={animationVariants.visible}
             transition={{ ...animationTransition, delay: 0.3 }}
@@ -380,21 +397,21 @@ export default function SourcesPage({
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Mostrando {Math.min(sourcesPerPage, sources.length)} de {totalSources} fuentes
             </p>
-            <div className="flex items-center space-x-2 overflow-visible w-full justify-center relative">
-              {/* Primera página */}
+            <div className="inline-flex flex-nowrap items-center justify-center">
+              {/* Primera página - Oculto en móviles */}
               <motion.div
                 whileHover={animationsEnabled ? { scale: 1.05 } : {}}
                 whileTap={animationsEnabled ? { scale: 0.95 } : {}}
-                className="relative z-10"
+                className="relative z-10 hidden sm:block mr-1"
               >
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => onPageChange(1)}
                   disabled={currentPage === 1}
-                  className="w-10 h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+                  className="w-8 h-8 sm:w-10 sm:h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
                 >
-                  <ChevronsLeft className="h-4 w-4" />
+                  <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
               </motion.div>
               
@@ -402,30 +419,37 @@ export default function SourcesPage({
               <motion.div
                 whileHover={animationsEnabled ? { scale: 1.05 } : {}}
                 whileTap={animationsEnabled ? { scale: 0.95 } : {}}
-                className="relative z-10"
+                className="relative z-10 mr-1"
               >
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="w-10 h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+                  className="w-8 h-8 sm:w-9 sm:h-9 p-0 relative flex items-center justify-center dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <span className="text-lg font-bold">&lt;</span>
                 </Button>
               </motion.div>
 
-              <div className="flex items-center space-x-1 relative z-10">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              <div className="inline-flex items-center relative z-10 mx-1 space-x-1">
+                {Array.from({ length: Math.min(totalPages, windowWidth < 640 ? 3 : 5) }).map((_, i) => {
+                  // Calcular el número de página basado en la posición actual
                   let pageNum;
-                  if (totalPages <= 5) {
+                  const maxVisiblePages = windowWidth < 640 ? 3 : 5;
+                  
+                  if (totalPages <= maxVisiblePages) {
+                    // Si hay menos páginas que el máximo visible, mostrar todas secuencialmente
                     pageNum = i + 1;
-                  } else if (currentPage <= 3) {
+                  } else if (currentPage <= Math.ceil(maxVisiblePages / 2)) {
+                    // Si estamos en las primeras páginas
                     pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
+                  } else if (currentPage >= totalPages - Math.floor(maxVisiblePages / 2)) {
+                    // Si estamos en las últimas páginas
+                    pageNum = totalPages - maxVisiblePages + 1 + i;
                   } else {
-                    pageNum = currentPage - 2 + i;
+                    // Si estamos en páginas intermedias
+                    pageNum = currentPage - Math.floor(maxVisiblePages / 2) + i;
                   }
 
                   return (
@@ -438,7 +462,7 @@ export default function SourcesPage({
                       <Button
                         variant={currentPage === pageNum ? "default" : "outline"}
                         onClick={() => onPageChange(pageNum)}
-                        className={`w-10 h-10 p-0 relative ${
+                        className={`w-8 h-8 sm:w-9 sm:h-9 p-0 text-xs sm:text-sm relative ${
                           currentPage === pageNum
                             ? "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
                             : "dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -455,7 +479,7 @@ export default function SourcesPage({
               <motion.div
                 whileHover={animationsEnabled ? { scale: 1.05 } : {}}
                 whileTap={animationsEnabled ? { scale: 0.95 } : {}}
-                className="relative z-10"
+                className="relative z-10 ml-1"
               >
                 <Button
                   variant="outline"
@@ -464,26 +488,26 @@ export default function SourcesPage({
                     onPageChange(Math.min(totalPages, currentPage + 1))
                   }
                   disabled={currentPage === totalPages}
-                  className="w-10 h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+                  className="w-8 h-8 sm:w-9 sm:h-9 p-0 relative flex items-center justify-center dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <span className="text-lg font-bold">&gt;</span>
                 </Button>
               </motion.div>
               
-              {/* Última página */}
+              {/* Última página - Oculto en móviles */}
               <motion.div
                 whileHover={animationsEnabled ? { scale: 1.05 } : {}}
                 whileTap={animationsEnabled ? { scale: 0.95 } : {}}
-                className="relative z-10"
+                className="relative z-10 hidden sm:block ml-1"
               >
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => onPageChange(totalPages)}
                   disabled={currentPage === totalPages}
-                  className="w-10 h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
+                  className="w-8 h-8 sm:w-10 sm:h-10 p-0 relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-transform ease-in-out"
                 >
-                  <ChevronsRight className="h-4 w-4" />
+                  <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
               </motion.div>
             </div>

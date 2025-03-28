@@ -383,6 +383,8 @@ const TrendsSection = () => {
               >
                 Comentarios
               </TabsTrigger>
+
+              
             </TabsList>
             
             {/* Alternativa móvil - solo muestra la categoría activa con selector */}
@@ -403,7 +405,7 @@ const TrendsSection = () => {
                 <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                      <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                      <ChevronDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-48 p-1 -mt-1 -mr-2 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
@@ -1014,7 +1016,7 @@ export default function HomePage() {
                 : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
             } transition-colors`}
           >
-            <ChevronLeft className="h-5 w-5" />
+            <span className="text-lg font-bold">&lt;</span>
           </button>
           
           <div className="flex justify-center items-center py-2 px-3 flex-1 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-center font-medium text-gray-700 dark:text-gray-300">
@@ -1037,7 +1039,7 @@ export default function HomePage() {
                 : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
             } transition-colors`}
           >
-            <ChevronRight className="h-5 w-5" />
+            <span className="text-lg font-bold">&gt;</span>
           </button>
         </div>
       </div>
@@ -1444,20 +1446,18 @@ export default function HomePage() {
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="h-7 w-7 xs:h-8 xs:w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200"
+                className="h-7 w-7 xs:h-8 xs:w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200 flex items-center justify-center"
                 onClick={scrollLeftHandler}
               >
-                <ChevronLeft className="h-3 w-3 xs:h-4 xs:w-4" />
-                <span className="sr-only">Anterior</span>
+                <span className="text-lg font-bold">&lt;</span>
               </Button>
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="h-7 w-7 xs:h-8 xs:w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200"
+                className="h-7 w-7 xs:h-8 xs:w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200 flex items-center justify-center"
                 onClick={scrollRightHandler}
               >
-                <ChevronRight className="h-3 w-3 xs:h-4 xs:w-4" />
-                <span className="sr-only">Siguiente</span>
+                <span className="text-lg font-bold">&gt;</span>
               </Button>
             </div>
           </motion.div>
