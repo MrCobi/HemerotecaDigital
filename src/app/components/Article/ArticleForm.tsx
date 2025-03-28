@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Source } from "../../../interface/source";
 import { Autocomplete, TextField, CircularProgress } from "@mui/material";
 import { fetchSources } from "../../services/SourcesbyLanguageService";
+
 interface SearchFormProps {
   searchParams: {
     q: string;
@@ -81,42 +82,147 @@ const SearchForm: React.FC<SearchFormProps> = ({
             htmlFor="sources"
             className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300"
           ></label>
-          <Autocomplete
-            id="sources"
-            options={availableSources}
-            getOptionLabel={(option) => option.name}
-            value={
-              availableSources.find(
-                (source) => source.id === searchParams.sources
-              ) || null
-            }
-            onChange={(_, newValue) => {
-              handleInputChange({
-                target: { name: "sources", value: newValue?.id || "" },
-              } as React.ChangeEvent<HTMLInputElement>);
-            }}
-            loading={loadingSources}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Selecciona una fuente"
-                variant="outlined"
-                fullWidth
-                InputProps={{
-                  ...params.InputProps,
-                  endAdornment: (
-                    <>
-                      {loadingSources ? (
-                        <CircularProgress color="inherit" size={20} />
-                      ) : null}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
-                }}
-                className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white dark:placeholder-gray-400"
-              />
-            )}
-          />
+          <div className="w-full">
+            <style jsx global>{`
+              .MuiAutocomplete-root .MuiOutlinedInput-root {
+                background-color: white;
+                border-radius: 0.75rem;
+                padding: 0.5rem 0.75rem;
+              }
+              .dark .MuiAutocomplete-root .MuiOutlinedInput-root {
+                background-color: rgb(55, 65, 81);
+                color: white;
+                border-color: rgb(75, 85, 99);
+              }
+              .MuiAutocomplete-root .MuiOutlinedInput-notchedOutline {
+                border-color: rgb(209, 213, 219);
+                border-width: 2px;
+                border-radius: 0.75rem;
+              }
+              .dark .MuiAutocomplete-root .MuiOutlinedInput-notchedOutline {
+                border-color: rgb(75, 85, 99);
+              }
+              .MuiAutocomplete-root:hover .MuiOutlinedInput-notchedOutline {
+                border-color: rgb(156, 163, 175);
+              }
+              .dark .MuiAutocomplete-root:hover .MuiOutlinedInput-notchedOutline {
+                border-color: rgb(107, 114, 128);
+              }
+              .MuiAutocomplete-root .Mui-focused .MuiOutlinedInput-notchedOutline {
+                border-color: rgb(59, 130, 246) !important;
+                border-width: 2px;
+              }
+              .MuiInputLabel-root {
+                color: rgb(75, 85, 99);
+                font-size: 0.875rem;
+                line-height: 1.25rem;
+                transform: translate(14px, 16px) scale(1);
+              }
+              .MuiInputLabel-root.Mui-focused,
+              .MuiInputLabel-root.MuiFormLabel-filled {
+                transform: translate(14px, -9px) scale(0.75);
+                background-color: white;
+                padding: 0 5px;
+              }
+              .dark .MuiInputLabel-root.Mui-focused,
+              .dark .MuiInputLabel-root.MuiFormLabel-filled {
+                background-color: rgb(55, 65, 81);
+              }
+              .dark .MuiInputLabel-root {
+                color: rgb(156, 163, 175);
+              }
+              .MuiInputLabel-root.Mui-focused {
+                color: rgb(59, 130, 246);
+              }
+              .MuiAutocomplete-endAdornment {
+                right: 9px !important;
+              }
+              .dark .MuiAutocomplete-clearIndicator, 
+              .dark .MuiAutocomplete-popupIndicator {
+                color: white;
+              }
+              .MuiAutocomplete-popupIndicatorOpen {
+                transform: rotate(180deg);
+              }
+              /* Forzar alineación del texto dentro del input */
+              .MuiAutocomplete-input {
+                padding-right: 60px !important; /* Espacio para iconos */
+              }
+              /* Estilo responsivo */
+              @media (max-width: 640px) {
+                .MuiInputLabel-root {
+                  transform: translate(14px, 14px) scale(1);
+                  font-size: 0.8125rem;
+                }
+                .MuiInputLabel-root.Mui-focused,
+                .MuiInputLabel-root.MuiFormLabel-filled {
+                  transform: translate(14px, -9px) scale(0.75);
+                }
+                .MuiAutocomplete-root .MuiOutlinedInput-root {
+                  padding: 0.375rem 0.5rem;
+                }
+                /* Ajustes específicos para evitar solapamiento en móviles */
+                .MuiAutocomplete-endAdornment {
+                  right: 5px !important;
+                }
+                .MuiAutocomplete-clearIndicator,
+                .MuiAutocomplete-popupIndicator {
+                  padding: 2px !important;
+                }
+                .MuiAutocomplete-clearIndicator svg,
+                .MuiAutocomplete-popupIndicator svg {
+                  width: 18px !important;
+                  height: 18px !important;
+                }
+                .MuiAutocomplete-input {
+                  padding-right: 55px !important;
+                  font-size: 0.875rem !important;
+                }
+                /* Truncar texto demasiado largo */
+                .MuiAutocomplete-input,
+                .MuiInputBase-input {
+                  text-overflow: ellipsis;
+                  white-space: nowrap;
+                  overflow: hidden;
+                }
+              }
+            `}</style>
+            <Autocomplete
+              id="sources"
+              options={availableSources}
+              getOptionLabel={(option) => option.name}
+              value={
+                availableSources.find(
+                  (source) => source.id === searchParams.sources
+                ) || null
+              }
+              onChange={(_, newValue) => {
+                handleInputChange({
+                  target: { name: "sources", value: newValue?.id || "" },
+                } as React.ChangeEvent<HTMLInputElement>);
+              }}
+              loading={loadingSources}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Selecciona una fuente"
+                  variant="outlined"
+                  fullWidth
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {loadingSources ? (
+                          <CircularProgress color="inherit" size={20} />
+                        ) : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+            />
+          </div>
         </div>
       </div>
 
