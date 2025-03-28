@@ -261,7 +261,7 @@ export default function SourcePageClient({
               e.stopPropagation();
               handleFavoriteClick(source.id);
             }}
-            className="absolute top-4 right-4 bg-white/90 hover:bg-white dark:bg-white/10 dark:hover:bg-white/20 p-2 rounded-full text-xl transition-transform duration-300 hover:scale-105 shadow-lg z-10"
+            className="absolute top-0 sm:top-4 right-0 sm:right-4 bg-white/90 hover:bg-white dark:bg-white/10 dark:hover:bg-white/20 p-2 rounded-full text-xl transition-transform duration-300 hover:scale-105 shadow-lg z-10"
             whileHover={animationsEnabled ? { scale: 1.1 } : {}}
             whileTap={animationsEnabled ? { scale: 0.9 } : {}}
           >
@@ -273,16 +273,17 @@ export default function SourcePageClient({
             />
           </motion.button>
 
-          <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
-            <div className="flex-1 text-center md:text-left">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white dark:text-white mb-4">
+          <div className="flex flex-col md:flex-row items-center gap-6 md:gap-12 pt-10 sm:pt-0">
+            {/* Texto a la izquierda en escritorio, centrado en móvil */}
+            <div className="flex-1 text-center md:text-left w-full md:w-auto">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white dark:text-white mb-3 sm:mb-4 break-words">
                 {source.name}
               </h1>
-              <p className="text-xl text-white/90 dark:text-gray-100/90 mb-6 max-w-2xl">
+              <p className="text-base sm:text-lg md:text-xl text-white/90 dark:text-gray-100/90 mb-4 sm:mb-6 max-w-2xl mx-auto md:mx-0">
                 {source.description}
               </p>
 
-              <div className="w-full max-w-sm md:mx-0 mb-6 relative z-10">
+              <div className="w-full md:max-w-sm mx-auto md:mx-0 mb-4 sm:mb-6 relative z-10">
                 <StarRating sourceId={source.id} />
               </div>
 
@@ -290,11 +291,11 @@ export default function SourcePageClient({
                 href={source.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center bg-white/95 hover:bg-white text-gray-700 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                className="inline-flex items-center bg-white/95 hover:bg-white text-gray-700 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white px-3 sm:px-4 md:px-6 py-2 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-sm sm:text-base"
               >
                 Visitar sitio web
                 <svg
-                  className="ml-2 w-4 h-4 sm:w-5 sm:h-5"
+                  className="ml-2 w-4 h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -309,17 +310,23 @@ export default function SourcePageClient({
               </a>
             </div>
 
-            {source.imageUrl && (
-              <div className="md:ml-4 transform hover:scale-105 transition-transform duration-300">
-                <div className="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden border-4 border-white/90 dark:border-white/10 shadow-2xl relative">
-                  <SourceImage
-                    imageUrl={source.imageUrl}
-                    name={source.name}
-                    size="xlarge" // Carga prioritária de la imagen
-                  />
+            <div 
+              className={`w-full md:w-auto flex justify-center items-center mb-6 md:mb-0 rounded-xl overflow-hidden ${
+                showComments ? "max-h-screen" : ""
+              }`}
+            >
+              {source.imageUrl && (
+                <div className="md:ml-4 transform hover:scale-105 transition-transform duration-300">
+                  <div className="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden border-4 border-white/90 dark:border-white/10 shadow-2xl relative">
+                    <SourceImage
+                      imageUrl={source.imageUrl || ''}
+                      name={source.name}
+                      size="xlarge" // Carga prioritária de la imagen
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -340,47 +347,52 @@ export default function SourcePageClient({
           </button>
 
           {showComments && (
-            <div className="p-4 sm:p-6 bg-white dark:bg-gray-900">
-              <CommentForm
-                sourceId={source.id}
-                onCommentAdded={() => {
-                  fetchComments();
-                  fetchCommentsCount(true);
-                }}
-              />
-              {isLoadingComments ? (
-                <div className="text-center py-4">
-                  <svg
-                    className="animate-spin h-6 h-6 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400 mx-auto"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  <p className="text-gray-600 dark:text-gray-400 mt-2">Cargando comentarios...</p>
+            <div className="bg-gray-50 dark:bg-gray-800/30 backdrop-blur-sm rounded-xl shadow-inner p-4 sm:p-6 mt-8">
+              <div className="max-w-4xl mx-auto">
+                <div className="mb-8">
+                  <CommentForm
+                    sourceId={source.id}
+                    onCommentAdded={() => {
+                      fetchComments();
+                      fetchCommentsCount(true);
+                    }}
+                  />
                 </div>
-              ) : (
-                <CommentList
-                  key={refreshKey}
-                  sourceId={source.id}
-                  refreshKey={refreshKey}
-                  currentPage={currentPage}
-                  onPageChange={setCurrentPage}
-                />
-              )}
+
+                {isLoadingComments ? (
+                  <div className="flex flex-col items-center justify-center py-10">
+                    <svg
+                      className="animate-spin h-8 w-8 text-blue-500 mb-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    <p className="text-gray-600 dark:text-gray-400 mt-2">Cargando comentarios...</p>
+                  </div>
+                ) : (
+                  <CommentList
+                    key={refreshKey}
+                    sourceId={source.id}
+                    refreshKey={refreshKey}
+                    currentPage={currentPage}
+                    onPageChange={setCurrentPage}
+                  />
+                )}
+              </div>
             </div>
           )}
         </div>
