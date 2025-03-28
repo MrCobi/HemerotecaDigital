@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import { useToast } from '@/src/app/components/ui/use-toast';
-import { Message, ConversationData, User } from '@/src/app/messages/types';
+import { Message, User, ConversationData } from '@/src/app/messages/types';
 import Image from 'next/image';
 
 // Importar el hook personalizado
@@ -54,23 +54,39 @@ DateSeparator.displayName = 'DateSeparator';
 // Componente para mostrar cada mensaje individual
 const MessageItem = React.memo(({ 
   message, 
-  currentUserId,
-  otherUser,
-  showAvatar,
+  currentUserId, 
+  otherUser, 
+  conversation,
   showDateSeparator,
   currentUserImage,
   currentUserName
-}: { 
-  message: Message, 
-  currentUserId: string,
-  otherUser: User | null | undefined,
-  showAvatar: boolean,
-  showDateSeparator: boolean,
-  currentUserImage: string | null | undefined,
-  currentUserName: string | null | undefined
+}: {
+  message: Message;
+  currentUserId: string;
+  otherUser: User | null;
+  conversation: ConversationData | null;
+  showDateSeparator: boolean;
+  currentUserImage: string | null;
+  currentUserName: string | null;
 }) => {
   const isCurrentUser = message.senderId === currentUserId;
   const messageDate = new Date(message.createdAt);
+  
+  // Obtener los datos del remitente para mensajes de grupo
+  const isGroupMessage = conversation?.isGroup === true;
+  
+  // Si es un mensaje de grupo y no es del usuario actual, buscar el participante
+  let messageSender = null;
+  if (isGroupMessage && !isCurrentUser && message.senderId) {
+    // Buscar el participante por su ID
+    const participant = conversation?.participants?.find(p => p.userId === message.senderId);
+    if (participant) {
+      messageSender = participant.user;
+    } else if (message.sender) {
+      // Usar la información del remitente directamente del mensaje si está disponible
+      messageSender = message.sender;
+    }
+  }
   
   // Función para determinar el texto de estado del mensaje
   const getMessageStatusText = () => {
@@ -100,19 +116,29 @@ const MessageItem = React.memo(({
       <div
         className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} items-end gap-2 mb-2`}
       >
-        {!isCurrentUser && showAvatar && (
+        {!isCurrentUser && (
           <Avatar className="h-8 w-8 flex-shrink-0">
-            {otherUser?.image ? (
+            {messageSender?.image ? (
+              <AvatarImage src={messageSender.image} alt={messageSender.username || 'Usuario'} />
+            ) : otherUser?.image ? (
               <AvatarImage src={otherUser.image} alt={otherUser?.username || 'Usuario'} />
             ) : (
               <AvatarFallback>
-                {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
+                {messageSender?.username?.charAt(0).toUpperCase() || 
+                 otherUser?.username?.charAt(0).toUpperCase() || 'U'}
               </AvatarFallback>
             )}
           </Avatar>
         )}
         
-        <div className={`flex flex-col ${!isCurrentUser && showAvatar ? 'ml-0' : !isCurrentUser ? 'ml-10' : ''}`}>
+        <div className={`flex flex-col ${!isCurrentUser ? 'ml-0' : ''}`}>
+          {/* Nombre del remitente para mensajes de grupo (que no sean del usuario actual) */}
+          {!isCurrentUser && isGroupMessage && messageSender && (
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">
+              {messageSender.username || messageSender.name || 'Usuario'}
+            </span>
+          )}
+          
           <div
             className={cn(
               'max-w-xs md:max-w-md p-3 rounded-lg',
@@ -152,7 +178,7 @@ const MessageItem = React.memo(({
           </div>
         </div>
         
-        {isCurrentUser && showAvatar && (
+        {isCurrentUser && (
           <Avatar className="h-8 w-8 flex-shrink-0">
             {currentUserImage ? (
               <AvatarImage src={currentUserImage} alt={currentUserName || 'Usuario'} />
@@ -270,9 +296,11 @@ export default function OptimizedChatWindow({
   return (
     <div className={cn("flex flex-col h-full", className)}>
       {/* Cabecera de la conversación */}
-      <div className="flex items-center p-3 border-b dark:border-gray-700">
-        <Avatar className="h-8 w-8 mr-2">
-          {otherUser?.image ? (
+      <div className="flex items-center p-3 border-b dark:border-gray-700 bg-white dark:bg-gray-800">
+        <Avatar className="h-10 w-10 mr-3">
+          {conversation?.isGroup ? (
+            <AvatarImage src={conversation.imageUrl || "/images/AvatarPredeterminado.webp"} alt={conversation.name || 'Grupo'} />
+          ) : otherUser?.image ? (
             <AvatarImage src={otherUser.image} alt={otherUser?.username || 'Usuario'} />
           ) : (
             <AvatarFallback>
@@ -280,7 +308,18 @@ export default function OptimizedChatWindow({
             </AvatarFallback>
           )}
         </Avatar>
-        <span className="font-medium">{otherUser?.username || 'Usuario'}</span>
+        <div className="flex flex-col">
+          <span className="font-medium">
+            {conversation?.isGroup 
+              ? conversation.name 
+              : otherUser?.username || 'Usuario'}
+          </span>
+          {conversation?.isGroup && (
+            <span className="text-xs text-gray-500">
+              {conversation.participants?.length || 0} participantes
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Contenedor de mensajes */}
@@ -311,7 +350,7 @@ export default function OptimizedChatWindow({
                 message={message}
                 currentUserId={currentUserId || ''}
                 otherUser={otherUser}
-                showAvatar={isLastInSequence}
+                conversation={conversation}
                 showDateSeparator={showDateSeparator}
                 currentUserImage={session?.user?.image || null}
                 currentUserName={session?.user?.name || null}
