@@ -161,10 +161,10 @@ export default function UserFavoritesPage() {
       {/* Header con la información del usuario */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-col items-center text-center sm:text-left gap-4 mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center flex-wrap justify-center">
             <Heart className="h-6 w-6 sm:h-8 sm:w-8 mr-2 text-red-500 flex-shrink-0" />
             {userData ? (
-              <span className="truncate">Periódicos favoritos de {userData.name || username}</span>
+              <span className="break-words">Periódicos favoritos de {userData.name || username}</span>
             ) : (
               <span>Cargando información del usuario...</span>
             )}
