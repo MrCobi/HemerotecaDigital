@@ -123,7 +123,18 @@ export function AppearanceSettings() {
 
   // Función para mostrar previsualización al hover
   const handleThemePreview = (previewTheme: string) => {
-    setPreviewTheme(previewTheme);
+    // Si es tema de sistema, preservamos la preferencia del sistema
+    if (previewTheme === "system") {
+      // Detectamos la preferencia del sistema
+      const systemPrefersDark = typeof window !== 'undefined' && 
+        window.matchMedia && 
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
+      // Aplicamos la preferencia real del sistema para la previsualización
+      setPreviewTheme(systemPrefersDark ? "dark" : "light");
+    } else {
+      setPreviewTheme(previewTheme);
+    }
   };
   
   // Función para quitar previsualización
@@ -193,7 +204,7 @@ export function AppearanceSettings() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <div className={`text-xs ${currentTheme === 'dark' ? 'text-gray-500' : 'text-gray-500'} transition-all duration-500`}>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
                     Este es un ejemplo del aspecto visual con el tema seleccionado
                   </div>
                 </div>
@@ -586,21 +597,29 @@ export function AppearanceSettings() {
           
           <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 sm:p-5 transition-all duration-500 hover:shadow-md">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
-              <label className="inline-flex items-center cursor-pointer mb-4 sm:mb-0">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={enableAnimations}
-                  onChange={() => setEnableAnimations(!enableAnimations)}
-                />
-                <div className="relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                <span className="ms-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
+                <div className="flex items-center order-2 sm:order-1">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={enableAnimations}
+                    onChange={() => setEnableAnimations(!enableAnimations)}
+                    id="animations-switch"
+                  />
+                  <label 
+                    htmlFor="animations-switch"
+                    className="relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 cursor-pointer">
+                  </label>
+                </div>
+                <span className="order-1 sm:order-2 mb-2 sm:mb-0 sm:ms-3 text-sm font-medium text-gray-700 dark:text-gray-300">
                   Animaciones activadas
                 </span>
-              </label>
+              </div>
               
-              <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 sm:p-3 rounded-lg border border-blue-100 dark:border-blue-800 max-w-full sm:max-w-xs">
-                <span className="font-medium text-blue-700 dark:text-blue-300">Consejo:</span> Al desactivar las animaciones mejora el rendimiento en dispositivos más antiguos.
+              <div className="mt-4 sm:mt-0 w-full sm:w-auto">
+                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 sm:p-3 rounded-lg border border-blue-100 dark:border-blue-800 max-w-full sm:max-w-xs">
+                  <span className="font-medium text-blue-700 dark:text-blue-300">Consejo:</span> Al desactivar las animaciones mejora el rendimiento en dispositivos más antiguos.
+                </div>
               </div>
             </div>
           </div>

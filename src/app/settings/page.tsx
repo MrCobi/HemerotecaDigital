@@ -113,7 +113,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-950 py-8 px-4 sm:px-6">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-950 py-6 px-2 sm:py-8 sm:px-6">
         <div className="max-w-3xl mx-auto">
           <motion.div 
             initial={{ opacity: 0 }}
@@ -143,18 +143,18 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-950 py-8 px-4 sm:px-6 transition-all duration-300">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-950 py-6 px-2 sm:py-8 sm:px-6 transition-all duration-300">
       <div className="max-w-3xl mx-auto">
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="text-center mb-8"
+          className="text-center mb-6 sm:mb-8"
         >
-          <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
             Configuración de tu cuenta
           </h1>
-          <p className="mt-3 text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          <p className="mt-2 sm:mt-3 text-sm sm:text-base text-gray-600 dark:text-gray-300 max-w-2xl mx-auto px-2">
             Gestiona tus preferencias y opciones de privacidad
           </p>
         </motion.div>
@@ -163,26 +163,26 @@ export default function SettingsPage() {
           variants={container}
           initial="hidden"
           animate="show"
-          className="space-y-6"
+          className="space-y-4 sm:space-y-6"
         >
           {/* Sección Tema */}
           <motion.div variants={item} className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl overflow-hidden shadow-lg dark:shadow-blue-900/20">
-            <div className="flex items-center border-b border-gray-100 dark:border-gray-700 p-5">
-              <UserIcon className="h-6 w-6 text-blue-500 dark:text-blue-400 mr-3" />
-              <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Personalización</h3>
+            <div className="flex items-center border-b border-gray-100 dark:border-gray-700 p-3 sm:p-5">
+              <UserIcon className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500 dark:text-blue-400 mr-2 sm:mr-3" />
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">Personalización</h3>
             </div>
-            <div className="p-5">
+            <div className="p-3 sm:p-5">
               <ThemeSelector />
             </div>
           </motion.div>
           
           {/* Sección de Privacidad */}
           <motion.div variants={item} className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl overflow-hidden shadow-lg dark:shadow-blue-900/20">
-            <div className="flex items-center border-b border-gray-100 dark:border-gray-700 p-5">
-              <LockClosedIcon className="h-6 w-6 text-blue-500 dark:text-blue-400 mr-3" />
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Privacidad</h2>
+            <div className="flex items-center border-b border-gray-100 dark:border-gray-700 p-3 sm:p-5">
+              <LockClosedIcon className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500 dark:text-blue-400 mr-2 sm:mr-3" />
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">Privacidad</h2>
             </div>
-            <div className="p-5">
+            <div className="p-3 sm:p-5">
               <PrivacySettings initialSettings={settings} />
             </div>
           </motion.div>
@@ -192,23 +192,23 @@ export default function SettingsPage() {
             variants={item} 
             className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl overflow-hidden shadow-lg dark:shadow-blue-900/20"
           >
-            <div className="flex items-center border-b border-gray-100 dark:border-gray-700 p-5">
-              <TrashIcon className="h-6 w-6 text-red-500 mr-3" />
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Eliminar cuenta</h2>
+            <div className="flex items-center border-b border-gray-100 dark:border-gray-700 p-3 sm:p-5">
+              <TrashIcon className="h-5 w-5 sm:h-6 sm:w-6 text-red-500 mr-2 sm:mr-3" />
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">Eliminar cuenta</h2>
             </div>
-            <div className="p-5">
-              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg mb-5 border border-red-100 dark:border-red-800/30">
-                <p className="text-gray-700 dark:text-gray-200">Una vez elimines tu cuenta, no hay vuelta atrás. Por favor, ten la certeza de que deseas hacerlo.</p>
+            <div className="p-3 sm:p-5">
+              <div className="bg-red-50 dark:bg-red-900/20 p-3 sm:p-4 rounded-lg mb-4 sm:mb-5 border border-red-100 dark:border-red-800/30">
+                <p className="text-sm sm:text-base text-gray-700 dark:text-gray-200">Una vez elimines tu cuenta, no hay vuelta atrás. Por favor, ten la certeza de que deseas hacerlo.</p>
               </div>
               
-              <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <div className="flex">
-                  <InformationCircleIcon className="h-6 w-6 text-blue-500 mr-3 flex-shrink-0" />
+                  <InformationCircleIcon className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500 mr-2 sm:mr-3 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200">
                       La eliminación de la cuenta es permanente. Todos tus datos y documentos serán eliminados y no podrán ser recuperados.
                     </p>
-                    <p className="text-sm text-blue-800 dark:text-blue-200 mt-2">
+                    <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 mt-2">
                       <strong>Importante:</strong> Recibirás un correo electrónico de confirmación para completar el proceso. Deberás hacer clic en el enlace de confirmación dentro de las próximas 24 horas.
                     </p>
                   </div>
@@ -216,26 +216,26 @@ export default function SettingsPage() {
               </div>
               
               {deleteRequested ? (
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
-                  <p className="text-green-700 dark:text-green-300">
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 sm:p-4 mb-4">
+                  <p className="text-sm text-green-700 dark:text-green-300">
                     <span className="font-medium">¡Solicitud enviada!</span> Hemos enviado un correo electrónico con instrucciones para confirmar la eliminación de tu cuenta.
                   </p>
                 </div>
               ) : showDeleteConfirm ? (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 sm:p-4 mb-4">
                   <h4 className="text-red-800 dark:text-red-300 font-medium mb-2">¿Estás seguro?</h4>
-                  <p className="text-red-700 dark:text-red-300 mb-4 text-sm">Esta acción no se puede deshacer. Se enviará un email de confirmación a tu dirección registrada.</p>
-                  <div className="flex space-x-3">
+                  <p className="text-xs sm:text-sm text-red-700 dark:text-red-300 mb-4">Esta acción no se puede deshacer. Se enviará un email de confirmación a tu dirección registrada.</p>
+                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                     <button
                       onClick={handleDeleteAccount}
                       disabled={isDeleting}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center disabled:opacity-50"
+                      className="px-3 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
                     >
                       {isDeleting ? 'Procesando...' : 'Confirmar eliminación'}
                     </button>
                     <button
                       onClick={() => setShowDeleteConfirm(false)}
-                      className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                      className="px-3 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                     >
                       Cancelar
                     </button>
@@ -244,7 +244,7 @@ export default function SettingsPage() {
               ) : (
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors flex items-center"
+                  className="w-full sm:w-auto px-3 py-2 text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors flex items-center justify-center"
                 >
                   <TrashIcon className="h-5 w-5 mr-2" />
                   Solicitar eliminación de cuenta
