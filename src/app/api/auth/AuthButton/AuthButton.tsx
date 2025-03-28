@@ -62,13 +62,13 @@ const AuthButton = () => {
       <div className="relative">
         <motion.button
           onClick={handleMenu}
-          className="flex items-center gap-1.5 xs:gap-2 px-2 xs:px-3 py-1.5 sm:py-2 rounded-lg bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white shadow-sm transition-colors duration-200"
+          className="flex items-center gap-1 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-2 rounded-lg bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white shadow-sm transition-colors duration-200"
           initial={buttonVariants.initial}
           whileHover={buttonVariants.hover}
           whileTap={buttonVariants.tap}
         >
-          <div className="flex items-center gap-1.5 xs:gap-2">
-            <div className="w-7 h-7 xs:w-8 xs:h-8 rounded-full overflow-hidden border-2 border-white/20">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full overflow-hidden border-2 border-white/20">
               {session.user.image && (session.user.image.includes('cloudinary') || 
               (!session.user.image.startsWith('/') && !session.user.image.startsWith('http'))) ? (
                 <CldImage
@@ -125,15 +125,15 @@ const AuthButton = () => {
               )}
             </div>
             <div className="flex flex-col items-start">
-              <span className="text-xs xs:text-sm font-medium text-white truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none">
+              <span className="text-xs sm:text-sm font-medium text-white truncate max-w-[80px] sm:max-w-none">
                 {session.user?.name || "Usuario"}
               </span>
-              <span className="text-[10px] xs:text-xs text-gray-200 truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none">
+              <span className="hidden sm:block text-[10px] sm:text-xs text-gray-200 truncate sm:max-w-none">
                 {session.user?.email || ""}
               </span>
             </div>
             <motion.svg
-              className="w-3 h-3 xs:w-4 xs:h-4 text-gray-200 ml-0.5 xs:ml-1 sm:ml-2"
+              className="w-3 h-3 sm:w-4 sm:h-4 text-gray-200 ml-0.5 sm:ml-2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -248,7 +248,49 @@ const AuthButton = () => {
                       strokeLinejoin="round"
                     />
                     <path
-                      d="M19.6224 10.3954L18.5247 7.7448L20 6L18 4L16.2647 5.48295L13.5578 4.36974L12.9353 2H10.981L10.3491 4.40113L7.70441 5.51596L6 4L4 6L5.45337 7.78885L4.3725 10.4463L2 11V13L4.40111 13.6555L5.51575 16.2997L4 18L6 20L7.79116 18.5403L10.397 19.6123L11 22H13L13.6045 19.6132L16.2551 18.5155L18 20L20 18L18.5159 16.2494L19.6139 13.598L22 13V11L19.6224 10.3954Z"
+                      d="M12 2V4"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M12 20V22"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M4.93 4.93L6.34 6.34"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M17.66 17.66L19.07 19.07"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M2 12H4"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M20 12H22"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M6.34 17.66L4.93 19.07"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M19.07 4.93L17.66 6.34"
                       strokeWidth="1.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -381,10 +423,10 @@ const AuthButton = () => {
   }
 
   return (
-    <div className="flex gap-2 xs:gap-3">
+    <div className="flex gap-1.5 sm:gap-3">
       <Link href="/api/auth/signin" passHref>
         <motion.button 
-          className="px-2 xs:px-3 sm:px-4 py-1.5 sm:py-2 text-xs xs:text-sm font-medium text-white bg-blue-600 dark:bg-blue-700 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-colors"
+          className="px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-medium text-white bg-blue-600 dark:bg-blue-700 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-colors"
           whileHover={animationsEnabled ? { scale: 1.05 } : {}}
           whileTap={animationsEnabled ? { scale: 0.95 } : {}}
         >
@@ -393,7 +435,7 @@ const AuthButton = () => {
       </Link>
       <Link href="/api/auth/signup" passHref>
         <motion.button 
-          className="px-2 xs:px-3 sm:px-4 py-1.5 sm:py-2 text-xs xs:text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800 border border-blue-600 dark:border-blue-500 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-colors"
+          className="px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800 border border-blue-600 dark:border-blue-500 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 transition-colors"
           whileHover={animationsEnabled ? { scale: 1.05 } : {}}
           whileTap={animationsEnabled ? { scale: 0.95 } : {}}
         >
