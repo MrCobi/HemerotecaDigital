@@ -32,26 +32,38 @@ export default function MobileMenu({
 
       {isOpen && (
         <div className="absolute top-16 left-0 right-0 bg-card shadow-lg border-t border-border z-50">
-          <div className="p-4 border-b border-border flex items-center">
-            <div className="flex-shrink-0 h-10 w-10">
-              <SafeImage
-                className="h-10 w-10 rounded-full object-cover"
-                src={userImage}
-                alt={username || "Administrador"}
-                width={40}
-                height={40}
-                fallbackSrc="/images/AvatarPredeterminado.webp"
-              />
+          <div className="p-4 border-b border-border flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 h-10 w-10">
+                <SafeImage
+                  className="h-10 w-10 rounded-full object-cover"
+                  src={userImage}
+                  alt={username || "Administrador"}
+                  width={40}
+                  height={40}
+                  fallbackSrc="/images/AvatarPredeterminado.webp"
+                />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-foreground">{username || "Administrador"}</p>
+                <Link
+                  href="/api/auth/signout"
+                  className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Cerrar sesión
+                </Link>
+              </div>
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-foreground">{username || "Administrador"}</p>
-              <Link
-                href="/api/auth/signout"
-                className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
-              >
-                Cerrar sesión
-              </Link>
-            </div>
+            
+            <button
+              onClick={toggleMenu}
+              className="p-2 rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              aria-label="Cerrar menú"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
           
           <nav className="px-4 py-2">
