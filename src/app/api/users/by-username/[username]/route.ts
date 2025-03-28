@@ -44,8 +44,7 @@ export async function GET(
 
     const favorites = user?.showFavorites ? await prisma.favoriteSource.findMany({
       where: { userId: user.id },
-      include: { source: true },
-      take: 6
+      include: { source: true }
     }) : [];
 
     // Obtener actividad si está pública

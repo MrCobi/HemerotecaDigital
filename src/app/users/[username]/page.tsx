@@ -156,8 +156,8 @@ export default function UserProfilePage() {
 
   const { user } = userData;
   const displayedFavorites =
-    favorites.length > 5 ? favorites.slice(0, 5) : favorites;
-  const remainingCount = favorites.length > 5 ? favorites.length - 5 : 0;
+    favorites.length > 6 ? favorites.slice(0, 5) : favorites;
+  const remainingCount = favorites.length > 6 ? favorites.length - 5 : 0;
 
   // Paginación para la actividad
   const _paginatedActivity = activity.slice(
@@ -404,7 +404,7 @@ export default function UserProfilePage() {
                 <Heart className="h-6 w-6 mr-2 text-red-500" />
                 Periódicos favoritos ({favorites.length})
               </h2>
-              {favorites.length > 5 && (
+              {favorites.length > 6 && (
                 <Link
                   href={`/users/${user.username}/favorites`}
                   className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors flex items-center"
