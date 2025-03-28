@@ -242,58 +242,16 @@ const AuthButton = () => {
                     stroke="currentColor"
                   >
                     <path
-                      d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z"
-                      strokeWidth="1.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
+                      strokeWidth="1.5"
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
                     />
                     <path
-                      d="M12 2V4"
-                      strokeWidth="1.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 20V22"
                       strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M4.93 4.93L6.34 6.34"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M17.66 17.66L19.07 19.07"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M2 12H4"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M20 12H22"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M6.34 17.66L4.93 19.07"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M19.07 4.93L17.66 6.34"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                      d="M12 15a3 3 0 100-6 3 3 0 000 6z"
                     />
                   </svg>
                   <span className="font-medium">Configuración</span>
@@ -383,11 +341,23 @@ const AuthButton = () => {
                   >
                     <svg
                       className="w-5 h-5 text-blue-500 dark:text-blue-400"
-                      fill="currentColor"
                       viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
                       xmlns="http://www.w3.org/2000/svg"
                     >
-                      <path d="M12 14c3.31 0 6-2.69 6-6s-2.69-6-6-6-6 2.69-6 6 2.69 6 6 6zm0-10c2.21 0 4 1.79 4 4s-1.79 4-4 4-4-1.79-4-4 1.79-4 4-4zm-6 4c.47-.72 2.78-2 6-2s5.53 1.28 6 2H6z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.5"
+                        d="M9 3H4a2 2 0 00-2 2v14a2 2 0 002 2h5m0-18h6a2 2 0 012 2v4M9 3v18m0 0h6a2 2 0 012-2V9m-8 12l6-6"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.5"
+                        d="M19 9h-4m0 0V5m0 4l4-4"
+                      />
                     </svg>
                     <span className="font-medium">Panel Admin</span>
                   </motion.div>
