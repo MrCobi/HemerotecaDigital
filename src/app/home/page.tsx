@@ -1006,10 +1006,10 @@ export default function HomePage() {
       <div className="flex justify-center items-center mt-4 w-full">
         <div className="flex w-full max-w-xs rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
           <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
+            onClick={() => !isLoadingFollowingActivity && setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1 || isLoadingFollowingActivity}
             className={`flex justify-center items-center py-2 px-3 w-1/4 ${
-              currentPage === 1
+              currentPage === 1 || isLoadingFollowingActivity
                 ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
                 : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
             } transition-colors`}
@@ -1018,14 +1018,21 @@ export default function HomePage() {
           </button>
           
           <div className="flex justify-center items-center py-2 px-3 flex-1 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-center font-medium text-gray-700 dark:text-gray-300">
-            Página {currentPage} de {totalPages}
+            {isLoadingFollowingActivity ? (
+              <span className="flex items-center">
+                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin mr-1.5" />
+                Cargando...
+              </span>
+            ) : (
+              <span>Página {currentPage} de {totalPages}</span>
+            )}
           </div>
           
           <button
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
+            onClick={() => !isLoadingFollowingActivity && setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages || isLoadingFollowingActivity}
             className={`flex justify-center items-center py-2 px-3 w-1/4 ${
-              currentPage === totalPages
+              currentPage === totalPages || isLoadingFollowingActivity
                 ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
                 : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
             } transition-colors`}
@@ -1106,17 +1113,17 @@ export default function HomePage() {
           <div className="absolute bottom-0 right-0 w-1/4 h-1/4 bg-indigo-500/5 dark:bg-indigo-400/5 rounded-full blur-3xl"></div>
         </div>
 
-        <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 flex flex-col justify-center">
+        <div className="relative h-full max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8 py-12 xs:py-16 sm:py-20 lg:py-24 flex flex-col justify-center">
           <motion.div
             initial={animationVariants.hidden}
             animate={animationVariants.visible}
             transition={animationTransition}
             className="max-w-3xl"
           >
-            <h1 className="text-2xl sm:text-3xl font-bold text-white dark:text-white mb-3 sm:mb-4 leading-tight">
+            <h1 className="text-2xl xs:text-3xl sm:text-3xl font-bold text-white dark:text-white mb-3 sm:mb-4 leading-tight">
               Bienvenido, {session?.user?.name || "Investigador"}
             </h1>
-            <p className="text-sm sm:text-base text-blue-100 dark:text-gray-200 mb-5 sm:mb-6 max-w-2xl">
+            <p className="text-sm xs:text-base text-blue-100 dark:text-gray-200 mb-5 sm:mb-6 max-w-2xl">
               Continúa explorando nuestra colección de documentos y descubre
               nuevas perspectivas de las noticias.
             </p>
@@ -1178,7 +1185,7 @@ export default function HomePage() {
       </section>
 
       <section id="stats-section" className="py-8 sm:py-12 lg:py-16 relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8">
           <motion.div
             initial={animationVariants.hidden}
             animate={animationVariants.visible}
@@ -1228,19 +1235,19 @@ export default function HomePage() {
           <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-indigo-500/5 dark:bg-indigo-400/5 rounded-full blur-3xl"></div>
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-2">
+              <h2 className="text-xl xs:text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-2">
                 Artículos Destacados
               </h2>
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-sm xs:text-base text-gray-600 dark:text-gray-300">
                 Selección especial de documentos históricos relevantes
               </p>
             </div>
             <Button
               variant="outline"
-              className="mt-4 md:mt-0 border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-900/30"
+              className="mt-4 md:mt-0 border-blue-500 text-blue-600 hover:bg-blue-100 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-800/40"
               onClick={() => router.push("/Articulos")}
             >
               Ver todos <ArrowRight className="ml-2 h-4 w-4" />
@@ -1363,13 +1370,13 @@ export default function HomePage() {
       </section>
 
       <section id="collections-section" className="py-12 sm:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-2">
+              <h2 className="text-xl xs:text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-2">
                 Categorías
               </h2>
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-sm xs:text-base text-gray-600 dark:text-gray-300">
                 Explora documentos históricos por categoría temática
               </p>
             </div>
@@ -1403,9 +1410,9 @@ export default function HomePage() {
                   animate={animationVariants.visible}
                   transition={animationTransition}
                   className="snap-start flex-shrink-0 relative"
-                  style={{ width: "280px" }}
+                  style={{ width: "280px", minWidth: "180px" }}
                 >
-                  <div className="group relative rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-40 w-full">
+                  <div className="group relative rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-32 xs:h-36 sm:h-40 w-full">
                     <div
                       className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-110"
                       style={{
@@ -1413,17 +1420,17 @@ export default function HomePage() {
                       }}
                     />
                     <div className={`absolute inset-0 bg-gradient-to-t ${gradientClass} opacity-70`} />
-                    <div className="absolute bottom-0 left-0 right-0 p-5 select-none">
-                      <h3 className="text-xl font-bold text-white">
+                    <div className="absolute bottom-0 left-0 right-0 p-3 xs:p-4 sm:p-5 select-none">
+                      <h3 className="text-base xs:text-lg sm:text-xl font-bold text-white">
                         {spanishCategory}
                       </h3>
-                      <div className="flex items-center mt-2 text-sm text-blue-50">
+                      <div className="flex items-center mt-1 xs:mt-2 text-xs xs:text-sm text-blue-50">
                         <Link
                           href={`/categories/${encodeURIComponent(englishCategory)}`}
                           className="flex items-center text-blue-100 hover:text-white transition-colors"
                         >
                           Explorar{" "}
-                          <ArrowRight className="ml-1 w-4 h-4 inline-block text-white" />
+                          <ArrowRight className="ml-1 w-3 h-3 xs:w-4 xs:h-4 inline-block text-white" />
                         </Link>
                       </div>
                     </div>
@@ -1437,19 +1444,19 @@ export default function HomePage() {
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="h-8 w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200"
+                className="h-7 w-7 xs:h-8 xs:w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200"
                 onClick={scrollLeftHandler}
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-3 w-3 xs:h-4 xs:w-4" />
                 <span className="sr-only">Anterior</span>
               </Button>
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="h-8 w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200"
+                className="h-7 w-7 xs:h-8 xs:w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200"
                 onClick={scrollRightHandler}
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-3 w-3 xs:h-4 xs:w-4" />
                 <span className="sr-only">Siguiente</span>
               </Button>
             </div>
@@ -1458,7 +1465,7 @@ export default function HomePage() {
       </section>
 
       <section id="recent-section" className="py-12 sm:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <motion.div
               initial={animationVariants.hidden}
@@ -1474,160 +1481,158 @@ export default function HomePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {isLoadingFollowingActivity ? (
-                    <div className="text-center py-4">
-                      <Loader2 className="h-6 w-6 animate-spin text-blue-600 mx-auto" />
-                      <p className="text-gray-600 mt-2">
-                        Cargando actividades...
-                      </p>
-                    </div>
-                  ) : followingActivity.length === 0 ? (
-                    <div className="text-center py-12 bg-blue-50 dark:bg-blue-900/20 rounded-xl h-full flex flex-col items-center justify-center">
-                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-800/30 mb-4">
-                        <Clock className="h-8 w-8 text-blue-500 dark:text-blue-400" />
+                  <div className="min-h-[400px] flex flex-col">
+                    {isLoadingFollowingActivity ? (
+                      <div className="text-center py-12 flex flex-col items-center justify-center h-full min-h-[320px]">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
+                        <p className="text-gray-600 dark:text-gray-400 mt-3">
+                          Cargando actividades...
+                        </p>
                       </div>
-                      <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">
-                        Sin actividad reciente
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-4">
-                        Los usuarios que sigues no han realizado actividades
-                        recientemente.
-                      </p>
-                      <Button
-                        variant="outline"
-                        className="border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/40"
-                        onClick={() => router.push("/explore")}
-                      >
-                        Explorar usuarios
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {followingActivity.map((activity) => (
-                        <div
-                          key={activity.id}
-                          className="p-2.5 sm:p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md mb-2"
+                    ) : followingActivity.length === 0 ? (
+                      <div className="text-center py-12 bg-blue-50 dark:bg-blue-900/20 rounded-xl h-full min-h-[320px] flex flex-col items-center justify-center">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-800/30 mb-4">
+                          <Clock className="h-8 w-8 text-blue-500 dark:text-blue-400" />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">
+                          Sin actividad reciente
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-4">
+                          Los usuarios que sigues no han realizado actividades
+                          recientemente.
+                        </p>
+                        <Button
+                          variant="outline"
+                          className="border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/40"
+                          onClick={() => router.push("/explore")}
                         >
-                          <div className="flex items-start space-x-2">
-                            <div className="flex-shrink-0">
-                              <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
-                                {activity.user.image && (activity.user.image.includes('cloudinary') || 
-                                (!activity.user.image.startsWith('/') && !activity.user.image.startsWith('http'))) ? (
-                                  <CldImage
-                                    src={activity.user.image}
-                                    alt={activity.user.name || "Usuario"}
-                                    width={40}
-                                    height={40}
-                                    crop="fill"
-                                    gravity="face"
-                                    className="h-8 w-8 sm:h-10 sm:w-10 rounded-full"
-                                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                      const target = e.target as HTMLImageElement;
-                                      target.src = "/images/AvatarPredeterminado.webp";
-                                    }}
-                                  />
-                                ) : (
-                                  <Image
-                                    src={activity.user.image || "/images/AvatarPredeterminado.webp"}
-                                    alt={activity.user.name || "Usuario"}
-                                    width={40}
-                                    height={40}
-                                    className="h-8 w-8 sm:h-10 sm:w-10 rounded-full"
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      target.src = "/images/AvatarPredeterminado.webp";
-                                    }}
-                                  />
-                                )}
-                              </Avatar>
-                            </div>
-                            
-                            <div className="flex flex-col space-y-1">
-                              <div className="flex items-center space-x-1.5">
-                                <span className="font-medium text-xs sm:text-sm text-gray-800 dark:text-white truncate max-w-[100px] sm:max-w-none">
-                                  {activity.user.username}
-                                </span>
-                                <span className="flex-shrink-0">
-                                  {(() => {
-                                    switch (activity.type) {
-                                      case "favorite_added":
-                                      case "favorite":
-                                        return <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500" />;
-                                      case "favorite_removed":
-                                        return <Heart className="h-3.5 w-3.5 text-red-500" />;
-                                      case "comment":
-                                      case "comment_reply":
-                                        return <MessageSquare className="h-3.5 w-3.5 text-green-500" />;
-                                      case "rating_added":
-                                        return <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />;
-                                      case "rating_removed":
-                                        return <Star className="h-3.5 w-3.5 text-purple-500" />;
-                                      case "follow":
-                                        return <User2 className="h-3.5 w-3.5 text-blue-500" />;
-                                      case "unfollow":
-                                        return <User2 className="h-3.5 w-3.5 text-red-500" />;
-                                      case "comment_deleted":
-                                        return <MessageSquare className="h-3.5 w-3.5 text-red-500" />;
-                                      default:
-                                        return null;
-                                    }
-                                  })()}
-                                </span>
-                                <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
-                                  {(() => {
-                                    switch (activity.type) {
-                                      case "favorite_added":
-                                      case "favorite":
-                                        return "agregó favorito";
-                                      case "favorite_removed":
-                                        return "eliminó favorito";
-                                      case "comment":
-                                        return "comentó";
-                                      case "rating_added":
-                                        return "calificó";
-                                      case "rating_removed":
-                                        return "quitó calificación";
-                                      case "follow":
-                                        return "siguió a";
-                                      case "unfollow":
-                                        return "dejó de seguir";
-                                      case "comment_reply":
-                                        return "respondió";
-                                      case "comment_deleted":
-                                        return "eliminó comentario";
-                                      default:
-                                        return "";
-                                    }
-                                  })()}
-                                </span>
+                          Explorar usuarios
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4 min-h-[320px] flex-grow">
+                        {followingActivity.map((activity) => (
+                          <div
+                            key={activity.id}
+                            className="p-2.5 sm:p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md mb-2"
+                          >
+                            <div className="flex items-start space-x-2">
+                              <div className="flex-shrink-0">
+                                <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
+                                  {activity.user.image && (activity.user.image.includes('cloudinary') || 
+                                  (!activity.user.image.startsWith('/') && !activity.user.image.startsWith('http'))) ? (
+                                    <CldImage
+                                      src={activity.user.image}
+                                      alt={activity.user.name || "Usuario"}
+                                      width={40}
+                                      height={40}
+                                      crop="fill"
+                                      gravity="face"
+                                      className="h-8 w-8 sm:h-10 sm:w-10 rounded-full"
+                                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = "/images/AvatarPredeterminado.webp";
+                                      }}
+                                    />
+                                  ) : (
+                                    <Image
+                                      src={activity.user.image || "/images/AvatarPredeterminado.webp"}
+                                      alt={activity.user.name || "Usuario"}
+                                      width={40}
+                                      height={40}
+                                      className="h-8 w-8 sm:h-10 sm:w-10 rounded-full"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = "/images/AvatarPredeterminado.webp";
+                                      }}
+                                    />
+                                  )}
+                                </Avatar>
                               </div>
                               
-                              <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 truncate max-w-[170px] sm:max-w-none">
-                                {activity.sourceName || activity.targetName || ""}
-                              </p>
-                              
-                              <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
-                                {new Date(activity.createdAt).toLocaleString(
-                                  "es-ES",
-                                  {
-                                    day: "numeric",
-                                    month: "short",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  }
-                                )}
-                              </p>
+                              <div className="flex flex-col space-y-1">
+                                <div className="flex items-center space-x-1.5">
+                                  <span className="font-medium text-xs sm:text-sm text-gray-800 dark:text-white truncate max-w-[100px] sm:max-w-none">
+                                    {activity.user.username}
+                                  </span>
+                                  <span className="flex-shrink-0">
+                                    {(() => {
+                                      switch (activity.type) {
+                                        case "favorite_added":
+                                        case "favorite":
+                                          return <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500" />;
+                                        case "favorite_removed":
+                                          return <Heart className="h-3.5 w-3.5 text-red-500" />;
+                                        case "comment":
+                                        case "comment_reply":
+                                          return <MessageSquare className="h-3.5 w-3.5 text-green-500" />;
+                                        case "rating_added":
+                                          return <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />;
+                                        case "rating_removed":
+                                          return <Star className="h-3.5 w-3.5 text-purple-500" />;
+                                        case "follow":
+                                          return <User2 className="h-3.5 w-3.5 text-blue-500" />;
+                                        case "unfollow":
+                                          return <User2 className="h-3.5 w-3.5 text-red-500" />;
+                                        case "comment_deleted":
+                                          return <MessageSquare className="h-3.5 w-3.5 text-red-500" />;
+                                        default:
+                                          return null;
+                                      }
+                                    })()}
+                                  </span>
+                                  <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+                                    {(() => {
+                                      switch (activity.type) {
+                                        case "favorite_added":
+                                        case "favorite":
+                                          return "agregó favorito";
+                                        case "favorite_removed":
+                                          return "eliminó favorito";
+                                        case "comment":
+                                          return "comentó";
+                                        case "rating_added":
+                                          return "calificó";
+                                        case "rating_removed":
+                                          return "quitó calificación";
+                                        case "follow":
+                                          return "siguió a";
+                                        case "unfollow":
+                                          return "dejó de seguir";
+                                        case "comment_reply":
+                                          return "respondió";
+                                        case "comment_deleted":
+                                          return "eliminó comentario";
+                                        default:
+                                          return "";
+                                      }
+                                    })()}
+                                  </span>
+                                </div>
+                                
+                                <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 truncate max-w-[170px] sm:max-w-none">
+                                  {activity.sourceName || activity.targetName || ""}
+                                </p>
+                                
+                                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
+                                  {new Date(activity.createdAt).toLocaleString(
+                                    "es-ES",
+                                    {
+                                      day: "numeric",
+                                      month: "short",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    }
+                                  )}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                      {!isLoadingFollowingActivity &&
-                        followingActivity.length > 0 &&
-                        totalActivities > itemsPerPage && (
-                          <PaginationControls />
-                        )}
-                    </div>
-                  )}
+                        ))}
+                        {followingActivity.length > 0 && <PaginationControls />}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
