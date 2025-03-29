@@ -10,7 +10,6 @@ type _Theme = "light" | "dark" | "system";
 // Tipos para opciones avanzadas
 type FontSize = "small" | "medium" | "large";
 type FontFamily = "sans" | "serif" | "mono";
-type ContentDensity = "compact" | "comfortable";
 
 export function AppearanceSettings() {
   const { theme, setTheme } = useTheme();
@@ -19,7 +18,6 @@ export function AppearanceSettings() {
   // Estados para las configuraciones avanzadas
   const [fontSize, setFontSize] = useState<FontSize>("medium");
   const [fontFamily, setFontFamily] = useState<FontFamily>("sans");
-  const [contentDensity, setContentDensity] = useState<ContentDensity>("comfortable");
   const [enableAnimations, setEnableAnimations] = useState(true);
   
   // Estado para la previsualización de temas
@@ -31,48 +29,40 @@ export function AppearanceSettings() {
     if (typeof document === "undefined") return;
     
     // Aplicar tamaño de fuente
-    document.documentElement.dataset.fontSize = fontSize;
+    document.documentElement.style.setProperty("--font-size-factor", fontSize === "small" ? "0.85" : fontSize === "medium" ? "1" : "1.2");
+    document.documentElement.setAttribute("data-font-family", fontFamily);
     
-    // Aplicar familia de fuente
-    document.documentElement.dataset.fontFamily = fontFamily;
-    
-    // Aplicar densidad de contenido
-    document.documentElement.dataset.contentDensity = contentDensity;
-    
-    // Aplicar animaciones
+    // Aplicar valores de animación
     document.documentElement.dataset.animations = enableAnimations ? "true" : "false";
-  }, [fontSize, fontFamily, contentDensity, enableAnimations]);
+  }, [fontSize, fontFamily, enableAnimations]);
 
   // Función para guardar en localStorage
   const saveToLocalStorage = useCallback(() => {
-    if (typeof window === "undefined") return;
+    if (typeof localStorage === "undefined") return;
     
+    // Guardar configuraciones avanzadas
     localStorage.setItem("hemopress-font-size", fontSize);
     localStorage.setItem("hemopress-font-family", fontFamily);
-    localStorage.setItem("hemopress-content-density", contentDensity);
-    localStorage.setItem("hemopress-animations", String(enableAnimations));
-  }, [fontSize, fontFamily, contentDensity, enableAnimations]);
+    localStorage.setItem("hemopress-animations", enableAnimations ? "true" : "false");
+  }, [fontSize, fontFamily, enableAnimations]);
 
   // Efecto para cargar inicialmente - solo se ejecuta una vez
   useEffect(() => {
-    setMounted(true);
-    
-    // Cargar preferencias guardadas
     if (typeof window !== "undefined") {
+      setMounted(true);
+      
       // Recuperar valores almacenados
       const savedFontSize = localStorage.getItem("hemopress-font-size") as FontSize | null;
       const savedFontFamily = localStorage.getItem("hemopress-font-family") as FontFamily | null;
-      const savedContentDensity = localStorage.getItem("hemopress-content-density") as ContentDensity | null;
       const savedEnableAnimations = localStorage.getItem("hemopress-animations");
       
       // Configurar estados con valores almacenados o predeterminados
       if (savedFontSize) setFontSize(savedFontSize);
       if (savedFontFamily) setFontFamily(savedFontFamily);
-      if (savedContentDensity) setContentDensity(savedContentDensity);
       if (savedEnableAnimations !== null) setEnableAnimations(savedEnableAnimations === "true");
     }
-  }, []); // Sin dependencias - solo se ejecuta en el montaje
-  
+  }, []);
+
   // Efecto para aplicar cambios al DOM cuando los valores cambian
   useEffect(() => {
     if (mounted) {
@@ -116,7 +106,6 @@ export function AppearanceSettings() {
   const resetToDefaults = useCallback(() => {
     setFontSize("medium");
     setFontFamily("sans");
-    setContentDensity("comfortable");
     setEnableAnimations(true);
     setTheme("system");
   }, [setTheme]);
@@ -167,9 +156,7 @@ export function AppearanceSettings() {
             </div>
             <div className={`relative rounded-lg ${
               currentTheme === 'dark' ? 'bg-gray-800' : 'bg-white'
-            } overflow-hidden shadow-lg transition-all duration-500 border ${
-              currentTheme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+            } overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700 transition-all duration-500`}>
               <div className={`p-3 ${
                 currentTheme === 'dark' ? 'bg-gray-900' : 'bg-blue-600'
               } flex items-center transition-all duration-500`}>
@@ -421,86 +408,6 @@ export function AppearanceSettings() {
               }`}
             >
               Monospace
-            </button>
-          </div>
-        </div>
-        
-        {/* Densidad de contenido */}
-        <div className="mb-12">
-          <div className="flex items-center mb-5">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500 dark:text-blue-400 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            <h2 className="text-lg font-medium text-gray-700 dark:text-gray-300">Densidad de contenido</h2>
-          </div>
-          
-          {/* Previsualización de densidad */}
-          <div className="mb-6 p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm transition-all duration-300">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-              Vista previa de la densidad de contenido
-            </div>
-            <div className="space-y-4">
-              <div className={`overflow-hidden transition-all duration-300 rounded-lg border ${
-                contentDensity === "compact" ? "border-2 border-blue-500" : "border border-gray-200 dark:border-gray-600"
-              }`}>
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-2 text-xs font-medium text-blue-800 dark:text-blue-200">
-                  Densidad: {contentDensity === "compact" ? "Compacta" : "Confortable"}
-                </div>
-                <div className={`bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-600 transition-all duration-300`}>
-                  {[1, 2, 3].map((item) => (
-                    <div key={item} className={`flex items-center transition-all duration-300 ${
-                      contentDensity === "compact" ? "py-1.5 px-3" : "py-3 px-4"
-                    }`}>
-                      <div className={`w-8 h-8 flex-shrink-0 rounded-md bg-blue-100 dark:bg-blue-800/50 flex items-center justify-center text-blue-600 dark:text-blue-300 transition-all duration-300 ${
-                        contentDensity === "compact" ? "w-7 h-7" : "w-8 h-8"
-                      }`}>
-                        {item}
-                      </div>
-                      <div className="ml-3">
-                        <p className={`text-gray-800 dark:text-gray-200 font-medium transition-all duration-300 ${
-                          contentDensity === "compact" ? "text-sm" : "text-base"
-                        }`}>
-                          Elemento de ejemplo {item}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button
-              onClick={() => setContentDensity("compact")}
-              className={`group relative p-5 rounded-xl flex items-center justify-center transition-all duration-300 transform hover:scale-105 hover:shadow-md ${
-                contentDensity === "compact" 
-                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white" 
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-              }`}
-            >
-              <div className="flex flex-col items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                </svg>
-                <span className="font-medium">Compacto</span>
-              </div>
-            </button>
-            
-            <button
-              onClick={() => setContentDensity("comfortable")}
-              className={`group relative p-5 rounded-xl flex items-center justify-center transition-all duration-300 transform hover:scale-105 hover:shadow-md ${
-                contentDensity === "comfortable" 
-                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white" 
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-              }`}
-            >
-              <div className="flex flex-col items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                </svg>
-                <span className="font-medium">Confortable</span>
-              </div>
             </button>
           </div>
         </div>
