@@ -4,8 +4,9 @@ import React from 'react';
 import { useSession } from 'next-auth/react';
 import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 
-// Importar correctamente el componente optimizado
+// Importar correctamente los componentes
 import OptimizedChatWindow from "./OptimizedChatWindow";
+import PrivateChatWindow from "./PrivateChatWindow"; // Añadimos el nuevo componente
 
 import { ConversationData, User } from '@/src/app/messages/types';
 
@@ -84,20 +85,58 @@ const MessageContainer = React.memo(({
 
   // En este punto, sabemos que _selectedConversationData no es null
   const conversationData = _selectedConversationData!;
-  // Determinar si la conversación es un grupo
-  const isGroup = conversationData.isGroup;
-  const _isRealGroup = isGroup && conversationData.participants && conversationData.participants.length > 0;
+  
+  // Determinar si la conversación es un grupo mediante múltiples comprobaciones
+  // 1. Comprobar el campo isGroup explícitamente
+  // 2. Comprobar si el ID comienza con 'group_' o 'conv_'
+  let isGroupByField = false;
+  
+  // Comprobar el campo isGroup con conversiones seguras para diferentes tipos de datos
+  if (typeof conversationData.isGroup === 'boolean') {
+    isGroupByField = conversationData.isGroup;
+  } else if (typeof conversationData.isGroup === 'number') {
+    isGroupByField = conversationData.isGroup === 1;
+  } else if (typeof conversationData.isGroup === 'string') {
+    const isGroupValue = conversationData.isGroup as string;
+    isGroupByField = isGroupValue === '1' || isGroupValue.toLowerCase() === 'true';
+  }
+  
+  const isGroupById = conversationData.id?.toString().startsWith('group_') || false;
+  const isPrivateById = conversationData.id?.toString().startsWith('conv_') || false;
+  
+  // Si hay conflicto entre los indicadores, priorizamos el ID como fuente de verdad
+  // Si no hay conflicto, usamos isGroup
+  const isGroup = isPrivateById ? false : (isGroupById ? true : isGroupByField);
+  
+  console.log('Tipo de conversación detectado:', {
+    id: conversationData.id,
+    isGroupField: conversationData.isGroup,
+    isGroupByField,
+    isGroupById,
+    isPrivateById,
+    decisiónFinal: isGroup ? 'GRUPO' : 'PRIVADO'
+  });
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* Conversación */}
-      <OptimizedChatWindow 
-        conversationId={_selectedConversation} 
-        conversation={conversationData}
-        currentUserId={_currentUserId || _session?.user?.id || ""}
-        _onUserProfileClick={_onUserProfileClick}
-        className="h-full"
-      />
+      {/* Conversación - Usar el componente adecuado según el tipo de conversación */}
+      {isGroup ? (
+        <OptimizedChatWindow 
+          conversationId={_selectedConversation} 
+          conversation={conversationData}
+          currentUserId={_currentUserId || _session?.user?.id || ""}
+          _onUserProfileClick={_onUserProfileClick}
+          className="h-full"
+        />
+      ) : (
+        <PrivateChatWindow 
+          conversationId={_selectedConversation} 
+          conversation={conversationData}
+          currentUserId={_currentUserId || _session?.user?.id || ""}
+          _onUserProfileClick={_onUserProfileClick}
+          className="h-full"
+        />
+      )}
     </div>
   );
 });

@@ -41,7 +41,7 @@ export function useChatContent(
     
     try {
       const response = await fetch(`/api/messages/read/${conversationIdToMark}`, {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store'
       });
@@ -63,7 +63,7 @@ export function useChatContent(
     
     try {
       const response = await fetch(`/api/messages/${messageId}/read`, {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store'
       });
