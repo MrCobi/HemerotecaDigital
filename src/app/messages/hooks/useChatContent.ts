@@ -27,6 +27,8 @@ export function useChatContent(
   const loadingMoreRef = useRef(false);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const readStatusRef = useRef<Record<string, boolean>>({});
+  const failedMarkReadAttempts = useRef<Record<string, boolean>>({});
+  const failedMessageMarkReadAttempts = useRef<Record<string, boolean>>({});
 
   // Función para desplazarse al final de los mensajes
   const scrollToBottom = useCallback(() => {
@@ -38,6 +40,12 @@ export function useChatContent(
   // Marcar conversación como leída
   const markConversationAsRead = useCallback(async (conversationIdToMark: string) => {
     if (!conversationIdToMark || !session?.user?.id) return;
+    
+    // Evitar intentos repetidos para conversaciones que ya fallaron
+    if (failedMarkReadAttempts.current[conversationIdToMark]) {
+      console.log(`Omitiendo intento de marcar como leído para ${conversationIdToMark} debido a fallo previo`);
+      return;
+    }
     
     try {
       const response = await fetch(`/api/messages/read/${conversationIdToMark}`, {
@@ -51,15 +59,37 @@ export function useChatContent(
         if (readStatusRef.current) {
           readStatusRef.current[conversationIdToMark] = true;
         }
+        // Si había un error previo, eliminarlo
+        localStorage.removeItem(`chat_access_error_${conversationIdToMark}`);
+      } else if (response.status === 403) {
+        // Si recibimos un 403, significa que el usuario no tiene permisos
+        // Guardamos esta conversación para no intentar marcarla como leída nuevamente
+        console.log(`No se tienen permisos para marcar como leído: ${conversationIdToMark}`);
+        failedMarkReadAttempts.current[conversationIdToMark] = true;
+        
+        // También guardar en localStorage para que otros componentes puedan detectarlo
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "No tienes permisos para acceder a esta conversación";
+          localStorage.setItem(`chat_access_error_${conversationIdToMark}`, errorMessage);
+        } catch (err) {
+          localStorage.setItem(`chat_access_error_${conversationIdToMark}`, "No tienes permisos para acceder a esta conversación");
+        }
       }
     } catch (error) {
       console.error('Error al marcar conversación como leída:', error);
     }
   }, [session?.user?.id]);
-  
+
   // Marcar un mensaje específico como leído
   const markMessageAsRead = useCallback(async (messageId: string) => {
     if (!messageId || !conversationId || !session?.user?.id) return;
+    
+    // Evitar intentos repetidos para mensajes que ya fallaron
+    if (failedMessageMarkReadAttempts.current[messageId]) {
+      console.log(`Omitiendo intento de marcar mensaje como leído para ${messageId} debido a fallo previo`);
+      return;
+    }
     
     try {
       const response = await fetch(`/api/messages/${messageId}/read`, {
@@ -71,6 +101,26 @@ export function useChatContent(
       if (response.ok) {
         // Actualizar estado local si es necesario
         console.log(`[useChatContent] Mensaje ${messageId} marcado como leído`);
+        // Si había un error previo, eliminarlo
+        if (conversationId) {
+          localStorage.removeItem(`chat_access_error_${conversationId}`);
+        }
+      } else if (response.status === 403) {
+        // Si recibimos un 403, significa que el usuario no tiene permisos
+        // Guardamos este mensaje para no intentar marcarlo como leído nuevamente
+        console.log(`No se tienen permisos para marcar el mensaje como leído: ${messageId}`);
+        failedMessageMarkReadAttempts.current[messageId] = true;
+        
+        // También guardar en localStorage para que otros componentes puedan detectarlo
+        if (conversationId) {
+          try {
+            const errorData = await response.json();
+            const errorMessage = errorData.error || "No tienes permisos para acceder a esta conversación";
+            localStorage.setItem(`chat_access_error_${conversationId}`, errorMessage);
+          } catch (err) {
+            localStorage.setItem(`chat_access_error_${conversationId}`, "No tienes permisos para acceder a esta conversación");
+          }
+        }
       }
     } catch (error) {
       console.error('Error al marcar mensaje como leído:', error);

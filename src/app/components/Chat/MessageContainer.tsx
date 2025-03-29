@@ -34,6 +34,23 @@ const MessageContainer = React.memo(({
   _currentUserId
 }: MessageContainerProps) => {
   const { data: _session } = useSession();
+  // Estado para seguimiento de errores de permisos
+  const [accessError, setAccessError] = React.useState<string | null>(null);
+  
+  // Efecto para comprobar si hay un error de permisos guardado para esta conversación
+  React.useEffect(() => {
+    if (_selectedConversation) {
+      // Verificar en localStorage si se ha guardado un error para esta conversación
+      const savedError = localStorage.getItem(`chat_access_error_${_selectedConversation}`);
+      if (savedError) {
+        setAccessError(savedError);
+      } else {
+        setAccessError(null);
+      }
+    } else {
+      setAccessError(null);
+    }
+  }, [_selectedConversation]);
   
   // Si no hay conversación seleccionada o estamos en modo móvil sin conversación, mostrar mensaje
   if (!_selectedConversation || (_isMobileView && !_selectedConversation)) {
@@ -60,6 +77,31 @@ const MessageContainer = React.memo(({
       <div className="flex-1 bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
         <LoadingSpinner className="w-8 h-8 text-blue-500" />
         <p className="mt-4 text-gray-600 dark:text-gray-400">Cargando conversación...</p>
+      </div>
+    );
+  }
+
+  // Si hay un error de acceso registrado, mostrar mensaje de error de permisos
+  if (accessError) {
+    return (
+      <div className="flex-1 bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
+        <div className="text-center">
+          <div className="flex items-center justify-center bg-red-100 dark:bg-red-900/30 p-4 rounded-full mb-4 w-16 h-16">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Error de acceso</h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            {accessError}
+          </p>
+          <button
+            onClick={_onBackClick}
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
+          >
+            Volver
+          </button>
+        </div>
       </div>
     );
   }

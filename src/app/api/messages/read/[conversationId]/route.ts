@@ -48,7 +48,10 @@ export const PUT = withAuth(async (
       });
     } else if (isGroupChat) {
       // Para conversaciones grupales
-      const conversationDbId = conversationId.replace('group_', '');
+      // Nota: No eliminamos el prefijo "group_" ya que en la base de datos se guarda con ese prefijo
+      const conversationDbId = conversationId;
+      
+      console.log(`Verificando pertenencia a grupo: ${conversationId}, userId: ${userId}`);
       
       // Verificar que el usuario pertenece a la conversación
       const participant = await prisma.conversationParticipant.findFirst({
@@ -57,6 +60,8 @@ export const PUT = withAuth(async (
           conversationId: conversationDbId
         }
       });
+      
+      console.log('Resultado de búsqueda de participante:', participant);
       
       if (!participant) {
         return NextResponse.json({ error: "No eres miembro de esta conversación" }, { status: 403 });
