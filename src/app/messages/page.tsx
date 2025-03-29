@@ -653,7 +653,7 @@ export default function MessagesPage() {
         )}
         
         {/* Área de mensajes */}
-        <div className="relative hidden w-2/3 flex-1 lg:w-3/4 md:flex">
+        <div className={`relative w-full flex-1 ${(mobileView && selectedConversation) ? 'flex' : (mobileView ? 'hidden' : 'md:flex')} md:w-2/3 lg:w-3/4`}>
           {selectedConversation && selectedConversationData ? (
             <MessageContainer
               key={selectedConversation}

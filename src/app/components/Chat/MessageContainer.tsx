@@ -168,6 +168,8 @@ const MessageContainer = React.memo(({
           conversation={conversationData}
           currentUserId={_currentUserId || _session?.user?.id || ""}
           _onUserProfileClick={_onUserProfileClick}
+          onBackClick={_onBackClick}
+          onSettingsClick={_onSettingsClick}
           className="h-full"
         />
       ) : (
@@ -176,6 +178,8 @@ const MessageContainer = React.memo(({
           conversation={conversationData}
           currentUserId={_currentUserId || _session?.user?.id || ""}
           _onUserProfileClick={_onUserProfileClick}
+          onBackClick={_onBackClick}
+          onSettingsClick={_onSettingsClick}
           className="h-full"
         />
       )}

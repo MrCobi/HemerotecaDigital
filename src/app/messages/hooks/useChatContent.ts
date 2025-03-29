@@ -92,7 +92,9 @@ export function useChatContent(
     }
     
     try {
-      const response = await fetch(`/api/messages/${messageId}/read`, {
+      // Obtener la URL base correcta (evitar hardcodear el puerto)
+      const baseUrl = window.location.origin;
+      const response = await fetch(`${baseUrl}/api/messages/${messageId}/read`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store'

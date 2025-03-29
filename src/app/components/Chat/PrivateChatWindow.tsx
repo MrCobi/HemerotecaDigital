@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { Image as ImageIcon, X, ArrowUp } from 'lucide-react';
+import { Image as ImageIcon, X, ArrowUp, ArrowLeft, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
@@ -21,6 +21,8 @@ type PrivateChatWindowProps = {
   className?: string;
   currentUserId?: string;
   _onUserProfileClick?: (user: User) => void;
+  onBackClick?: () => void;
+  onSettingsClick?: () => void;
 };
 
 // Componente para mostrar separadores de fecha entre mensajes
@@ -177,13 +179,15 @@ const PrivateMessageItem = React.memo(({
 PrivateMessageItem.displayName = 'PrivateMessageItem';
 
 // Componente principal de la ventana de chat privado
-export default function PrivateChatWindow({
+const PrivateChatWindow = ({
   conversation,
   conversationId,
   className,
   currentUserId,
   _onUserProfileClick,
-}: PrivateChatWindowProps) {
+  onBackClick,
+  onSettingsClick,
+}: PrivateChatWindowProps) => {
   const { data: session } = useSession();
   const { toast: _toast } = useToast();
   const imageInputRef = React.useRef<HTMLInputElement>(null);
@@ -313,24 +317,52 @@ export default function PrivateChatWindow({
 
   // Renderizar la interfaz principal de chat privado
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-      {/* Cabecera de la conversación */}
-      <div className="flex items-center p-3 border-b dark:border-gray-700 bg-white dark:bg-gray-800">
-        <Avatar className="h-10 w-10 mr-3">
-          {otherUser && otherUser.image ? (
-            <AvatarImage src={otherUser.image} alt={otherUser.username || otherUser.name || 'Usuario'} />
-          ) : (
-            <AvatarFallback>
-              {otherUser && (otherUser.username?.charAt(0).toUpperCase() || 
-               otherUser.name?.charAt(0).toUpperCase()) || 'U'}
-            </AvatarFallback>
-          )}
-        </Avatar>
-        <div className="flex flex-col">
-          <span className="font-medium">
-            {otherUser ? (otherUser.username || otherUser.name || 'Usuario') : 'Usuario'}
-          </span>
+    <div className={cn("flex flex-col h-full bg-white dark:bg-gray-950", className)}>
+      {/* Cabecera del chat con información del usuario */}
+      <div className="p-3 border-b flex items-center justify-between gap-3 bg-white dark:bg-gray-900 shadow-sm">
+        <div className="flex items-center gap-3">
+          {/* Botón de volver */}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onBackClick}
+            className="mr-1 md:hidden" // Solo visible en móviles
+            aria-label="Volver"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          
+          <Avatar className="h-10 w-10" onClick={() => _onUserProfileClick?.(otherUser as User)}>
+            {otherUser?.image ? (
+              <AvatarImage src={otherUser.image} alt={otherUser?.username || 'Usuario'} />
+            ) : (
+              <AvatarFallback>
+                {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
+              </AvatarFallback>
+            )}
+          </Avatar>
+          <div className="flex flex-col flex-1 min-w-0">
+            <span className="font-medium truncate">
+              {otherUser?.username || 'Usuario'}
+            </span>
+            <span className="text-xs text-gray-500 truncate">
+              {otherUser?.name || 'Sin nombre'}
+            </span>
+          </div>
         </div>
+        
+        {/* Botón de configuración */}
+        {onSettingsClick && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onSettingsClick}
+            className="ml-auto"
+            aria-label="Configuración"
+          >
+            <Settings className="h-5 w-5" />
+          </Button>
+        )}
       </div>
 
       {/* Contenedor de mensajes */}
@@ -400,53 +432,95 @@ export default function PrivateChatWindow({
       )}
 
       {/* Área de entrada de mensaje */}
-      <div className="p-3 border-t dark:border-gray-700 bg-white dark:bg-gray-800">
+      <div className="p-3 border-t flex flex-col">
+        {/* Vista previa de imagen seleccionada */}
+        {imagePreview && (
+          <div className="mb-2 relative">
+            <div className="relative w-24 h-24 overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
+              <Image
+                src={imagePreview}
+                alt="Preview"
+                fill
+                style={{ objectFit: 'cover' }}
+              />
+              <Button
+                variant="destructive"
+                size="icon"
+                className="absolute top-0 right-0 h-6 w-6 rounded-full"
+                onClick={() => handleImageChange(null)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+            {uploadProgress > 0 && uploadProgress < 100 && (
+              <div className="mt-1 w-24">
+                <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <span className="text-xs text-gray-500">{uploadProgress}%</span>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Input y botones para enviar mensajes */}
         <div className="flex items-end gap-2">
           <Button
             type="button"
-            size="icon"
             variant="ghost"
-            className="h-9 w-9 flex-shrink-0"
+            size="icon"
             onClick={openFileSelector}
+            className="h-10 w-10 flex-shrink-0"
+            disabled={sendingMessage}
           >
             <ImageIcon className="h-5 w-5" />
-            <span className="sr-only">Adjuntar imagen</span>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
           </Button>
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileSelect}
-          />
-          <Textarea
-            value={newMessageContent}
-            onChange={handleTextChange}
-            placeholder="Escribe un mensaje..."
-            className="min-h-[36px] flex-1 resize-none"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-          />
-          <Button
-            type="button"
-            size="icon"
-            disabled={(!newMessageContent && !imageToSend) || sendingMessage}
-            className="h-9 w-9 rounded-full flex-shrink-0"
-            onClick={handleSendMessage}
-          >
-            {sendingMessage ? (
-              <LoadingSpinner className="h-4 w-4" />
-            ) : (
-              <ArrowUp className="h-5 w-5" />
-            )}
-            <span className="sr-only">Enviar mensaje</span>
-          </Button>
+          
+          <div className="flex-1 relative">
+            <Textarea
+              value={newMessageContent}
+              onChange={handleTextChange}
+              placeholder="Escribe un mensaje..."
+              className="resize-none min-h-[40px] max-h-[120px] py-2 pr-10"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              disabled={sendingMessage}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleSendMessage}
+              className="absolute right-2 bottom-1 h-8 w-8"
+              disabled={(!newMessageContent.trim() && !imageToSend) || sendingMessage}
+            >
+              {sendingMessage ? (
+                <LoadingSpinner className="h-4 w-4" />
+              ) : (
+                <ArrowUp className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
   );
-}
+};
+
+PrivateChatWindow.displayName = 'PrivateChatWindow';
+
+export default PrivateChatWindow;
