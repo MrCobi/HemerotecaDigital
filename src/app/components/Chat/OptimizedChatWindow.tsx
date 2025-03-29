@@ -4,7 +4,8 @@ import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { Image as ImageIcon, X, ArrowUp, ArrowLeft, Settings } from 'lucide-react';
+// Importar los iconos directamente desde Lucide React para mejor compatibilidad
+import { ArrowLeft, ArrowUp, Image as ImageIcon, Settings, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
