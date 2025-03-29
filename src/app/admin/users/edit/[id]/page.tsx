@@ -268,10 +268,10 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
           <h1 className="text-2xl font-bold text-foreground">Editar Usuario</h1>
           <Button
             type="button"
-            className={`flex items-center gap-2 ${buttonVariants({ variant: "outline" })}`}
+            className={`flex items-center gap-2 ${buttonVariants({ variant: "outline" })} text-muted-foreground`}
             onClick={() => router.back()}
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
             Volver
           </Button>
         </div>
@@ -279,9 +279,9 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
         <div className="bg-card rounded-xl shadow-md overflow-hidden">
           <div className="md:flex">
             {/* Panel lateral izquierdo */}
-            <div className="md:w-1/3 bg-primary/10 p-6">
+            <div className="md:w-1/3 bg-primary/10 p-4 sm:p-6">
               <div className="text-center">
-                <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-md">
+                <div className="relative w-32 h-32 mx-auto rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-md">
                   {preview ? (
                     <Image
                       src={preview}
@@ -337,7 +337,7 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                 </div>
                 {userInfo && (
                   <>
-                    <h2 className="text-xl font-semibold mb-2">{userInfo.name}</h2>
+                    <h2 className="text-xl font-semibold mt-3 mb-2">{userInfo.name}</h2>
                     <p className="text-muted-foreground text-sm mb-4">
                       ID: {userInfo.id.substring(0, 8)}...
                     </p>
@@ -358,31 +358,39 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                   </>
                 )}
               </div>
-              <div className="mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="flex flex-col items-center space-y-3">
+              
+              <div className="my-6">
+                <div className="flex flex-col items-center">
+                  <div className="w-full max-w-[300px] mx-auto">
+                    <label 
+                      htmlFor="imageUpload" 
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                    >
+                      Imagen de perfil
+                    </label>
                     <input
                       id="imageUpload"
                       type="file"
                       accept="image/*"
                       onChange={handleFileChange}
-                      className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                      className="block w-full text-sm text-muted-foreground truncate file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                     />
-                    
-                    {uploadProgress > 0 && (
-                      <div className="bg-primary/10 text-primary p-2 rounded-md">
-                        Subiendo imagen... {uploadProgress}%
-                      </div>
-                    )}
-                    {uploadError && (
-                      <div className="bg-destructive/10 text-destructive p-2 rounded-md">
-                        {uploadError}
-                      </div>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Imagen recomendada: cuadrada, mínimo 200x200px. Formatos aceptados: JPG, PNG.
-                    </p>
                   </div>
+                  
+                  {uploadProgress > 0 && (
+                    <div className="bg-primary/10 text-primary p-2 rounded-md mt-2 w-full max-w-[300px]">
+                      Subiendo imagen... {uploadProgress}%
+                    </div>
+                  )}
+                  {uploadError && (
+                    <div className="bg-destructive/10 text-destructive p-2 rounded-md mt-2 w-full max-w-[300px]">
+                      {uploadError}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2 text-center max-w-[300px]">
+                    Imagen recomendada: cuadrada, mínimo 200x200px.<br/>
+                    Formatos aceptados: JPG, PNG.
+                  </p>
                 </div>
               </div>
             </div>
@@ -519,18 +527,19 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                       </Select>
                     </div>
                   </CardContent>
-                  <CardFooter className="flex justify-end space-x-4 pt-4">
+                  <CardFooter className="flex flex-wrap justify-end gap-3 pt-4 border-t">
                     <Button
                       type="button"
-                      className={buttonVariants({ variant: "outline" })}
+                      variant="outline"
                       onClick={() => router.back()}
+                      className="min-w-[100px]"
                     >
                       Cancelar
                     </Button>
                     <Button
                       type="submit"
                       disabled={isSaving}
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 min-w-[150px]"
                     >
                       {isSaving ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

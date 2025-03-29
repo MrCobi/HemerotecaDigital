@@ -35,14 +35,82 @@ type FavoritesTableProps = {
   favorites: Favorite[];
 };
 
+// Componente para el diálogo de confirmación de eliminación
+interface DeleteFavoriteDialogProps {
+  favoriteId: string;
+  onDelete: (id: string) => Promise<void>;
+}
+
+function DeleteFavoriteDialog({ favoriteId, onDelete }: DeleteFavoriteDialogProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  async function handleDelete() {
+    try {
+      setIsDeleting(true);
+      await onDelete(favoriteId);
+      setIsOpen(false);
+      toast.success("Favorito eliminado correctamente");
+    } catch (error) {
+      console.error("Error al eliminar favorito:", error);
+      toast.error("Error al eliminar favorito");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+  
+  return (
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialogTrigger asChild>
+        <button
+          className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
+          title="Eliminar favorito"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          <span className="ml-1 text-xs truncate">Eliminar</span>
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <Trash2 className="h-5 w-5 text-destructive" />
+            Eliminar favorito
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            ¿Estás seguro de que deseas eliminar este favorito?
+          </AlertDialogDescription>
+          <p className="text-destructive font-medium text-sm mt-2">
+            Esta acción no se puede deshacer.
+          </p>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+              e.preventDefault();
+              handleDelete();
+            }}
+            disabled={isDeleting}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            {isDeleting ? (
+              <span className="animate-pulse">Eliminando...</span>
+            ) : (
+              "Eliminar favorito"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export default function FavoritesTable({ favorites }: FavoritesTableProps) {
   // Estado para paginación y filtrado
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterValue, setFilterValue] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [favoriteToDelete, setFavoriteToDelete] = useState<string | null>(null);
   const [localFavorites, setLocalFavorites] = useState<Favorite[]>(favorites);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -95,7 +163,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
   const endIndex = startIndex + rowsPerPage;
   const currentFavorites = filteredFavorites.slice(startIndex, endIndex);
 
-  const handleDelete = useCallback(async (id: string) => {
+  const handleDelete = useCallback(async (id: string): Promise<void> => {
     try {
       setIsDeleting(true);
       const response = await fetch(`/api/admin/favorites/${id}`, {
@@ -115,10 +183,6 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
         setCurrentPage(prev => prev - 1);
       }
       
-      // Cerrar el diálogo
-      setIsDeleteDialogOpen(false);
-      setFavoriteToDelete(null);
-      
       // Mostrar notificación de éxito
       toast.success("Favorito eliminado correctamente");
     } catch (error) {
@@ -127,7 +191,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
     } finally {
       setIsDeleting(false);
     }
-  }, [currentFavorites, currentPage, setIsDeleting, setLocalFavorites, setIsDeleteDialogOpen, setFavoriteToDelete]);
+  }, [currentFavorites, currentPage]);
 
   const columns: Column<Favorite>[] = useMemo(() => [
     {
@@ -253,54 +317,25 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
       id: "actions",
       cell: (favorite: Favorite) => {
         return (
-          <div className="flex items-center justify-start gap-1.5">
+          <div className="flex items-center space-x-2">
             <Link
-              href={`/sources/${favorite.source.id}`}
+              href={favorite.source.url}
+              target="_blank"
               className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
-              title="Ver fuente"
+              title="Visitar fuente"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              <span className="ml-1 text-xs truncate">Ver</span>
+              <span className="ml-1 text-xs truncate">Visitar</span>
             </Link>
-            <button
-              className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
-              title="Eliminar favorito"
-              onClick={() => setFavoriteToDelete(favorite.id)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span className="ml-1 text-xs truncate">Eliminar</span>
-            </button>
-            <AlertDialog open={isDeleteDialogOpen && favoriteToDelete === favorite.id} onOpenChange={setIsDeleteDialogOpen}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta acción eliminará el favorito y no se puede deshacer.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setFavoriteToDelete(null)}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      e.preventDefault();
-                      handleDelete(favorite.id);
-                    }}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting && favoriteToDelete === favorite.id ? (
-                      <span className="animate-pulse">Eliminando...</span>
-                    ) : (
-                      "Eliminar"
-                    )}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <DeleteFavoriteDialog 
+              favoriteId={favorite.id} 
+              onDelete={handleDelete}
+            />
           </div>
         );
-      }
+      },
     }
-  ], [isDeleteDialogOpen, favoriteToDelete, categoryFilter, isDeleting, handleDelete, uniqueCategories]);
+  ], [isDeleting, handleDelete, uniqueCategories]);
 
   return (
     <div className="space-y-4">

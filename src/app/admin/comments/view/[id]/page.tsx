@@ -412,22 +412,6 @@ export default function CommentViewPage() {
               Volver
             </Link>
           </Button>
-          {!comment.isDeleted && (
-            <DeleteDialog 
-              entityId={comment.id}
-              entityName="este comentario"
-              entityType="el comentario"
-              onDelete={handleDeleteComment}
-              consequenceText="Esta acción no eliminará físicamente el comentario, sino que lo marcará como eliminado."
-            >
-              <Button 
-                variant="destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Eliminar comentario
-              </Button>
-            </DeleteDialog>
-          )}
         </CardFooter>
       </Card>
     </div>

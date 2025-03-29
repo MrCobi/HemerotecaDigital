@@ -10,6 +10,7 @@ import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
 import { Trash2, Book } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 type Rating = {
   id: string;
@@ -37,14 +38,81 @@ type RatingsTableProps = {
   onRatingDeleted?: (id: string) => void;
 };
 
+interface DeleteRatingDialogProps {
+  ratingId: string;
+  onDelete: (id: string) => Promise<void>;
+}
+
+function DeleteRatingDialog({ ratingId, onDelete }: DeleteRatingDialogProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  async function handleDelete() {
+    try {
+      setIsDeleting(true);
+      await onDelete(ratingId);
+      setIsOpen(false);
+      toast.success("Valoración eliminada correctamente");
+    } catch (error) {
+      console.error("Error al eliminar valoración:", error);
+      toast.error("Error al eliminar valoración");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+  
+  return (
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialogTrigger asChild>
+        <button
+          className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
+          title="Eliminar valoración"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          <span className="ml-1 text-xs truncate">Eliminar</span>
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <Trash2 className="h-5 w-5 text-destructive" />
+            Eliminar valoración
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            ¿Estás seguro de que deseas eliminar esta valoración?
+          </AlertDialogDescription>
+          <p className="text-destructive font-medium text-sm mt-2">
+            Esta acción no se puede deshacer.
+          </p>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+              e.preventDefault();
+              handleDelete();
+            }}
+            disabled={isDeleting}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            {isDeleting ? (
+              <span className="animate-pulse">Eliminando...</span>
+            ) : (
+              "Eliminar valoración"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableProps) {
   // Estado para paginación y filtrado
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterValue, setFilterValue] = useState("");
   const [ratingFilter, setRatingFilter] = useState<number | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [ratingToDelete, setRatingToDelete] = useState<string | null>(null);
   const [localRatings, setLocalRatings] = useState<Rating[]>(ratings);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -119,12 +187,11 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
         onRatingDeleted(id);
       }
 
-      // Actualizar el estado local
-      setIsDeleteDialogOpen(false);
-      setRatingToDelete(null);
+      // Mostrar notificación de éxito
+      toast.success("Valoración eliminada correctamente");
     } catch (error) {
       console.error('Error al eliminar la valoración:', error);
-      alert('Error al eliminar la valoración. Por favor, inténtalo de nuevo.');
+      toast.error('Error al eliminar la valoración');
     } finally {
       setIsDeleting(false);
     }
@@ -313,45 +380,15 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
               <Book className="h-3.5 w-3.5" />
               <span className="ml-1 text-xs truncate">Ver</span>
             </Link>
-            <button
-              className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
-              title="Eliminar valoración"
-              onClick={() => setRatingToDelete(rating.id)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span className="ml-1 text-xs truncate">Eliminar</span>
-            </button>
-            <AlertDialog open={isDeleteDialogOpen && ratingToDelete === rating.id} onOpenChange={setIsDeleteDialogOpen}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta acción eliminará la valoración y no se puede deshacer.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setRatingToDelete(null)}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      e.preventDefault();
-                      handleDelete(rating.id);
-                    }}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting && ratingToDelete === rating.id ? (
-                      <span className="animate-pulse">Eliminando...</span>
-                    ) : (
-                      "Eliminar"
-                    )}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <DeleteRatingDialog 
+              ratingId={rating.id} 
+              onDelete={handleDelete}
+            />
           </div>
         );
       },
     },
-  ], [isDeleteDialogOpen, ratingToDelete, handleDelete, isDeleting, ratingFilterElement]);
+  ], [handleDelete]);
 
   return (
     <div className="space-y-4">

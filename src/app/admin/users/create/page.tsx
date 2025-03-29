@@ -142,10 +142,10 @@ export default function CreateUserPage() {
           <h1 className="text-2xl font-bold text-foreground">Crear Nuevo Usuario</h1>
           <Button
             type="button"
-            className={`flex items-center gap-2 ${buttonVariants({ variant: "outline" })}`}
+            className={`flex items-center gap-2 ${buttonVariants({ variant: "outline" })} text-muted-foreground`}
             onClick={() => router.back()}
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
             Volver
           </Button>
         </div>

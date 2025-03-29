@@ -8,7 +8,7 @@ import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
 import { Trash2, User } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 type User = {
   id: string;
@@ -31,13 +31,80 @@ type FollowsTableProps = {
   onDeleteFollow?: (id: string) => Promise<void>;
 };
 
+interface DeleteFollowDialogProps {
+  followId: string;
+  onDelete: (id: string) => Promise<void>;
+}
+
+function DeleteFollowDialog({ followId, onDelete }: DeleteFollowDialogProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  async function handleDelete() {
+    try {
+      setIsDeleting(true);
+      await onDelete(followId);
+      setIsOpen(false);
+      toast.success("Relación de seguimiento eliminada correctamente");
+    } catch (error) {
+      console.error("Error al eliminar relación de seguimiento:", error);
+      toast.error("Error al eliminar relación de seguimiento");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+  
+  return (
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialogTrigger asChild>
+        <button
+          className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
+          title="Eliminar relación"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          <span className="ml-1 text-xs truncate">Eliminar</span>
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <Trash2 className="h-5 w-5 text-destructive" />
+            Eliminar relación de seguimiento
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            ¿Estás seguro de que deseas eliminar esta relación de seguimiento?
+          </AlertDialogDescription>
+          <p className="text-destructive font-medium text-sm mt-2">
+            Esta acción no se puede deshacer.
+          </p>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+              e.preventDefault();
+              handleDelete();
+            }}
+            disabled={isDeleting}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            {isDeleting ? (
+              <span className="animate-pulse">Eliminando...</span>
+            ) : (
+              "Eliminar relación"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export default function FollowsTable({ follows, onDeleteFollow }: FollowsTableProps) {
   // Estado para paginación y filtrado
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterValue, setFilterValue] = useState("");
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [followToDelete, setFollowToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Filtra las relaciones de seguimiento según los criterios seleccionados
@@ -63,7 +130,7 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
   const endIndex = startIndex + rowsPerPage;
   const currentFollows = filteredFollows?.slice(startIndex, endIndex) || [];
 
-  const handleDelete = useCallback(async (id: string) => {
+  const handleDelete = useCallback(async (id: string): Promise<void> => {
     try {
       setIsDeleting(true);
       
@@ -71,9 +138,14 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
         await onDeleteFollow(id);
       } else {
         // Implementación por defecto si no se proporciona función de eliminación
-        console.log(`Eliminar relación de seguimiento ${id}`);
-        // Simular una espera para demostrar el estado de carga
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const response = await fetch(`/api/admin/follows/${id}`, {
+          method: 'DELETE',
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Error desconocido');
+        }
       }
       
       toast.success("Relación de seguimiento eliminada correctamente");
@@ -82,10 +154,8 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
       toast.error("No se pudo eliminar la relación de seguimiento");
     } finally {
       setIsDeleting(false);
-      setIsDeleteDialogOpen(false);
-      setFollowToDelete(null);
     }
-  }, [onDeleteFollow, setIsDeleting, setIsDeleteDialogOpen, setFollowToDelete]);
+  }, [onDeleteFollow]);
 
   // Función para renderizar la imagen del usuario
   const renderUserImage = (user: User | undefined | null, size: number = 32) => {
@@ -209,40 +279,15 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
               <User className="h-3.5 w-3.5" />
               <span className="ml-1 text-xs truncate">Seguido</span>
             </Link>
-            <button
-              className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
-              title="Eliminar relación"
-              onClick={() => setFollowToDelete(follow.id)}
-              disabled={isDeleting && followToDelete === follow.id}
-            >
-              {isDeleting && followToDelete === follow.id ? (
-                <span className="animate-pulse text-xs">Eliminando...</span>
-              ) : (
-                <>
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="ml-1 text-xs truncate">Eliminar</span>
-                </>
-              )}
-            </button>
-            <AlertDialog open={isDeleteDialogOpen && followToDelete === follow.id} onOpenChange={setIsDeleteDialogOpen}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta acción eliminará la relación de seguimiento y no se puede deshacer.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setFollowToDelete(null)}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleDelete(follow.id)}>Eliminar</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <DeleteFollowDialog 
+              followId={follow.id} 
+              onDelete={handleDelete}
+            />
           </div>
         );
       },
     },
-  ], [isDeleteDialogOpen, followToDelete, isDeleting, handleDelete]);
+  ], [isDeleting, handleDelete]);
 
   return (
     <div className="space-y-4">

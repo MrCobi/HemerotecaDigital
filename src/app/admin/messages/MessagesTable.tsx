@@ -65,17 +65,84 @@ type MessagesTableProps = {
   messages: Message[];
 };
 
+interface DeleteMessageDialogProps {
+  messageId: string;
+  onDelete: (id: string) => Promise<void>;
+}
+
+function DeleteMessageDialog({ messageId, onDelete }: DeleteMessageDialogProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  async function handleDelete() {
+    try {
+      setIsDeleting(true);
+      await onDelete(messageId);
+      setIsOpen(false);
+      toast.success("Mensaje eliminado correctamente");
+    } catch (error) {
+      console.error("Error al eliminar mensaje:", error);
+      toast.error("Error al eliminar mensaje");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+  
+  return (
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialogTrigger asChild>
+        <button
+          className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
+          title="Eliminar mensaje"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          <span className="ml-1 text-xs truncate">Borrar</span>
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <Trash2 className="h-5 w-5 text-destructive" />
+            Eliminar mensaje
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            ¿Estás seguro de que deseas eliminar este mensaje?
+          </AlertDialogDescription>
+          <p className="text-destructive font-medium text-sm mt-2">
+            Esta acción no se puede deshacer.
+          </p>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+              e.preventDefault();
+              handleDelete();
+            }}
+            disabled={isDeleting}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            {isDeleting ? (
+              <span className="animate-pulse">Eliminando...</span>
+            ) : (
+              "Eliminar mensaje"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export default function MessagesTable({ messages }: MessagesTableProps) {
   // Estado para paginación y filtrado
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterValue, setFilterValue] = useState("");
   const [filterType, setFilterType] = useState<"all" | "read" | "unread" | "individual" | "group">("all");
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
-  const [localMessages, setLocalMessages] = useState<Message[]>(messages);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMarkingAsRead, setIsMarkingAsRead] = useState<string | null>(null);
+  const [localMessages, setLocalMessages] = useState<Message[]>(messages);
 
   // Actualizar localMessages cuando cambian los mensajes (al montar el componente)
   useEffect(() => {
@@ -128,7 +195,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     }
     
     return filtered;
-  }, [localMessages, filterValue, filterType]);
+  }, [messages, filterValue, filterType, localMessages]);
 
   // Calcula el total de páginas
   const totalPages = Math.ceil(filteredMessages.length / rowsPerPage);
@@ -140,7 +207,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     return filteredMessages.slice(startIndex, endIndex);
   }, [filteredMessages, currentPage, rowsPerPage]);
 
-  const handleDelete = useCallback(async (id: string) => {
+  const handleDelete = useCallback(async (id: string): Promise<void> => {
     try {
       setIsDeleting(true);
       const response = await fetch(`/api/admin/messages/${id}`, {
@@ -159,10 +226,6 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       if (paginatedMessages.length === 1 && currentPage > 1) {
         setCurrentPage(prev => prev - 1);
       }
-      
-      // Cerrar el diálogo
-      setIsDeleteDialogOpen(false);
-      setMessageToDelete(null);
       
       // Mostrar notificación de éxito
       toast.success("Mensaje eliminado correctamente");
@@ -543,20 +606,20 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       id: "actions",
       cell: (message: Message) => {
         return (
-          <div className="flex justify-end space-x-2">
+          <div className="flex justify-end items-center space-x-2">
             <Link
               href={`/admin/messages/view/${message.id}`}
-              className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
+              className="inline-flex items-center justify-center h-8 py-0.5 px-2 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
               title="Ver mensaje"
             >
               <Eye className="h-3.5 w-3.5" />
-              <span className="ml-1 text-xs truncate">Ver</span>
+              <span className="ml-1 text-xs font-medium">Ver</span>
             </Link>
             {!message.read && (
               <button
                 onClick={() => handleMarkAsRead(message.id)}
                 disabled={isMarkingAsRead === message.id}
-                className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors"
+                className="inline-flex items-center justify-center h-8 py-0.5 px-2 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors"
                 title="Marcar como leído"
               >
                 {isMarkingAsRead === message.id ? (
@@ -564,51 +627,18 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
                 ) : (
                   <CheckCircle className="h-3.5 w-3.5" />
                 )}
-                <span className="ml-1 text-xs truncate">Marcar leído</span>
+                <span className="ml-1 text-xs font-medium">Marcar leído</span>
               </button>
             )}
-            <AlertDialog open={isDeleteDialogOpen && messageToDelete === message.id} onOpenChange={setIsDeleteDialogOpen}>
-              <AlertDialogTrigger asChild>
-                <button 
-                  className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
-                  title="Eliminar mensaje"
-                  onClick={() => setMessageToDelete(message.id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="ml-1 text-xs truncate">Borrar</span>
-                </button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta acción eliminará el mensaje y no se puede deshacer.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setMessageToDelete(null)}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={() => handleDelete(message.id)}
-                    disabled={isDeleting}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    {isDeleting ? (
-                      <>
-                        <div className="h-4 w-4 mr-2 animate-spin rounded-full border-b-2 border-white"></div>
-                        Eliminando...
-                      </>
-                    ) : (
-                      'Eliminar'
-                    )}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <DeleteMessageDialog 
+              messageId={message.id} 
+              onDelete={handleDelete}
+            />
           </div>
         );
       },
     },
-  ], [isDeleteDialogOpen, messageToDelete, isDeleting, isMarkingAsRead, filterElement, handleDelete]);
+  ], [isDeleting, isMarkingAsRead, filterElement, handleDelete]);
 
   return (
     <div className="space-y-4">
