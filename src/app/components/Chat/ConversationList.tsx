@@ -437,10 +437,28 @@ const ConversationList = React.memo(({
           <div className="h-full flex items-center justify-center p-4">
             <div className="text-center text-gray-500 dark:text-gray-400">
               <p className="mb-2">No hay conversaciones disponibles</p>
-              <Button variant="outline" onClick={onNewMessage}>
-                <MessageSquarePlus className="mr-2 h-4 w-4" /> 
-                Iniciar nueva conversación
-              </Button>
+              {selectedFilter === 'all' ? (
+                <div className="flex flex-col space-y-2">
+                  <Button variant="outline" onClick={onNewMessage}>
+                    <MessageSquarePlus className="mr-2 h-4 w-4" /> 
+                    Iniciar nueva conversación
+                  </Button>
+                  <Button variant="outline" onClick={onNewGroup}>
+                    <Users className="mr-2 h-4 w-4" /> 
+                    Crear grupo
+                  </Button>
+                </div>
+              ) : selectedFilter === 'private' ? (
+                <Button variant="outline" onClick={onNewMessage}>
+                  <MessageSquarePlus className="mr-2 h-4 w-4" /> 
+                  Iniciar nueva conversación
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={onNewGroup}>
+                  <Users className="mr-2 h-4 w-4" /> 
+                  Crear grupo
+                </Button>
+              )}
             </div>
           </div>
         )}
