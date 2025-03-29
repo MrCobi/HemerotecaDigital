@@ -330,7 +330,7 @@ const PrivateChatWindow = ({
             className="mr-1 md:hidden" // Solo visible en móviles
             aria-label="Volver"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </Button>
           
           <Avatar className="h-10 w-10" onClick={() => _onUserProfileClick?.(otherUser as User)}>
@@ -361,7 +361,7 @@ const PrivateChatWindow = ({
             className="ml-auto"
             aria-label="Configuración"
           >
-            <Settings className="h-5 w-5" />
+            <Settings className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </Button>
         )}
       </div>
@@ -415,7 +415,7 @@ const PrivateChatWindow = ({
               className="absolute top-1 right-1 bg-gray-800 bg-opacity-70 rounded-full p-1 text-white"
               onClick={() => handleImageChange(null)}
             >
-              <X size={16} />
+              <X size={16} className="text-white" />
             </button>
           </div>
           {uploadProgress > 0 && uploadProgress < 100 && (
@@ -477,7 +477,7 @@ const PrivateChatWindow = ({
             className="h-10 w-10 flex-shrink-0"
             disabled={sendingMessage}
           >
-            <ImageIcon className="h-5 w-5" />
+            <ImageIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <input
               ref={imageInputRef}
               type="file"
@@ -512,7 +512,7 @@ const PrivateChatWindow = ({
               {sendingMessage ? (
                 <LoadingSpinner className="h-4 w-4" />
               ) : (
-                <ArrowUp className="h-4 w-4" />
+                <ArrowUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               )}
             </Button>
           </div>

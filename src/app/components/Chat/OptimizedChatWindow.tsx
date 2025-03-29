@@ -311,7 +311,7 @@ const OptimizedChatWindow = ({
             className="mr-1 md:hidden" // Solo visible en móviles
             aria-label="Volver"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </Button>
           
           <Avatar className="h-10 w-10" onClick={() => conversation?.isGroup ? null : _onUserProfileClick?.(otherUser as User)}>
@@ -348,7 +348,7 @@ const OptimizedChatWindow = ({
             className="ml-auto"
             aria-label="Configuración"
           >
-            <Settings className="h-5 w-5" />
+            <Settings className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </Button>
         )}
       </div>
@@ -437,7 +437,7 @@ const OptimizedChatWindow = ({
             className="h-10 w-10 flex-shrink-0"
             disabled={sendingMessage}
           >
-            <ImageIcon className="h-5 w-5" />
+            <ImageIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <input
               ref={imageInputRef}
               type="file"
@@ -472,7 +472,7 @@ const OptimizedChatWindow = ({
               {sendingMessage ? (
                 <LoadingSpinner className="h-4 w-4" />
               ) : (
-                <ArrowUp className="h-4 w-4" />
+                <ArrowUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               )}
             </Button>
           </div>

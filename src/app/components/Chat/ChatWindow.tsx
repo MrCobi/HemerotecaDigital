@@ -906,7 +906,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               </DialogTitle>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </Button>
           </div>
         </DialogHeader>
@@ -967,7 +967,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               size="icon" 
               disabled={isSending || !newMessage.trim() || canSendMessages === false}
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </Button>
           </div>
         </form>
