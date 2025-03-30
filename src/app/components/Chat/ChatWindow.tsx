@@ -4,12 +4,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/app/comp
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { X, Send } from 'lucide-react';
+import { X, Send, Mic, Play, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { flushSync } from 'react-dom';
 import useSocket, { MessageType } from '@/src/hooks/useSocket';
 import { API_ROUTES } from '@/src/config/api-routes';
+import VoiceMessageRecorder from './VoiceMessageRecorder';
 
 type User = {
   id: string;
@@ -18,6 +19,7 @@ type User = {
   image?: string | null;
 };
 
+// Definir Message como un tipo independiente para evitar conflictos
 type Message = {
   id?: string;
   tempId?: string;
@@ -28,6 +30,7 @@ type Message = {
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   conversationId?: string;
   read?: boolean;
+  messageType?: 'text' | 'image' | 'voice' | 'video' | 'file';
 };
 
 type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
@@ -40,130 +43,105 @@ interface ChatWindowProps {
   conversationId?: string;
 }
 
-export const ChatWindow: React.FC<ChatWindowProps> = ({
+const ChatWindow = ({
   isOpen,
   onClose,
   otherUser,
   _initialMessages = [],
   conversationId,
-}) => {
+}: ChatWindowProps) => {
+  // Estado y lógica del componente
   const { data: session } = useSession();
   const currentUserId = session?.user?.id;
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [canSendMessages, setCanSendMessages] = useState<boolean | null>(null);
-  const [_isCheckingRelationship, setIsCheckingRelationship] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const _isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
-  const [isTyping, setIsTyping] = useState(false);
-  const [peerIsTyping, setPeerIsTyping] = useState(false);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [hasMoreMessages, setHasMoreMessages] = useState(true);
-  
-  // Estado para controlar la carga de mensajes
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const [_messagesLoaded, setMessagesLoaded] = useState(false);
-  const [_showEmojiPicker, _setShowEmojiPicker] = useState(false);
 
-  // Socket.io integration
-  const {
-    connected,
-    error: _socketError,
-    sendMessage: sendSocketMessage,
-    updateTypingStatus: setTypingStatus,
-    markMessageAsRead: markAsRead,
-    socketInstance: _socketInstance
-  } = useSocket({
-    userId: currentUserId,
-    username: session?.user?.name || session?.user?.username || 'Usuario',
-    onNewMessage: (message: MessageType) => {
-      console.log('Hook recibió mensaje:', message);
-      console.log('Comprobando si es relevante:', {
-        otherUserId: otherUser?.id,
-        currentUserId,
-        esParaEstaConversacion: 
-          (message.senderId === otherUser?.id && message.receiverId === currentUserId) ||
-          (message.senderId === currentUserId && message.receiverId === otherUser?.id)
-      });
-      
-      if (
-        (message.senderId === otherUser?.id && message.receiverId === currentUserId) ||
-        (message.senderId === currentUserId && message.receiverId === otherUser?.id)
-      ) {
-        console.log('Procesando mensaje relevante para esta conversación:', message);
-        handleNewMessage(message);
+  // Socket para comunicación en tiempo real
+  const { connected, sendMessage, socketInstance, updateTypingStatus } = useSocket({
+    userId: currentUserId || undefined,
+    onNewMessage: (message) => {
+      // Solo añadir el mensaje si pertenece a esta conversación
+      if (message.conversationId === conversationId) {
+        setMessages(prev => [...prev, message]);
         
-        // Marcar como leído si el mensaje es del otro usuario
-        if (message.senderId === otherUser?.id && message.id) {
-          console.log('Marcando mensaje como leído:', message.id);
-          markAsRead({ messageId: message.id, conversationId: message.conversationId || conversationId || '' });
+        // Desplazar al fondo si ya estamos en el fondo
+        if (isAtBottom) {
+          scrollToBottom();
         }
-      } else {
-        console.log('Mensaje ignorado por no pertenecer a esta conversación');
       }
     },
     onTypingStatus: (status) => {
-      if (status.userId === otherUser?.id) {
+      // Solo actualizar estado de tipeo si coincide con la conversación actual
+      if (status.conversationId === conversationId && status.userId !== currentUserId) {
         setPeerIsTyping(status.isTyping);
       }
-    },
-    onMessageStatus: (status: { messageId: string; status: string }) => {
-      console.log(`Actualizando estado del mensaje ${status.messageId} a ${status.status}`);
-      updateMessageStatus(status.messageId, status.status as MessageStatus);
-    },
-    onMessageRead: (data) => {
-      // Actualizar mensaje como leído
-      setMessages(prev => 
-        prev.map(msg => 
-          (data.messageIds.includes(msg.id || '') || data.messageIds.includes(msg.tempId || '')) 
-            ? { ...msg, read: true, status: 'read' } 
-            : msg
-        )
-      );
     }
   });
+
+  // Referencias para el manejo del scroll
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Estados para el manejo de mensajes
+  const [newMessage, setNewMessage] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [peerIsTyping, setPeerIsTyping] = useState(false);
+  const [canSendMessages, setCanSendMessages] = useState<boolean | null>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [audioPlaying, setAudioPlaying] = useState<string | null>(null);
+
+  // Referencias para temporizadores
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isCheckingRelationshipRef = useRef(false);
+
+  // Referencia al reproductor de audio
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Verificar si los usuarios se siguen mutuamente
   useEffect(() => {
     if (!otherUser?.id || !currentUserId || !isOpen) return;
-    
+
     const checkMutualFollow = async () => {
       // Evitar verificaciones repetidas usando sessionStorage
       const relationshipKey = `mutual_follow_${currentUserId}_${otherUser.id}`;
       const cachedRelationship = sessionStorage.getItem(relationshipKey);
-      
+
       if (cachedRelationship) {
         console.log('Usando relación de seguimiento en caché');
         setCanSendMessages(cachedRelationship === 'true');
         return;
       }
-      
+
       try {
-        setIsCheckingRelationship(true);
+        isCheckingRelationshipRef.current = true;
         const response = await fetch(`/api/relationships/check?targetUserId=${otherUser.id}`);
-        
+
         if (response.ok) {
           const data = await response.json();
           // Solo permitir enviar mensajes si ambos usuarios se siguen mutuamente
           setCanSendMessages(data.isMutualFollow);
-          
+
           // Guardar en sessionStorage para evitar peticiones repetidas
           sessionStorage.setItem(relationshipKey, data.isMutualFollow ? 'true' : 'false');
         } else {
-          console.error('Error al verificar relación de seguimiento');
+          console.error('Error al verificar relación de seguimiento:', response.status);
           setCanSendMessages(false);
         }
       } catch (error) {
         console.error('Error al verificar relación de seguimiento:', error);
         setCanSendMessages(false);
       } finally {
-        setIsCheckingRelationship(false);
+        isCheckingRelationshipRef.current = false;
       }
     };
-    
+
     checkMutualFollow();
   }, [otherUser?.id, currentUserId, isOpen]);
 
@@ -171,54 +149,54 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const handleNewMessage = (message: MessageType) => {
     const startTime = performance.now();
     console.log('HandleNewMessage iniciado para:', message.id || message.tempId, 'de', message.senderId, 'a', message.receiverId);
-    
+
     // Asegurar que message.createdAt sea una cadena de fecha válida
     const msgCreatedAt = message.createdAt as string | object;
     if (typeof msgCreatedAt === 'object' && msgCreatedAt !== null) {
       try {
         // Convertir cualquier objeto a string ISO
         message.createdAt = new Date().toISOString();
-      } catch  {
+      } catch {
         // Si hay algún error, asignar la fecha actual
         message.createdAt = new Date().toISOString();
       }
-    } else if (typeof msgCreatedAt !== 'string') {
+    } else if (!msgCreatedAt) {
       message.createdAt = new Date().toISOString();
     }
-    
+
     // Validar que el mensaje pertenezca a esta conversación
     const isInConversation = (
       (message.senderId === currentUserId && message.receiverId === otherUser?.id) ||
       (message.senderId === otherUser?.id && message.receiverId === currentUserId)
     );
-    
+
     if (!isInConversation) {
       console.log('Mensaje ignorado porque no pertenece a esta conversación');
       console.log(`Conversación actual: ${currentUserId} <-> ${otherUser?.id}`);
       console.log(`Mensaje: ${message.senderId} -> ${message.receiverId}`);
       return;
     }
-    
+
     // Asegurar que el contenido sea válido
     if (!message.content) {
       console.error('Mensaje sin contenido ignorado');
       return;
     }
-    
+
     // Añadir un log detallado del mensaje para depuración
     console.log('Objeto mensaje completo:', JSON.stringify(message, null, 2));
-    
+
+    // Actualizar el estado de los mensajes
     setMessages(prevMessages => {
       // Comprobar si este mensaje es un duplicado usando una verificación más robusta
       const isDuplicate = prevMessages.some(msg => {
-        // Si tiene ID o tempId y coinciden
         if ((msg.id && msg.id === message.id) || 
             (msg.tempId && msg.tempId === message.tempId) ||
             (message.id && msg.tempId === message.id) ||
             (message.tempId && msg.id === message.tempId)) {
           return true;
         }
-        
+
         // Si tiene el mismo contenido, emisor, receptor y está dentro de un rango de tiempo cercano (5 segundos)
         if (msg.content === message.content && 
             msg.senderId === message.senderId && 
@@ -227,12 +205,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           const newMsgTime = new Date(message.createdAt).getTime();
           return Math.abs(msgTime - newMsgTime) < 5000; // 5 segundos de margen
         }
-        
+
         return false;
       });
-      
+
       console.log('¿Mensaje es duplicado?', isDuplicate);
-      
+
       if (isDuplicate) {
         console.log('Ignorando mensaje duplicado');
         // Si es duplicado, actualizar propiedades como el ID o estado si es necesario
@@ -250,7 +228,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             // Mantener el ID existente si es definitivo o usar el nuevo si existe
             const finalId = msg.id || message.id;
             // Mantener tempId solo si no hay ID definitivo
-            const finalTempId = finalId ? undefined : (msg.tempId || message.tempId);
+            const finalTempId = !finalId ? (msg.tempId || message.tempId) : undefined;
             
             // Usar el mejor estado disponible
             const finalStatus = message.status === 'failed' ? 'failed' : 
@@ -270,13 +248,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           return msg;
         });
       }
-      
+
       // Si no es duplicado, añadir el mensaje a la lista
       console.log('Añadiendo nuevo mensaje a la lista. ID:', message.id || message.tempId);
-      
+
+      // Adaptación del mensaje para que coincida con el tipo Message
+      const newMessage: Message = {
+        id: message.id,
+        tempId: message.tempId,
+        content: message.content,
+        senderId: message.senderId,
+        receiverId: message.receiverId,
+        createdAt: message.createdAt,
+        status: message.status as MessageStatus,
+        read: message.read,
+        messageType: message.messageType,
+        conversationId: message.conversationId
+      };
+
       // Crear una copia del arreglo y añadir el nuevo mensaje
-      const newMessagesList = [...prevMessages, message];
-      
+      const newMessagesList = [...prevMessages, newMessage];
+
       // Ordenar mensajes por fecha de creación
       return newMessagesList.sort((a, b) => {
         const timeA = new Date(a.createdAt).getTime();
@@ -284,60 +276,157 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         return timeA - timeB;
       });
     });
-    
+
     const processingTime = performance.now() - startTime;
     console.log(`Procesamiento de mensaje completado en ${processingTime.toFixed(2)}ms`);
-    
+
     // Desplazar al fondo del chat si estamos en la parte inferior
     if (isAtBottom && messagesEndRef.current) {
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        scrollToBottom();
       }, 100);
     }
   };
 
+  // Manejar el evento de tipeo (escribiendo)
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setNewMessage(value);
+
+    // Enviar evento "typing" para notificar al otro usuario
+    if (!isTyping && value.trim()) {
+      setIsTyping(true);
+      if (conversationId) {
+        updateTypingStatus({ conversationId, isTyping: true });
+      }
+    }
+
+    // Resetear el estado de tipeo después de un tiempo
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      // Enviar evento de que dejó de escribir
+      if (conversationId) {
+        updateTypingStatus({ conversationId, isTyping: false });
+      }
+    }, 2000);
+  };
+
+  // Función para desplazarse al final del chat
+  const scrollToBottom = useCallback(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messagesEndRef]);
+
+  // Manejar desplazamiento para detectar cuando el usuario está en la parte inferior
+  const handleScroll = useCallback(() => {
+    if (chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+      const isAtBottomNow = scrollHeight - scrollTop - clientHeight < 30;
+      setIsAtBottom(isAtBottomNow);
+    }
+  }, []);
+
   // Actualizar estado de un mensaje
   const updateMessageStatus = (messageId: string, status: MessageStatus) => {
-    setMessages(prev => 
-      prev.map(msg => 
-        (msg.id === messageId || msg.tempId === messageId) 
-          ? { ...msg, status } 
+    setMessages(prev =>
+      prev.map(msg =>
+        (msg.id === messageId || msg.tempId === messageId)
+          ? { ...msg, status }
           : msg
       )
     );
   };
 
-  // Desplazarse al fondo del chat cuando se añaden nuevos mensajes
-  useEffect(() => {
-    if (isAtBottom && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  // Manejar reproducción de audio
+  const handleToggleAudio = useCallback((audioUrl: string) => {
+    if (audioPlaying === audioUrl) {
+      // Pausar la reproducción actual
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setAudioPlaying(null);
+    } else {
+      // Detener cualquier reproducción anterior
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      
+      // Crear nuevo reproductor de audio
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      
+      // Configurar evento para cuando termine la reproducción
+      audio.onended = () => {
+        setAudioPlaying(null);
+      };
+      
+      // Iniciar reproducción
+      audio.play().catch(error => {
+        console.error('Error reproduciendo audio:', error);
+        setAudioPlaying(null);
+      });
+      
+      // Actualizar estado
+      setAudioPlaying(audioUrl);
     }
-  }, [messages, isAtBottom]);
+  }, [audioPlaying]);
 
-  // Detectar si el usuario está en el fondo del chat
-  useEffect(() => {
-    const chatContainer = chatContainerRef.current;
-    if (!chatContainer) return;
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainer;
-      const isAtBottomNow = scrollHeight - scrollTop - clientHeight < 30;
-      setIsAtBottom(isAtBottomNow);
-    };
-
-    chatContainer.addEventListener('scroll', handleScroll);
-    handleScroll();
-
-    return () => {
-      chatContainer.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
+  // Enviar mensaje de voz
+  const handleSendVoiceMessage = useCallback(async (audioBlob: Blob) => {
+    if (!conversationId || !otherUser || !currentUserId) return;
+    
+    try {
+      setIsSending(true);
+      
+      // Crear un FormData para enviar el archivo
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'voice-message.webm');
+      formData.append('conversationId', conversationId);
+      formData.append('receiverId', otherUser.id);
+      formData.append('messageType', 'voice');
+      
+      // Mensaje temporal para mostrar mientras se envía
+      const tempMessage: Message = {
+        tempId: `temp-${Date.now()}`,
+        content: URL.createObjectURL(audioBlob),
+        senderId: currentUserId,
+        createdAt: new Date(),
+        status: 'sending',
+        messageType: 'voice'
+      };
+      
+      // Añadir mensaje temporal a la lista
+      setMessages(prev => [...prev, tempMessage]);
+      
+      // Enviar mensaje
+      await fetch(`/api/messages/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      // Limpiar
+      setShowVoiceRecorder(false);
+      
+      // Desplazar al final
+      scrollToBottom();
+      
+    } catch (error) {
+      console.error('Error al enviar mensaje de voz:', error);
+    } finally {
+      setIsSending(false);
+    }
+  }, [conversationId, otherUser, currentUserId, scrollToBottom]);
 
   // Manejar envío de mensajes
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!newMessage.trim() || !currentUserId || !otherUser) return;
-    
+
     // Verificar si los usuarios se siguen mutuamente antes de enviar
     if (canSendMessages === false) {
       console.error('No se pueden enviar mensajes: los usuarios no se siguen mutuamente');
@@ -346,10 +435,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
     // Crear tempId fuera del bloque try para que esté disponible en todo el ámbito de la función
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    
+
     try {
       setIsSending(true);
-      
+
       // Crear nuevo mensaje
       const message = {
         tempId,
@@ -358,38 +447,37 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         receiverId: otherUser.id,
         createdAt: new Date(),
         status: 'sending',
-        conversationId
+        conversationId,
+        messageType: 'text'
       } as Message;
-      
+
       console.log('Enviando mensaje:', message);
-      
+
       // Actualizar UI inmediatamente para mostrar el mensaje enviado localmente
       flushSync(() => {
         setMessages(prev => [...prev, message]);
         setNewMessage('');
       });
-      
+
       // Desplazar al fondo del chat
-      if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
-      
+      scrollToBottom();
+
       // ESTRATEGIA DE ENVÍO: Primero intentar Socket.io, si falla, usar API REST
       let messageSaved = false;
-      
+
       // Primero intenta enviar por Socket.io
       if (connected) {
         // Asegurarnos de que createdAt sea siempre un string para compatibilidad con MessageType
         const messageForSocket = {
           ...message,
-          createdAt: typeof message.createdAt === 'string' 
-            ? message.createdAt 
-            : (message.createdAt && typeof message.createdAt === 'object' && 'toISOString' in message.createdAt
-                ? (message.createdAt as Date).toISOString() 
-                : new Date().toISOString())
+          createdAt: typeof message.createdAt === 'string'
+            ? message.createdAt
+            : message.createdAt instanceof Date
+              ? message.createdAt.toISOString()
+              : new Date().toISOString()
         };
-        
-        const socketSuccess = sendSocketMessage(messageForSocket);
+
+        const socketSuccess = sendMessage(messageForSocket);
         if (socketSuccess) {
           console.log('Mensaje enviado exitosamente via Socket.io');
           messageSaved = true;
@@ -400,7 +488,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       } else {
         console.log('Socket no conectado, usando API REST directamente');
       }
-      
+
       // Solo si Socket.io falló o no está conectado, usar API REST como respaldo
       if (!messageSaved) {
         try {
@@ -412,10 +500,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             body: JSON.stringify({
               content: message.content,
               receiverId: message.receiverId,
-              tempId: message.tempId
+              tempId: message.tempId,
+              messageType: 'text'
             }),
           });
-          
+
           if (!response.ok) {
             console.error('Error al guardar mensaje vía API:', response.status);
             updateMessageStatus(tempId, 'failed');
@@ -424,10 +513,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             console.log('Mensaje guardado correctamente en base de datos vía API', savedMessage);
             // Actualizar el estado del mensaje solo si tenemos un ID permanente
             if (savedMessage.id) {
-              setMessages(prev => 
-                prev.map(msg => 
-                  msg.tempId === tempId 
-                    ? { ...msg, id: savedMessage.id, status: 'sent' } 
+              setMessages(prev =>
+                prev.map(msg =>
+                  msg.tempId === tempId
+                    ? { ...msg, id: savedMessage.id, status: 'sent' }
                     : msg
                 )
               );
@@ -446,31 +535,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
-  // Manejar reenvío de mensajes fallidos
-  const handleResendMessage = async (messageId: string) => {
-    const messageToResend = messages.find(m => m.id === messageId || m.tempId === messageId);
-    if (!messageToResend) return;
-
-    // Actualizar estado a 'sending'
-    updateMessageStatus(messageId, 'sending');
-    
-    // Reenviar a través de Socket.io
-    const messageForSocket = {
-      ...messageToResend,
-      createdAt: typeof messageToResend.createdAt === 'string' 
-        ? messageToResend.createdAt 
-        : (messageToResend.createdAt && typeof messageToResend.createdAt === 'object' && 'toISOString' in messageToResend.createdAt
-            ? (messageToResend.createdAt as Date).toISOString() 
-            : new Date().toISOString())
-    };
-    
-    const success = sendSocketMessage(messageForSocket);
-    
-    if (!success) {
-      updateMessageStatus(messageId, 'failed');
-    }
-  };
-
   // Manejar teclas en el textarea
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -479,110 +543,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
-  // Manejar estado de typing
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setNewMessage(e.target.value);
-    
-    if (otherUser?.id && !isTyping) {
-      setIsTyping(true);
-      setTypingStatus({ conversationId: conversationId || '', isTyping: true });
-    }
-    
-    // Reset typing timeout
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    
-    // Set typing timeout
-    typingTimeoutRef.current = setTimeout(() => {
-      if (otherUser?.id) {
-        setIsTyping(false);
-        setTypingStatus({ conversationId: conversationId || '', isTyping: false });
-      }
-    }, 2000);
-  };
-
-  // Agrupar mensajes por fecha
-  const groupedMessages = messages.reduce<Record<string, Message[]>>((groups, message) => {
-    const date = new Date(message.createdAt);
-    const dateKey = format(date, 'yyyy-MM-dd');
-    
-    if (!groups[dateKey]) {
-      groups[dateKey] = [];
-    }
-    
-    groups[dateKey].push(message);
-    return groups;
-  }, {});
-
   // Renderizar mensajes agrupados por fecha
-  const _renderGroupedMessages = () => {
-    return Object.entries(groupedMessages).map(([dateKey, messages]) => {
-      const date = new Date(dateKey);
-      const day = format(date, 'd');
-      const month = format(date, 'MMMM');
-      const weekday = format(date, 'EEEE');
-      const formattedDate = `${weekday}, ${day} de ${month}`;
-      
-      return (
-        <div key={dateKey} className="flex flex-col space-y-4 mb-4">
-          <div className="flex justify-center">
-            <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-              {formattedDate}
-            </span>
-          </div>
-          
-          {messages.map((message, index) => {
-            const isSelfMessage = message.senderId === currentUserId;
-            const messageTime = format(new Date(message.createdAt), 'HH:mm');
-            
-            return (
-              <div
-                key={message.id || message.tempId || index}
-                className={cn(
-                  "flex",
-                  isSelfMessage ? "justify-end" : "justify-start"
-                )}
-              >
-                <div
-                  className={cn(
-                    "max-w-[80%] rounded-lg px-4 py-2",
-                    isSelfMessage
-                      ? "bg-blue-500 text-white dark:bg-blue-600 rounded-br-none"
-                      : "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-100 rounded-bl-none"
-                  )}
-                >
-                  <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                  <div className="flex items-center justify-end mt-1 space-x-1">
-                    <span className="text-xs opacity-70">{messageTime}</span>
-                    
-                    {isSelfMessage && (
-                      <span className="text-xs">
-                        {message.status === 'sending' && '⌛'}
-                        {message.status === 'sent' && '✓'}
-                        {message.status === 'delivered' && '✓✓'}
-                        {message.status === 'read' && '✓✓'}
-                        {message.status === 'failed' && (
-                          <button 
-                            onClick={() => handleResendMessage(message.id || message.tempId || '')}
-                            className="text-red-400 text-xs hover:underline"
-                          >
-                            Error - Reintentar
-                          </button>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
-    });
-  };
-
-  // Render messages grouped by date
   const renderMessagesByDate = () => {
     // Agrupar mensajes por fecha (sin hora)
     const messagesByDate: Record<string, Message[]> = {};
@@ -633,6 +594,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           {messages.map((message, index) => {
             const isSelfMessage = message.senderId === currentUserId;
             const messageTime = format(new Date(message.createdAt), 'HH:mm');
+            const isVoiceMessage = message.messageType === 'voice';
             
             return (
               <div
@@ -650,7 +612,23 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                       : "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-100 rounded-bl-none"
                   )}
                 >
-                  <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                  {isVoiceMessage ? (
+                    <div className="voice-message">
+                      <button
+                        onClick={() => handleToggleAudio(message.content || '')}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-opacity-20 bg-black hover:bg-opacity-30 transition-colors"
+                      >
+                        {audioPlaying === message.content ? (
+                          <Pause className="h-5 w-5" />
+                        ) : (
+                          <Play className="h-5 w-5" />
+                        )}
+                        <div className="w-32 h-1 bg-current opacity-50 rounded-full"></div>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                  )}
                   <div className="flex items-center justify-end mt-1 space-x-1">
                     <span className="text-xs opacity-70">{messageTime}</span>
                     
@@ -661,7 +639,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                         {message.status === 'delivered' && '✓✓'}
                         {message.status === 'read' && '✓✓'}
                         {message.status === 'failed' && (
-                          <button 
+                          <button
                             onClick={() => handleResendMessage(message.id || message.tempId || '')}
                             className="text-red-400 text-xs hover:underline"
                           >
@@ -680,217 +658,74 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     });
   };
 
-  // Función para desplazarse al final del chat
-  const _scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  // Manejar reenvío de mensajes fallidos
+  const handleResendMessage = async (messageId: string) => {
+    const messageToResend = messages.find(m => m.id === messageId || m.tempId === messageId);
+    if (!messageToResend) return;
+
+    // Actualizar estado a 'sending'
+    updateMessageStatus(messageId, 'sending');
+
+    // Reenviar a través de Socket.io si está disponible
+    if (connected && messageToResend) {
+      // Asegurarnos de que createdAt sea siempre un string
+      const messageForSocket = {
+        ...messageToResend,
+        createdAt: typeof messageToResend.createdAt === 'string'
+          ? messageToResend.createdAt
+          : messageToResend.createdAt instanceof Date
+            ? messageToResend.createdAt.toISOString()
+            : new Date().toISOString()
+      };
+
+      const success = sendMessage(messageForSocket);
+      
+      if (!success) {
+        updateMessageStatus(messageId, 'failed');
+      }
+    } else {
+      updateMessageStatus(messageId, 'failed');
     }
   };
 
-  // Manejar desplazamiento para detectar cuando el usuario está en la parte inferior
-  const handleScroll = () => {
-    if (chatContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+  // Detectar si el usuario está en el fondo del chat
+  useEffect(() => {
+    const chatContainer = chatContainerRef.current;
+    if (!chatContainer) return;
+
+    const handleInitialScroll = () => {
+      const { scrollHeight, clientHeight } = chatContainer;
+      chatContainer.scrollTop = scrollHeight - clientHeight;
+      setIsAtBottom(true);
+    };
+
+    handleInitialScroll();
+    
+    const handleScrollEvent = () => {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainer;
       const isAtBottomNow = scrollHeight - scrollTop - clientHeight < 30;
       setIsAtBottom(isAtBottomNow);
-    }
-  };
-
-  // Cargar mensajes de la conversación cuando cambia la conversación o se abre la ventana
-  // Usamos useCallback para evitar recrear esta función y causar efectos secundarios
-  const _loadConversationMessages = useCallback(async () => {
-    if (!otherUser?.id || !currentUserId) return;
-    
-    setIsLoadingMessages(true);
-    
-    try {
-      console.log(`Cargando mensajes entre ${currentUserId} y ${otherUser.id}`);
-      const response = await fetch(`/api/messages?otherUserId=${otherUser.id}`);
-      
-      if (!response.ok) {
-        console.error('Error al cargar mensajes:', response.status);
-        return;
-      }
-      
-      const data = await response.json();
-      
-      if (data && Array.isArray(data.messages)) {
-        console.log(`Recibidos ${data.messages.length} mensajes de la API`);
-        
-        // Procesar mensajes para evitar duplicados
-        const uniqueMessages = data.messages.filter((msg: Message, index: number, self: Message[]) => {
-          // Filtrar mensajes duplicados por ID o contenido+tiempo
-          return self.findIndex((m: Message) => 
-            (m.id && m.id === msg.id) || 
-            (m.content === msg.content && 
-             m.senderId === msg.senderId && 
-             m.receiverId === msg.receiverId &&
-             Math.abs(new Date(m.createdAt).getTime() - new Date(msg.createdAt).getTime()) < 5000)
-          ) === index;
-        });
-        
-        // Reemplazar mensajes en lugar de añadirlos
-        setMessages(uniqueMessages);
-        
-        // Marcar los mensajes no leídos como leídos
-        const unreadMessages = uniqueMessages.filter(
-          (msg: Message) => !msg.read && msg.senderId === otherUser.id
-        );
-        
-        for (const msg of unreadMessages) {
-          if (msg.id) {
-            markAsRead({ messageId: msg.id, conversationId: conversationId || '' });
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error al cargar mensajes:', error);
-    } finally {
-      setIsLoadingMessages(false);
-      setMessagesLoaded(true);
-    }
-  }, [otherUser?.id, currentUserId, conversationId, markAsRead]);
-
-  // Función para cargar mensajes históricos
-  const loadHistoricalMessages = useCallback(async () => {
-    if (!otherUser?.id || !currentUserId || !hasMoreMessages || isLoadingMessages) {
-      return;
-    }
-    
-    setIsLoadingMessages(true);
-    
-    try {
-      // Obtener la fecha del mensaje más antiguo actual
-      const oldestMessage = [...messages].sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      )[0];
-      
-      const beforeDate = oldestMessage 
-        ? new Date(oldestMessage.createdAt).toISOString()
-        : new Date().toISOString();
-      
-      console.log(`Cargando mensajes históricos anteriores a ${beforeDate}`);
-      
-      const response = await fetch(
-        `/api/messages?otherUserId=${otherUser.id}&beforeDate=${beforeDate}&limit=20`
-      );
-      
-      if (!response.ok) {
-        console.error('Error al cargar mensajes históricos:', response.status);
-        return;
-      }
-      
-      const data = await response.json();
-      
-      if (data && Array.isArray(data.messages)) {
-        if (data.messages.length === 0) {
-          console.log('No hay más mensajes históricos');
-          setHasMoreMessages(false);
-          return;
-        }
-        
-        console.log(`Recibidos ${data.messages.length} mensajes históricos`);
-        
-        // Procesar mensajes para evitar duplicados
-        const existingIds = new Set(messages.map(m => m.id).filter(Boolean));
-        const newMessages = data.messages.filter((msg: Message) => !msg.id || !existingIds.has(msg.id));
-        
-        if (newMessages.length > 0) {
-          setMessages(prev => [...newMessages, ...prev]);
-        } else {
-          setHasMoreMessages(false);
-        }
-      }
-    } catch (error) {
-      console.error('Error al cargar mensajes históricos:', error);
-    } finally {
-      setIsLoadingMessages(false);
-    }
-  }, [otherUser?.id, currentUserId, hasMoreMessages, isLoadingMessages, messages]);
-
-  // Función para manejar la carga de mensajes al hacer scroll hacia arriba
-  const _handleLoadMore = () => {
-    if (!isLoadingMessages && hasMoreMessages) {
-      loadHistoricalMessages();
-    }
-  };
-
-  useEffect(() => {
-    loadHistoricalMessages();
-  }, [loadHistoricalMessages]);
-
-  // Capturar focus para evitar que la ventana se vuelva a abrir
-  useEffect(() => {
-    const closeOnEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
     };
 
-    // Agregar el event listener cuando la ventana está abierta
-    if (isOpen) {
-      window.addEventListener('keydown', closeOnEscape);
-    }
+    chatContainer.addEventListener('scroll', handleScrollEvent);
 
-    // Remover cuando se desmonta o cierra
     return () => {
-      window.removeEventListener('keydown', closeOnEscape);
+      chatContainer.removeEventListener('scroll', handleScrollEvent);
     };
-  }, [isOpen, onClose]);
+  }, []);
 
-  // No permitir que la ventana se abra sin interacción del usuario
+  // Desplazarse al fondo del chat cuando se añaden nuevos mensajes
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    // Si la ventana está abierta y no hay actividad reciente, cerrarla después de un tiempo
-    if (isOpen) {
-      const lastMessageTime = messages.length > 0
-        ? new Date(messages[messages.length - 1].createdAt).getTime()
-        : Date.now();
-        
-      const timeSinceLastMessage = Date.now() - lastMessageTime;
-      
-      // Si no ha habido actividad en más de 5 minutos y la ventana se abrió automáticamente, cerrarla
-      if (timeSinceLastMessage > 5 * 60 * 1000) {
-        timeoutId = setTimeout(() => {
-          onClose();
-        }, 1000);
-      }
+    if (isAtBottom) {
+      scrollToBottom();
     }
-    
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [isOpen, messages, onClose]);
-
-  // Limpiar estado de mensajes al cerrar la ventana o cambiar de conversación
-  useEffect(() => {
-    if (!isOpen) {
-      // Al cerrar, no limpiamos los mensajes inmediatamente para evitar recargas al reabrir
-      return () => {
-        // Solo limpiar cuando cambia el otherUser (cambia de conversación)
-        if (!isOpen) {
-          console.log('Limpiando estado de mensajes al cambiar de conversación');
-          setMessagesLoaded(false);
-          // También reiniciar otros estados para evitar comportamientos extraños
-          setCanSendMessages(null);
-        }
-      };
-    }
-  }, [isOpen, otherUser?.id]);
-
-  // Manejar cierre de ventana
-  const handleClose = () => {
-    // No limpiar los mensajes al cerrar, solo cuando cambia la conversación
-    onClose();
-  };
+  }, [messages, isAtBottom, scrollToBottom]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       // Solo permitir cerrar si es un evento real del usuario
-      // Si la ventana está abierta y se está intentando cerrar, llamar a handleClose
       if (isOpen && !open) {
-        handleClose();
+        onClose();
       }
     }}>
       <DialogContent className="sm:max-w-[500px] p-0 h-[80vh] flex flex-col">
@@ -945,6 +780,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Audio element oculto para reproducción */}
+        <audio ref={audioRef} className="hidden" />
+        
         {/* Formulario de envío */}
         <form onSubmit={handleSendMessage} className="border-t p-4">
           {canSendMessages === false && (
@@ -952,24 +790,52 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               Para poder enviar mensajes, ambos usuarios deben seguirse mutuamente.
             </div>
           )}
-          <div className="flex items-end gap-2">
-            <Textarea
-              className="min-h-10 flex-1 resize-none"
-              placeholder={canSendMessages === false ? "No puedes enviar mensajes" : "Escribe tu mensaje..."}
-              value={newMessage}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              disabled={isSending || canSendMessages === false}
-              rows={1}
+          
+          {showVoiceRecorder ? (
+            <VoiceMessageRecorder
+              onSend={handleSendVoiceMessage}
+              onCancel={() => setShowVoiceRecorder(false)}
+              isVisible={showVoiceRecorder}
+              senderId={currentUserId || ''}
+              _receiverId={otherUser?.id || ''}
+              session={session}
+              onClose={() => setShowVoiceRecorder(false)}
+              setUploadStatus={setUploadStatus}
             />
-            <Button 
-              type="submit" 
-              size="icon" 
-              disabled={isSending || !newMessage.trim() || canSendMessages === false}
-            >
-              <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            </Button>
-          </div>
+          ) : (
+            <div className="flex items-end gap-2">
+              <Textarea
+                className="min-h-10 flex-1 resize-none"
+                placeholder={canSendMessages === false ? "No puedes enviar mensajes" : "Escribe tu mensaje..."}
+                value={newMessage}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                disabled={isSending || canSendMessages === false}
+                rows={1}
+              />
+              
+              {/* Botón de micrófono */}
+              {canSendMessages !== false && (
+                <Button 
+                  type="button" 
+                  size="icon" 
+                  variant="ghost"
+                  onClick={() => setShowVoiceRecorder(true)}
+                  disabled={isSending}
+                >
+                  <Mic className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </Button>
+              )}
+              
+              <Button 
+                type="submit" 
+                size="icon" 
+                disabled={isSending || !newMessage.trim() || canSendMessages === false}
+              >
+                <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </Button>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>

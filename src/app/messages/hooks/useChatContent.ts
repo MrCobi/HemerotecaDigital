@@ -231,9 +231,25 @@ export function useChatContent(
     username: session?.user?.name || session?.user?.username || 'Usuario',
     onNewMessage: (message) => {
       console.log('[useChatContent] Recibido nuevo mensaje:', message);
-      if (message.conversationId === conversationId) {
+      console.log('[useChatContent] Conversación actual:', conversationId);
+      console.log('[useChatContent] Conversación del mensaje:', message.conversationId);
+      console.log('[useChatContent] ¿Coinciden?', message.conversationId === conversationId);
+      
+      // Normalizar los IDs para compararlos correctamente
+      const normalizedConversationId = conversationId?.replace(/^(group_|conv_)/, '') || '';
+      const normalizedMessageConversationId = message.conversationId?.replace(/^(group_|conv_)/, '') || '';
+      
+      console.log('[useChatContent] IDs normalizados - Actual:', normalizedConversationId, 'Mensaje:', normalizedMessageConversationId);
+      
+      // Si los IDs coinciden o si los IDs normalizados coinciden
+      if (message.conversationId === conversationId || 
+          (normalizedConversationId && normalizedMessageConversationId && 
+           normalizedConversationId === normalizedMessageConversationId)) {
+        console.log('[useChatContent] El mensaje pertenece a esta conversación, añadiendo...');
         // Añadir mensaje a la lista, reemplazando cualquier mensaje temporal si existe
         addNewMessage(message);
+      } else {
+        console.log('[useChatContent] El mensaje NO pertenece a esta conversación');
       }
     },
     // El servidor ahora envía message_ack con tempId incluido
@@ -504,6 +520,104 @@ export function useChatContent(
     }
   }, [conversationId, session?.user?.id, imageToSend, newMessageContent, fetchMessages]);
 
+  // Enviar mensaje de voz
+  const sendVoiceMessage = useCallback(async (audioBlob: Blob) => {
+    if (!conversationId || !session?.user?.id || !audioBlob) return;
+    
+    try {
+      setSendingMessage(true);
+      
+      // Crear un data URL temporal para mostrar en la UI inmediatamente
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      
+      // Esperar a que se cargue el archivo
+      const audioDataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+      });
+      
+      // ID temporal para el mensaje
+      const tempId = `temp-voice-${Date.now()}`;
+      
+      // Crear objeto de mensaje temporal para UI
+      const tempMessage: Message = {
+        id: tempId,
+        content: audioDataUrl,
+        createdAt: new Date(),
+        read: true,
+        senderId: session.user.id,
+        sender: {
+          id: session.user.id,
+          username: session.user.name || session.user.username || 'Usuario',
+          image: session.user.image || null
+        },
+        messageType: 'voice'
+      };
+      
+      // Añadir mensaje temporalmente a la lista
+      setMessages(prev => [...prev, tempMessage]);
+      
+      // Iniciar carga a Cloudinary
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'voice-message.webm');
+      formData.append('upload_preset', 'hemeroteca_digital');
+      formData.append('resource_type', 'video'); // Para archivos de audio
+      
+      // Cargar archivo a Cloudinary
+      const cloudinaryResponse = await fetch('https://api.cloudinary.com/v1_1/hemeroteca-digital/upload', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const cloudinaryData = await cloudinaryResponse.json();
+      
+      if (!cloudinaryData.secure_url) {
+        throw new Error('Error al cargar archivo de audio');
+      }
+      
+      // URL del audio en Cloudinary
+      const audioUrl = cloudinaryData.secure_url;
+      
+      // Enviar mensaje por socket
+      if (connected) {
+        await sendMessage({
+          conversationId,
+          content: audioUrl,
+          messageType: 'voice',
+          senderId: session.user.id
+        });
+      } else {
+        // Fallback si no hay conexión socket
+        await fetch(`/api/messages/conversations/${conversationId}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            content: audioUrl, 
+            messageType: 'voice' 
+          })
+        });
+      }
+      
+      // Actualizar el mensaje temporal con la URL de Cloudinary
+      setMessages(prev => prev.map(msg => 
+        msg.id === tempId 
+          ? { ...msg, content: audioUrl } 
+          : msg
+      ));
+      
+      // Desplazar al final después de enviar
+      scrollToBottom();
+      
+    } catch (error) {
+      console.error('Error sending voice message:', error);
+      // Eliminar mensaje temporal en caso de error
+      setMessages(prev => prev.filter(msg => !msg.id?.startsWith('temp-voice-')));
+    } finally {
+      setSendingMessage(false);
+    }
+  }, [conversationId, session?.user, connected, sendMessage, scrollToBottom]);
+
   // Enviar mensaje (texto o imagen)
   const handleSendMessage = useCallback(async () => {
     if (imageToSend) {
@@ -515,6 +629,11 @@ export function useChatContent(
 
   // Añadir nuevo mensaje recibido
   const addNewMessage = useCallback((message: Partial<Message>) => {
+    console.log('[useChatContent] Añadiendo mensaje:', message);
+    console.log('[useChatContent] Tipo de mensaje:', message.messageType);
+    console.log('[useChatContent] ConversationId del mensaje:', message.conversationId);
+    console.log('[useChatContent] ConversationId actual:', conversationId);
+    
     setMessages(prevMessages => {
       // Comprobar si ya existe un mensaje con el mismo ID o tempId
       const existingMessageIndex = prevMessages.findIndex(m => 
@@ -524,6 +643,7 @@ export function useChatContent(
       
       // Log para depuración
       console.log(`[useChatContent] addNewMessage - mensaje existente: ${existingMessageIndex !== -1}, tempId: ${message.tempId}, id: ${message.id}`);
+      console.log('[useChatContent] Mensajes actuales:', prevMessages.length);
       
       // Si ya existe, actualizarlo
       if (existingMessageIndex !== -1) {
@@ -533,8 +653,11 @@ export function useChatContent(
           ...updatedMessages[existingMessageIndex],
           ...message,
           // Si el mensaje tiene ID confirmado, eliminar el tempId
-          tempId: message.id ? undefined : updatedMessages[existingMessageIndex].tempId || message.tempId
+          tempId: message.id ? undefined : updatedMessages[existingMessageIndex].tempId || message.tempId,
+          // Asegurar que se mantiene el conversationId correcto
+          conversationId: message.conversationId || updatedMessages[existingMessageIndex].conversationId || conversationId || ''
         };
+        console.log('[useChatContent] Mensaje actualizado:', updatedMessages[existingMessageIndex]);
         return updatedMessages;
       }
       
@@ -544,6 +667,7 @@ export function useChatContent(
         content: message.content || '',
         senderId: message.senderId || '',
         receiverId: message.receiverId,
+        // Asegurar que se usa el conversationId correcto
         conversationId: message.conversationId || conversationId || '',
         createdAt: message.createdAt || new Date().toISOString(),
         read: message.read || false,
@@ -553,6 +677,8 @@ export function useChatContent(
         sender: message.sender,
         tempId: !message.id ? (message.tempId || `temp-${Date.now()}`) : undefined
       };
+      
+      console.log('[useChatContent] Nuevo mensaje creado:', newMessage);
       
       // Si el mensaje es de otro usuario, marcarlo como leído si la conversación está abierta
       if (newMessage.senderId !== session?.user?.id && conversationId && newMessage.id) {
@@ -635,5 +761,6 @@ export function useChatContent(
     
     messagesEndRef,
     messagesContainerRef,
+    sendVoiceMessage
   };
 }

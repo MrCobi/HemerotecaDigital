@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/ava
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
 // Importar los iconos directamente desde Lucide React para mejor compatibilidad
-import { ArrowLeft, ArrowUp, Image as ImageIcon, Settings, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Image as ImageIcon, Settings, X, Mic, Play, Pause, StopCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
@@ -15,6 +15,7 @@ import Image from 'next/image';
 
 // Importar el hook personalizado
 import { useChatContent } from '@/src/app/messages/hooks/useChatContent';
+import useAudioRecorder from '@/src/hooks/useAudioRecorder';
 
 type PrivateChatWindowProps = {
   conversation: ConversationData | null;
@@ -61,7 +62,8 @@ const PrivateMessageItem = React.memo(({
   otherUser,
   showDateSeparator,
   currentUserImage,
-  currentUserName
+  currentUserName,
+  onPlayAudio
 }: {
   message: Message;
   currentUserId: string;
@@ -69,6 +71,7 @@ const PrivateMessageItem = React.memo(({
   showDateSeparator: boolean;
   currentUserImage: string | null;
   currentUserName: string | null;
+  onPlayAudio: (url: string) => void;
 }) => {
   const isCurrentUser = message.senderId === currentUserId;
   const messageDate = new Date(message.createdAt);
@@ -92,6 +95,9 @@ const PrivateMessageItem = React.memo(({
     }
   };
   
+  // Determinar si es un mensaje de voz
+  const isVoiceMessage = message.messageType === 'voice';
+  
   return (
     <>
       {showDateSeparator && (
@@ -103,25 +109,17 @@ const PrivateMessageItem = React.memo(({
       >
         {!isCurrentUser && (
           <Avatar className="h-8 w-8 flex-shrink-0">
-            {otherUser && 'image' in otherUser && otherUser.image ? (
-              <AvatarImage src={otherUser.image} alt={
-                (otherUser && 'username' in otherUser && otherUser.username) || 
-                (otherUser && 'name' in otherUser && otherUser.name) || 
-                'Usuario'
-              } />
+            {otherUser?.image ? (
+              <AvatarImage src={otherUser.image} alt={otherUser?.username || 'Usuario'} />
             ) : (
               <AvatarFallback>
-                {(otherUser && 'username' in otherUser && otherUser.username?.charAt(0).toUpperCase()) || 
-                 (otherUser && 'name' in otherUser && otherUser.name?.charAt(0).toUpperCase()) || 
-                 'U'}
+                {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
               </AvatarFallback>
             )}
           </Avatar>
         )}
         
         <div className={`flex flex-col ${!isCurrentUser ? 'ml-0' : ''}`}>
-          {/* Nombre del remitente (para chats privados solo se muestra en la cabecera) */}
-          
           <div
             className={cn(
               'max-w-xs md:max-w-md p-3 rounded-lg',
@@ -130,7 +128,18 @@ const PrivateMessageItem = React.memo(({
                 : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'
             )}
           >
-            {message.messageType === 'image' && message.imageUrl && (
+            {/* Contenido del mensaje según su tipo */}
+            {isVoiceMessage ? (
+              <div className="voice-message flex items-center gap-2 min-w-[150px]">
+                <button
+                  onClick={() => onPlayAudio(message.mediaUrl || '')}
+                  className="flex items-center gap-2 px-2 py-1 rounded-full bg-opacity-20 bg-black hover:bg-opacity-30 transition-colors"
+                >
+                  <Play className="h-5 w-5" />
+                  <div className="w-20 h-1 bg-current opacity-50 rounded-full"></div>
+                </button>
+              </div>
+            ) : message.messageType === 'image' && message.imageUrl ? (
               <div className="mb-2">
                 <Image 
                   src={message.imageUrl} 
@@ -141,9 +150,7 @@ const PrivateMessageItem = React.memo(({
                   loading="lazy"
                 />
               </div>
-            )}
-            
-            {message.content && (
+            ) : (
               <div className="whitespace-pre-wrap break-words">{message.content}</div>
             )}
           </div>
@@ -193,6 +200,20 @@ const PrivateChatWindow = ({
   const { toast: _toast } = useToast();
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   
+  // Estados y referencias para mensajes de voz
+  const [showVoiceRecorder, setShowVoiceRecorder] = React.useState(false);
+  const [recordingTime, setRecordingTime] = React.useState(0);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const [currentPlayingAudio, setCurrentPlayingAudio] = React.useState<string | null>(null);
+
+  // Hook de grabación de audio
+  const { 
+    isRecording, 
+    startRecording, 
+    stopRecording, 
+    recordingTime: hookRecordingTime 
+  } = useAudioRecorder();
+
   // Usar el hook personalizado para manejar la lógica del chat
   const {
     messages,
@@ -277,6 +298,177 @@ const PrivateChatWindow = ({
     // Si llegamos hasta aquí, no pudimos encontrar al otro usuario
     return null;
   }, [conversation, currentUserId]);
+
+  // Iniciar grabación de voz
+  const handleStartVoiceRecording = React.useCallback(() => {
+    setShowVoiceRecorder(true);
+    startRecording();
+  }, [startRecording]);
+
+  // Función para enviar mensajes de voz
+  const sendVoiceMessage = async (blob: Blob) => {
+    if (!conversationId) return;
+    
+    // Verificar si es una conversación de grupo o privada
+    const isGroup = conversationId.startsWith('group_');
+    console.log('Enviando mensaje de voz a:', { conversationId, isGroup });
+    
+    try {
+      // Crear URL para mostrar temporalmente mientras se envía
+      const tempUrl = URL.createObjectURL(blob);
+      
+      // Crear un ID temporal único para este mensaje
+      const tempId = `temp-${Date.now()}`;
+      
+      // Añadir mensaje optimista a la interfaz
+      const tempMessage: Message = {
+        tempId,
+        content: '',
+        mediaUrl: tempUrl,
+        senderId: currentUserId || '',
+        createdAt: new Date(),
+        status: 'sending',
+        messageType: 'voice'
+      };
+      
+      // Crear FormData para subir el archivo
+      const formData = new FormData();
+      formData.append('file', blob, 'voice-message.webm');
+      
+      // 1. Subir el archivo de audio a Cloudinary
+      console.log('Subiendo audio a Cloudinary...');
+      const uploadResponse = await fetch('/api/messages/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`Error al cargar el archivo de audio: ${uploadResponse.statusText}`);
+      }
+      
+      const { url: audioUrl } = await uploadResponse.json();
+      console.log('Audio subido con éxito:', audioUrl);
+      
+      if (!audioUrl) {
+        throw new Error('No se recibió URL del servidor');
+      }
+      
+      // 2. Construir el payload según el tipo de conversación
+      const messagePayload: any = {
+        conversationId,
+        messageType: 'voice',
+        mediaUrl: audioUrl,
+        content: 'Mensaje de voz', // Contenido descriptivo para fallbacks
+        tempId // Incluir el ID temporal para actualizar el estado optimista
+      };
+      
+      // Para conversaciones privadas, agregar receiverId
+      if (!isGroup && otherUser?.id) {
+        messagePayload.receiverId = otherUser.id;
+      }
+      
+      console.log('Enviando mensaje con payload:', messagePayload);
+      
+      // Enviar el mensaje con la URL del audio
+      const messageResponse = await fetch('/api/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(messagePayload),
+      });
+      
+      if (!messageResponse.ok) {
+        const errorText = await messageResponse.text();
+        throw new Error(`Error al enviar mensaje de voz (${messageResponse.status}): ${errorText}`);
+      }
+      
+      console.log('Mensaje de voz enviado con éxito');
+      
+      // Aquí podríamos actualizar el estado del mensaje con la respuesta del servidor
+      
+    } catch (error) {
+      console.error('Error al enviar mensaje de voz:', error);
+      _toast?.({
+        title: "Error",
+        description: "No se pudo enviar el mensaje de voz",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Detener grabación de voz y enviar
+  const handleStopVoiceRecording = React.useCallback(async () => {
+    if (!isRecording) return;
+    
+    const blob = await stopRecording();
+    if (!blob) return;
+    
+    // Enviar el mensaje de voz
+    await sendVoiceMessage(blob);
+    
+    setShowVoiceRecorder(false);
+  }, [isRecording, stopRecording]);
+
+  // Cancelar grabación de voz
+  const handleCancelVoiceRecording = React.useCallback(() => {
+    stopRecording();
+    setShowVoiceRecorder(false);
+  }, [stopRecording]);
+
+  // Reproducir audio
+  const handlePlayAudio = React.useCallback((audioUrl: string) => {
+    if (!audioUrl) {
+      console.error('URL de audio no válida');
+      _toast?.({
+        title: "Error",
+        description: "No se puede reproducir este mensaje de voz",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (currentPlayingAudio === audioUrl) {
+      // Detener reproducción actual
+      if (audioRef.current) {
+        audioRef.current.pause();
+        setCurrentPlayingAudio(null);
+      }
+    } else {
+      // Detener reproducción anterior
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      
+      // Crear nuevo reproductor
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      
+      // Configurar evento para cuando termine
+      audio.onended = () => {
+        setCurrentPlayingAudio(null);
+      };
+      
+      // Iniciar reproducción
+      audio.play().catch(error => {
+        console.error('Error reproduciendo audio:', error);
+        setCurrentPlayingAudio(null);
+        _toast?.({
+          title: "Error",
+          description: "No se pudo reproducir el mensaje de voz",
+          variant: "destructive"
+        });
+      });
+      
+      // Actualizar estado
+      setCurrentPlayingAudio(audioUrl);
+    }
+  }, [currentPlayingAudio, _toast]);
+
+  // Actualizar tiempo de grabación desde el hook
+  React.useEffect(() => {
+    setRecordingTime(hookRecordingTime);
+  }, [hookRecordingTime]);
 
   // Mostrar un mensaje si no hay conversación seleccionada
   if (!conversationId || !conversation) {
@@ -386,13 +578,14 @@ const PrivateChatWindow = ({
             
             return (
               <PrivateMessageItem
-                key={`${message.id || message.tempId}-${index}`}
+                key={message.id || message.tempId || index}
                 message={message}
                 currentUserId={currentUserId || ''}
                 otherUser={otherUser}
                 showDateSeparator={showDateSeparator}
                 currentUserImage={session?.user?.image || null}
                 currentUserName={session?.user?.name || null}
+                onPlayAudio={handlePlayAudio}
               />
             );
           })
@@ -432,12 +625,44 @@ const PrivateChatWindow = ({
         </div>
       )}
 
-      {/* Área de entrada de mensaje */}
+      {/* Reproductor de audio oculto */}
+      <audio ref={audioRef} className="hidden" />
+      
+      {/* Grabación de voz (visible cuando showVoiceRecorder es true) */}
+      {showVoiceRecorder && (
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse"></div>
+              <span className="text-sm">Grabando: {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelVoiceRecording}
+                className="text-red-500"
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleStopVoiceRecording}
+              >
+                Enviar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Formulario para enviar mensajes */}
       <div className="p-3 border-t flex flex-col">
         {/* Vista previa de imagen seleccionada */}
         {imagePreview && (
-          <div className="mb-2 relative">
-            <div className="relative w-24 h-24 overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
+          <div className="mb-2">
+            <div className="relative w-24 h-24 rounded overflow-hidden">
               <Image
                 src={imagePreview}
                 alt="Preview"
@@ -475,7 +700,7 @@ const PrivateChatWindow = ({
             size="icon"
             onClick={openFileSelector}
             className="h-10 w-10 flex-shrink-0"
-            disabled={sendingMessage}
+            disabled={sendingMessage || showVoiceRecorder}
           >
             <ImageIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <input
@@ -485,6 +710,18 @@ const PrivateChatWindow = ({
               onChange={handleFileSelect}
               className="hidden"
             />
+          </Button>
+          
+          {/* Botón de micrófono */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleStartVoiceRecording}
+            className="h-10 w-10 flex-shrink-0"
+            disabled={sendingMessage || showVoiceRecorder}
+          >
+            <Mic className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </Button>
           
           <div className="flex-1 relative">
@@ -499,7 +736,7 @@ const PrivateChatWindow = ({
                   handleSendMessage();
                 }
               }}
-              disabled={sendingMessage}
+              disabled={sendingMessage || showVoiceRecorder}
             />
             <Button
               type="button"
@@ -507,7 +744,7 @@ const PrivateChatWindow = ({
               size="icon"
               onClick={handleSendMessage}
               className="absolute right-2 bottom-1 h-8 w-8"
-              disabled={(!newMessageContent.trim() && !imageToSend) || sendingMessage}
+              disabled={(!newMessageContent.trim() && !imageToSend) || sendingMessage || showVoiceRecorder}
             >
               {sendingMessage ? (
                 <LoadingSpinner className="h-4 w-4" />

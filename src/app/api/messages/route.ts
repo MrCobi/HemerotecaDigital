@@ -252,51 +252,67 @@ export const POST = withAuth(async (request: Request, { userId, user }: { userId
 
       // Si no es duplicado, crear el mensaje
       try {
-        // Primero, verificar si existe una conversación entre los usuarios
-        let conversationId = null;
+        // Primero, verificar si ya se proporcionó un conversationId existente
+        let conversationId = existingConversationId;
         
-        // Buscar una conversación existente entre los dos usuarios
-        const existingConversation = await prisma.conversation.findFirst({
-          where: {
-            AND: [
-              { isGroup: false },
-              {
-                participants: {
-                  some: {
-                    userId: userId
+        // Si no hay conversationId o es una conversación de tipo conv_,
+        // verificar si es un grupo buscando por el prefijo
+        const isGroupConversation = conversationId && conversationId.startsWith('group_');
+        console.log(`Verificando tipo de conversación: ${conversationId}, es grupo: ${isGroupConversation}`);
+        
+        // Si no hay conversationId o es necesario crear una conversación privada
+        if (!conversationId) {
+          console.log('No se proporcionó conversationId, buscando o creando conversación privada');
+          
+          // Buscar una conversación existente entre los dos usuarios
+          const existingConversation = await prisma.conversation.findFirst({
+            where: {
+              AND: [
+                { isGroup: false },
+                {
+                  participants: {
+                    some: {
+                      userId: userId
+                    }
+                  }
+                },
+                {
+                  participants: {
+                    some: {
+                      userId: receiverId
+                    }
                   }
                 }
-              },
-              {
-                participants: {
-                  some: {
-                    userId: receiverId
-                  }
-                }
-              }
-            ]
-          }
-        });
-        
-        if (existingConversation) {
-          conversationId = existingConversation.id;
-        } else {
-          // Si no existe, crear una nueva conversación
-          const newConversation = await prisma.conversation.create({
-            data: {
-              isGroup: false,
-              participants: {
-                create: [
-                  { userId: userId },
-                  { userId: receiverId }
-                ]
-              }
+              ]
             }
           });
-          conversationId = newConversation.id;
+          
+          if (existingConversation) {
+            conversationId = existingConversation.id;
+            console.log(`Encontrada conversación existente: ${conversationId}`);
+          } else {
+            // Si no existe, crear una nueva conversación
+            const newConversation = await prisma.conversation.create({
+              data: {
+                isGroup: false,
+                participants: {
+                  create: [
+                    { userId: userId },
+                    { userId: receiverId }
+                  ]
+                }
+              }
+            });
+            conversationId = newConversation.id;
+            console.log(`Creada nueva conversación privada: ${conversationId}`);
+          }
+        } else {
+          console.log(`Usando conversationId existente: ${conversationId}`);
         }
         
         // Ahora crear el mensaje asociado a la conversación
+        console.log(`Creando mensaje con conversationId: ${conversationId}`);
+        
         return prisma.directMessage.create({
           data: {
             content,
