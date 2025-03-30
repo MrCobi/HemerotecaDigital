@@ -17,12 +17,11 @@ import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import { useToast } from '@/src/app/components/ui/use-toast';
 import { Message, User, ConversationData } from '@/src/app/messages/types';
 import NextImage from 'next/image';
-import { Dialog, DialogContent, DialogTitle } from "@/src/app/components/ui/dialog";
+import useAudioRecorder from '@/src/hooks/useAudioRecorder';
+import AudioPlayer from './AudioPlayer';
 
 // Importar el hook personalizado
 import { useChatContent } from '@/src/app/messages/hooks/useChatContent';
-import useAudioRecorder from '@/src/hooks/useAudioRecorder';
-import AudioPlayer from './AudioPlayer';
 
 // Función para extraer el ID de Cloudinary de una URL completa
 const extractCloudinaryId = (url: string): string => {
@@ -101,8 +100,7 @@ const PrivateMessageItem = React.memo(({
   const isCurrentUser = message.senderId === currentUserId;
   const messageDate = new Date(message.createdAt);
   
-  // Estado para manejar el modal de la imagen
-  const [isImageOpen, setIsImageOpen] = React.useState(false);
+  // Estado para manejar la carga de imágenes
   const [imageLoaded, setImageLoaded] = React.useState(false);
   const [useCloudinary, setUseCloudinary] = React.useState(true);
 

@@ -9,12 +9,9 @@ import { ArrowLeft, ArrowUp, Image as ImageIcon, Settings, X, Mic } from 'lucide
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
-import { useToast } from '@/src/app/components/ui/use-toast';
 import { Message, User, ConversationData } from '@/src/app/messages/types';
 import NextImage from 'next/image';
 import { CldImage } from 'next-cloudinary';
-import { Dialog, DialogContent, DialogTitle } from "@/src/app/components/ui/dialog";
-
 // Importar el hook personalizado
 import { useChatContent } from '@/src/app/messages/hooks/useChatContent';
 import useAudioRecorder from '@/src/hooks/useAudioRecorder';
@@ -125,7 +122,6 @@ const MessageItem = React.memo(({
   const isVoiceMessage = message.messageType === 'voice';
   const isImageMessage = message.messageType === 'image' && message.mediaUrl;
   
-  const [isImageOpen, setIsImageOpen] = React.useState(false);
   const [imageLoaded, setImageLoaded] = React.useState(false);
   const [useCloudinary, setUseCloudinary] = React.useState(true);
 
@@ -275,9 +271,8 @@ const OptimizedChatWindow = ({
   onSettingsClick,
   _onPlayAudio,
 }: OptimizedChatWindowProps) => {
-  const { toast: _toast } = useToast();
-  const imageInputRef = React.useRef<HTMLInputElement>(null);
   const { data: session } = useSession();
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
   
   // Estados y referencias para mensajes de voz
   const [showVoiceRecorder, setShowVoiceRecorder] = React.useState(false);
@@ -408,13 +403,8 @@ const OptimizedChatWindow = ({
       console.log('Mensaje de voz enviado con éxito');
     } catch (error) {
       console.error('Error al enviar mensaje de voz:', error);
-      _toast?.({
-        title: "Error",
-        description: "No se pudo enviar el mensaje de voz",
-        variant: "destructive"
-      });
     }
-  }, [conversationId, _toast, currentUserId, otherUser]);
+  }, [conversationId, currentUserId, otherUser]);
 
   // Detener grabación de voz y enviar
   const handleStopVoiceRecording = React.useCallback(async () => {
@@ -438,11 +428,6 @@ const OptimizedChatWindow = ({
   const handlePlayAudio = React.useCallback((audioUrl: string) => {
     if (!audioUrl) {
       console.error('URL de audio no válida');
-      _toast?.({
-        title: "Error",
-        description: "No se puede reproducir este mensaje de voz",
-        variant: "destructive"
-      });
       return;
     }
     
@@ -471,17 +456,12 @@ const OptimizedChatWindow = ({
       audio.play().catch(error => {
         console.error('Error reproduciendo audio:', error);
         setCurrentPlayingAudio(null);
-        _toast?.({
-          title: "Error",
-          description: "No se pudo reproducir el mensaje de voz",
-          variant: "destructive"
-        });
       });
       
       // Actualizar estado
       setCurrentPlayingAudio(audioUrl);
     }
-  }, [currentPlayingAudio, _toast]);
+  }, [currentPlayingAudio]);
 
   // Actualizar tiempo de grabación desde el hook
   React.useEffect(() => {
@@ -523,12 +503,6 @@ const OptimizedChatWindow = ({
       <div className={cn("flex flex-col h-full justify-center items-center p-4", className)}>
         <div className="text-center space-y-2 text-red-500">
           <p>Error: {error}</p>
-          <Button
-            onClick={() => window.location.reload()}
-            variant="outline"
-          >
-            Reintentar
-          </Button>
         </div>
       </div>
     );
@@ -726,11 +700,11 @@ const OptimizedChatWindow = ({
           >
             <ImageIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <input
-              ref={imageInputRef}
               type="file"
               accept="image/*"
               onChange={handleFileSelect}
               className="hidden"
+              ref={imageInputRef}
             />
           </Button>
           
