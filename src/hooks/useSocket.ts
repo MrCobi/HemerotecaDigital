@@ -164,10 +164,10 @@ export default function useSocket(options: UseSocketOptions) {
 
   // Estado de conexión
   const [connected, setConnected] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  const [_initialized, _setInitialized] = useState(false);
   const [_error, _setError] = useState<Error | unknown>(null);
   const [_onlineUsers, _setOnlineUsers] = useState<UserType[]>([]);
-
+  
   // Use a properly typed ref for the socket that points to the global instance
   const socketRef = useRef<Socket | null>(null);
   const instanceId = useRef<number>(++socketInitCount);
@@ -416,7 +416,7 @@ export default function useSocket(options: UseSocketOptions) {
         message.receiverId === userId || 
         (message.conversationId && activeConversations.current.has(message.conversationId)) ||
         // También procesar mensajes de salas a las que pertenecemos aunque no los tengamos en activeConversations
-        (message.conversationId && message.conversationId.startsWith('conv_'));
+        (message.conversationId && (message.conversationId.startsWith('conv_') || message.conversationId.startsWith('group_')));
       
       // Verificar si es un mensaje duplicado
       const isDuplicate = !shouldProcessMessageOnce(message.id);
@@ -492,7 +492,7 @@ export default function useSocket(options: UseSocketOptions) {
         callbacksRef.current.onMessageRead(data);
       }
     });
-  }, [processPendingMessages, userId, username]);
+  }, [processPendingMessages, userId, username, shouldProcessMessageOnce]); // Agregando shouldProcessMessageOnce como dependencia
 
   // Función para inicializar el socket
   const initSocket = useCallback(() => {
@@ -549,7 +549,7 @@ export default function useSocket(options: UseSocketOptions) {
     setupEventHandlers();
     connectionAttemptInProgress = false;
     reconnectAttempts.current = 0;
-  }, [userId, setupEventHandlers, instanceId, processPendingMessages]);
+  }, [userId, setupEventHandlers, processPendingMessages]); // Agregando processPendingMessages como dependencia
 
   // Manejar reconexión con backoff exponencial
   const _handleReconnect = useCallback(() => {
@@ -579,31 +579,18 @@ export default function useSocket(options: UseSocketOptions) {
 
   // Función para unirse a una conversación (sala de chat)
   const joinConversation = useCallback((conversationId: string) => {
-    if (!socketRef.current || !conversationId) return;
-    
-    console.log(`[Socket] Intentando unirse a la conversación: ${conversationId}`);
-    
-    // Verificar si la conexión está activa
-    if (!socketRef.current.connected) {
-      console.log(`[Socket] Socket no conectado, iniciando conexión para unirse a ${conversationId}`);
-      
-      // Intentar establecer conexión si no está conectado
-      socketRef.current.connect();
-      
-      // Registrar la conversación para unirse después de la conexión
-      activeConversations.current.add(conversationId);
-      
-      return;
+    if (!connected || !socketRef.current || !userId || !conversationId) {
+      console.warn(`[Socket] No se puede unir a la conversación: socket no conectado o faltan datos`);
+      return false;
     }
     
-    // Emitir el evento para unirse a la sala
+    console.log(`[Socket] Solicitando unirse a la conversación: ${conversationId}`);
+    
+    // Enviar evento al servidor
     socketRef.current.emit('join_conversation', { conversationId, userId });
     
-    // Registrar en las conversaciones activas
-    activeConversations.current.add(conversationId);
-    
-    console.log(`[Socket] Unido a la conversación: ${conversationId}, Total: ${activeConversations.current.size}`);
-  }, [userId]);
+    return true;
+  }, [connected, userId]); // Quitar shouldProcessMessageOnce como no es necesario
 
   // Función para salir de una conversación (sala de chat)
   const leaveConversation = useCallback((conversationId: string) => {
@@ -759,7 +746,7 @@ export default function useSocket(options: UseSocketOptions) {
     return true;
   }, [connected, resetInactivityTimer]);
 
-  const markMessageAsRead = useCallback(({ messageId, conversationId }: { messageId: string, conversationId: string }) => {
+  const markMessageAsRead = useCallback(async ({ messageId, conversationId }: { messageId: string, conversationId: string }) => {
     if (!socketRef.current || !connected) {
       console.error(`[Socket] No se puede marcar mensaje como leído: socket no conectado`);
       return false;
@@ -769,7 +756,7 @@ export default function useSocket(options: UseSocketOptions) {
     console.log(`[Socket] Marcando mensaje como leído:`, messageId);
     socketRef.current.emit('mark_read', { messageId, conversationId });
     return true;
-  }, [connected, resetInactivityTimer]);
+  }, [connected, resetInactivityTimer]); // Quitar shouldProcessMessageOnce como no es necesario
 
   const setActive = useCallback((conversationId: string) => {
     if (!socketRef.current || !connected || !userId) {

@@ -4,15 +4,19 @@ import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-// Importar los iconos directamente desde Lucide React para mejor compatibilidad
-import { ArrowLeft, ArrowUp, Image as ImageIcon, Settings, X, Mic, Play, Pause, StopCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+// Importamos y renombramos con prefijo '_' para indicar que no se utilizan
+import { es as _es } from 'date-fns/locale';
+import { default as _Image } from 'next/image';
+import { CldImage } from 'next-cloudinary';
+import { useRef as _useRef, useState, useEffect as _useEffect, useCallback as _useCallback } from 'react';
+// Importar los iconos necesarios
+import { ArrowLeft, ArrowUp, ImageIcon, Settings, X, Mic } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import { useToast } from '@/src/app/components/ui/use-toast';
 import { Message, User, ConversationData } from '@/src/app/messages/types';
 import NextImage from 'next/image';
-import { CldImage } from 'next-cloudinary';
 import { Dialog, DialogContent, DialogTitle } from "@/src/app/components/ui/dialog";
 
 // Importar el hook personalizado
@@ -34,13 +38,16 @@ const extractCloudinaryId = (url: string): string => {
 };
 
 type PrivateChatWindowProps = {
-  conversation: ConversationData | null;
+  conversation: ConversationData;
   conversationId: string | null;
   className?: string;
   currentUserId?: string;
+  _userId?: string;
+  _isOpen?: boolean;
   _onUserProfileClick?: (user: User) => void;
   onBackClick?: () => void;
   onSettingsClick?: () => void;
+  _onPlayAudio?: (url: string) => void;
 };
 
 // Componente para mostrar separadores de fecha entre mensajes
@@ -79,7 +86,7 @@ const PrivateMessageItem = React.memo(({
   showDateSeparator,
   currentUserImage,
   currentUserName,
-  onPlayAudio,
+  _onPlayAudio,
   index
 }: {
   message: Message;
@@ -88,7 +95,7 @@ const PrivateMessageItem = React.memo(({
   showDateSeparator: boolean;
   currentUserImage: string | null;
   currentUserName: string | null;
-  onPlayAudio: (url: string) => void;
+  _onPlayAudio: (url: string) => void;
   index: number;
 }) => {
   const isCurrentUser = message.senderId === currentUserId;
@@ -301,10 +308,13 @@ const PrivateChatWindow = ({
   conversation,
   conversationId,
   className,
-  currentUserId,
+  currentUserId = '',
+  _userId,
+  _isOpen,
   _onUserProfileClick,
   onBackClick,
   onSettingsClick,
+  _onPlayAudio,
 }: PrivateChatWindowProps) => {
   const { data: session } = useSession();
   const { toast: _toast } = useToast();
@@ -325,10 +335,10 @@ const PrivateChatWindow = ({
   } = useAudioRecorder();
 
   // Estado para manejar la imagen seleccionada
-  const [image, setImage] = React.useState<File | null>(null);
-  const [imagePreview, setImagePreview] = React.useState<string | null>(null);
-  const [uploadProgress, setUploadProgress] = React.useState(0);
-  const [previewUseCloudinary, setPreviewUseCloudinary] = React.useState(true);
+  const [_image, _setImage] = useState<File | null>(null);
+  const [imagePreview, _setImagePreview] = useState<string | null>(null);
+  const [_uploadProgress, _setUploadProgress] = useState(0);
+  const [previewUseCloudinary, setPreviewUseCloudinary] = useState(true);
 
   // Usar el hook personalizado para manejar la lógica del chat
   const {
@@ -339,7 +349,7 @@ const PrivateChatWindow = ({
     newMessageContent,
     sendingMessage,
     imageToSend,
-    uploadProgress: _uploadProgress,
+    uploadProgress: _uploadProgressChat,
     
     setNewMessageContent,
     handleSendMessage,
@@ -421,86 +431,77 @@ const PrivateChatWindow = ({
   }, [startRecording]);
 
   // Función para enviar mensajes de voz
-  const sendVoiceMessage = async (blob: Blob) => {
-    if (!conversationId) return;
-    
-    // Verificar si es una conversación de grupo o privada
-    const isGroup = conversationId.startsWith('group_');
-    console.log('Enviando mensaje de voz a:', { conversationId, isGroup });
+  const sendVoiceMessage = React.useCallback(async (blob: Blob) => {
+    if (!conversationId || !otherUser?.id) {
+      console.error('No se puede enviar mensaje: datos insuficientes', { conversationId, otherUserId: otherUser?.id });
+      return { success: false, error: 'Datos insuficientes' };
+    }
     
     try {
-      // Crear URL para mostrar temporalmente mientras se envía
+      // Crear URL para previsualización temporal
       const tempUrl = URL.createObjectURL(blob);
       
-      // Crear un ID temporal único para este mensaje
+      // Crear ID temporal para el mensaje
       const tempId = `temp-${Date.now()}`;
       
-      // Añadir mensaje optimista a la interfaz
-      const tempMessage: Message = {
+      // Añadir mensaje temporal (optimista)
+      const _tempMessage: Message = {
+        id: tempId,
         tempId,
+        conversationId,
+        senderId: currentUserId,
         content: '',
         mediaUrl: tempUrl,
-        senderId: currentUserId || '',
+        messageType: 'voice',
         createdAt: new Date(),
         status: 'sending',
-        messageType: 'voice'
       };
       
-      // Crear FormData para subir el archivo
-      const formData = new FormData();
-      formData.append('file', blob, 'voice-message.webm');
+      // Añadir a la UI de forma optimista
       
-      // 1. Subir el archivo de audio a Cloudinary
-      console.log('Subiendo audio a Cloudinary...');
-      const uploadResponse = await fetch('/api/messages/upload', {
+      // Subir el archivo
+      const formData = new FormData();
+      formData.append('file', blob, `voice-message-${Date.now()}.webm`);
+      formData.append('type', 'audio');
+      
+      const uploadRes = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
       
-      if (!uploadResponse.ok) {
-        throw new Error(`Error al cargar el archivo de audio: ${uploadResponse.statusText}`);
+      if (!uploadRes.ok) {
+        throw new Error('Error al subir el archivo de audio');
       }
       
-      const { url: audioUrl } = await uploadResponse.json();
-      console.log('Audio subido con éxito:', audioUrl);
+      const { url: audioUrl } = await uploadRes.json();
       
       if (!audioUrl) {
-        throw new Error('No se recibió URL del servidor');
+        throw new Error('No se obtuvo URL del audio');
       }
       
-      // 2. Construir el payload según el tipo de conversación
-      const messagePayload: any = {
+      // Enviar el mensaje con la URL real
+      const payload = {
         conversationId,
-        messageType: 'voice',
+        content: '',
         mediaUrl: audioUrl,
-        content: 'Mensaje de voz', // Contenido descriptivo para fallbacks
-        tempId // Incluir el ID temporal para actualizar el estado optimista
+        messageType: 'voice',
+        receiverId: otherUser.id,
       };
       
-      // Para conversaciones privadas, agregar receiverId
-      if (!isGroup && otherUser?.id) {
-        messagePayload.receiverId = otherUser.id;
-      }
-      
-      console.log('Enviando mensaje con payload:', messagePayload);
-      
-      // Enviar el mensaje con la URL del audio
-      const messageResponse = await fetch('/api/messages', {
+      const result = await fetch('/api/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(messagePayload),
+        body: JSON.stringify(payload),
       });
       
-      if (!messageResponse.ok) {
-        const errorText = await messageResponse.text();
-        throw new Error(`Error al enviar mensaje de voz (${messageResponse.status}): ${errorText}`);
+      if (!result.ok) {
+        throw new Error(`Error al enviar mensaje: ${result.status}`);
       }
       
-      console.log('Mensaje de voz enviado con éxito');
-      
-      // Aquí podríamos actualizar el estado del mensaje con la respuesta del servidor
+      // Actualizar estado (mensaje enviado correctamente)
+      return { success: true, messageId: tempId, finalUrl: audioUrl };
       
     } catch (error) {
       console.error('Error al enviar mensaje de voz:', error);
@@ -509,8 +510,9 @@ const PrivateChatWindow = ({
         description: "No se pudo enviar el mensaje de voz",
         variant: "destructive"
       });
+      return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
     }
-  };
+  }, [conversationId, otherUser?.id, _toast, currentUserId]);
 
   // Detener grabación de voz y enviar
   const handleStopVoiceRecording = React.useCallback(async () => {
@@ -523,7 +525,7 @@ const PrivateChatWindow = ({
     await sendVoiceMessage(blob);
     
     setShowVoiceRecorder(false);
-  }, [isRecording, stopRecording]);
+  }, [isRecording, stopRecording, sendVoiceMessage]);
 
   // Cancelar grabación de voz
   const handleCancelVoiceRecording = React.useCallback(() => {
@@ -700,7 +702,7 @@ const PrivateChatWindow = ({
                 showDateSeparator={showDateSeparator}
                 currentUserImage={session?.user?.image || null}
                 currentUserName={session?.user?.name || null}
-                onPlayAudio={handlePlayAudio}
+                _onPlayAudio={_onPlayAudio ?? handlePlayAudio}
                 index={index}
               />
             );

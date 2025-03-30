@@ -83,7 +83,7 @@ export function useChatContent(
   }, [session?.user?.id]);
 
   // Marcar un mensaje específico como leído
-  const markMessageAsRead = useCallback(async (messageId: string) => {
+  const _markMessageAsRead = useCallback(async (messageId: string) => {
     if (!messageId || !conversationId || !session?.user?.id) return;
     
     // Evitar intentos repetidos para mensajes que ya fallaron

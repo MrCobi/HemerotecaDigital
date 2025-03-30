@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/ava
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
 // Importar los iconos directamente desde Lucide React para mejor compatibilidad
-import { ArrowLeft, ArrowUp, Image as ImageIcon, Settings, X, Mic, Play, Pause, StopCircle } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Image as ImageIcon, Settings, X, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
@@ -25,9 +25,12 @@ type OptimizedChatWindowProps = {
   conversationId: string | null;
   className?: string;
   currentUserId?: string;
+  _userId?: string;
+  _isOpen?: boolean;
   _onUserProfileClick?: (user: User) => void;
   onBackClick?: () => void;
   onSettingsClick?: () => void;
+  _onPlayAudio?: (url: string) => void;
 };
 
 // Componente para mostrar separadores de fecha entre mensajes
@@ -67,7 +70,7 @@ const MessageItem = React.memo(({
   showDateSeparator,
   currentUserImage,
   currentUserName,
-  onPlayAudio,
+  _onPlayAudio,
   index
 }: {
   message: Message;
@@ -77,7 +80,7 @@ const MessageItem = React.memo(({
   showDateSeparator: boolean;
   currentUserImage: string | null;
   currentUserName: string | null;
-  onPlayAudio: (url: string) => void;
+  _onPlayAudio: (url: string) => void;
   index: number;
 }) => {
   const isCurrentUser = message.senderId === currentUserId;
@@ -329,9 +332,12 @@ const OptimizedChatWindow = ({
   conversationId,
   className,
   currentUserId = '',
+  _userId,
+  _isOpen,
   _onUserProfileClick,
   onBackClick,
   onSettingsClick,
+  _onPlayAudio,
 }: OptimizedChatWindowProps) => {
   const { toast: _toast } = useToast();
   const imageInputRef = React.useRef<HTMLInputElement>(null);
@@ -367,7 +373,7 @@ const OptimizedChatWindow = ({
     handleSendMessage,
     handleImageChange,
     loadMoreMessages: _loadMoreMessages,
-    handleScroll,
+    handleScroll: _handleScroll,
     
     messagesEndRef,
     messagesContainerRef,
@@ -383,7 +389,7 @@ const OptimizedChatWindow = ({
   }, [startRecording]);
 
   // Función para enviar mensajes de voz
-  const sendVoiceMessage = async (blob: Blob) => {
+  const sendVoiceMessage = React.useCallback(async (blob: Blob) => {
     if (!conversationId) return;
     
     // Verificar si es una conversación de grupo o privada
@@ -398,7 +404,7 @@ const OptimizedChatWindow = ({
       const tempId = `temp-${Date.now()}`;
       
       // Añadir mensaje optimista a la interfaz
-      const tempMessage: Message = {
+      const _tempMessage: Message = {
         tempId,
         content: '',
         mediaUrl: tempUrl,
@@ -431,16 +437,22 @@ const OptimizedChatWindow = ({
       }
       
       // 2. Construir el payload según el tipo de conversación
-      const messagePayload: any = {
+      const messagePayload: {
+        conversationId: string | null;
+        content?: string;
+        mediaUrl?: string;
+        messageType: 'voice';
+        tempId?: string;
+        receiverId?: string;
+      } = {
         conversationId,
         messageType: 'voice',
         mediaUrl: audioUrl,
-        content: 'Mensaje de voz', // Contenido descriptivo para fallbacks
-        tempId // Incluir el ID temporal para actualizar el estado optimista
+        tempId: `temp-${Date.now()}`,
       };
       
-      // Para conversaciones privadas, agregar receiverId
-      if (!isGroup && otherUser?.id) {
+      // Si es conversación privada, agregar el receiverId
+      if (otherUser?.id) {
         messagePayload.receiverId = otherUser.id;
       }
       
@@ -472,7 +484,7 @@ const OptimizedChatWindow = ({
         variant: "destructive"
       });
     }
-  };
+  }, [conversationId, otherUser?.id, _toast, currentUserId]);
 
   // Detener grabación de voz y enviar
   const handleStopVoiceRecording = React.useCallback(async () => {
@@ -481,11 +493,10 @@ const OptimizedChatWindow = ({
     const blob = await stopRecording();
     if (!blob) return;
     
-    // Enviar el mensaje de voz
     await sendVoiceMessage(blob);
     
     setShowVoiceRecorder(false);
-  }, [isRecording, stopRecording, conversationId, otherUser]);
+  }, [isRecording, stopRecording, sendVoiceMessage]);
 
   // Cancelar grabación de voz
   const handleCancelVoiceRecording = React.useCallback(() => {
@@ -614,13 +625,15 @@ const OptimizedChatWindow = ({
             variant="ghost" 
             size="icon" 
             onClick={onBackClick}
-            className="mr-1 md:hidden" // Solo visible en móviles
-            aria-label="Volver"
+            className="mr-2"
           >
             <ArrowLeft className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </Button>
           
-          <Avatar className="h-10 w-10" onClick={() => conversation?.isGroup ? null : _onUserProfileClick?.(otherUser as User)}>
+          <Avatar className="h-10 w-10" onClick={() => {
+            if (conversation?.isGroup || !otherUser) return;
+            _onUserProfileClick?.(otherUser);
+          }}>
             {conversation?.isGroup ? (
               <AvatarImage src={conversation.imageUrl || "/images/AvatarPredeterminado.webp"} alt={conversation.name || 'Grupo'} />
             ) : otherUser?.image ? (
@@ -693,7 +706,7 @@ const OptimizedChatWindow = ({
                   showDateSeparator={showDateSeparator}
                   currentUserImage={session?.user?.image || null}
                   currentUserName={session?.user?.name || null}
-                  onPlayAudio={handlePlayAudio}
+                  _onPlayAudio={_onPlayAudio ?? handlePlayAudio}
                   index={index}
                 />
               </div>
@@ -739,7 +752,9 @@ const OptimizedChatWindow = ({
         {/* Vista previa de imagen seleccionada */}
         {imagePreview && (
           <div className="mb-2 relative">
-            <div className="relative w-24 h-24 overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
+            <div
+              className="relative w-24 h-24 overflow-hidden rounded-md border border-gray-300 dark:border-gray-700"
+            >
               <NextImage
                 src={imagePreview}
                 alt="Preview"

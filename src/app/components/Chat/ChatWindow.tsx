@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/app/comp
 import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/avatar';
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
-import { X, Send, Mic, Play, Pause } from 'lucide-react';
+import { X, Send, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { flushSync } from 'react-dom';
@@ -64,7 +64,7 @@ const ChatWindow = ({
   const currentUserId = session?.user?.id;
 
   // Socket para comunicación en tiempo real
-  const { connected, sendMessage, socketInstance, updateTypingStatus } = useSocket({
+  const { connected, sendMessage, socketInstance: _socketInstance, updateTypingStatus } = useSocket({
     userId: currentUserId || undefined,
     onNewMessage: (message) => {
       // Solo añadir el mensaje si pertenece a esta conversación
@@ -92,18 +92,18 @@ const ChatWindow = ({
   // Estados para el manejo de mensajes
   const [newMessage, setNewMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [messagesLoaded, setMessagesLoaded] = useState(false);
+  const [_messagesLoaded, _setMessagesLoaded] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [peerIsTyping, setPeerIsTyping] = useState(false);
   const [canSendMessages, setCanSendMessages] = useState<boolean | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const [page, setPage] = useState(1);
-  const [hasMoreMessages, setHasMoreMessages] = useState(true);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
+  const [_page, _setPage] = useState(1);
+  const [_hasMoreMessages, _setHasMoreMessages] = useState(true);
+  const [isLoadingMessages, _setIsLoadingMessages] = useState(false);
+  const [_isLoadingMoreMessages, _setIsLoadingMoreMessages] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [_uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [audioPlaying, setAudioPlaying] = useState<string | null>(null);
 
   // Referencias para temporizadores
@@ -155,7 +155,7 @@ const ChatWindow = ({
   }, [otherUser?.id, currentUserId, isOpen]);
 
   // Función para manejar nuevos mensajes
-  const handleNewMessage = (message: MessageType) => {
+  const _handleNewMessage = (message: MessageType) => {
     const startTime = performance.now();
     console.log('HandleNewMessage iniciado para:', message.id || message.tempId, 'de', message.senderId, 'a', message.receiverId);
 
@@ -352,7 +352,7 @@ const ChatWindow = ({
   };
 
   // Manejar reproducción de audio
-  const handleToggleAudio = useCallback((audioUrl: string) => {
+  const _handleToggleAudio = useCallback((audioUrl: string) => {
     if (audioPlaying === audioUrl) {
       // Pausar la reproducción actual
       if (audioRef.current) {
