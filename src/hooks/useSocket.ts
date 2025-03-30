@@ -162,13 +162,17 @@ export default function useSocket(options: UseSocketOptions) {
     onError
   } = options;
 
+  // Estado de conexión
   const [connected, setConnected] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const [_error, _setError] = useState<Error | unknown>(null);
   const [_onlineUsers, _setOnlineUsers] = useState<UserType[]>([]);
 
   // Use a properly typed ref for the socket that points to the global instance
   const socketRef = useRef<Socket | null>(null);
   const instanceId = useRef<number>(++socketInitCount);
+  
+  // Refs para callbacks y estado interno
   const callbacksRef = useRef({
     onNewMessage,
     onUserOnline,
@@ -179,6 +183,33 @@ export default function useSocket(options: UseSocketOptions) {
     onDisconnect,
     onError
   });
+  
+  // Registro de mensajes procesados para evitar duplicados
+  const recentlyProcessedMessages = useRef<Set<string>>(new Set());
+  const activeConversations = useRef<Set<string>>(new Set());
+  
+  // Función para evitar procesamiento de mensajes duplicados
+  const shouldProcessMessageOnce = useCallback((messageId: string) => {
+    if (!messageId) return true; // Si no hay ID, procesarlo (mensajes temporales)
+    
+    // Si ya procesamos este mensaje recientemente, ignorarlo
+    if (recentlyProcessedMessages.current.has(messageId)) {
+      console.log(`[Socket] Mensaje ${messageId} ya procesado, ignorando duplicado`);
+      return false;
+    }
+    
+    // Añadir a los mensajes procesados
+    recentlyProcessedMessages.current.add(messageId);
+    
+    // Limitar el tamaño del conjunto para evitar crecimiento indefinido
+    if (recentlyProcessedMessages.current.size > 100) {
+      // Eliminar el mensaje más antiguo (el primero añadido)
+      const oldestMessage = Array.from(recentlyProcessedMessages.current)[0];
+      recentlyProcessedMessages.current.delete(oldestMessage);
+    }
+    
+    return true;
+  }, []);
 
   // Estado para mensajes en proceso de envío
   const [_messagesInFlight, setMessagesInFlight] = useState<Record<string, boolean>>({});
@@ -221,7 +252,6 @@ export default function useSocket(options: UseSocketOptions) {
   // Estado de actividad del usuario
   const [isActive, _setIsActive] = useState(true);
   const inactivityTimeout = useRef<NodeJS.Timeout | null>(null);
-  const activeConversations = useRef<Set<string>>(new Set());
   
   // Resetear timer de inactividad sin usar setState
   const resetInactivityTimer = useCallback(() => {
@@ -375,17 +405,33 @@ export default function useSocket(options: UseSocketOptions) {
     socket.on('new_message', (message: MessageType) => {
       console.log(`[Socket] Mensaje nuevo recibido:`, message);
       
+      // Verificar si el mensaje tiene un ID
+      if (!message.id) {
+        console.log(`[Socket] Mensaje sin ID, generando uno temporal para rastreo`);
+        message.id = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      }
+      
+      // Verificar si el mensaje pertenece a una conversación activa
       const shouldProcessMessage = 
         message.receiverId === userId || 
         (message.conversationId && activeConversations.current.has(message.conversationId)) ||
         // También procesar mensajes de salas a las que pertenecemos aunque no los tengamos en activeConversations
         (message.conversationId && message.conversationId.startsWith('conv_'));
       
-      if (shouldProcessMessage && callbacksRef.current.onNewMessage) {
-        console.log(`[Socket] Procesando nuevo mensaje para UI`);
+      // Verificar si es un mensaje duplicado
+      const isDuplicate = !shouldProcessMessageOnce(message.id);
+      
+      if (shouldProcessMessage && !isDuplicate && callbacksRef.current.onNewMessage) {
+        console.log(`[Socket] Procesando nuevo mensaje para UI:`, message.id);
         callbacksRef.current.onNewMessage(message);
       } else {
-        console.log(`[Socket] Mensaje no procesado, no pertenece a una conversación activa`);
+        if (isDuplicate) {
+          console.log(`[Socket] Mensaje duplicado ignorado:`, message.id);
+        } else if (!shouldProcessMessage) {
+          console.log(`[Socket] Mensaje no pertenece a una conversación activa:`, message.conversationId);
+        } else {
+          console.log(`[Socket] No hay callback para procesar el mensaje`);
+        }
       }
     });
     

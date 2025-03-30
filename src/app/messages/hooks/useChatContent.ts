@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { Message, ConversationData, User } from '../types';
 import useSocket from '@/src/hooks/useSocket';
+import cuid from 'cuid';
 
 const MESSAGE_PAGE_SIZE = 20;
 
@@ -129,6 +130,140 @@ export function useChatContent(
     }
   }, [conversationId, session?.user?.id]);
 
+  // Función auxiliar para determinar si se debe actualizar el estado del mensaje
+  const shouldUpdateStatus = useCallback((currentStatus?: string, newStatus?: string) => {
+    if (!newStatus) return false;
+    if (!currentStatus) return true;
+    
+    const statusPriority: Record<string, number> = {
+      'sending': 1,
+      'sent': 2,
+      'delivered': 3,
+      'read': 4,
+      'failed': 0
+    };
+    
+    // Solo actualizar si el nuevo estado tiene mayor prioridad
+    return (statusPriority[newStatus] || 0) > (statusPriority[currentStatus] || 0);
+  }, []);
+
+  // Función para añadir un nuevo mensaje a la lista
+  const addNewMessage = useCallback((newMessage: Message) => {
+    console.log('[useChatContent] Añadiendo mensaje:', newMessage);
+    console.log('[useChatContent] Tipo de mensaje:', newMessage.messageType);
+    console.log('[useChatContent] ConversationId del mensaje:', newMessage.conversationId);
+    console.log('[useChatContent] ConversationId actual:', conversation?.id);
+    
+    setMessages(prevMessages => {
+      // Verificar si ya existe un mensaje con el mismo ID
+      const existingIndex = prevMessages.findIndex(msg => msg.id === newMessage.id);
+      
+      // Verificar si existe un mensaje temporal que corresponda a este mensaje
+      const tempIndex = prevMessages.findIndex(msg => 
+        msg.tempId && newMessage.tempId && msg.tempId === newMessage.tempId
+      );
+      
+      console.log('[useChatContent] Actualización de estado - existingIndex:', existingIndex, 'tempIndex:', tempIndex);
+      
+      // Si ya existe un mensaje con este ID, no lo añadimos de nuevo
+      if (existingIndex !== -1) {
+        // Solo actualizamos algunos campos específicos si es necesario
+        const updatedMessages = [...prevMessages];
+        
+        // Solo actualizamos el estado si el nuevo tiene un estado más "avanzado"
+        const currentStatus = prevMessages[existingIndex].status;
+        const newStatus = newMessage.status;
+        
+        if (shouldUpdateStatus(currentStatus, newStatus)) {
+          updatedMessages[existingIndex] = {
+            ...updatedMessages[existingIndex],
+            status: newStatus,
+            read: newMessage.read || updatedMessages[existingIndex].read
+          };
+          console.log('[useChatContent] Actualizado estado de mensaje:', updatedMessages[existingIndex]);
+        }
+        
+        return updatedMessages;
+      }
+      
+      // Si hay un mensaje temporal que corresponde a este, lo reemplazamos
+      if (tempIndex !== -1) {
+        const updatedMessages = [...prevMessages];
+        
+        console.log('[useChatContent] addNewMessage - mensaje existente:', true, 'tempId:', prevMessages[tempIndex].tempId, 'id:', newMessage.id);
+        console.log('[useChatContent] Mensajes actuales:', prevMessages.length);
+        
+        // Actualizar el mensaje temporal con los datos del mensaje real
+        updatedMessages[tempIndex] = {
+          ...newMessage,
+          tempId: prevMessages[tempIndex].tempId // Mantener el tempId para referencia
+        };
+        
+        console.log('[useChatContent] Mensaje actualizado:', updatedMessages[tempIndex]);
+        return updatedMessages;
+      }
+      
+      // Si es un mensaje completamente nuevo, lo añadimos
+      console.log('[useChatContent] addNewMessage - mensaje existente:', false, 'tempId:', newMessage.tempId, 'id:', newMessage.id);
+      console.log('[useChatContent] Mensajes actuales:', prevMessages.length);
+      
+      // Crear un nuevo mensaje procesado
+      const processedMessage: Message = {
+        ...newMessage,
+        createdAt: newMessage.createdAt || new Date().toISOString(),
+      };
+      
+      console.log('[useChatContent] Nuevo mensaje creado:', processedMessage);
+      
+      // Devolver una nueva lista con el mensaje añadido
+      return [...prevMessages, processedMessage];
+    });
+    
+    // Reproducir el sonido de notificación si es un mensaje entrante
+    if (newMessage.senderId !== session?.user?.id) {
+      // playMessageSound();
+    }
+    
+    // Marcar la conversación como leída localmente
+    // setConversation(prev => prev ? { ...prev, unreadCount: 0 } : null);
+    
+    // Desplazarse al final del chat
+    if (scrollToBottom) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [conversation?.id, session?.user?.id, scrollToBottom, shouldUpdateStatus]);
+
+  // Manejar nuevo mensaje recibido
+  const handleNewMessage = useCallback((message: Message) => {
+    console.log('[useChatContent] Recibido nuevo mensaje:', message);
+    
+    // Verificar si el mensaje pertenece a la conversación actual
+    const currentConvId = conversation?.id;
+    const messageConvId = message.conversationId;
+    
+    console.log('[useChatContent] Conversación actual:', currentConvId);
+    console.log('[useChatContent] Conversación del mensaje:', messageConvId);
+    console.log('[useChatContent] ¿Coinciden?', currentConvId === messageConvId);
+    
+    if (!currentConvId || !messageConvId) return;
+    
+    // Extraer el ID base para conversaciones grupales (sin el prefijo 'group_')
+    const normalizedCurrentId = currentConvId.replace('group_', '');
+    const normalizedMessageId = messageConvId.replace('group_', '');
+    
+    console.log('[useChatContent] IDs normalizados - Actual:', normalizedCurrentId, 'Mensaje:', normalizedMessageId);
+    
+    // Verificar si el mensaje pertenece a esta conversación
+    const belongsToCurrentConversation = 
+      normalizedCurrentId === normalizedMessageId ||
+      currentConvId === messageConvId;
+    
+    if (belongsToCurrentConversation) {
+      console.log('[useChatContent] El mensaje pertenece a esta conversación, añadiendo...');
+      addNewMessage(message);
+    }
+  }, [conversation, addNewMessage]);
+
   // Cargar mensajes
   const fetchMessages = useCallback(async () => {
     if (!conversationId || !session?.user?.id || loadingMoreRef.current) return;
@@ -241,15 +376,14 @@ export function useChatContent(
       
       console.log('[useChatContent] IDs normalizados - Actual:', normalizedConversationId, 'Mensaje:', normalizedMessageConversationId);
       
-      // Si los IDs coinciden o si los IDs normalizados coinciden
-      if (message.conversationId === conversationId || 
-          (normalizedConversationId && normalizedMessageConversationId && 
-           normalizedConversationId === normalizedMessageConversationId)) {
+      // Verificar si el mensaje pertenece a esta conversación
+      const belongsToCurrentConversation = 
+        normalizedConversationId === normalizedMessageConversationId ||
+        conversationId === message.conversationId;
+      
+      if (belongsToCurrentConversation) {
         console.log('[useChatContent] El mensaje pertenece a esta conversación, añadiendo...');
-        // Añadir mensaje a la lista, reemplazando cualquier mensaje temporal si existe
-        addNewMessage(message);
-      } else {
-        console.log('[useChatContent] El mensaje NO pertenece a esta conversación');
+        handleNewMessage(message);
       }
     },
     // El servidor ahora envía message_ack con tempId incluido
@@ -460,186 +594,113 @@ export function useChatContent(
     }
   }, [conversationId, session?.user, newMessageContent, connected, sendMessage, scrollToBottom]);
 
-  // Enviar mensaje con imagen
-  const sendImageMessage = useCallback(async () => {
-    if (!conversationId || !session?.user?.id || !imageToSend) return;
+  // Enviar mensaje de imagen
+  const sendImageMessage = useCallback(async (file: File) => {
+    if (!file || !session?.user?.id) return;
+    
+    // Generar un ID temporal único para identificar este mensaje
+    const tempId = cuid();
+    
+    // Crear un mensaje temporal para mostrar en la UI mientras se envía
+    const tempMessage: Message = {
+      tempId,
+      content: '',
+      mediaUrl: URL.createObjectURL(file),
+      senderId: session.user.id,
+      receiverId: conversation?.otherId,
+      conversationId: conversation?.id || '',
+      messageType: 'image',
+      status: 'sending',
+      createdAt: new Date().toISOString(),
+    };
+    
+    // Agregar a la lista de mensajes localmente (actualización optimista)
+    setMessages(prev => [...prev, tempMessage]);
     
     try {
+      // Crear FormData para enviar la imagen
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('conversationId', conversation?.id || '');
+      formData.append('senderId', session.user.id);
+      formData.append('receiverId', conversation?.otherId || '');
+      formData.append('tempId', tempId); // Incluir el ID temporal
+      
+      // Establecer estado de envío
       setSendingMessage(true);
       
-      // Crear ID temporal para actualización optimista
-      const tempId = `temp-img-${Date.now()}`;
-      
-      // Crear URL temporal para la vista previa optimista
-      const tempImageUrl = imagePreview || '';
-      
-      // Crear mensaje optimista y añadirlo a la UI inmediatamente
-      const optimisticMessage: Message = {
-        id: tempId,
-        tempId,
-        content: newMessageContent.trim() || '', // Eliminar "Imagen" como valor por defecto
-        mediaUrl: tempImageUrl,
-        senderId: session.user.id,
-        createdAt: new Date(),
-        status: 'sending',
-        messageType: 'image'
-      };
-      
-      // Añadir mensaje optimista a la UI
-      setMessages(prev => [...prev, optimisticMessage]);
-      setTimeout(scrollToBottom, 100);
-      
-      // Crear FormData para la imagen
-      const formData = new FormData();
-      formData.append('file', imageToSend);
-      formData.append('upload_preset', 'hemeroteca_digital');
-      formData.append('resource_type', 'image'); // Para archivos de imagen
-      
-      if (newMessageContent.trim()) {
-        formData.append('content', newMessageContent);
-      }
-      
-      // Configurar para seguimiento de progreso
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `/api/messages/upload`, true);
-      
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const progress = Math.round((event.loaded / event.total) * 100);
-          setUploadProgress(progress);
+      // Intenta enviar mediante Socket.io
+      if (connected) {
+        try {
+          // Crear una URL de datos para enviar por socket
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
           
-          // Actualizar progreso en el mensaje optimista
-          setMessages(prev => prev.map(msg => 
-            msg.tempId === tempId 
-              ? { ...msg, uploadProgress: progress } 
-              : msg
-          ));
-        }
-      };
-      
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            // Parsear respuesta
-            const response = JSON.parse(xhr.responseText);
-            console.log('Imagen enviada correctamente:', response);
+          reader.onloadend = function() {
+            const base64data = reader.result as string;
             
-            if (response.url) {
-              // Actualizar el mensaje optimista con la URL real
-              setMessages(prev => prev.map(msg => 
-                msg.tempId === tempId 
-                  ? { 
-                      ...msg, 
-                      id: response.messageId || msg.id,
-                      mediaUrl: response.url,
-                      status: 'sent',
-                      uploadProgress: 100
-                    } 
-                  : msg
-              ));
-              
-              // Usar una función separada para enviar notificación para evitar problemas con await
-              const notifyOthersAboutImage = () => {
-                // Enviar mensaje por socket para notificar a otros usuarios
-                if (connected) {
-                  console.log('Enviando notificación de imagen por socket');
-                  const result = sendMessage({
-                    conversationId,
-                    content: newMessageContent.trim() || '', // Eliminar "Imagen" como valor por defecto
-                    messageType: 'image',
-                    senderId: session.user.id,
-                    mediaUrl: response.url,
-                    tempId
-                  });
-                  
-                  if (result === false) {
-                    console.error('Error enviando notificación por socket: no hay conexión');
-                  } else {
-                    console.log('Notificación de imagen enviada por socket');
-                  }
-                } else {
-                  // Fallback si no hay conexión socket - enviar por API REST
-                  console.log('Sin conexión socket, enviando por API REST');
-                  fetch(`/api/messages/conversations/${conversationId}/messages`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                      content: newMessageContent.trim() || '', // Eliminar "Imagen" como valor por defecto
-                      messageType: 'image',
-                      mediaUrl: response.url
-                    })
-                  }).then(apiResponse => {
-                    if (!apiResponse.ok) {
-                      return apiResponse.text().then(text => {
-                        console.error('Error en respuesta API:', text);
-                      });
-                    }
-                  }).catch(apiError => {
-                    console.error('Error enviando notificación por API:', apiError);
-                  });
-                }
-              };
-              
-              // Ejecutar la notificación
-              notifyOthersAboutImage();
-            } else {
-              console.warn('Respuesta sin URL de imagen:', response);
-              // En caso de error recuperable, mantener el mensaje con una indicación de error
-              setMessages(prev => prev.map(msg => 
-                msg.tempId === tempId 
-                  ? { ...msg, status: 'failed', errorMessage: 'No se pudo cargar la imagen' } 
-                  : msg
-              ));
-              
-              // También recargar mensajes para asegurar sincronización
-              setTimeout(fetchMessages, 1000);
-            }
-          } catch (parseError) {
-            console.error('Error al procesar respuesta:', parseError);
-            // Actualizar estado de envío
-            setMessages(prev => prev.map(msg => 
-              msg.tempId === tempId 
-                ? { ...msg, status: 'failed', errorMessage: 'Error al procesar respuesta' } 
-                : msg
-            ));
-          }
-          
-          // Limpiar estado
-          setNewMessageContent('');
-          setImageToSend(null);
-          setImagePreview(null);
-          setUploadProgress(0);
-        } else {
-          // Error
-          console.error('Error al enviar imagen:', xhr.statusText);
-          // Actualizar mensaje para mostrar error
-          setMessages(prev => prev.map(msg => 
-            msg.tempId === tempId 
-              ? { ...msg, status: 'failed', errorMessage: `Error: ${xhr.statusText}` } 
-              : msg
-          ));
+            // Enviar el mensaje con la URL de datos
+            sendMessage({
+              messageType: 'image',
+              conversationId: conversation?.id,
+              senderId: session.user.id,
+              receiverId: conversation?.otherId,
+              tempId,
+              content: '', // Contenido vacío para imágenes
+              mediaUrl: base64data, // Usar base64 para enviar por socket
+              createdAt: new Date().toISOString(),
+              status: 'sending'
+            });
+          };
+        } catch (error) {
+          console.error('Error preparando imagen para socket:', error);
+          throw error; // Relanzar para que el bloque catch principal lo maneje
         }
-        setSendingMessage(false);
-      };
-      
-      xhr.onerror = () => {
-        console.error('Error de red al enviar imagen');
+      } else {
+        // Fallback: Enviar por API REST
+        const response = await fetch('/api/messages/send-image', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error('Error al enviar la imagen');
+        }
+        
+        const data = await response.json();
+        
+        // Actualizar el mensaje temporal con la información real
         setMessages(prev => prev.map(msg => 
           msg.tempId === tempId 
-            ? { ...msg, status: 'failed', errorMessage: 'Error de conexión' } 
+            ? { ...data.message, status: 'delivered' } 
             : msg
         ));
-        setSendingMessage(false);
-      };
+      }
       
-      // Enviar
-      xhr.send(formData);
+      // Limpiar la vista previa y restablecer estados
+      setImageToSend(null);
+      setImagePreview(null);
+      setUploadProgress(0);
       
     } catch (error) {
-      console.error('Error sending image message:', error);
+      console.error('Error enviando imagen:', error);
+      
+      // Marcar el mensaje como fallido
+      setMessages(prev => prev.map(msg => 
+        msg.tempId === tempId 
+          ? { ...msg, status: 'failed' } 
+          : msg
+      ));
+      
+      // toast?.({
+      //   title: "Error",
+      //   description: "No se pudo enviar la imagen",
+      //   variant: "destructive",
+      // });
+    } finally {
       setSendingMessage(false);
     }
-  }, [conversationId, session?.user?.id, imageToSend, imagePreview, newMessageContent, scrollToBottom, connected, sendMessage]);
+  }, [conversation, session?.user?.id, connected, sendMessage]);
 
   // Enviar mensaje de voz
   const sendVoiceMessage = useCallback(async (audioBlob: Blob) => {
@@ -742,84 +803,11 @@ export function useChatContent(
   // Enviar mensaje (texto o imagen)
   const handleSendMessage = useCallback(async () => {
     if (imageToSend) {
-      await sendImageMessage();
+      await sendImageMessage(imageToSend);
     } else {
       await sendTextMessage();
     }
   }, [imageToSend, sendImageMessage, sendTextMessage]);
-
-  // Añadir nuevo mensaje recibido
-  const addNewMessage = useCallback((message: Partial<Message>) => {
-    console.log('[useChatContent] Añadiendo mensaje:', message);
-    console.log('[useChatContent] Tipo de mensaje:', message.messageType);
-    console.log('[useChatContent] ConversationId del mensaje:', message.conversationId);
-    console.log('[useChatContent] ConversationId actual:', conversationId);
-    
-    setMessages(prevMessages => {
-      // Comprobar si ya existe un mensaje con el mismo ID o tempId
-      const existingMessageIndex = prevMessages.findIndex(m => 
-        (message.id && m.id === message.id) || 
-        (message.tempId && (m.id === message.tempId || m.tempId === message.tempId))
-      );
-      
-      // Log para depuración
-      console.log(`[useChatContent] addNewMessage - mensaje existente: ${existingMessageIndex !== -1}, tempId: ${message.tempId}, id: ${message.id}`);
-      console.log('[useChatContent] Mensajes actuales:', prevMessages.length);
-      
-      // Si ya existe, actualizarlo
-      if (existingMessageIndex !== -1) {
-        const updatedMessages = [...prevMessages];
-        // Actualizar propiedades pero mantener las que no vienen en el mensaje nuevo
-        updatedMessages[existingMessageIndex] = {
-          ...updatedMessages[existingMessageIndex],
-          ...message,
-          // Si el mensaje tiene ID confirmado, eliminar el tempId
-          tempId: message.id ? undefined : updatedMessages[existingMessageIndex].tempId || message.tempId,
-          // Asegurar que se mantiene el conversationId correcto
-          conversationId: message.conversationId || updatedMessages[existingMessageIndex].conversationId || conversationId || ''
-        };
-        console.log('[useChatContent] Mensaje actualizado:', updatedMessages[existingMessageIndex]);
-        return updatedMessages;
-      }
-      
-      // Crear objeto de mensaje completo
-      const newMessage: Message = {
-        id: message.id || message.tempId || `temp-${Date.now()}`,
-        content: message.content || '',
-        senderId: message.senderId || '',
-        receiverId: message.receiverId,
-        // Asegurar que se usa el conversationId correcto
-        conversationId: message.conversationId || conversationId || '',
-        createdAt: message.createdAt || new Date().toISOString(),
-        read: message.read || false,
-        status: message.status || 'sending',
-        mediaUrl: message.mediaUrl,
-        messageType: message.messageType || 'text',
-        sender: message.sender,
-        tempId: !message.id ? (message.tempId || `temp-${Date.now()}`) : undefined
-      };
-      
-      console.log('[useChatContent] Nuevo mensaje creado:', newMessage);
-      
-      // Si el mensaje es de otro usuario, marcarlo como leído si la conversación está abierta
-      if (newMessage.senderId !== session?.user?.id && conversationId && newMessage.id) {
-        markMessageAsRead(newMessage.id);
-      }
-      
-      // Agregar mensaje al principio si es más reciente o al final si es más antiguo
-      const sortedMessages = [...prevMessages, newMessage].sort((a, b) => {
-        // Ordenar por createdAt
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      });
-      
-      return sortedMessages;
-    });
-    
-    // Si es un mensaje recibido, marcar la conversación como leída
-    if (message.senderId !== session?.user?.id && conversationId) {
-      markConversationAsRead(conversationId);
-    }
-  }, [conversationId, markConversationAsRead, markMessageAsRead, session?.user?.id]);
 
   // Preparar carga de imagen
   const handleImageChange = useCallback((file: File | null) => {

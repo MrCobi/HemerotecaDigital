@@ -133,6 +133,7 @@ const MessageItem = React.memo(({
       )}
       
       <div
+        key={`${message.id || message.tempId || 'msg'}-${index}`}
         className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} items-end gap-2 mb-2`}
       >
         {!isCurrentUser && (
@@ -188,76 +189,88 @@ const MessageItem = React.memo(({
                       <CldImage 
                         src={extractCloudinaryId(message.mediaUrl)}
                         alt="Imagen adjunta" 
-                        className={`max-w-full rounded-lg transition-all duration-200 ${
-                          imageLoaded ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
-                        } group-hover:scale-[1.02] transform`}
-                        width={300}
-                        height={200}
-                        loading="lazy"
-                        onLoad={() => setImageLoaded(true)}
+                        className="rounded-lg cursor-pointer object-cover w-full h-full"
+                        width={400}
+                        height={300}
+                        quality={100}
                         onError={() => {
                           console.log("Error cargando imagen de Cloudinary, usando fallback");
                           setImageLoaded(true);
                           setUseCloudinary(false);
                         }}
+                        onLoad={() => setImageLoaded(true)}
                       />
                     ) : (
                       <NextImage 
                         src={message.mediaUrl!} 
-                        alt="Imagen adjunta" 
-                        className={`max-w-full rounded-lg transition-all duration-200 ${
-                          imageLoaded ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
-                        } group-hover:scale-[1.02] transform`}
-                        width={300}
-                        height={200}
-                        loading="lazy"
+                        alt="Imagen adjunta"
+                        className="rounded-lg cursor-pointer object-cover w-full h-full"
+                        width={400}
+                        height={300}
+                        quality={100}
+                        unoptimized={true}
                         onLoad={() => setImageLoaded(true)}
                         onError={() => setImageLoaded(true)}
                       />
                     )}
                     {imageLoaded && (
-                      <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity duration-200 rounded-lg"></div>
-                    )}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <div className="bg-black bg-opacity-50 text-white py-1 px-3 rounded-full text-xs">
-                        Ver imagen
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-30 transition-opacity duration-200 rounded-lg"></div>
+                        <div className="z-10 bg-black bg-opacity-75 text-white py-2 px-4 rounded-full text-sm font-medium">
+                          Ver imagen
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
                 
                 {isImageOpen && (
-                  <Dialog open={isImageOpen} onOpenChange={setIsImageOpen}>
-                    <DialogContent className="p-0 max-w-4xl w-full bg-transparent border-none shadow-none">
+                  <Dialog open={isImageOpen} onOpenChange={setIsImageOpen} modal={true}>
+                    <DialogContent className="p-0 m-0 max-w-[90vw] max-h-[85vh] bg-black border-none shadow-xl flex items-center justify-center rounded-lg">
                       <DialogTitle className="sr-only">Ver imagen</DialogTitle>
-                      <div className="relative w-full h-full">
+                      <div className="w-full h-full flex items-center justify-center relative">
                         {message.mediaUrl && message.mediaUrl.includes('cloudinary.com') && useCloudinary ? (
                           <CldImage
                             src={extractCloudinaryId(message.mediaUrl)}
                             alt="Imagen ampliada"
-                            className="object-contain rounded-lg max-h-[80vh]"
-                            width={1200}
-                            height={900}
-                            quality={90}
+                            width={1280}
+                            height={800}
+                            style={{
+                              objectFit: 'contain',
+                              maxWidth: '100%',
+                              maxHeight: '85vh'
+                            }}
+                            quality={100}
+                            sizes="90vw"
                             onError={() => setUseCloudinary(false)}
+                            priority
                           />
                         ) : (
                           <NextImage
                             src={message.mediaUrl!}
                             alt="Imagen ampliada"
-                            className="object-contain rounded-lg max-h-[80vh]"
-                            width={1200}
-                            height={900}
+                            width={1280}
+                            height={800}
+                            style={{
+                              objectFit: 'contain',
+                              maxWidth: '100%',
+                              maxHeight: '85vh'
+                            }}
                             quality={100}
+                            priority
+                            unoptimized={true}
                           />
                         )}
-                        <button
-                          onClick={() => setIsImageOpen(false)}
-                          className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-2 hover:bg-opacity-70 transition-all"
-                        >
-                          <X size={20} />
-                        </button>
                       </div>
+                      <button
+                        className="absolute top-0 right-0 p-2 rounded-full bg-black bg-opacity-50 cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsImageOpen(false);
+                        }}
+                      >
+                        <X className="h-6 w-6 text-white" />
+                      </button>
                     </DialogContent>
                   </Dialog>
                 )}
@@ -668,18 +681,22 @@ const OptimizedChatWindow = ({
             const _isLastInSequence = !nextMessage || nextMessage.senderId !== message.senderId;
             
             return (
-              <MessageItem
-                key={message.id || message.tempId || index}
-                message={message}
-                currentUserId={currentUserId}
-                otherUser={otherUser}
-                conversation={conversation}
-                showDateSeparator={showDateSeparator}
-                currentUserImage={session?.user?.image || null}
-                currentUserName={session?.user?.name || null}
-                onPlayAudio={handlePlayAudio}
-                index={index}
-              />
+              <div 
+                key={`${message.id || message.tempId || 'msg'}-${index}`}
+                className={`flex ${message.senderId === session?.user?.id ? 'justify-end' : 'justify-start'} mb-4`}
+              >
+                <MessageItem
+                  message={message}
+                  currentUserId={currentUserId}
+                  otherUser={otherUser}
+                  conversation={conversation}
+                  showDateSeparator={showDateSeparator}
+                  currentUserImage={session?.user?.image || null}
+                  currentUserName={session?.user?.name || null}
+                  onPlayAudio={handlePlayAudio}
+                  index={index}
+                />
+              </div>
             );
           })
         )}
