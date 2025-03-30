@@ -11,6 +11,7 @@ import { flushSync } from 'react-dom';
 import useSocket, { MessageType } from '@/src/hooks/useSocket';
 import { API_ROUTES } from '@/src/config/api-routes';
 import VoiceMessageRecorder from './VoiceMessageRecorder';
+import AudioPlayer from './AudioPlayer';
 
 type User = {
   id: string;
@@ -31,6 +32,14 @@ type Message = {
   conversationId?: string;
   read?: boolean;
   messageType?: 'text' | 'image' | 'voice' | 'video' | 'file';
+  mediaUrl?: string; // URL para mensajes de voz u otros medios
+  imageUrl?: string; // URL específica para imágenes
+  sender?: {
+    id: string;
+    username?: string;
+    name?: string;
+    image?: string;
+  };
 };
 
 type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
@@ -613,18 +622,12 @@ const ChatWindow = ({
                   )}
                 >
                   {isVoiceMessage ? (
-                    <div className="voice-message">
-                      <button
-                        onClick={() => handleToggleAudio(message.content || '')}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-opacity-20 bg-black hover:bg-opacity-30 transition-colors"
-                      >
-                        {audioPlaying === message.content ? (
-                          <Pause className="h-5 w-5" />
-                        ) : (
-                          <Play className="h-5 w-5" />
-                        )}
-                        <div className="w-32 h-1 bg-current opacity-50 rounded-full"></div>
-                      </button>
+                    <div className="voice-message w-full">
+                      <AudioPlayer 
+                        audioUrl={message.mediaUrl || ''}
+                        messageId={message.id || message.tempId || `msg-${index}`}
+                        isSender={isSelfMessage}
+                      />
                     </div>
                   ) : (
                     <div className="whitespace-pre-wrap break-words">{message.content}</div>
