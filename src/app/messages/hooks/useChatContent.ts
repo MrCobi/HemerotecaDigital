@@ -467,11 +467,33 @@ export function useChatContent(
     try {
       setSendingMessage(true);
       
+      // Crear ID temporal para actualización optimista
+      const tempId = `temp-img-${Date.now()}`;
+      
+      // Crear URL temporal para la vista previa optimista
+      const tempImageUrl = imagePreview || '';
+      
+      // Crear mensaje optimista y añadirlo a la UI inmediatamente
+      const optimisticMessage: Message = {
+        id: tempId,
+        tempId,
+        content: newMessageContent.trim() || '', // Eliminar "Imagen" como valor por defecto
+        mediaUrl: tempImageUrl,
+        senderId: session.user.id,
+        createdAt: new Date(),
+        status: 'sending',
+        messageType: 'image'
+      };
+      
+      // Añadir mensaje optimista a la UI
+      setMessages(prev => [...prev, optimisticMessage]);
+      setTimeout(scrollToBottom, 100);
+      
       // Crear FormData para la imagen
       const formData = new FormData();
       formData.append('file', imageToSend);
-      formData.append('conversationId', conversationId);
-      formData.append('messageType', 'image');
+      formData.append('upload_preset', 'hemeroteca_digital');
+      formData.append('resource_type', 'image'); // Para archivos de imagen
       
       if (newMessageContent.trim()) {
         formData.append('content', newMessageContent);
@@ -479,21 +501,109 @@ export function useChatContent(
       
       // Configurar para seguimiento de progreso
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `/api/messages/conversations/${conversationId}/upload`, true);
+      xhr.open('POST', `/api/messages/upload`, true);
       
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
           const progress = Math.round((event.loaded / event.total) * 100);
           setUploadProgress(progress);
+          
+          // Actualizar progreso en el mensaje optimista
+          setMessages(prev => prev.map(msg => 
+            msg.tempId === tempId 
+              ? { ...msg, uploadProgress: progress } 
+              : msg
+          ));
         }
       };
       
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          // Éxito
-          console.log('Imagen enviada correctamente');
-          // Recargar mensajes para mostrar la imagen
-          fetchMessages();
+          try {
+            // Parsear respuesta
+            const response = JSON.parse(xhr.responseText);
+            console.log('Imagen enviada correctamente:', response);
+            
+            if (response.url) {
+              // Actualizar el mensaje optimista con la URL real
+              setMessages(prev => prev.map(msg => 
+                msg.tempId === tempId 
+                  ? { 
+                      ...msg, 
+                      id: response.messageId || msg.id,
+                      mediaUrl: response.url,
+                      status: 'sent',
+                      uploadProgress: 100
+                    } 
+                  : msg
+              ));
+              
+              // Usar una función separada para enviar notificación para evitar problemas con await
+              const notifyOthersAboutImage = () => {
+                // Enviar mensaje por socket para notificar a otros usuarios
+                if (connected) {
+                  console.log('Enviando notificación de imagen por socket');
+                  const result = sendMessage({
+                    conversationId,
+                    content: newMessageContent.trim() || '', // Eliminar "Imagen" como valor por defecto
+                    messageType: 'image',
+                    senderId: session.user.id,
+                    mediaUrl: response.url,
+                    tempId
+                  });
+                  
+                  if (result === false) {
+                    console.error('Error enviando notificación por socket: no hay conexión');
+                  } else {
+                    console.log('Notificación de imagen enviada por socket');
+                  }
+                } else {
+                  // Fallback si no hay conexión socket - enviar por API REST
+                  console.log('Sin conexión socket, enviando por API REST');
+                  fetch(`/api/messages/conversations/${conversationId}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                      content: newMessageContent.trim() || '', // Eliminar "Imagen" como valor por defecto
+                      messageType: 'image',
+                      mediaUrl: response.url
+                    })
+                  }).then(apiResponse => {
+                    if (!apiResponse.ok) {
+                      return apiResponse.text().then(text => {
+                        console.error('Error en respuesta API:', text);
+                      });
+                    }
+                  }).catch(apiError => {
+                    console.error('Error enviando notificación por API:', apiError);
+                  });
+                }
+              };
+              
+              // Ejecutar la notificación
+              notifyOthersAboutImage();
+            } else {
+              console.warn('Respuesta sin URL de imagen:', response);
+              // En caso de error recuperable, mantener el mensaje con una indicación de error
+              setMessages(prev => prev.map(msg => 
+                msg.tempId === tempId 
+                  ? { ...msg, status: 'failed', errorMessage: 'No se pudo cargar la imagen' } 
+                  : msg
+              ));
+              
+              // También recargar mensajes para asegurar sincronización
+              setTimeout(fetchMessages, 1000);
+            }
+          } catch (parseError) {
+            console.error('Error al procesar respuesta:', parseError);
+            // Actualizar estado de envío
+            setMessages(prev => prev.map(msg => 
+              msg.tempId === tempId 
+                ? { ...msg, status: 'failed', errorMessage: 'Error al procesar respuesta' } 
+                : msg
+            ));
+          }
+          
           // Limpiar estado
           setNewMessageContent('');
           setImageToSend(null);
@@ -502,12 +612,23 @@ export function useChatContent(
         } else {
           // Error
           console.error('Error al enviar imagen:', xhr.statusText);
+          // Actualizar mensaje para mostrar error
+          setMessages(prev => prev.map(msg => 
+            msg.tempId === tempId 
+              ? { ...msg, status: 'failed', errorMessage: `Error: ${xhr.statusText}` } 
+              : msg
+          ));
         }
         setSendingMessage(false);
       };
       
       xhr.onerror = () => {
         console.error('Error de red al enviar imagen');
+        setMessages(prev => prev.map(msg => 
+          msg.tempId === tempId 
+            ? { ...msg, status: 'failed', errorMessage: 'Error de conexión' } 
+            : msg
+        ));
         setSendingMessage(false);
       };
       
@@ -518,7 +639,7 @@ export function useChatContent(
       console.error('Error sending image message:', error);
       setSendingMessage(false);
     }
-  }, [conversationId, session?.user?.id, imageToSend, newMessageContent, fetchMessages]);
+  }, [conversationId, session?.user?.id, imageToSend, imagePreview, newMessageContent, scrollToBottom, connected, sendMessage]);
 
   // Enviar mensaje de voz
   const sendVoiceMessage = useCallback(async (audioBlob: Blob) => {

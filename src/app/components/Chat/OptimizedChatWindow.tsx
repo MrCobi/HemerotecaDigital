@@ -11,7 +11,9 @@ import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import { useToast } from '@/src/app/components/ui/use-toast';
 import { Message, User, ConversationData } from '@/src/app/messages/types';
-import Image from 'next/image';
+import NextImage from 'next/image';
+import { CldImage } from 'next-cloudinary';
+import { Dialog, DialogContent, DialogTitle } from "@/src/app/components/ui/dialog";
 
 // Importar el hook personalizado
 import { useChatContent } from '@/src/app/messages/hooks/useChatContent';
@@ -118,7 +120,12 @@ const MessageItem = React.memo(({
   
   // Determinar si es un mensaje de voz
   const isVoiceMessage = message.messageType === 'voice';
+  const isImageMessage = message.messageType === 'image' && message.mediaUrl;
   
+  const [isImageOpen, setIsImageOpen] = React.useState(false);
+  const [imageLoaded, setImageLoaded] = React.useState(false);
+  const [useCloudinary, setUseCloudinary] = React.useState(true);
+
   return (
     <>
       {showDateSeparator && (
@@ -168,17 +175,93 @@ const MessageItem = React.memo(({
                   isSender={isCurrentUser}
                 />
               </div>
-            ) : message.messageType === 'image' && message.imageUrl ? (
-              <div className="mb-2">
-                <Image 
-                  src={message.imageUrl} 
-                  alt="Imagen adjunta" 
-                  className="max-w-full rounded-lg"
-                  width={300}
-                  height={200}
-                  loading="lazy"
-                />
-              </div>
+            ) : isImageMessage ? (
+              <>
+                <div className="mb-2 relative group">
+                  <div
+                    className={`relative overflow-hidden rounded-lg cursor-pointer ${
+                      !imageLoaded ? 'bg-gray-200 dark:bg-gray-700 animate-pulse h-[150px]' : ''
+                    }`}
+                    onClick={() => setIsImageOpen(true)}
+                  >
+                    {message.mediaUrl && message.mediaUrl.includes('cloudinary.com') && useCloudinary ? (
+                      <CldImage 
+                        src={extractCloudinaryId(message.mediaUrl)}
+                        alt="Imagen adjunta" 
+                        className={`max-w-full rounded-lg transition-all duration-200 ${
+                          imageLoaded ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
+                        } group-hover:scale-[1.02] transform`}
+                        width={300}
+                        height={200}
+                        loading="lazy"
+                        onLoad={() => setImageLoaded(true)}
+                        onError={() => {
+                          console.log("Error cargando imagen de Cloudinary, usando fallback");
+                          setImageLoaded(true);
+                          setUseCloudinary(false);
+                        }}
+                      />
+                    ) : (
+                      <NextImage 
+                        src={message.mediaUrl!} 
+                        alt="Imagen adjunta" 
+                        className={`max-w-full rounded-lg transition-all duration-200 ${
+                          imageLoaded ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
+                        } group-hover:scale-[1.02] transform`}
+                        width={300}
+                        height={200}
+                        loading="lazy"
+                        onLoad={() => setImageLoaded(true)}
+                        onError={() => setImageLoaded(true)}
+                      />
+                    )}
+                    {imageLoaded && (
+                      <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity duration-200 rounded-lg"></div>
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <div className="bg-black bg-opacity-50 text-white py-1 px-3 rounded-full text-xs">
+                        Ver imagen
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {isImageOpen && (
+                  <Dialog open={isImageOpen} onOpenChange={setIsImageOpen}>
+                    <DialogContent className="p-0 max-w-4xl w-full bg-transparent border-none shadow-none">
+                      <DialogTitle className="sr-only">Ver imagen</DialogTitle>
+                      <div className="relative w-full h-full">
+                        {message.mediaUrl && message.mediaUrl.includes('cloudinary.com') && useCloudinary ? (
+                          <CldImage
+                            src={extractCloudinaryId(message.mediaUrl)}
+                            alt="Imagen ampliada"
+                            className="object-contain rounded-lg max-h-[80vh]"
+                            width={1200}
+                            height={900}
+                            quality={90}
+                            onError={() => setUseCloudinary(false)}
+                          />
+                        ) : (
+                          <NextImage
+                            src={message.mediaUrl!}
+                            alt="Imagen ampliada"
+                            className="object-contain rounded-lg max-h-[80vh]"
+                            width={1200}
+                            height={900}
+                            quality={100}
+                          />
+                        )}
+                        <button
+                          onClick={() => setIsImageOpen(false)}
+                          className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-2 hover:bg-opacity-70 transition-all"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </>
             ) : (
               <div className="whitespace-pre-wrap break-words">{message.content}</div>
             )}
@@ -214,6 +297,18 @@ const MessageItem = React.memo(({
 });
 
 MessageItem.displayName = 'MessageItem';
+
+const extractCloudinaryId = (url: string): string => {
+  // Ejemplo: https://res.cloudinary.com/dlg8j3g5k/image/upload/v1/path/to/image.jpg
+  const regex = /\/image\/upload\/(?:v\d+\/)?(.+)$/;
+  const match = url.match(regex);
+  if (match && match[1]) {
+    return match[1];
+  }
+  // Fallback: devolver la última parte de la URL
+  const parts = url.split('/');
+  return parts[parts.length - 1];
+};
 
 // Componente principal de la ventana de chat
 const OptimizedChatWindow = ({
@@ -628,7 +723,7 @@ const OptimizedChatWindow = ({
         {imagePreview && (
           <div className="mb-2 relative">
             <div className="relative w-24 h-24 overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
-              <Image
+              <NextImage
                 src={imagePreview}
                 alt="Preview"
                 fill
