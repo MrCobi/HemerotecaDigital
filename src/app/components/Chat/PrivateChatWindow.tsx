@@ -715,6 +715,7 @@ const PrivateChatWindow = ({
       
       {/* Formulario para enviar mensajes */}
       <div className="p-3 border-t flex flex-col">
+
         {/* Input y botones para enviar mensajes */}
         <div className="flex items-end gap-2">
           <Button
@@ -770,7 +771,7 @@ const PrivateChatWindow = ({
               disabled={(!newMessageContent.trim() && !imageToSend) || sendingMessage || showVoiceRecorder}
             >
               {sendingMessage ? (
-                <LoadingSpinner className="h-4 w-4" />
+                <LoadingSpinner className="h-4 w-4" showText={false} />
               ) : (
                 <ArrowUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               )}

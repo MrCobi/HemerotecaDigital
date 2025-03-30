@@ -743,7 +743,7 @@ const OptimizedChatWindow = ({
               disabled={(!newMessageContent.trim() && !imageToSend) || sendingMessage || showVoiceRecorder}
             >
               {sendingMessage ? (
-                <LoadingSpinner className="h-4 w-4" />
+                <LoadingSpinner className="h-4 w-4" showText={false} />
               ) : (
                 <ArrowUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               )}
