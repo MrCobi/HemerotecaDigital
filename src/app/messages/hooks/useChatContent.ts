@@ -618,49 +618,60 @@ export function useChatContent(
     setMessages(prev => [...prev, tempMessage]);
     
     try {
-      // Crear FormData para enviar la imagen
-      const formData = new FormData();
-      formData.append('image', file);
-      formData.append('conversationId', conversation?.id || '');
-      formData.append('senderId', session.user.id);
-      formData.append('receiverId', conversation?.otherId || '');
-      formData.append('tempId', tempId); // Incluir el ID temporal
-      
       // Establecer estado de envío
       setSendingMessage(true);
       
-      // Intenta enviar mediante Socket.io
+      // Subir la imagen a Cloudinary mediante la API de upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'image');
+      
+      const uploadRes = await fetch('/api/messages/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!uploadRes.ok) {
+        throw new Error('Error al subir la imagen');
+      }
+      
+      const { url: imageUrl } = await uploadRes.json();
+      
+      if (!imageUrl) {
+        throw new Error('No se obtuvo URL de la imagen');
+      }
+      
+      // Ahora, enviar el mensaje con la URL de Cloudinary
       if (connected) {
-        try {
-          // Crear una URL de datos para enviar por socket
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          
-          reader.onloadend = function() {
-            const base64data = reader.result as string;
-            
-            // Enviar el mensaje con la URL de datos
-            sendMessage({
-              messageType: 'image',
-              conversationId: conversation?.id,
-              senderId: session.user.id,
-              receiverId: conversation?.otherId,
-              tempId,
-              content: '', // Contenido vacío para imágenes
-              mediaUrl: base64data, // Usar base64 para enviar por socket
-              createdAt: new Date().toISOString(),
-              status: 'sending'
-            });
-          };
-        } catch (error) {
-          console.error('Error preparando imagen para socket:', error);
-          throw error; // Relanzar para que el bloque catch principal lo maneje
-        }
+        // Enviar mediante Socket.io usando la URL de Cloudinary
+        sendMessage({
+          messageType: 'image',
+          conversationId: conversation?.id,
+          senderId: session.user.id,
+          receiverId: conversation?.otherId,
+          tempId,
+          content: '', // Contenido vacío para imágenes
+          mediaUrl: imageUrl, // Usar la URL de Cloudinary en lugar del base64
+          createdAt: new Date().toISOString(),
+          status: 'sending'
+        });
       } else {
         // Fallback: Enviar por API REST
-        const response = await fetch('/api/messages/send-image', {
+        const payload = {
+          messageType: 'image',
+          conversationId: conversation?.id,
+          senderId: session.user.id,
+          receiverId: conversation?.otherId,
+          mediaUrl: imageUrl,
+          content: ''
+        };
+        
+        const response = await fetch('/api/messages', {
           method: 'POST',
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
         });
         
         if (!response.ok) {
@@ -682,6 +693,9 @@ export function useChatContent(
       setImagePreview(null);
       setUploadProgress(0);
       
+      // Desplazar al final después de enviar
+      scrollToBottom();
+      
     } catch (error) {
       console.error('Error enviando imagen:', error);
       
@@ -692,6 +706,7 @@ export function useChatContent(
           : msg
       ));
       
+      // Mostrar mensaje de error en UI
       // toast?.({
       //   title: "Error",
       //   description: "No se pudo enviar la imagen",
@@ -700,7 +715,7 @@ export function useChatContent(
     } finally {
       setSendingMessage(false);
     }
-  }, [conversation, session?.user?.id, connected, sendMessage]);
+  }, [conversation, session?.user?.id, connected, sendMessage, scrollToBottom]);
 
   // Enviar mensaje de voz
   const sendVoiceMessage = useCallback(async (audioBlob: Blob) => {
