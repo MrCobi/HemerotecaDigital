@@ -7,7 +7,6 @@ import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
-import { Button } from "@/src/app/components/ui/button";
 import { Trash2, Book } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
 import { toast } from "sonner";
@@ -114,7 +113,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
   const [filterValue, setFilterValue] = useState("");
   const [ratingFilter, setRatingFilter] = useState<number | null>(null);
   const [localRatings, setLocalRatings] = useState<Rating[]>(ratings);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [_isDeleting, setIsDeleting] = useState(false);
 
   // Actualizar localRatings cuando cambian las ratings (al montar el componente)
   useMemo(() => {
@@ -388,7 +387,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
         );
       },
     },
-  ], [handleDelete]);
+  ], [handleDelete, ratingFilterElement]);
 
   return (
     <div className="space-y-4">

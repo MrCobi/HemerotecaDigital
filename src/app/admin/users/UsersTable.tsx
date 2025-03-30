@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { DataTable, Column } from "../components/DataTable";
-import { Button, buttonVariants } from "@/src/app/components/ui/button";
+import { buttonVariants } from "@/src/app/components/ui/button";
 import { Trash2, Edit, User, AlertTriangle } from "lucide-react";
 import {
   AlertDialog,

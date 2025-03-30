@@ -12,7 +12,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/src/app/components/ui/alert-dialog";
-import { Button } from "@/src/app/components/ui/button";
 
 interface DeleteDialogProps {
   entityId?: string;
@@ -21,7 +20,7 @@ interface DeleteDialogProps {
   title?: string;
   description?: string;
   onDelete: () => Promise<void>;
-  buttonSize?: "sm" | "lg" | "default" | "icon";
+  _buttonSize?: "sm" | "lg" | "default" | "icon";
   buttonLabel?: string;
   deleteLabel?: string;
   deletingLabel?: string;
@@ -35,7 +34,7 @@ export default function DeleteDialog({
   title,
   description,
   onDelete,
-  buttonSize = "sm",
+  _buttonSize = "sm",
   buttonLabel = "Eliminar",
   deleteLabel = "Eliminar",
   deletingLabel = "Eliminando...",

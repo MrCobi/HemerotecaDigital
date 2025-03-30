@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/src/app/components/ui/badge";
 import { 
   User, Settings, Clock, Mail, CalendarDays, Shield, MessageCircle, 
-  Star, BookMarked, Inbox, UserCheck, AlertCircle, Loader2, ChevronDown, Trash2, AlertTriangle
+  Star, BookMarked, Inbox, UserCheck, AlertCircle, Loader2, AlertTriangle
 } from "lucide-react";
 import { CldImage } from "next-cloudinary";
 import Image from "next/image";

@@ -5,7 +5,6 @@ import Image from "next/image";
 import { format } from "date-fns";
 import { useState, useMemo, useCallback } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
-import { Button } from "@/src/app/components/ui/button";
 import { ExternalLink, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
 import { toast } from "sonner";
@@ -112,7 +111,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
   const [filterValue, setFilterValue] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [localFavorites, setLocalFavorites] = useState<Favorite[]>(favorites);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [_isDeleting, setIsDeleting] = useState(false);
 
   // Actualizar localFavorites cuando cambian los favoritos (al montar el componente)
   useMemo(() => {
@@ -335,7 +334,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
         );
       },
     }
-  ], [isDeleting, handleDelete, uniqueCategories]);
+  ], [handleDelete, uniqueCategories, categoryFilter]);
 
   return (
     <div className="space-y-4">

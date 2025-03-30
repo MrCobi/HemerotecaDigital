@@ -72,7 +72,7 @@ export function useChatContent(
           const errorData = await response.json();
           const errorMessage = errorData.error || "No tienes permisos para acceder a esta conversación";
           localStorage.setItem(`chat_access_error_${conversationIdToMark}`, errorMessage);
-        } catch (err) {
+        } catch  {
           localStorage.setItem(`chat_access_error_${conversationIdToMark}`, "No tienes permisos para acceder a esta conversación");
         }
       }
@@ -119,7 +119,7 @@ export function useChatContent(
             const errorData = await response.json();
             const errorMessage = errorData.error || "No tienes permisos para acceder a esta conversación";
             localStorage.setItem(`chat_access_error_${conversationId}`, errorMessage);
-          } catch (err) {
+          } catch {
             localStorage.setItem(`chat_access_error_${conversationId}`, "No tienes permisos para acceder a esta conversación");
           }
         }
@@ -336,12 +336,9 @@ export function useChatContent(
       };
     }
     
-    // Deshabilitamos la regla de exhaustive-deps porque solo queremos
-    // que este efecto se ejecute cuando cambie conversationId o connected
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, connected, session?.user?.id]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!conversationId || !session?.user?.id) return;
     
@@ -387,7 +384,8 @@ export function useChatContent(
       controller.abort();
       // No limpiamos el readStatusRef para mantener el cache entre cambios
     };
-  }, [conversationId, session?.user?.id]);  
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, session?.user?.id]);
 
   // Enviar mensaje de texto
   const sendTextMessage = useCallback(async () => {

@@ -19,8 +19,6 @@ import {
   Heart,
   MessageSquare,
   User2,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
 } from "lucide-react";
 import { Button } from "@/src/app/components/ui/button";
@@ -584,150 +582,151 @@ const TrendsSection = () => {
   );
 };
 
-const useHorizontalScroll = () => {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
-  const [_momentum, _setMomentum] = useState({ x: 0, timestamp: 0 });
-  const animationRef = useRef<number | null>(null);
-  const velocityRef = useRef(0);
-  const lastTimeRef = useRef(0);
-  const lastPositionRef = useRef(0);
+// Hook no utilizado actualmente - se mantiene por si se necesita en el futuro
+// const useHorizontalScroll = () => {
+//   const scrollRef = useRef<HTMLDivElement>(null);
+//   const [isDragging, setIsDragging] = useState(false);
+//   const [startX, setStartX] = useState(0);
+//   const [scrollLeft, setScrollLeft] = useState(0);
+//   const [momentum, setMomentum] = useState({ x: 0, timestamp: 0 });
+//   const animationRef = useRef<number | null>(null);
+//   const velocityRef = useRef(0);
+//   const lastTimeRef = useRef(0);
+//   const lastPositionRef = useRef(0);
 
-  // Función para aplicar inercia al scroll
-  const applyMomentum = () => {
-    if (!scrollRef.current || Math.abs(velocityRef.current) < 0.5) {
-      animationRef.current = null;
-      return;
-    }
+//   // Función para aplicar inercia al scroll
+//   const applyMomentum = () => {
+//     if (!scrollRef.current || Math.abs(velocityRef.current) < 0.5) {
+//       animationRef.current = null;
+//       return;
+//     }
 
-    // Aplicar fricción para desacelerar gradualmente
-    velocityRef.current *= 0.95;
+//     // Aplicar fricción para desacelerar gradualmente
+//     velocityRef.current *= 0.95;
 
-    // Aplicar el desplazamiento basado en la velocidad actual
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft -= velocityRef.current;
-    }
+//     // Aplicar el desplazamiento basado en la velocidad actual
+//     if (scrollRef.current) {
+//       scrollRef.current.scrollLeft -= velocityRef.current;
+//     }
 
-    // Continuar la animación
-    animationRef.current = requestAnimationFrame(applyMomentum);
-  };
+//     // Continuar la animación
+//     animationRef.current = requestAnimationFrame(applyMomentum);
+//   };
 
-  const onMouseDown = (e: React.MouseEvent) => {
-    if (!scrollRef.current) return;
+//   const onMouseDown = (e: React.MouseEvent) => {
+//     if (!scrollRef.current) return;
 
-    // Detener cualquier animación de inercia en curso
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
-    }
+//     // Detener cualquier animación de inercia en curso
+//     if (animationRef.current) {
+//       cancelAnimationFrame(animationRef.current);
+//       animationRef.current = null;
+//     }
 
-    setIsDragging(true);
-    setStartX(e.clientX);
-    setScrollLeft(scrollRef.current.scrollLeft);
-    lastTimeRef.current = Date.now();
-    lastPositionRef.current = e.clientX;
-    velocityRef.current = 0;
+//     setIsDragging(true);
+//     setStartX(e.clientX);
+//     setScrollLeft(scrollRef.current.scrollLeft);
+//     lastTimeRef.current = Date.now();
+//     lastPositionRef.current = e.clientX;
+//     velocityRef.current = 0;
 
-    // Cambiar el cursor durante el arrastre
-    document.body.style.cursor = "grabbing";
-  };
+//     // Cambiar el cursor durante el arrastre
+//     document.body.style.cursor = "grabbing";
+//   };
 
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !scrollRef.current) return;
-    e.preventDefault();
+//   const onMouseMove = (e: React.MouseEvent) => {
+//     if (!isDragging || !scrollRef.current) return;
+//     e.preventDefault();
 
-    // Calcular la velocidad del movimiento
-    const now = Date.now();
-    const dt = now - lastTimeRef.current;
-    const dx = e.clientX - lastPositionRef.current;
+//     // Calcular la velocidad del movimiento
+//     const now = Date.now();
+//     const dt = now - lastTimeRef.current;
+//     const dx = e.clientX - lastPositionRef.current;
 
-    if (dt > 0) {
-      // Suavizar la velocidad con un factor de amortiguación
-      velocityRef.current = 0.8 * velocityRef.current + 0.2 * (dx / dt) * 16;
-    }
+//     if (dt > 0) {
+//       // Suavizar la velocidad con un factor de amortiguación
+//       velocityRef.current = 0.8 * velocityRef.current + 0.2 * (dx / dt) * 16;
+//     }
 
-    lastTimeRef.current = now;
-    lastPositionRef.current = e.clientX;
+//     lastTimeRef.current = now;
+//     lastPositionRef.current = e.clientX;
 
-    // Aplicar un factor de suavizado para el desplazamiento
-    const walk = (e.clientX - startX) * 1.2; // Factor reducido para mayor suavidad
-    scrollRef.current.scrollLeft = scrollLeft - walk;
-  };
+//     // Aplicar un factor de suavizado para el desplazamiento
+//     const walk = (e.clientX - startX) * 1.2; // Factor reducido para mayor suavidad
+//     scrollRef.current.scrollLeft = scrollLeft - walk;
+//   };
 
-  const onMouseUp = () => {
-    setIsDragging(false);
-    document.body.style.cursor = "";
+//   const onMouseUp = () => {
+//     setIsDragging(false);
+//     document.body.style.cursor = "";
 
-    // Iniciar la animación de inercia cuando se suelta el mouse
-    if (Math.abs(velocityRef.current) > 0.5) {
-      animationRef.current = requestAnimationFrame(applyMomentum);
-    }
-  };
+//     // Iniciar la animación de inercia cuando se suelta el mouse
+//     if (Math.abs(velocityRef.current) > 0.5) {
+//       animationRef.current = requestAnimationFrame(applyMomentum);
+//     }
+//   };
 
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (!scrollRef.current) return;
+//   const onTouchStart = (e: React.TouchEvent) => {
+//     if (!scrollRef.current) return;
 
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
-    }
+//     if (animationRef.current) {
+//       cancelAnimationFrame(animationRef.current);
+//       animationRef.current = null;
+//     }
 
-    setIsDragging(true);
-    setStartX(e.touches[0].clientX);
-    setScrollLeft(scrollRef.current.scrollLeft);
-    lastTimeRef.current = Date.now();
-    lastPositionRef.current = e.touches[0].clientX;
-    velocityRef.current = 0;
-  };
+//     setIsDragging(true);
+//     setStartX(e.touches[0].clientX);
+//     setScrollLeft(scrollRef.current.scrollLeft);
+//     lastTimeRef.current = Date.now();
+//     lastPositionRef.current = e.touches[0].clientX;
+//     velocityRef.current = 0;
+//   };
 
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || !scrollRef.current) return;
+//   const onTouchMove = (e: React.TouchEvent) => {
+//     if (!isDragging || !scrollRef.current) return;
 
-    const now = Date.now();
-    const dt = now - lastTimeRef.current;
-    const dx = e.touches[0].clientX - lastPositionRef.current;
+//     const now = Date.now();
+//     const dt = now - lastTimeRef.current;
+//     const dx = e.touches[0].clientX - lastPositionRef.current;
 
-    if (dt > 0) {
-      velocityRef.current = 0.8 * velocityRef.current + 0.2 * (dx / dt) * 16;
-    }
+//     if (dt > 0) {
+//       velocityRef.current = 0.8 * velocityRef.current + 0.2 * (dx / dt) * 16;
+//     }
 
-    lastTimeRef.current = now;
-    lastPositionRef.current = e.touches[0].clientX;
+//     lastTimeRef.current = now;
+//     lastPositionRef.current = e.touches[0].clientX;
 
-    const walk = (e.touches[0].clientX - startX) * 1.2;
-    scrollRef.current.scrollLeft = scrollLeft - walk;
-  };
+//     const walk = (e.touches[0].clientX - startX) * 1.2;
+//     scrollRef.current.scrollLeft = scrollLeft - walk;
+//   };
 
-  const onTouchEnd = () => {
-    setIsDragging(false);
+//   const onTouchEnd = () => {
+//     setIsDragging(false);
 
-    if (Math.abs(velocityRef.current) > 0.5) {
-      animationRef.current = requestAnimationFrame(applyMomentum);
-    }
-  };
+//     if (Math.abs(velocityRef.current) > 0.5) {
+//       animationRef.current = requestAnimationFrame(applyMomentum);
+//     }
+//   };
 
-  // Limpiar animaciones al desmontar
-  useEffect(() => {
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, []);
+//   // Limpiar animaciones al desmontar
+//   useEffect(() => {
+//     return () => {
+//       if (animationRef.current) {
+//         cancelAnimationFrame(animationRef.current);
+//       }
+//     };
+//   }, []);
 
-  return {
-    scrollRef,
-    onMouseDown,
-    onMouseUp,
-    onMouseMove,
-    onTouchStart,
-    onTouchMove,
-    onTouchEnd,
-    isDragging,
-  };
-};
+//   return {
+//     scrollRef,
+//     onMouseDown,
+//     onMouseUp,
+//     onMouseMove,
+//     onTouchStart,
+//     onTouchMove,
+//     onTouchEnd,
+//     isDragging,
+//   };
+// };
 
 export default function HomePage() {
   const { data: session } = useSession();
@@ -1162,7 +1161,7 @@ export default function HomePage() {
                     className="text-blue-200 dark:text-gray-300 hover:text-white dark:hover:text-white p-0 h-auto"
                     asChild
                   >
-                    <a className="flex items-center px-2 py-1 -ml-2 hover:bg-blue-600/10 dark:hover:bg-gray-700/30 rounded-md transition-colors">
+                    <a className="flex items-center text-blue-100 hover:text-white transition-colors">
                       <Filter className="h-3 w-3 mr-1" /> Búsqueda avanzada
                     </a>
                   </Button>

@@ -8,7 +8,7 @@ import { Badge } from "@/src/app/components/ui/badge";
 import Link from "next/link";
 import { memo, useEffect, useState } from "react";
 import { CldImage } from 'next-cloudinary';
-import { User as UserIcon, MessageCircle, Star, Heart, ChevronRight, Users } from "lucide-react";
+import { User as UserIcon, MessageCircle, ChevronRight, Users } from "lucide-react";
 
 interface UserCardProps {
   user: Pick<User, "id" | "name" | "username" | "image"> & {
@@ -247,7 +247,7 @@ export const UserCard = memo(function UserCard({ user, action }: UserCardProps) 
                 <div className="relative px-2 py-3 mt-2 bg-gray-50 dark:bg-gray-800 rounded-lg border-l-2 border-blue-300 dark:border-blue-700">
                   <MessageCircle className="absolute left-2 top-2 h-3.5 w-3.5 text-blue-400 dark:text-blue-500" />
                   <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 italic pl-7 pr-2 text-left">
-                    "{user.bio}"
+                    &quot;{user.bio}&quot;
                   </p>
                 </div>
               )}

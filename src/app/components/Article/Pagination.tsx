@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/src/app/components/ui/button";
 import { motion } from "framer-motion";
-import { ChevronsLeft, ChevronsRight } from "lucide-react";
+
 
 interface Props {
   currentPage: number;

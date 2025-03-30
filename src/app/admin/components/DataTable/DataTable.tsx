@@ -67,8 +67,8 @@ export default function DataTable<T>({
     }));
   };
 
-  const isMobileView = windowWidth < 768;
-  const isTabletView = windowWidth >= 768 && windowWidth < 1080;
+  const _isMobileView = windowWidth < 768;
+  const _isTabletView = windowWidth >= 768 && windowWidth < 1080;
 
   const getTabletVisibleColumns = () => {
     if (windowWidth < 850) return 3; 
@@ -76,7 +76,7 @@ export default function DataTable<T>({
     return 5; 
   };
 
-  const tabletVisibleColumns = getTabletVisibleColumns();
+  const _tabletVisibleColumns = getTabletVisibleColumns();
 
   const renderMobileRow = (item: T, index: number) => {
     const isExpanded = expandedRows[index] || false;

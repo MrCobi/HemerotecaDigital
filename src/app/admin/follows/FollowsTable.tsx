@@ -105,7 +105,7 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterValue, setFilterValue] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [_isDeleting, setIsDeleting] = useState(false);
 
   // Filtra las relaciones de seguimiento según los criterios seleccionados
   const filteredFollows = useMemo(() => {
@@ -287,7 +287,7 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
         );
       },
     },
-  ], [isDeleting, handleDelete]);
+  ], [handleDelete]);
 
   return (
     <div className="space-y-4">

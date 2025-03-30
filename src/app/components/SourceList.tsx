@@ -21,8 +21,6 @@ import {
   Search,
   Globe2,
   Info,
-  ChevronLeft,
-  ChevronRight,
   Heart,
 } from "lucide-react";
 import { useRouter } from "next/navigation";

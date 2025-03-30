@@ -6,7 +6,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
-import { Button } from "@/src/app/components/ui/button";
 import { Trash2, Eye, CheckCircle, Users, MessageSquare } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
 import { toast } from "sonner";
@@ -140,7 +139,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterValue, setFilterValue] = useState("");
   const [filterType, setFilterType] = useState<"all" | "read" | "unread" | "individual" | "group">("all");
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [_isDeleting, setIsDeleting] = useState(false);
   const [isMarkingAsRead, setIsMarkingAsRead] = useState<string | null>(null);
   const [localMessages, setLocalMessages] = useState<Message[]>(messages);
 
@@ -195,7 +194,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     }
     
     return filtered;
-  }, [messages, filterValue, filterType, localMessages]);
+  }, [filterValue, filterType, localMessages]);
 
   // Calcula el total de páginas
   const totalPages = Math.ceil(filteredMessages.length / rowsPerPage);
@@ -638,7 +637,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
     },
-  ], [isDeleting, isMarkingAsRead, filterElement, handleDelete]);
+  ], [isMarkingAsRead, filterElement, handleDelete]);
 
   return (
     <div className="space-y-4">

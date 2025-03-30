@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth, AuthParams } from "../../../../../lib/auth-utils";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 // PUT para marcar un mensaje específico como leído
 export const PUT = withAuth(async (

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Source } from "@/src/interface/source";
 import DataTable, { Column } from "../components/DataTable/DataTable";
-import { ExternalLink, Edit, Star, Trash } from "lucide-react";
+import { ExternalLink, Edit, Star } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import DeleteDialog from "@/src/components/ui/DeleteDialog";
