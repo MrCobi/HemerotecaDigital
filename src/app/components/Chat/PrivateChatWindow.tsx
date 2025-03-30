@@ -464,7 +464,7 @@ const PrivateChatWindow = ({
       formData.append('file', blob, `voice-message-${Date.now()}.webm`);
       formData.append('type', 'audio');
       
-      const uploadRes = await fetch('/api/upload', {
+      const uploadRes = await fetch('/api/messages/upload', {
         method: 'POST',
         body: formData,
       });
@@ -500,7 +500,6 @@ const PrivateChatWindow = ({
         throw new Error(`Error al enviar mensaje: ${result.status}`);
       }
       
-      // Actualizar estado (mensaje enviado correctamente)
       return { success: true, messageId: tempId, finalUrl: audioUrl };
       
     } catch (error) {
@@ -620,7 +619,6 @@ const PrivateChatWindow = ({
     return (
       <div className={cn("flex flex-col h-full justify-center items-center p-4", className)}>
         <LoadingSpinner className="h-8 w-8 mb-2" />
-        <p>Cargando mensajes...</p>
       </div>
     );
   }

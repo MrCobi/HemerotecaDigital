@@ -392,10 +392,6 @@ const OptimizedChatWindow = ({
   const sendVoiceMessage = React.useCallback(async (blob: Blob) => {
     if (!conversationId) return;
     
-    // Verificar si es una conversación de grupo o privada
-    const isGroup = conversationId.startsWith('group_');
-    console.log('Enviando mensaje de voz a:', { conversationId, isGroup });
-    
     try {
       // Crear URL para mostrar temporalmente mientras se envía
       const tempUrl = URL.createObjectURL(blob);
@@ -417,6 +413,7 @@ const OptimizedChatWindow = ({
       // Crear FormData para subir el archivo
       const formData = new FormData();
       formData.append('file', blob, 'voice-message.webm');
+      formData.append('type', 'audio');
       
       // 1. Subir el archivo de audio a Cloudinary
       console.log('Subiendo audio a Cloudinary...');
@@ -473,9 +470,6 @@ const OptimizedChatWindow = ({
       }
       
       console.log('Mensaje de voz enviado con éxito');
-      
-      // Aquí podríamos actualizar el estado del mensaje con la respuesta del servidor
-      
     } catch (error) {
       console.error('Error al enviar mensaje de voz:', error);
       _toast?.({
@@ -484,7 +478,7 @@ const OptimizedChatWindow = ({
         variant: "destructive"
       });
     }
-  }, [conversationId, otherUser?.id, _toast, currentUserId]);
+  }, [conversationId, _toast, currentUserId, otherUser]);
 
   // Detener grabación de voz y enviar
   const handleStopVoiceRecording = React.useCallback(async () => {
@@ -609,7 +603,7 @@ const OptimizedChatWindow = ({
     return (
       <div className={cn("flex flex-col h-full justify-center items-center p-4", className)}>
         <LoadingSpinner className="h-8 w-8 mb-2" />
-        <p>Cargando mensajes...</p>
+
       </div>
     );
   }
