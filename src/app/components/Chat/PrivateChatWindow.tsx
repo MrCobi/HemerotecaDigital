@@ -16,6 +16,7 @@ import Image from 'next/image';
 // Importar el hook personalizado
 import { useChatContent } from '@/src/app/messages/hooks/useChatContent';
 import useAudioRecorder from '@/src/hooks/useAudioRecorder';
+import AudioPlayer from './AudioPlayer';
 
 type PrivateChatWindowProps = {
   conversation: ConversationData | null;
@@ -63,7 +64,8 @@ const PrivateMessageItem = React.memo(({
   showDateSeparator,
   currentUserImage,
   currentUserName,
-  onPlayAudio
+  onPlayAudio,
+  index
 }: {
   message: Message;
   currentUserId: string;
@@ -72,6 +74,7 @@ const PrivateMessageItem = React.memo(({
   currentUserImage: string | null;
   currentUserName: string | null;
   onPlayAudio: (url: string) => void;
+  index: number;
 }) => {
   const isCurrentUser = message.senderId === currentUserId;
   const messageDate = new Date(message.createdAt);
@@ -130,14 +133,12 @@ const PrivateMessageItem = React.memo(({
           >
             {/* Contenido del mensaje según su tipo */}
             {isVoiceMessage ? (
-              <div className="voice-message flex items-center gap-2 min-w-[150px]">
-                <button
-                  onClick={() => onPlayAudio(message.mediaUrl || '')}
-                  className="flex items-center gap-2 px-2 py-1 rounded-full bg-opacity-20 bg-black hover:bg-opacity-30 transition-colors"
-                >
-                  <Play className="h-5 w-5" />
-                  <div className="w-20 h-1 bg-current opacity-50 rounded-full"></div>
-                </button>
+              <div className="voice-message min-w-[200px]">
+                <AudioPlayer 
+                  audioUrl={message.mediaUrl || ''}
+                  messageId={message.id || message.tempId || `msg-${index}`}
+                  isSender={isCurrentUser}
+                />
               </div>
             ) : message.messageType === 'image' && message.imageUrl ? (
               <div className="mb-2">
@@ -586,6 +587,7 @@ const PrivateChatWindow = ({
                 currentUserImage={session?.user?.image || null}
                 currentUserName={session?.user?.name || null}
                 onPlayAudio={handlePlayAudio}
+                index={index}
               />
             );
           })
