@@ -180,104 +180,40 @@ const MessageItem = React.memo(({
                 />
               </div>
             ) : isImageMessage ? (
-              <>
-                <div className="mb-2 relative group">
-                  <div
-                    className={`relative overflow-hidden rounded-lg cursor-pointer ${
-                      !imageLoaded ? 'bg-gray-200 dark:bg-gray-700 animate-pulse h-[150px]' : ''
-                    }`}
-                    onClick={() => setIsImageOpen(true)}
-                  >
-                    {message.mediaUrl && message.mediaUrl.includes('cloudinary.com') && useCloudinary ? (
-                      <CldImage 
-                        src={extractCloudinaryId(message.mediaUrl)}
-                        alt="Imagen adjunta" 
-                        className="rounded-lg cursor-pointer object-cover w-full h-full"
-                        width={400}
-                        height={300}
-                        quality={100}
-                        onError={() => {
-                          console.log("Error cargando imagen de Cloudinary, usando fallback");
-                          setImageLoaded(true);
-                          setUseCloudinary(false);
-                        }}
-                        onLoad={() => setImageLoaded(true)}
-                      />
-                    ) : (
-                      <NextImage 
-                        src={message.mediaUrl!} 
-                        alt="Imagen adjunta"
-                        className="rounded-lg cursor-pointer object-cover w-full h-full"
-                        width={400}
-                        height={300}
-                        quality={100}
-                        unoptimized={true}
-                        onLoad={() => setImageLoaded(true)}
-                        onError={() => setImageLoaded(true)}
-                      />
-                    )}
-                    {imageLoaded && (
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-30 transition-opacity duration-200 rounded-lg"></div>
-                        <div className="z-10 bg-black bg-opacity-75 text-white py-2 px-4 rounded-full text-sm font-medium">
-                          Ver imagen
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {isImageOpen && (
-                  <Dialog open={isImageOpen} onOpenChange={setIsImageOpen} modal={true}>
-                    <DialogContent className="p-0 m-0 max-w-[90vw] max-h-[85vh] bg-black border-none shadow-xl flex items-center justify-center rounded-lg">
-                      <DialogTitle className="sr-only">Ver imagen</DialogTitle>
-                      <div className="w-full h-full flex items-center justify-center relative">
-                        {message.mediaUrl && message.mediaUrl.includes('cloudinary.com') && useCloudinary ? (
-                          <CldImage
-                            src={extractCloudinaryId(message.mediaUrl)}
-                            alt="Imagen ampliada"
-                            width={1280}
-                            height={800}
-                            style={{
-                              objectFit: 'contain',
-                              maxWidth: '100%',
-                              maxHeight: '85vh'
-                            }}
-                            quality={100}
-                            sizes="90vw"
-                            onError={() => setUseCloudinary(false)}
-                            priority
-                          />
-                        ) : (
-                          <NextImage
-                            src={message.mediaUrl!}
-                            alt="Imagen ampliada"
-                            width={1280}
-                            height={800}
-                            style={{
-                              objectFit: 'contain',
-                              maxWidth: '100%',
-                              maxHeight: '85vh'
-                            }}
-                            quality={100}
-                            priority
-                            unoptimized={true}
-                          />
-                        )}
-                      </div>
-                      <button
-                        className="absolute top-0 right-0 p-2 rounded-full bg-black bg-opacity-50 cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsImageOpen(false);
-                        }}
-                      >
-                        <X className="h-6 w-6 text-white" />
-                      </button>
-                    </DialogContent>
-                  </Dialog>
+              <div
+                className={`relative overflow-hidden rounded-lg ${
+                  !imageLoaded ? 'bg-gray-200 dark:bg-gray-700 animate-pulse h-[150px]' : ''
+                }`}
+              >
+                {message.mediaUrl && message.mediaUrl.includes('cloudinary.com') && useCloudinary ? (
+                  <CldImage 
+                    src={extractCloudinaryId(message.mediaUrl)}
+                    alt="Imagen adjunta" 
+                    className="rounded-lg object-cover w-full h-full"
+                    width={400}
+                    height={300}
+                    quality={100}
+                    onError={() => {
+                      console.log("Error cargando imagen de Cloudinary, usando fallback");
+                      setImageLoaded(true);
+                      setUseCloudinary(false);
+                    }}
+                    onLoad={() => setImageLoaded(true)}
+                  />
+                ) : (
+                  <NextImage 
+                    src={message.mediaUrl!} 
+                    alt="Imagen adjunta"
+                    className="rounded-lg object-cover w-full h-full"
+                    width={400}
+                    height={300}
+                    quality={100}
+                    unoptimized={true}
+                    onLoad={() => setImageLoaded(true)}
+                    onError={() => setImageLoaded(true)}
+                  />
                 )}
-              </>
+              </div>
             ) : (
               <div className="whitespace-pre-wrap break-words">{message.content}</div>
             )}
