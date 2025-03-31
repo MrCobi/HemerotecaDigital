@@ -22,7 +22,7 @@ export const isDevelopment = (): boolean => {
 export const getBaseUrl = (): string => {
   return process.env.NEXTAUTH_URL || (
     isProduction() 
-      ? 'https://yourproductiondomain.com' // Update this with your production domain
+      ? 'http://88.23.126.28:3000' // Update this with your production domain
       : 'http://localhost:3000'
   );
 };
