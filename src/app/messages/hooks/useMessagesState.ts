@@ -729,5 +729,7 @@ export function useMessagesState() {
     handleGroupDescriptionChange,
     handleParticipantToggle,
     handleGroupImageChange,
+    setSelectedConversationData,
+    setIsGroupAdmin
   };
 }

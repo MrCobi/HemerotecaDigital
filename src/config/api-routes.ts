@@ -95,7 +95,15 @@ export const API_ROUTES = {
     conversations: "/api/messages/conversations",
     createConversation: "/api/messages/conversations/create",
     createGroup: "/api/messages/group",
-    uploadGroupImage: "/api/messages/upload",
+    uploadGroupImage: "/api/messages/group/upload",
+    group: {
+      update: (groupId: string) => `/api/messages/group/${groupId}`,
+      delete: (groupId: string) => `/api/messages/group/${groupId}`,
+      addParticipants: (groupId: string) => `/api/messages/group/${groupId}/participants`,
+      removeParticipant: (groupId: string, participantId: string) => 
+        `/api/messages/group/${groupId}/participants/${participantId}`,
+      leaveGroup: (groupId: string) => `/api/messages/group/${groupId}/leave`
+    },
     groupMessages: "/api/messages/group-messages",
     upload: "/api/messages/upload",
     read: "/api/messages/read",

@@ -12,6 +12,7 @@ import { CldImage } from 'next-cloudinary';
 import Image from 'next/image';
 import { API_ROUTES } from '@/src/config/api-routes';
 import { useToast } from '@/src/app/hooks/use-toast';
+import io from 'socket.io-client';
 
 export type User = {
   id: string;
@@ -47,6 +48,7 @@ interface GroupManagementModalProps {
   onConversationUpdate: (updatedData: Partial<ConversationData>) => void;
   onDeleteGroup?: () => void;
   onLeaveGroup?: () => void;
+  onGroupDeleted?: (groupId: string) => void;
 }
 
 const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
@@ -57,7 +59,8 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   isAdmin,
   onConversationUpdate,
   onDeleteGroup,
-  onLeaveGroup
+  onLeaveGroup,
+  onGroupDeleted
 }) => {
   const { data: _session } = useSession();
   const { toast } = useToast();
@@ -71,20 +74,84 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   const [possibleParticipants, setPossibleParticipants] = useState<User[]>([]);
   const [selectedNewParticipants, setSelectedNewParticipants] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [groupImageFile, setGroupImageFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [localConversationData, setLocalConversationData] = useState<ConversationData | null>(null);
   
-  // Actualizar estados cuando cambia la conversación seleccionada
+  // Actualizar nuestro estado local cuando los datos de la conversación cambian desde el exterior
   useEffect(() => {
     if (conversationData) {
+      setLocalConversationData(conversationData);
+      // También actualizar otros estados importantes
       setGroupNameEdit(conversationData.name || "");
       setGroupDescriptionEdit(conversationData.description || "");
+      setPreviewImage(null);
+      setGroupImageFile(null);
+      setUploadProgress(0);
       
       // Verificar si el usuario actual es administrador
       const currentUserParticipant = conversationData.participants.find(
         p => p.userId === currentUserId
       );
-      setIsGroupAdmin(currentUserParticipant?.role === 'admin');
+      const userIsAdmin = !!currentUserParticipant && ['admin', 'owner'].includes(currentUserParticipant.role);
+      setIsGroupAdmin(userIsAdmin);
+      
+      console.log("[DEBUG] Datos de conversación actualizados:", conversationData, "Usuario es admin:", userIsAdmin);
     }
   }, [conversationData, currentUserId]);
+
+  // Limpiar estado al cerrar
+  useEffect(() => {
+    if (!isOpen) {
+      setShowAddParticipantsModal(false);
+      setIsUpdatingGroup(false);
+      setPreviewImage(null);
+      setGroupImageFile(null);
+      setUploadProgress(0);
+    }
+  }, [isOpen]);
+
+  // Crear una función para notificar a los demás participantes de los cambios
+  const notifyGroupUpdated = useCallback(async (updateType: string, updatedData: any) => {
+    if (!conversationData) return;
+    
+    try {
+      // Enviar notificación a través de socket.io
+      const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001');
+      
+      // Usamos el ID con prefijo para mantener la consistencia con la lógica de socket
+      socket.emit('group_updated', {
+        groupId: conversationData.id.startsWith('group_') ? conversationData.id : `group_${conversationData.id}`,
+        updateType,
+        updatedData,
+        updatedBy: {
+          id: currentUserId,
+          name: _session?.user?.name,
+          image: _session?.user?.image
+        }
+      });
+    } catch (error) {
+      console.error('Error al notificar actualización del grupo:', error);
+    }
+  }, [conversationData, currentUserId, _session?.user]);
+  
+  // Función para asegurar que el ID de conversación tiene el formato correcto
+  const ensureIdFormat = useCallback((id: string | null | undefined) => {
+    if (!id) return '';
+    // Si ya tiene el prefijo, devolverlo tal cual
+    if (id.startsWith('group_') || id.startsWith('conv_')) {
+      return id;
+    }
+    // Si no tiene prefijo, añadir 'group_' para grupos
+    return `group_${id}`;
+  }, []);
+  
+  // Función para eliminar el prefijo del ID para la API
+  const getIdForApi = useCallback((id: string) => {
+    return id.replace(/^(conv_|group_)/, '');
+  }, []);
   
   // Función para actualizar la información del grupo
   const updateGroupInfo = async (data: { name?: string, description?: string, imageUrl?: string }) => {
@@ -93,7 +160,13 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
     try {
       setIsUpdatingGroup(true);
       
-      const response = await fetch(`${API_ROUTES.messages.createGroup}/${conversationData.id}`, {
+      // Obtenemos solo el ID sin prefijo para enviarlo a la API
+      const groupId = getIdForApi(conversationData.id);
+      console.log(`[Cliente] Actualizando grupo con ID: ${groupId} (original: ${conversationData.id})`);
+      console.log(`[Cliente] Datos a enviar:`, data);
+      
+      // Asegurarnos de que estamos usando ensureIdFormat consistentemente en el cliente y servidor
+      const response = await fetch(`${API_ROUTES.messages.group.update(groupId)}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -101,89 +174,170 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
         body: JSON.stringify(data)
       });
       
-      if (!response.ok) {
-        throw new Error('Error al actualizar el grupo');
+      console.log(`[Cliente] Respuesta del servidor - Status: ${response.status}`);
+      
+      // Intentamos capturar y mostrar la respuesta completa para depuración
+      let responseText = "";
+      try {
+        responseText = await response.text();
+        console.log(`[Cliente] Respuesta texto completo:`, responseText);
+        
+        let responseData: {
+          success?: boolean;
+          error?: string;
+          conversation?: any;
+        } = {};
+        
+        try {
+          // Solo intentar parsear si hay contenido
+          if (responseText.trim().length > 0) {
+            responseData = JSON.parse(responseText);
+            console.log(`[Cliente] Respuesta JSON parseada:`, responseData);
+          } else {
+            console.log(`[Cliente] Respuesta vacía del servidor`);
+            responseData = { error: "Respuesta vacía del servidor" };
+          }
+        } catch (e) {
+          console.error('[Cliente] Error al parsear la respuesta JSON:', e);
+          throw new Error('Error al parsear la respuesta del servidor');
+        }
+        
+        if (!response.ok) {
+          console.error('[Cliente] Error al actualizar grupo:', responseData);
+          throw new Error(responseData.error || 'Error actualizando grupo');
+        }
+        
+        if (responseData && (responseData.success || responseData.conversation)) {
+          toast({
+            title: "Grupo actualizado",
+            description: "La información del grupo ha sido actualizada correctamente"
+          });
+          
+          // Notificar a los demás participantes usando notifyGroupUpdated
+          try {
+            notifyGroupUpdated('info_updated', data);
+            console.log(`[Cliente] Notificación enviada para el grupo: ${conversationData.id}`);
+          } catch (notifyError) {
+            console.error('[Cliente] Error al notificar actualización:', notifyError);
+          }
+          
+          // Actualizar la conversación en el contexto
+          if (responseData.conversation) {
+            onConversationUpdate(responseData.conversation);
+          } else {
+            onConversationUpdate(data);
+          }
+          
+          setIsUpdatingGroup(false);
+          return true;
+        } else {
+          throw new Error('La respuesta no indicó éxito');
+        }
+      } catch (parseError) {
+        console.error('[Cliente] Error al procesar la respuesta:', parseError);
+        throw new Error('Error al procesar la respuesta del servidor');
       }
-      
-      // Notificar al componente padre sobre la actualización
-      onConversationUpdate(data);
-      
-      return true;
     } catch (error) {
-      console.error('Error al actualizar el grupo:', error);
+      console.error('Error:', error);
       toast({
         title: "Error",
-        description: "No se pudo actualizar la información del grupo",
-        variant: "destructive",
+        description: error instanceof Error ? error.message : "No se pudo actualizar la información del grupo",
+        variant: "destructive"
       });
-      return false;
-    } finally {
       setIsUpdatingGroup(false);
+      return false;
     }
   };
   
-  // Función para cambiar la imagen del grupo
-  const handleChangeGroupImage = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async (e) => {
-      const target = e.target as HTMLInputElement;
-      if (target.files && target.files[0]) {
-        const file = target.files[0];
+  // Función para manejar la subida de imágenes
+  const handleImageUpload = useCallback(async (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (file) {
+      // Verificar que es una imagen
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Error",
+          description: "Solo se permiten archivos de imagen",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Mostrar previsualización
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setPreviewImage(e.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+      setGroupImageFile(file);
+
+      // Subir la imagen a Cloudinary
+      try {
+        setIsUploadingImage(true);
+        setUploadProgress(0);
         
-        // Crear URL para previsualización
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (e.target?.result) {
-            // Preview en este caso no es necesario ya que no mostramos una previsualización
+        // Crear FormData para la carga
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Crear XHR para poder monitorear el progreso
+        const xhr = new XMLHttpRequest();
+        
+        // Configurar el evento de progreso
+        xhr.upload.addEventListener("progress", (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            setUploadProgress(percent);
+          }
+        });
+        
+        // Configurar evento cuando la carga termina
+        xhr.onreadystatechange = async () => {
+          if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+              // Carga exitosa
+              const response = JSON.parse(xhr.responseText);
+              
+              // Actualizar la información del grupo con la nueva URL de imagen
+              if (response.url) {
+                const success = await updateGroupInfo({ imageUrl: response.url });
+                if (success) {
+                  toast({
+                    title: "Imagen actualizada",
+                    description: "La imagen del grupo ha sido actualizada correctamente"
+                  });
+                }
+              }
+            } else {
+              // Error
+              toast({
+                title: "Error",
+                description: "No se pudo subir la imagen",
+                variant: "destructive"
+              });
+            }
+            setIsUploadingImage(false);
           }
         };
-        reader.readAsDataURL(file);
         
-        // Subir la imagen a Cloudinary
-        try {
-          // Iniciar carga
-          setIsUpdatingGroup(true);
-          
-          // Usar el endpoint de carga de imágenes para grupos
-          const formData = new FormData();
-          formData.append('file', file);
-          
-          const response = await fetch(API_ROUTES.messages.uploadGroupImage, {
-            method: 'POST',
-            body: formData
-          });
-          
-          if (!response.ok) {
-            throw new Error('Error al subir la imagen');
-          }
-          
-          const data = await response.json();
-          
-          // Actualizar el grupo con la nueva imagen
-          await updateGroupInfo({
-            imageUrl: data.url
-          });
-          
-          toast({
-            title: "Imagen actualizada",
-            description: "La imagen del grupo ha sido actualizada correctamente",
-          });
-        } catch (error) {
-          console.error('Error al cambiar la imagen:', error);
-          toast({
-            title: "Error",
-            description: "No se pudo cambiar la imagen del grupo",
-            variant: "destructive",
-          });
-        } finally {
-          setIsUpdatingGroup(false);
-        }
+        // Abrir y enviar la solicitud
+        xhr.open("POST", API_ROUTES.messages.uploadGroupImage);
+        xhr.send(formData);
+        
+      } catch (error) {
+        console.error('Error al subir imagen:', error);
+        toast({
+          title: "Error",
+          description: "No se pudo subir la imagen",
+          variant: "destructive"
+        });
+        setIsUploadingImage(false);
       }
-    };
-    input.click();
-  };
+    }
+  }, [toast, updateGroupInfo]);
   
   // Función para actualizar el nombre del grupo
   const handleUpdateGroupName = async () => {
@@ -191,7 +345,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
       toast({
         title: "Error",
         description: "El nombre del grupo no puede estar vacío",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
@@ -200,7 +354,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
     if (success) {
       toast({
         title: "Nombre actualizado",
-        description: "El nombre del grupo ha sido actualizado correctamente",
+        description: "El nombre del grupo ha sido actualizado correctamente"
       });
     }
   };
@@ -211,7 +365,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
     if (success) {
       toast({
         title: "Descripción actualizada",
-        description: "La descripción del grupo ha sido actualizada correctamente",
+        description: "La descripción del grupo ha sido actualizada correctamente"
       });
     }
   };
@@ -238,7 +392,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
       toast({
         title: "Error",
         description: "No se pudieron cargar los posibles participantes",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   }, [conversationData, toast]);
@@ -263,89 +417,116 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   
   // Función para añadir participantes al grupo
   const handleAddParticipants = async () => {
-    if (!conversationData || selectedNewParticipants.length === 0) return;
+    if (!conversationData || !isAdmin || selectedNewParticipants.length === 0) return;
     
     try {
       setIsUpdatingGroup(true);
       
-      const response = await fetch(`${API_ROUTES.messages.createGroup}/${conversationData.id}/participants`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ participants: selectedNewParticipants })
-      });
+      // Obtenemos solo el ID sin prefijo para enviarlo a la API
+      const groupId = getIdForApi(conversationData.id);
+      console.log(`[Cliente] Añadiendo participantes al grupo: ${groupId} (original: ${conversationData.id})`);
+      
+      const response = await fetch(
+        API_ROUTES.messages.group.addParticipants(groupId),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ participants: selectedNewParticipants })
+        }
+      );
       
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error al añadir participantes:', errorData);
         throw new Error('Error al añadir participantes');
       }
       
-      // Actualizar localmente
-      const updatedParticipants = [
-        ...conversationData.participants,
-        ...possibleParticipants
-          .filter(user => selectedNewParticipants.includes(user.id))
-          .map(user => ({
-            id: user.id,
-            userId: user.id,
-            role: 'member' as 'admin' | 'member' | 'moderator' | 'owner',
-            user
-          }))
-      ];
+      // Obtener los datos actualizados de la respuesta
+      const responseData = await response.json();
+      console.log('[DEBUG] Respuesta de añadir participantes:', responseData);
       
-      onConversationUpdate({ participants: updatedParticipants });
-      
-      toast({
-        title: "Participantes añadidos",
-        description: "Los participantes han sido añadidos correctamente",
-      });
-      
-      // Cerrar modal y resetear estado
+      // Cerrar modal y limpiar selección
       setShowAddParticipantsModal(false);
       setSelectedNewParticipants([]);
       
+      // Usar los datos completos de la conversación que devuelve el servidor
+      if (responseData && responseData.conversation) {
+        // Llamar a la función de actualización del componente padre con los datos completos
+        onConversationUpdate(responseData.conversation);
+      }
+      
+      // Notificar a los demás participantes
+      notifyGroupUpdated('participants_added', selectedNewParticipants);
+      
+      toast({
+        title: "Participantes añadidos",
+        description: "Los participantes han sido añadidos correctamente"
+      });
+      
     } catch (error) {
-      console.error('Error al añadir participantes:', error);
       toast({
         title: "Error",
-        description: "No se pudieron añadir los participantes",
-        variant: "destructive",
+        description: "Ha ocurrido un error al añadir los participantes",
+        variant: "destructive"
       });
     } finally {
       setIsUpdatingGroup(false);
     }
   };
-  
+
   // Función para eliminar un participante
   const handleRemoveParticipant = async (userId: string) => {
-    if (!conversationData || !isAdmin || userId === currentUserId) return;
+    if (!conversationData || !isAdmin) return;
     
     try {
       setIsUpdatingGroup(true);
       
-      const response = await fetch(`${API_ROUTES.messages.createGroup}/${conversationData.id}/participants/${userId}`, {
-        method: 'DELETE'
-      });
+      // Obtenemos solo el ID sin prefijo para enviarlo a la API
+      const groupId = getIdForApi(conversationData.id);
+      console.log(`[Cliente] Eliminando participante ${userId} del grupo: ${groupId} (original: ${conversationData.id})`);
+      
+      const response = await fetch(
+        API_ROUTES.messages.group.removeParticipant(groupId, userId),
+        {
+          method: 'DELETE'
+        }
+      );
       
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error al eliminar participante:', errorData);
         throw new Error('Error al eliminar participante');
       }
       
-      // Actualizar localmente
-      const updatedParticipants = conversationData.participants.filter(p => p.userId !== userId);
-      onConversationUpdate({ participants: updatedParticipants });
+      // Obtener los datos actualizados de la respuesta
+      const responseData = await response.json();
+      console.log('[DEBUG] Respuesta de eliminar participante:', responseData);
+      
+      // Usar los datos completos de la conversación que devuelve el servidor
+      if (responseData && responseData.conversation) {
+        // Llamar a la función de actualización del componente padre con los datos completos
+        onConversationUpdate(responseData.conversation);
+      } else {
+        // Si no hay datos completos en la respuesta, actualizar localmente
+        const updatedParticipants = conversationData.participants.filter(p => p.userId !== userId);
+        onConversationUpdate({ participants: updatedParticipants });
+      }
+      
+      // Notificar a los demás participantes
+      notifyGroupUpdated('participant_removed', userId);
       
       toast({
         title: "Participante eliminado",
-        description: "El participante ha sido eliminado correctamente",
+        description: "El participante ha sido eliminado correctamente"
       });
       
     } catch (error) {
-      console.error('Error al eliminar participante:', error);
       toast({
         title: "Error",
-        description: "No se pudo eliminar al participante",
-        variant: "destructive",
+        description: "Ha ocurrido un error al eliminar el participante",
+        variant: "destructive"
       });
     } finally {
       setIsUpdatingGroup(false);
@@ -356,77 +537,101 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   const handleDeleteGroup = async () => {
     if (!conversationData || !isAdmin) return;
     
-    if (window.confirm('¿Estás seguro de que quieres eliminar este grupo? Esta acción no se puede deshacer.')) {
+    const confirmDelete = window.confirm('¿Estás seguro de eliminar este grupo? Esta acción no se puede deshacer.');
+    
+    if (confirmDelete) {
       try {
         setIsUpdatingGroup(true);
         
-        const response = await fetch(`${API_ROUTES.messages.createGroup}/${conversationData.id}`, {
-          method: 'DELETE'
-        });
+        // Obtenemos solo el ID sin prefijo para enviarlo a la API
+        const groupId = getIdForApi(conversationData.id);
+        console.log(`[Cliente] Eliminando grupo: ${groupId} (original: ${conversationData.id})`);
+        
+        const response = await fetch(
+          API_ROUTES.messages.group.delete(groupId),
+          {
+            method: 'DELETE'
+          }
+        );
         
         if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Error al eliminar grupo:', errorData);
           throw new Error('Error al eliminar el grupo');
         }
         
+        // Notificar a los demás participantes
+        notifyGroupUpdated('group_deleted', conversationData.id);
+        
         toast({
           title: "Grupo eliminado",
-          description: "El grupo ha sido eliminado correctamente",
+          description: "El grupo ha sido eliminado correctamente"
         });
         
-        // Cerrar modal y notificar al componente padre
+        // Cerrar modal y notificar para refrescar la lista de conversaciones
         onClose();
-        
-        if (onDeleteGroup) {
-          onDeleteGroup();
+        if (onGroupDeleted) {
+          onGroupDeleted(conversationData.id);
         }
         
       } catch (error) {
-        console.error('Error al eliminar el grupo:', error);
         toast({
           title: "Error",
-          description: "No se pudo eliminar el grupo",
-          variant: "destructive",
+          description: "Ha ocurrido un error al eliminar el grupo",
+          variant: "destructive"
         });
       } finally {
         setIsUpdatingGroup(false);
       }
     }
   };
-  
+
   // Función para abandonar el grupo
   const handleLeaveGroup = async () => {
     if (!conversationData) return;
     
-    if (window.confirm('¿Estás seguro de que quieres abandonar este grupo?')) {
+    const confirmLeave = window.confirm('¿Estás seguro de abandonar este grupo?');
+    
+    if (confirmLeave) {
       try {
         setIsUpdatingGroup(true);
         
-        const response = await fetch(`${API_ROUTES.messages.createGroup}/${conversationData.id}/leave`, {
-          method: 'POST'
-        });
+        // Obtenemos solo el ID sin prefijo para enviarlo a la API
+        const groupId = getIdForApi(conversationData.id);
+        console.log(`[Cliente] Abandonando grupo: ${groupId} (original: ${conversationData.id})`);
+        
+        const response = await fetch(
+          API_ROUTES.messages.group.leaveGroup(groupId),
+          {
+            method: 'POST'
+          }
+        );
         
         if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Error al abandonar grupo:', errorData);
           throw new Error('Error al abandonar el grupo');
         }
         
+        // Notificar a los demás participantes
+        notifyGroupUpdated('participant_left', currentUserId);
+        
         toast({
           title: "Grupo abandonado",
-          description: "Has abandonado el grupo correctamente",
+          description: "Has abandonado el grupo correctamente"
         });
         
-        // Cerrar modal y notificar al componente padre
+        // Cerrar modal y actualizar lista de conversaciones
         onClose();
-        
-        if (onLeaveGroup) {
-          onLeaveGroup();
+        if (onGroupDeleted) {
+          onGroupDeleted(conversationData.id);
         }
         
       } catch (error) {
-        console.error('Error al abandonar el grupo:', error);
         toast({
           title: "Error",
-          description: "No se pudo abandonar el grupo",
-          variant: "destructive",
+          description: "Ha ocurrido un error al abandonar el grupo",
+          variant: "destructive"
         });
       } finally {
         setIsUpdatingGroup(false);
@@ -453,36 +658,57 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
         
         <div className="space-y-6 max-h-[70vh] overflow-y-auto py-2">
           {/* Imagen del grupo */}
-          <div className="flex justify-center">
-            <div className="relative">
-              <Avatar className="h-24 w-24 mx-auto">
-                {conversationData?.imageUrl ? (
-                  <CldImage
-                    src={conversationData.imageUrl}
-                    alt={conversationData.name || "Grupo"}
-                    width={96}
-                    height={96}
-                    crop="fill"
-                    gravity="face"
-                    className="object-cover"
-                  />
-                ) : (
-                  <AvatarFallback className="text-2xl bg-gradient-to-br from-teal-400 to-blue-500">
-                    <Users className="h-12 w-12 text-white" />
-                  </AvatarFallback>
+          <div className="relative flex justify-center mb-6">
+            {previewImage ? (
+              <div className="relative h-24 w-24 rounded-full overflow-hidden">
+                <Image
+                  src={previewImage}
+                  alt="Preview"
+                  width={96}
+                  height={96}
+                  className="object-cover"
+                />
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                    <div className="w-16 h-1 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-blue-500" 
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
                 )}
-              </Avatar>
-              {isAdmin && (
-                <Button 
-                  variant="secondary" 
-                  size="icon" 
-                  className="absolute bottom-0 right-0 h-8 w-8 rounded-full shadow-md"
-                  onClick={handleChangeGroupImage}
-                >
-                  <UploadCloud className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
+              </div>
+            ) : conversationData?.imageUrl ? (
+              <div className="h-24 w-24 rounded-full overflow-hidden">
+                <Image
+                  src={conversationData.imageUrl}
+                  alt={conversationData.name || "Grupo"}
+                  width={96}
+                  height={96}
+                  className="object-cover"
+                />
+              </div>
+            ) : (
+              <div className="h-24 w-24 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                <Users className="h-12 w-12 text-gray-500 dark:text-gray-400" />
+              </div>
+            )}
+            <Button 
+              variant="secondary" 
+              size="icon" 
+              className="absolute bottom-0 right-0 h-8 w-8 rounded-full shadow-md"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = handleImageUpload;
+                input.click();
+              }}
+              disabled={isUploadingImage || !isAdmin}
+            >
+              <UploadCloud className="h-4 w-4" />
+            </Button>
           </div>
           
           {/* Nombre del grupo */}
@@ -537,7 +763,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
           {/* Participantes */}
           <div>
             <div className="flex justify-between items-center mb-3">
-              <h3 className="text-sm font-medium">Participantes ({conversationData?.participants.length || 0})</h3>
+              <h3 className="text-sm font-medium">Participantes ({localConversationData?.participants.length || 0})</h3>
               {isAdmin && (
                 <Button 
                   size="sm" 
@@ -551,7 +777,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
               )}
             </div>
             <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
-              {conversationData?.participants?.map((participant) => (
+              {localConversationData?.participants?.map((participant) => (
                 <div key={participant.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-800 rounded-md">
                   <div className="flex items-center space-x-2">
                     <Avatar className="h-8 w-8">

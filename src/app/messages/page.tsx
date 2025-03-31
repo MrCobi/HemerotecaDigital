@@ -130,6 +130,8 @@ export default function MessagesPage() {
     toggleGroupManagementModal,
     setMutualFollowers,
     setMutualFollowersForGroups,
+    setSelectedConversationData,
+    setIsGroupAdmin,
   } = useMessagesState();
 
   // Deselectionar conversación (usado en la vista móvil)
@@ -995,11 +997,25 @@ export default function MessagesPage() {
           conversationData={selectedConversationData}
           currentUserId={session?.user?.id || ''}
           isAdmin={isGroupAdmin}
-          onConversationUpdate={() => {
-            // Recargar datos de la conversación
-            selectConversation(selectedConversation);
-            // Recargar lista de conversaciones
-            fetchConversations();
+          onConversationUpdate={(updatedData) => {
+            console.log("[DEBUG] Recibiendo datos actualizados de la conversación:", updatedData);
+            
+            // Forzar una actualización completa desde el servidor
+            if (selectedConversation) {
+              // Actualizar la vista con los datos recibidos inmediatamente si están completos
+              if (updatedData && Object.keys(updatedData).length > 0) {
+                // Si recibimos una conversación completa desde el servidor, seleccionarla directamente
+                if (updatedData.id && updatedData.participants) {
+                  // Esta llamada actualiza el selectedConversationData internamente
+                  selectConversation(updatedData.id);
+                }
+              }
+              
+              // De todas formas, refrescar desde el servidor para mantener consistencia
+              fetchConversations().then(() => {
+                selectConversation(selectedConversation);
+              });
+            }
           }}
         />
       )}
