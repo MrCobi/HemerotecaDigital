@@ -130,11 +130,11 @@ export const GroupManagementModal = ({
   }, [conversationData]);
 
   // Función para obtener el ID para la API (sin prefijos)
-  const getIdForApi = (id: string): string => {
+  const getIdForApi = useCallback((id: string): string => {
     if (!id) return '';
     return id.replace(/^(group_|conv_)/, '');
-  };
-  
+  }, []);
+
   // Función para actualizar la información del grupo
   const updateGroupInfo = useCallback(async (data: { name?: string, description?: string, imageUrl?: string }) => {
     if (!conversationData) return;
