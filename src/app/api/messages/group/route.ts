@@ -152,7 +152,7 @@ export const POST = withAuth(async (req: Request, auth: AuthParams) => {
     // También intentar notificar por websocket si está disponible
     try {
       const { default: fetch } = await import('node-fetch');
-      const socketUrl = 'http://localhost:3001/webhook/new-group';
+      const socketUrl = process.env.SOCKET_WEBHOOK_URL || 'http://localhost:3001/webhook/new-group';
       await fetch(socketUrl, {
         method: 'POST',
         headers: {

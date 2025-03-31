@@ -38,7 +38,7 @@ interface DirectMessage {
 // Función para notificar al servidor de sockets sobre nuevos mensajes de grupo
 async function notifySocketServer(message: SocketMessage) {
   try {
-    const socketUrl = 'http://localhost:3001/webhook/new-message';
+    const socketUrl = process.env.SOCKET_WEBHOOK_URL || 'http://localhost:3001/webhook/new-message';
     const response = await fetch(socketUrl, {
       method: 'POST',
       headers: {

@@ -30,7 +30,7 @@ interface SocketMessage {
 // Function to notify socket server about new messages
 async function notifySocketServer(message: SocketMessage) {
   try {
-    const socketUrl = 'http://localhost:3001/webhook/new-message';
+    const socketUrl = process.env.SOCKET_WEBHOOK_URL || 'http://localhost:3001/webhook/new-message';
     const response = await fetch(socketUrl, {
       method: 'POST',
       headers: {

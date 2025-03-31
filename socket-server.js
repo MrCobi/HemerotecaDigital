@@ -21,7 +21,7 @@ app.use(bodyParser.json());
 const SOCKET_PORT = process.env.SOCKET_PORT || 3001;
 
 // Definir las rutas API para uso del servidor socket
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 const API_ROUTES = {
   messages: {
     socket: `${API_BASE_URL}/api/messages/socket`,
