@@ -243,24 +243,25 @@ export function useChatContent(
     
     console.log('[useChatContent] Conversación actual:', currentConvId);
     console.log('[useChatContent] Conversación del mensaje:', messageConvId);
-    console.log('[useChatContent] ¿Coinciden?', currentConvId === messageConvId);
     
     if (!currentConvId || !messageConvId) return;
     
-    // Extraer el ID base para conversaciones grupales (sin el prefijo 'group_')
-    const normalizedCurrentId = currentConvId.replace('group_', '');
-    const normalizedMessageId = messageConvId.replace('group_', '');
+    // Normalizar IDs para comparación consistente, igual que en onNewMessage
+    const normalizedCurrentId = (currentConvId || '').replace(/^(group_|conv_)/, '');
+    const normalizedMessageId = (messageConvId || '').replace(/^(group_|conv_)/, '');
     
     console.log('[useChatContent] IDs normalizados - Actual:', normalizedCurrentId, 'Mensaje:', normalizedMessageId);
     
-    // Verificar si el mensaje pertenece a esta conversación
-    const belongsToCurrentConversation = 
-      normalizedCurrentId === normalizedMessageId ||
-      currentConvId === messageConvId;
+    // Verificar coincidencia exacta tras normalización
+    const belongsToCurrentConversation = normalizedCurrentId === normalizedMessageId;
+    
+    console.log('[useChatContent] ¿Coinciden?', belongsToCurrentConversation);
     
     if (belongsToCurrentConversation) {
       console.log('[useChatContent] El mensaje pertenece a esta conversación, añadiendo...');
       addNewMessage(message);
+    } else {
+      console.log('[useChatContent] El mensaje NO pertenece a esta conversación, ignorando');
     }
   }, [conversation, addNewMessage]);
 
@@ -368,22 +369,24 @@ export function useChatContent(
       console.log('[useChatContent] Recibido nuevo mensaje:', message);
       console.log('[useChatContent] Conversación actual:', conversationId);
       console.log('[useChatContent] Conversación del mensaje:', message.conversationId);
-      console.log('[useChatContent] ¿Coinciden?', message.conversationId === conversationId);
       
-      // Normalizar los IDs para compararlos correctamente
-      const normalizedConversationId = conversationId?.replace(/^(group_|conv_)/, '') || '';
-      const normalizedMessageConversationId = message.conversationId?.replace(/^(group_|conv_)/, '') || '';
+      // Normalizar los IDs para compararlos correctamente - MEJORADO
+      // Eliminar cualquier prefijo (group_, conv_) y asegurar que ambos son strings
+      const normalizedConversationId = (conversationId || '').replace(/^(group_|conv_)/, '');
+      const normalizedMessageConversationId = (message.conversationId || '').replace(/^(group_|conv_)/, '');
       
       console.log('[useChatContent] IDs normalizados - Actual:', normalizedConversationId, 'Mensaje:', normalizedMessageConversationId);
       
-      // Verificar si el mensaje pertenece a esta conversación
-      const belongsToCurrentConversation = 
-        normalizedConversationId === normalizedMessageConversationId ||
-        conversationId === message.conversationId;
+      // Verificar coincidencia exacta tras normalización
+      const belongsToCurrentConversation = normalizedConversationId === normalizedMessageConversationId;
+      
+      console.log('[useChatContent] ¿Coinciden?', belongsToCurrentConversation);
       
       if (belongsToCurrentConversation) {
         console.log('[useChatContent] El mensaje pertenece a esta conversación, añadiendo...');
         handleNewMessage(message);
+      } else {
+        console.log('[useChatContent] El mensaje NO pertenece a esta conversación, ignorando');
       }
     },
     // El servidor ahora envía message_ack con tempId incluido

@@ -165,7 +165,7 @@ export default function HomePage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="w-full sm:w-auto text-white dark:text-blue-200 border-white dark:border-blue-200 hover:bg-white/10 dark:hover:bg-blue-800/30 text-sm sm:text-base"
+                className="w-full sm:w-auto text-white dark:text-blue-200 text-blue-600 border-white dark:border-blue-200 hover:bg-white/10 dark:hover:bg-blue-800/30 text-sm sm:text-base"
                 onClick={() => router.push("/api/auth/signup")}
               >
                 Registrarse

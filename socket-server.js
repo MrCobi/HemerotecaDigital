@@ -119,11 +119,31 @@ const pingClients = () => {
 // Iniciar ping cada 60 segundos en lugar de 30
 const pingInterval = setInterval(pingClients, 60000);
 
+// Función para normalizar un ID de conversación
+function normalizeConversationId(id) {
+  if (!id) return '';
+  return id.replace(/^(conv_|group_)/, '');
+}
+
+// Función para construir el nombre de sala a partir de un ID de conversación
+function getConversationRoomName(conversationId) {
+  const normalizedId = normalizeConversationId(conversationId);
+  return `conversation-${normalizedId}`;
+}
+
 // Manejar conexiones de Socket.io
 io.on('connection', (socket) => {
-  let currentUserId = null;
+  console.log(`[${new Date().toISOString()}] Conexión establecida: ${socket.id}`);
   
-  console.log(chalk.green(`[${new Date().toISOString()}] Conexión establecida: ${socket.id}`));
+  let currentUserId = null;
+  let currentUsername = null;
+  
+  // Ping para mantener las conexiones activas y verificar presencia
+  setInterval(() => {
+    if (currentUserId) {
+      socket.emit('ping');
+    }
+  }, 30000);
   
   // Socket.io event handlers
   socket.on('disconnect', (reason) => {
@@ -182,39 +202,69 @@ io.on('connection', (socket) => {
     socket._lastActivityTime = Date.now();
   });
 
-  // Evento: Usuario se identifica
-  socket.on('identify', ({ userId, username }) => {
-    const existingEntry = Array.from(onlineUsers.values()).find(u => u.userId === userId);
-    
-    if (existingEntry) {
-      io.to(existingEntry.socketId).emit('forceDisconnect', 'Nueva conexión detectada');
-      onlineUsers.delete(existingEntry.socketId);
-    }
-
-    onlineUsers.set(socket.id, { socketId: socket.id, userId, username });
-    userSocketMap.set(userId, socket.id);
-    currentUserId = userId;
-    
-    // Emitir lista actualizada de usuarios conectados
-    const userList = Array.from(onlineUsers.values());
-    io.emit('users_online', userList);
-    
-    console.log(`Usuario identificado: ${username} (${userId})`);
-    console.log('Lista actual de usuarios conectados:');
-    Array.from(onlineUsers.entries()).forEach(([socketId, user]) => {
-      console.log(`- Socket: ${socketId}, Usuario: ${user.userId}, Nombre: ${user.username}`);
-    });
-    
-    // Unirse a conversaciones pendientes ahora que el usuario está identificado
-    if (socket._pendingConversations && socket._pendingConversations.length > 0) {
-      console.log(`Uniendo usuario ${userId} a ${socket._pendingConversations.length} conversaciones pendientes`);
-      socket._pendingConversations.forEach(convId => {
-        const roomName = `conversation-${convId}`;
-        // Ya estamos unidos, solo actualizamos el registro
-        console.log(`Usuario ${userId} ahora identificado en conversación ${convId}`);
+  // Identificar al usuario al conectarse
+  socket.on('identify', async ({ userId, username }) => {
+    try {
+      // Validar los datos del usuario
+      if (!userId) {
+        console.error('Se intentó identificar sin proporcionar userId');
+        socket.emit('error', { message: 'Se requiere userId para identificarse' });
+        return;
+      }
+      
+      currentUserId = userId;
+      currentUsername = username || 'Usuario sin nombre';
+      
+      // Registrar el socket para este usuario
+      userSocketMap.set(userId, socket.id);
+      
+      console.log(`Usuario identificado: ${username} (${userId})`);
+      
+      // Mostrar lista de usuarios conectados
+      console.log('Lista actual de usuarios conectados:');
+      for (const [uid, sid] of userSocketMap.entries()) {
+        console.log(`- Socket: ${sid}, Usuario: ${uid}`);
+      }
+      
+      // Unirse a la sala personal del usuario
+      const personalRoom = `user_${userId}`;
+      socket.join(personalRoom);
+      
+      // Unirse a conversaciones pendientes si existen
+      if (socket._pendingConversations && socket._pendingConversations.length > 0) {
+        console.log(`Uniendo a ${socket._pendingConversations.length} conversaciones pendientes`);
+        
+        for (const conversationId of socket._pendingConversations) {
+          const roomName = getConversationRoomName(conversationId);
+          socket.join(roomName);
+          
+          // Registrar participación
+          const normalizedId = normalizeConversationId(conversationId);
+          if (!activeConversations.has(normalizedId)) {
+            activeConversations.set(normalizedId, new Set());
+          }
+          activeConversations.get(normalizedId).add(userId);
+          
+          console.log(`Usuario ${userId} se unió a conversación pendiente ${normalizedId} (sala: ${roomName})`);
+        }
+        
+        // Limpiar conversaciones pendientes
+        socket._pendingConversations = [];
+      }
+      
+      // Notificar que el usuario está en línea
+      socket.broadcast.emit('user_status', {
+        userId,
+        status: 'online',
+        timestamp: new Date().toISOString()
       });
-      // Limpiar lista de pendientes
-      socket._pendingConversations = [];
+      
+      // Enviar estado al usuario conectado
+      socket.emit('connected', { userId });
+      
+    } catch (error) {
+      console.error('Error al identificar usuario:', error);
+      socket.emit('error', { message: 'Error al procesar la identificación' });
     }
   });
 
@@ -238,8 +288,9 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Crear un nombre normalizado para la sala
-    const roomName = `conversation-${conversationId}`;
+    // Normalizar el ID de conversación y crear nombre de sala
+    const normalizedId = normalizeConversationId(conversationId);
+    const roomName = getConversationRoomName(conversationId);
     
     // Verificar si ya está en la sala para evitar uniones duplicadas
     const rooms = Array.from(socket.rooms || []);
@@ -252,54 +303,21 @@ io.on('connection', (socket) => {
     socket.join(roomName);
     
     // Registrar la participación en la conversación
-    if (!activeConversations.has(conversationId)) {
-      activeConversations.set(conversationId, new Set());
+    if (!activeConversations.has(normalizedId)) {
+      activeConversations.set(normalizedId, new Set());
     }
-    activeConversations.get(conversationId).add(userId);
+    activeConversations.get(normalizedId).add(userId);
     
-    console.log(`Usuario ${userId} se unió a la conversación ${conversationId}`);
-    console.log(`Participantes actuales: ${Array.from(activeConversations.get(conversationId)).join(', ')}`);
+    console.log(`Usuario ${userId} se unió a la conversación ${normalizedId} (sala: ${roomName})`);
+    console.log(`Participantes actuales: ${Array.from(activeConversations.get(normalizedId)).join(', ')}`);
     
     // Almacenar las conversaciones activas de este socket para limpiarlas al desconectar
     if (!socket._activeConversations) {
       socket._activeConversations = new Set();
     }
-    socket._activeConversations.add(conversationId);
+    socket._activeConversations.add(normalizedId);
   });
   
-  // Salir de una sala de conversación
-  socket.on('leave_conversation', ({ conversationId }) => {
-    // Obtener el userId del socket actual
-    const userId = currentUserId || Object.keys(userSocketMap).find(uid => userSocketMap[uid] === socket.id);
-    
-    if (!conversationId || !userId) {
-      console.error(`Datos incompletos para salir de conversación: userId=${userId}, conversationId=${conversationId}`);
-      return;
-    }
-    
-    const roomName = `conversation-${conversationId}`;
-    
-    // Salir de la sala
-    socket.leave(roomName);
-    
-    // Eliminar del registro de conversaciones activas
-    if (activeConversations.has(conversationId)) {
-      activeConversations.get(conversationId).delete(userId);
-      
-      // Si la sala queda vacía, eliminarla
-      if (activeConversations.get(conversationId).size === 0) {
-        activeConversations.delete(conversationId);
-      }
-    }
-    
-    // Eliminar de las conversaciones activas de este socket
-    if (socket._activeConversations) {
-      socket._activeConversations.delete(conversationId);
-    }
-    
-    console.log(`Usuario ${userId} salió de la conversación ${conversationId}`);
-  });
-
   // Evento: Enviar mensaje
   socket.on('send_message', async (message) => {
     try {
@@ -344,52 +362,45 @@ io.on('connection', (socket) => {
         console.log('Mensaje guardado en la BD:', savedMessage);
       }
       
-      // Emitir al remitente
+      // Emitir confirmación al remitente
       socket.emit('message_ack', {
         messageId: savedMessage.id,
         tempId: message.tempId,
         status: 'sent'
       });
+      
+      // También enviar el mensaje completo al remitente para mantener consistencia
       socket.emit('new_message', savedMessage);
       console.log(`Mensaje emitido al remitente (${savedMessage.senderId})`);
 
       // Emitir a todos los miembros de la sala de conversación
       if (savedMessage.conversationId) {
-        const roomName = `conversation-${savedMessage.conversationId}`;
+        // Normalizar el ID y usar la función para obtener el nombre de sala
+        const roomName = getConversationRoomName(savedMessage.conversationId);
         console.log(`Emitiendo mensaje a la sala ${roomName} (excluyendo remitente)`);
-        // Emit to conversation room, excluding the sender
+        
+        // Emitir a la sala, excluyendo al remitente que ya recibió el mensaje
         socket.to(roomName).emit('new_message', savedMessage);
       } 
       // Si no hay conversationId pero existe un receptor directo
       else if (savedMessage.receiverId) {
-        const receiverSocket = userSocketMap.get(savedMessage.receiverId);
-        if (receiverSocket) {
-          console.log(`Enviando mensaje a receptor ${savedMessage.receiverId} en socket ${receiverSocket}`);
-          io.to(receiverSocket).emit('new_message', savedMessage);
+        const receiverSocketId = userSocketMap.get(savedMessage.receiverId);
+        if (receiverSocketId) {
+          console.log(`Enviando mensaje directo a receptor ${savedMessage.receiverId} en socket ${receiverSocketId}`);
+          io.to(receiverSocketId).emit('new_message', savedMessage);
         } else {
           console.log(`Receptor ${savedMessage.receiverId} no está conectado`);
         }
       }
+      
     } catch (error) {
       console.error('Error al enviar mensaje:', error);
-      // Notificar al remitente que hubo un error
-      socket.emit('message_error', {
-        tempId: message.tempId,
-        error: 'Error al guardar el mensaje'
-      });
-    }
-  });
-
-  // Evento: Manejar typing para conversaciones
-  socket.on('typing', ({ userId, receiverId, conversationId, isTyping }) => {
-    if (conversationId) {
-      const roomName = `conversation-${conversationId}`;
-      socket.to(roomName).emit('typing_status', { userId, conversationId, isTyping });
-    } else if (receiverId) {
-      // Encontrar el socket del destinatario usando el mapa más eficiente
-      const receiverSocketId = userSocketMap.get(receiverId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('typing_status', { userId, isTyping });
+      if (message && message.tempId) {
+        socket.emit('message_ack', { 
+          tempId: message.tempId, 
+          status: 'failed',
+          error: error.message
+        });
       }
     }
   });
@@ -411,7 +422,7 @@ io.on('connection', (socket) => {
       
       // Emitir evento de lectura a todos los participantes si es una conversación
       if (conversationId) {
-        const roomName = `conversation-${conversationId}`;
+        const roomName = getConversationRoomName(conversationId);
         io.to(roomName).emit('message_read', { messageId, conversationId, readBy: userId });
       } else {
         // Buscar el remitente original del mensaje
