@@ -91,7 +91,6 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
             Icon = Star;
             break;
           case 'rating_removed':
-          case 'rating_deleted':
             type = "Valoración eliminada";
             className = "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
             Icon = StarOff;
@@ -145,7 +144,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
           <option value="comment_reply">Respuestas</option>
           <option value="comment_deleted">Comentarios eliminados</option>
           <option value="rating_added">Valoraciones</option>
-          <option value="rating_deleted">Valoraciones eliminadas</option>
+          <option value="rating_removed">Valoraciones eliminadas</option>
           <option value="favorite_added">Favoritos agregados</option>
           <option value="favorite_removed">Favoritos eliminados</option>
           <option value="follow">Seguimientos</option>

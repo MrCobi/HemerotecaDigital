@@ -48,7 +48,6 @@ export type ActivityType =
   | 'rating' 
   | 'rating_added'
   | 'rating_removed'
-  | 'rating_deleted'
   | 'favorite' 
   | 'favorite_added'
   | 'favorite_removed'

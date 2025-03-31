@@ -21,6 +21,7 @@ const activityIcons = {
   favorite_removed: <X className="h-4 w-4 text-red-500" />,
   rating: <Star className="h-4 w-4 text-yellow-500" />,
   rating_added: <Star className="h-4 w-4 text-yellow-500" />,
+  rating_removed: <Star className="h-4 w-4 text-orange-500" />,
   comment: <MessageSquare className="h-4 w-4 text-green-500" />,
   comment_deleted: <Trash className="h-4 w-4 text-red-500" />,
   comment_reply: <Reply className="h-4 w-4 text-green-500" />,
@@ -70,6 +71,8 @@ function getActivityMessage(activity: ActivityHistory): string {
     case 'rating':
     case 'rating_added':
       return `Valoraste la fuente "${activity.sourceName}"`;
+    case 'rating_removed':
+      return `Eliminaste la valoración de la fuente "${activity.sourceName}"`;
     case 'comment':
       return `Comentaste en "${activity.sourceName}"`;
     case 'comment_deleted':

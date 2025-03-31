@@ -1425,7 +1425,7 @@ export default function HomePage() {
                       <h3 className="text-base xs:text-lg sm:text-xl font-bold text-white">
                         {spanishCategory}
                       </h3>
-                      <div className="flex items-center mt-1 xs:mt-2 text-xs xs:text-sm text-blue-50">
+                      <div className="flex items-center mt-1 xs:mt-2 text-xs sm:text-sm text-blue-50">
                         <Link
                           href={`/categories/${encodeURIComponent(englishCategory)}`}
                           className="flex items-center text-blue-100 hover:text-white transition-colors"
@@ -1465,12 +1465,11 @@ export default function HomePage() {
 
       <section id="recent-section" className="py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 gap-8">
             <motion.div
               initial={animationVariants.hidden}
               animate={animationVariants.visible}
               transition={animationTransition}
-              className="lg:col-span-2"
             >
               <Card className="border-blue-100 dark:border-blue-900/30 h-full">
                 <CardHeader className="pb-2">
@@ -1509,111 +1508,107 @@ export default function HomePage() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="space-y-4 min-h-[320px] flex-grow">
+                      <div className="space-y-3 min-h-[320px]">
                         {followingActivity.map((activity) => (
                           <div
                             key={activity.id}
-                            className="p-2.5 sm:p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md mb-2"
+                            className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg shadow-sm transition-all duration-300 hover:shadow-md hover:bg-blue-100 dark:hover:bg-blue-800/30"
                           >
-                            <div className="flex items-start space-x-2">
-                              <div className="flex-shrink-0">
-                                <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
-                                  {activity.user.image && (activity.user.image.includes('cloudinary') || 
-                                  (!activity.user.image.startsWith('/') && !activity.user.image.startsWith('http'))) ? (
-                                    <CldImage
-                                      src={activity.user.image}
-                                      alt={activity.user.name || "Usuario"}
-                                      width={40}
-                                      height={40}
-                                      crop="fill"
-                                      gravity="face"
-                                      className="h-8 w-8 sm:h-10 sm:w-10 rounded-full"
-                                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "/images/AvatarPredeterminado.webp";
-                                      }}
-                                    />
-                                  ) : (
-                                    <Image
-                                      src={activity.user.image || "/images/AvatarPredeterminado.webp"}
-                                      alt={activity.user.name || "Usuario"}
-                                      width={40}
-                                      height={40}
-                                      className="h-8 w-8 sm:h-10 sm:w-10 rounded-full"
-                                      onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "/images/AvatarPredeterminado.webp";
-                                      }}
-                                    />
-                                  )}
-                                </Avatar>
-                              </div>
+                            <div className="flex items-center w-full">
+                              <Avatar className="h-10 w-10 flex-shrink-0 border-2 border-white dark:border-gray-800 shadow-sm mr-3 sm:mr-4">
+                                {activity.user.image?.startsWith("https://") ? (
+                                  <CldImage
+                                    src={activity.user.image}
+                                    alt={activity.user.name || "Usuario"}
+                                    width={40}
+                                    height={40}
+                                    className="h-full w-full rounded-full object-cover"
+                                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = "/images/AvatarPredeterminado.webp";
+                                    }}
+                                  />
+                                ) : (
+                                  <Image
+                                    src={activity.user.image || "/images/AvatarPredeterminado.webp"}
+                                    alt={activity.user.name || "Usuario"}
+                                    width={40}
+                                    height={40}
+                                    className="h-full w-full rounded-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = "/images/AvatarPredeterminado.webp";
+                                    }}
+                                  />
+                                )}
+                              </Avatar>
                               
-                              <div className="flex flex-col space-y-1">
-                                <div className="flex items-center space-x-1.5">
-                                  <span className="font-medium text-xs sm:text-sm text-gray-800 dark:text-white truncate max-w-[100px] sm:max-w-none">
+                              <div className="flex flex-grow items-center justify-between flex-wrap sm:flex-nowrap gap-2">
+                                <div className="flex items-center flex-wrap gap-1.5">
+                                  <span className="font-medium text-sm text-gray-800 dark:text-white">
                                     {activity.user.username}
                                   </span>
-                                  <span className="flex-shrink-0">
-                                    {(() => {
-                                      switch (activity.type) {
-                                        case "favorite_added":
-                                        case "favorite":
-                                          return <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500" />;
-                                        case "favorite_removed":
-                                          return <Heart className="h-3.5 w-3.5 text-red-500" />;
-                                        case "comment":
-                                        case "comment_reply":
-                                          return <MessageSquare className="h-3.5 w-3.5 text-green-500" />;
-                                        case "rating_added":
-                                          return <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />;
-                                        case "rating_removed":
-                                          return <Star className="h-3.5 w-3.5 text-purple-500" />;
-                                        case "follow":
-                                          return <User2 className="h-3.5 w-3.5 text-blue-500" />;
-                                        case "unfollow":
-                                          return <User2 className="h-3.5 w-3.5 text-red-500" />;
-                                        case "comment_deleted":
-                                          return <MessageSquare className="h-3.5 w-3.5 text-red-500" />;
-                                        default:
-                                          return null;
-                                      }
-                                    })()}
-                                  </span>
-                                  <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
-                                    {(() => {
-                                      switch (activity.type) {
-                                        case "favorite_added":
-                                        case "favorite":
-                                          return "agregó favorito";
-                                        case "favorite_removed":
-                                          return "eliminó favorito";
-                                        case "comment":
-                                          return "comentó";
-                                        case "rating_added":
-                                          return "calificó";
-                                        case "rating_removed":
-                                          return "quitó calificación";
-                                        case "follow":
-                                          return "siguió a";
-                                        case "unfollow":
-                                          return "dejó de seguir";
-                                        case "comment_reply":
-                                          return "respondió";
-                                        case "comment_deleted":
-                                          return "eliminó comentario";
-                                        default:
-                                          return "";
-                                      }
-                                    })()}
+                                  <div className="flex items-center gap-1">
+                                    <span className="inline-flex items-center">
+                                      {(() => {
+                                        switch (activity.type) {
+                                          case "favorite_added":
+                                          case "favorite":
+                                            return <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500" />;
+                                          case "favorite_removed":
+                                            return <Heart className="h-3.5 w-3.5 text-red-500" />;
+                                          case "comment":
+                                          case "comment_reply":
+                                            return <MessageSquare className="h-3.5 w-3.5 text-green-500" />;
+                                          case "rating_added":
+                                            return <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />;
+                                          case "rating_removed":
+                                            return <Star className="h-3.5 w-3.5 text-purple-500" />;
+                                          case "follow":
+                                            return <User2 className="h-3.5 w-3.5 text-blue-500" />;
+                                          case "unfollow":
+                                            return <User2 className="h-3.5 w-3.5 text-red-500" />;
+                                          case "comment_deleted":
+                                            return <MessageSquare className="h-3.5 w-3.5 text-red-500" />;
+                                          default:
+                                            return null;
+                                        }
+                                      })()}
+                                    </span>
+                                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                                      {(() => {
+                                        switch (activity.type) {
+                                          case "favorite_added":
+                                          case "favorite":
+                                            return "agregó favorito";
+                                          case "favorite_removed":
+                                            return "eliminó favorito";
+                                          case "comment":
+                                            return "comentó";
+                                          case "rating_added":
+                                            return "calificó";
+                                          case "rating_removed":
+                                            return "quitó calificación";
+                                          case "follow":
+                                            return "siguió a";
+                                          case "unfollow":
+                                            return "dejó de seguir";
+                                          case "comment_reply":
+                                            return "respondió";
+                                          case "comment_deleted":
+                                            return "eliminó comentario";
+                                          default:
+                                            return "";
+                                        }
+                                      })()}
+                                    </span>
+                                  </div>
+                                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                                    {activity.sourceName || activity.targetName || ""}
                                   </span>
                                 </div>
                                 
-                                <p className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 truncate max-w-[170px] sm:max-w-none">
-                                  {activity.sourceName || activity.targetName || ""}
-                                </p>
-                                
-                                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 sm:ml-auto">
                                   {new Date(activity.createdAt).toLocaleString(
                                     "es-ES",
                                     {

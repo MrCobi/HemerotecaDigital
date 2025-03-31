@@ -151,7 +151,7 @@ export const DELETE = withAuth(async (req: Request, { userId, user: _user }: { u
           user: {
             connect: { id: userId }
           },
-          type: "rating_deleted",
+          type: "rating_removed",
           sourceName: rating.source.name,
           source: {
             connect: { id: rating.sourceId }
