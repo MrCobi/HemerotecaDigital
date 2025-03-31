@@ -1,5 +1,5 @@
 // src/app/api/messages/group/[groupId]/participants/[participantId]/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth, AuthParams } from "../../../../../../../lib/auth-utils";
 

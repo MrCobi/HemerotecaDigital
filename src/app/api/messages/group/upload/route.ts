@@ -9,6 +9,13 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Definir tipos para la respuesta de Cloudinary
+interface CloudinaryResponse {
+  secure_url: string;
+  public_id: string;
+  [key: string]: unknown;
+}
+
 export async function POST(request: NextRequest) {
   return withAuth(async (user: AuthParams['user']) => {
     try {
@@ -58,8 +65,8 @@ export async function POST(request: NextRequest) {
       // Devolver la URL de la imagen subida
       return NextResponse.json({
         success: true,
-        url: (result as any).secure_url,
-        publicId: (result as any).public_id
+        url: (result as CloudinaryResponse).secure_url,
+        publicId: (result as CloudinaryResponse).public_id
       });
       
     } catch (error) {

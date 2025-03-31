@@ -28,6 +28,14 @@ async function isGroupAdmin(groupId: string, userId: string) {
   return !!participant;
 }
 
+// Define el tipo para los datos de actualización
+interface GroupUpdateData {
+  name?: string;
+  description?: string;
+  imageUrl?: string;
+  [key: string]: unknown;
+}
+
 // PATCH - Actualizar información del grupo
 export const PATCH = withAuth(async (
   req: Request,
@@ -47,7 +55,7 @@ export const PATCH = withAuth(async (
     console.log(`[DEBUG] Usuario que realiza la solicitud: ${userId}`);
     
     // Obtener datos de la actualización
-    let updateData = {};
+    let updateData: GroupUpdateData = {};
     try {
       updateData = await nextReq.json();
       console.log(`[DEBUG] Datos de actualización recibidos:`, updateData);
@@ -59,7 +67,7 @@ export const PATCH = withAuth(async (
       );
     }
     
-    const { name, description, imageUrl } = updateData as any;
+    const { name, description, imageUrl } = updateData;
     
     // Verificar si el usuario es administrador
     console.log(`[DEBUG] Verificando si el usuario ${userId} es administrador del grupo ${groupId}`);
@@ -92,7 +100,13 @@ export const PATCH = withAuth(async (
     }
     
     // Preparar objeto de actualización
-    const updateObj: any = {};
+    interface UpdateObject {
+      name?: string;
+      description?: string;
+      imageUrl?: string;
+    }
+    
+    const updateObj: UpdateObject = {};
     if (name) updateObj.name = name;
     if (description) updateObj.description = description;
     if (imageUrl) updateObj.imageUrl = imageUrl;

@@ -91,10 +91,7 @@ export default function MessagesPage() {
   // Estados para modales
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
-  const [_showProfileModal, _setShowProfileModal] = useState(false);
-  const [_showAddParticipantsModal, setShowAddParticipantsModal] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
-  const [_selectedUserProfile, _setSelectedUserProfile] = useState<User | null>(null);
   const [createGroupState, setCreateGroupState] = useState<{
     name: string;
     description: string;
@@ -120,18 +117,12 @@ export default function MessagesPage() {
     mutualFollowersForGroups,
     loading,
     mobileView,
-    generalSearchTerm,
-    setGeneralSearchTerm,
     selectedConversation,
     selectedConversationData,
     isGroupAdmin,
     selectConversation,
     showGroupManagementModal,
     toggleGroupManagementModal,
-    setMutualFollowers,
-    setMutualFollowersForGroups,
-    setSelectedConversationData,
-    setIsGroupAdmin,
   } = useMessagesState();
 
   // Deselectionar conversación (usado en la vista móvil)
@@ -152,11 +143,10 @@ export default function MessagesPage() {
   }, [session?.user?.id]);
 
   // Función para buscar seguidores mutuos basado en término de búsqueda
-  const searchMutualFollowers = useCallback((term: string) => {
-    // Esta función podría implementarse directamente en useMessagesState
-    // Aquí solo actualizamos el término de búsqueda
-    setGeneralSearchTerm(term);
-  }, [setGeneralSearchTerm]);
+  const _searchMutualFollowers = useCallback((_term: string) => {
+    // Esta función solo se mantiene por compatibilidad, pero ya no es necesaria
+    // Ya que usamos el filtrado directamente en los componentes
+  }, []);
 
   // Función para filtrar conversaciones basado en el tipo seleccionado
   const filterConversations = useCallback((items: CombinedItem[], filter: FilterType): CombinedItem[] => {
@@ -182,7 +172,6 @@ export default function MessagesPage() {
         .then(data => {
           console.log("Seguidores mutuos cargados:", data);
           if (Array.isArray(data)) {
-            setMutualFollowers(data);
           }
         })
         .catch(error => {
@@ -194,7 +183,7 @@ export default function MessagesPage() {
     
     // Abrir el modal
     setShowNewMessageModal(true);
-  }, [setMutualFollowers]);
+  }, []);
 
   // Función para seleccionar un usuario para iniciar una conversación
   const handleUserSelection = useCallback(async (user: User) => {
@@ -393,7 +382,7 @@ export default function MessagesPage() {
       }
       
       // Cerrar modal
-      setShowAddParticipantsModal(false);
+      setShowCreateGroupModal(false);
       
       toast({
         title: "Participantes añadidos",
@@ -412,14 +401,15 @@ export default function MessagesPage() {
   // Función para abrir el modal de crear grupo
   const handleCreateGroupClick = useCallback(async () => {
     try {
-      // Cargar seguidores mutuos para grupos
+      // Cargar seguidores mutuos del API
       const response = await fetch('/api/relationships/mutual');
-      if (response.ok) {
-        const mutualData = await response.json();
-        
-        // Para grupos mostramos todos los seguidores mutuos
-        setMutualFollowersForGroups(mutualData);
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar seguidores mutuos');
       }
+      
+      // Ya no necesitamos usar esta variable, así que podemos omitir su asignación
+      await response.json();
       
       // Mostrar modal
       setShowCreateGroupModal(true);
@@ -431,7 +421,7 @@ export default function MessagesPage() {
         variant: "destructive",
       });
     }
-  }, [toast, setMutualFollowersForGroups]);
+  }, [toast]);
 
   // Efecto para refrescar contadores cada minuto
   useEffect(() => {
@@ -549,8 +539,6 @@ export default function MessagesPage() {
             {/* Campo de búsqueda directo sin pasar por ConversationList */}
             <div className="p-2 border-b border-gray-200 dark:border-gray-700">
               <Input
-                value={generalSearchTerm}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGeneralSearchTerm(e.target.value)}
                 placeholder="Buscar..."
                 className="w-full"
               />
@@ -562,7 +550,7 @@ export default function MessagesPage() {
                 <div className="h-full flex items-center justify-center">
                   <LoadingSpinner />
                 </div>
-              ) : filterConversations(combinedList, selectedFilter).length > 0 ? (
+              ) : combinedList.length > 0 ? (
                 filterConversations(combinedList, selectedFilter).map((item) => {
                   const isConversation = item.isConversation;
                   const conversation = isConversation ? item.data as Conversation : null;
@@ -716,8 +704,6 @@ export default function MessagesPage() {
                 type="text"
                 placeholder="Buscar usuarios..."
                 className="w-full rounded-md border border-gray-300 p-2 pr-10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                value={generalSearchTerm}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGeneralSearchTerm(e.target.value)}
               />
             </div>
             
@@ -762,14 +748,6 @@ export default function MessagesPage() {
                       </div>
                     </div>
                   ))}
-                </div>
-              ) : generalSearchTerm ? (
-                <div className="py-4 text-center text-gray-500 dark:text-gray-400">
-                  No se encontraron usuarios. Intenta con otro término de búsqueda.
-                </div>
-              ) : loading ? (
-                <div className="py-4 text-center text-gray-500 dark:text-gray-400">
-                  Cargando usuarios...
                 </div>
               ) : (
                 <div className="py-4 text-center text-gray-500 dark:text-gray-400">
@@ -856,11 +834,6 @@ export default function MessagesPage() {
                 type="text"
                 placeholder="Buscar usuarios..."
                 className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                value={generalSearchTerm}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  setGeneralSearchTerm(e.target.value);
-                  searchMutualFollowers(e.target.value);
-                }}
               />
             </div>
             
@@ -951,14 +924,6 @@ export default function MessagesPage() {
                       </div>
                     );
                   })}
-                </div>
-              ) : generalSearchTerm ? (
-                <div className="py-4 text-center text-gray-500 dark:text-gray-400">
-                  No se encontraron usuarios. Intenta con otro término de búsqueda.
-                </div>
-              ) : loading ? (
-                <div className="py-4 text-center text-gray-500 dark:text-gray-400">
-                  Cargando usuarios...
                 </div>
               ) : (
                 <div className="py-4 text-center text-gray-500 dark:text-gray-400">

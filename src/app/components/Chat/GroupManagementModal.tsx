@@ -12,7 +12,6 @@ import { CldImage } from 'next-cloudinary';
 import Image from 'next/image';
 import { API_ROUTES } from '@/src/config/api-routes';
 import { useToast } from '@/src/app/hooks/use-toast';
-import io from 'socket.io-client';
 
 export type User = {
   id: string;
@@ -45,23 +44,19 @@ interface GroupManagementModalProps {
   conversationData: ConversationData | null;
   currentUserId: string;
   isAdmin: boolean;
-  onConversationUpdate: (updatedData: Partial<ConversationData>) => void;
-  onDeleteGroup?: () => void;
-  onLeaveGroup?: () => void;
-  onGroupDeleted?: (groupId: string) => void;
+  onConversationUpdate: (data: Partial<ConversationData>) => void;
+  _onDeleteGroup?: (conversationId: string) => void;
+  _onLeaveGroup?: (conversationId: string) => void;
 }
 
-const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
+export const GroupManagementModal = ({
   isOpen,
   onClose,
   conversationData,
   currentUserId,
-  isAdmin,
+  isAdmin: initialIsAdmin,
   onConversationUpdate,
-  onDeleteGroup,
-  onLeaveGroup,
-  onGroupDeleted
-}) => {
+}: GroupManagementModalProps) => {
   const { data: _session } = useSession();
   const { toast } = useToast();
   
@@ -75,7 +70,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   const [selectedNewParticipants, setSelectedNewParticipants] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [groupImageFile, setGroupImageFile] = useState<File | null>(null);
+  const [_groupImageFile, setGroupImageFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [localConversationData, setLocalConversationData] = useState<ConversationData | null>(null);
@@ -114,58 +109,44 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   }, [isOpen]);
 
   // Crear una función para notificar a los demás participantes de los cambios
-  const notifyGroupUpdated = useCallback(async (updateType: string, updatedData: any) => {
+  const notifyGroupUpdated = useCallback(async (updateType: string, updatedData: unknown) => {
     if (!conversationData) return;
     
     try {
-      // Enviar notificación a través de socket.io
-      const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001');
-      
-      // Usamos el ID con prefijo para mantener la consistencia con la lógica de socket
-      socket.emit('group_updated', {
-        groupId: conversationData.id.startsWith('group_') ? conversationData.id : `group_${conversationData.id}`,
-        updateType,
-        updatedData,
-        updatedBy: {
-          id: currentUserId,
-          name: _session?.user?.name,
-          image: _session?.user?.image
-        }
+      await fetch('/api/socket/group-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversationId: conversationData.id,
+          updateType,
+          data: updatedData
+        })
       });
-    } catch (error) {
-      console.error('Error al notificar actualización del grupo:', error);
+    } catch (err) {
+      console.error('Error al notificar actualización:', err);
     }
-  }, [conversationData, currentUserId, _session?.user]);
-  
-  // Función para asegurar que el ID de conversación tiene el formato correcto
-  const ensureIdFormat = useCallback((id: string | null | undefined) => {
+  }, [conversationData]);
+
+  // Función para obtener el ID para la API (sin prefijos)
+  const getIdForApi = (id: string): string => {
     if (!id) return '';
-    // Si ya tiene el prefijo, devolverlo tal cual
-    if (id.startsWith('group_') || id.startsWith('conv_')) {
-      return id;
-    }
-    // Si no tiene prefijo, añadir 'group_' para grupos
-    return `group_${id}`;
-  }, []);
-  
-  // Función para eliminar el prefijo del ID para la API
-  const getIdForApi = useCallback((id: string) => {
-    return id.replace(/^(conv_|group_)/, '');
-  }, []);
+    return id.replace(/^(group_|conv_)/, '');
+  };
   
   // Función para actualizar la información del grupo
-  const updateGroupInfo = async (data: { name?: string, description?: string, imageUrl?: string }) => {
-    if (!conversationData) return false;
+  const updateGroupInfo = useCallback(async (data: { name?: string, description?: string, imageUrl?: string }) => {
+    if (!conversationData) return;
+    
+    setIsUpdatingGroup(true);
     
     try {
-      setIsUpdatingGroup(true);
-      
       // Obtenemos solo el ID sin prefijo para enviarlo a la API
       const groupId = getIdForApi(conversationData.id);
       console.log(`[Cliente] Actualizando grupo con ID: ${groupId} (original: ${conversationData.id})`);
       console.log(`[Cliente] Datos a enviar:`, data);
       
-      // Asegurarnos de que estamos usando ensureIdFormat consistentemente en el cliente y servidor
       const response = await fetch(`${API_ROUTES.messages.group.update(groupId)}`, {
         method: 'PATCH',
         headers: {
@@ -174,80 +155,50 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
         body: JSON.stringify(data)
       });
       
-      console.log(`[Cliente] Respuesta del servidor - Status: ${response.status}`);
-      
-      // Intentamos capturar y mostrar la respuesta completa para depuración
-      let responseText = "";
-      try {
-        responseText = await response.text();
-        console.log(`[Cliente] Respuesta texto completo:`, responseText);
-        
-        let responseData: {
-          success?: boolean;
-          error?: string;
-          conversation?: any;
-        } = {};
-        
-        try {
-          // Solo intentar parsear si hay contenido
-          if (responseText.trim().length > 0) {
-            responseData = JSON.parse(responseText);
-            console.log(`[Cliente] Respuesta JSON parseada:`, responseData);
-          } else {
-            console.log(`[Cliente] Respuesta vacía del servidor`);
-            responseData = { error: "Respuesta vacía del servidor" };
-          }
-        } catch (e) {
-          console.error('[Cliente] Error al parsear la respuesta JSON:', e);
-          throw new Error('Error al parsear la respuesta del servidor');
-        }
-        
-        if (!response.ok) {
-          console.error('[Cliente] Error al actualizar grupo:', responseData);
-          throw new Error(responseData.error || 'Error actualizando grupo');
-        }
-        
-        if (responseData && (responseData.success || responseData.conversation)) {
-          toast({
-            title: "Grupo actualizado",
-            description: "La información del grupo ha sido actualizada correctamente"
-          });
-          
-          // Notificar a los demás participantes usando notifyGroupUpdated
-          try {
-            notifyGroupUpdated('info_updated', data);
-            console.log(`[Cliente] Notificación enviada para el grupo: ${conversationData.id}`);
-          } catch (notifyError) {
-            console.error('[Cliente] Error al notificar actualización:', notifyError);
-          }
-          
-          // Actualizar la conversación en el contexto
-          if (responseData.conversation) {
-            onConversationUpdate(responseData.conversation);
-          } else {
-            onConversationUpdate(data);
-          }
-          
-          setIsUpdatingGroup(false);
-          return true;
-        } else {
-          throw new Error('La respuesta no indicó éxito');
-        }
-      } catch (parseError) {
-        console.error('[Cliente] Error al procesar la respuesta:', parseError);
-        throw new Error('Error al procesar la respuesta del servidor');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error al actualizar grupo:', errorData);
+        throw new Error('Error al actualizar el grupo');
       }
-    } catch (error) {
-      console.error('Error:', error);
+      
+      const responseData = await response.json();
+      
+      // Actualizar datos en la interfaz
+      if (responseData.success) {
+        toast({
+          title: "Grupo actualizado",
+          description: "La información del grupo ha sido actualizada correctamente"
+        });
+        
+        // Notificar a los demás participantes usando notifyGroupUpdated
+        try {
+          notifyGroupUpdated('info_updated', data);
+          console.log(`[Cliente] Notificación enviada para el grupo: ${conversationData.id}`);
+        } catch (notifyError) {
+          console.error('[Cliente] Error al notificar actualización:', notifyError);
+        }
+        
+        // Actualizar la conversación en el contexto
+        if (responseData.conversation) {
+          onConversationUpdate(responseData.conversation);
+        } else {
+          onConversationUpdate(data);
+        }
+        
+        setIsUpdatingGroup(false);
+        return true;
+      }
+    } catch (err) {
+      console.error('Error:', err);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo actualizar la información del grupo",
+        description: err instanceof Error ? err.message : "No se pudo actualizar la información del grupo",
         variant: "destructive"
       });
       setIsUpdatingGroup(false);
       return false;
     }
-  };
+  }, [conversationData, getIdForApi, notifyGroupUpdated, onConversationUpdate, toast]);
   
   // Función para manejar la subida de imágenes
   const handleImageUpload = useCallback(async (e: Event) => {
@@ -417,7 +368,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   
   // Función para añadir participantes al grupo
   const handleAddParticipants = async () => {
-    if (!conversationData || !isAdmin || selectedNewParticipants.length === 0) return;
+    if (!conversationData || !initialIsAdmin || selectedNewParticipants.length === 0) return;
     
     try {
       setIsUpdatingGroup(true);
@@ -465,12 +416,13 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
         description: "Los participantes han sido añadidos correctamente"
       });
       
-    } catch (error) {
+    } catch (err) {
       toast({
         title: "Error",
-        description: "Ha ocurrido un error al añadir los participantes",
+        description: "Ha ocurrido un error al añadir participantes",
         variant: "destructive"
       });
+      console.error("Error al añadir participantes:", err);
     } finally {
       setIsUpdatingGroup(false);
     }
@@ -478,7 +430,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
 
   // Función para eliminar un participante
   const handleRemoveParticipant = async (userId: string) => {
-    if (!conversationData || !isAdmin) return;
+    if (!conversationData || !initialIsAdmin) return;
     
     try {
       setIsUpdatingGroup(true);
@@ -522,12 +474,13 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
         description: "El participante ha sido eliminado correctamente"
       });
       
-    } catch (error) {
+    } catch (err) {
       toast({
         title: "Error",
         description: "Ha ocurrido un error al eliminar el participante",
         variant: "destructive"
       });
+      console.error("Error al eliminar participante:", err);
     } finally {
       setIsUpdatingGroup(false);
     }
@@ -535,7 +488,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
   
   // Función para eliminar el grupo
   const handleDeleteGroup = async () => {
-    if (!conversationData || !isAdmin) return;
+    if (!conversationData || !initialIsAdmin) return;
     
     const confirmDelete = window.confirm('¿Estás seguro de eliminar este grupo? Esta acción no se puede deshacer.');
     
@@ -570,16 +523,14 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
         
         // Cerrar modal y notificar para refrescar la lista de conversaciones
         onClose();
-        if (onGroupDeleted) {
-          onGroupDeleted(conversationData.id);
-        }
         
-      } catch (error) {
+      } catch (err) {
         toast({
           title: "Error",
           description: "Ha ocurrido un error al eliminar el grupo",
           variant: "destructive"
         });
+        console.error("Error al eliminar grupo:", err);
       } finally {
         setIsUpdatingGroup(false);
       }
@@ -623,16 +574,14 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
         
         // Cerrar modal y actualizar lista de conversaciones
         onClose();
-        if (onGroupDeleted) {
-          onGroupDeleted(conversationData.id);
-        }
         
-      } catch (error) {
+      } catch (err) {
         toast({
           title: "Error",
           description: "Ha ocurrido un error al abandonar el grupo",
           variant: "destructive"
         });
+        console.error("Error al abandonar grupo:", err);
       } finally {
         setIsUpdatingGroup(false);
       }
@@ -705,7 +654,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
                 input.onchange = handleImageUpload;
                 input.click();
               }}
-              disabled={isUploadingImage || !isAdmin}
+              disabled={isUploadingImage || !initialIsAdmin}
             >
               <UploadCloud className="h-4 w-4" />
             </Button>
@@ -719,10 +668,10 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
                 value={groupNameEdit}
                 onChange={(e) => setGroupNameEdit(e.target.value)}
                 placeholder="Nombre del grupo"
-                disabled={!isAdmin || isUpdatingGroup}
+                disabled={!initialIsAdmin || isUpdatingGroup}
                 className="flex-1"
               />
-              {isAdmin && (
+              {initialIsAdmin && (
                 <Button 
                   size="sm" 
                   onClick={handleUpdateGroupName}
@@ -743,10 +692,10 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
                 value={groupDescriptionEdit}
                 onChange={(e) => setGroupDescriptionEdit(e.target.value)}
                 placeholder="Descripción del grupo"
-                disabled={!isAdmin || isUpdatingGroup}
+                disabled={!initialIsAdmin || isUpdatingGroup}
                 className="min-h-[80px]"
               />
-              {isAdmin && (
+              {initialIsAdmin && (
                 <Button 
                   size="sm" 
                   onClick={handleUpdateGroupDescription}
@@ -764,7 +713,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
           <div>
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-sm font-medium">Participantes ({localConversationData?.participants.length || 0})</h3>
-              {isAdmin && (
+              {initialIsAdmin && (
                 <Button 
                   size="sm" 
                   variant="outline" 
@@ -810,7 +759,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
                       )}
                     </div>
                   </div>
-                  {isAdmin && participant.userId !== currentUserId && (
+                  {initialIsAdmin && participant.userId !== currentUserId && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
@@ -829,7 +778,7 @@ const GroupManagementModal: React.FC<GroupManagementModalProps> = ({
           {/* Acciones del grupo */}
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex flex-col space-y-2">
-              {isAdmin ? (
+              {initialIsAdmin ? (
                 <Button 
                   variant="destructive" 
                   onClick={handleDeleteGroup}
