@@ -280,7 +280,7 @@ export default function UserProfilePage() {
                   </div>
                   {/* Botón de Seguir */}
                   {session?.user?.id !== user.id && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 sm:flex-nowrap">
                       <FollowButton
                         targetUserId={user.id}
                         isFollowing={isFollowing}
@@ -334,23 +334,10 @@ export default function UserProfilePage() {
                             alert("Ha ocurrido un error al iniciar la conversación");
                           }
                         }}
-                        className="w-full flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-500 to-teal-400 text-white rounded-lg shadow hover:from-blue-600 hover:to-teal-500 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-all duration-200 ease-in-out transform hover:-translate-y-0.5"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 mr-2"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                          />
-                        </svg>
-                        Enviar mensaje
+                        <MessageSquare className="h-5 w-5" />
+                        <span>Enviar mensaje</span>
                       </Button>
                     </div>
                   )}
