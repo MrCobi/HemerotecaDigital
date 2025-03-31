@@ -33,7 +33,7 @@ const API_ROUTES = {
 const server = createServer(app); // Use Express app with the HTTP server
 const io = new Server(server, {
   cors: {
-    origin: '*', // Permitir cualquier origen para desarrollo
+    origin: process.env.NEXT_PUBLIC_BASE_URL ? [process.env.NEXT_PUBLIC_BASE_URL] : '*', // Permitir el origen de la aplicación o cualquiera en desarrollo
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
@@ -449,7 +449,7 @@ io.on('connection', (socket) => {
 });
 
 // Iniciar servidor
-server.listen(SOCKET_PORT, () => {
+server.listen(SOCKET_PORT, '0.0.0.0', () => {
   const timestamp = new Date().toISOString();
-  console.log(`Servidor Socket.io escuchando en puerto ${SOCKET_PORT}`);
+  console.log(`[${timestamp}] Servidor Socket.io escuchando en puerto ${SOCKET_PORT} en todas las interfaces`);
 });
