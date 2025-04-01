@@ -239,7 +239,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
             }}
           />
         );
-      } catch (error) {
+      } catch {
         // Si hay algún error con Cloudinary, usamos la imagen predeterminada
         return (
           <Image
