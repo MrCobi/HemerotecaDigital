@@ -229,7 +229,7 @@ export default function SourcePageClient({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-gray-900">
-      <header className="relative py-16 md:py-24 overflow-hidden bg-blue-800 dark:bg-gradient-to-br dark:from-slate-900 dark:via-blue-950 dark:to-slate-900">
+      <header className="relative py-12 sm:py-16 md:py-20 lg:py-24 overflow-hidden bg-blue-800 dark:bg-gradient-to-br dark:from-slate-900 dark:via-blue-950 dark:to-slate-900">
         {/* Patrones de fondo optimizados */}
         <div className="absolute inset-0 opacity-10">
           <svg
@@ -261,7 +261,7 @@ export default function SourcePageClient({
               e.stopPropagation();
               handleFavoriteClick(source.id);
             }}
-            className="absolute top-0 sm:top-4 right-0 sm:right-4 bg-white/90 hover:bg-white dark:bg-white/10 dark:hover:bg-white/20 p-2 rounded-full text-xl transition-transform duration-300 hover:scale-105 shadow-lg z-10"
+            className="absolute top-0 sm:top-4 right-4 bg-white/90 hover:bg-white dark:bg-white/10 dark:hover:bg-white/20 p-2 rounded-full text-xl transition-transform duration-300 hover:scale-105 shadow-lg z-10"
             whileHover={animationsEnabled ? { scale: 1.1 } : {}}
             whileTap={animationsEnabled ? { scale: 0.9 } : {}}
           >
@@ -273,17 +273,18 @@ export default function SourcePageClient({
             />
           </motion.button>
 
-          <div className="flex flex-col md:flex-row items-center gap-6 md:gap-12 pt-10 sm:pt-0">
+          <div className="flex flex-col lg:flex-row items-center gap-6 sm:gap-8 lg:gap-12 pt-8 sm:pt-6 lg:pt-0">
             {/* Texto a la izquierda en escritorio, centrado en móvil */}
-            <div className="flex-1 text-center md:text-left w-full md:w-auto">
+            <div className="flex-1 text-center lg:text-left w-full lg:w-auto">
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white dark:text-white mb-3 sm:mb-4 break-words">
                 {source.name}
               </h1>
-              <p className="text-base sm:text-lg md:text-xl text-white/90 dark:text-gray-100/90 mb-4 sm:mb-6 max-w-2xl mx-auto md:mx-0">
+              <p className="text-base sm:text-lg md:text-xl text-white/90 dark:text-gray-100/90 mb-4 sm:mb-6 max-w-2xl mx-auto lg:mx-0">
                 {source.description}
               </p>
 
-              <div className="w-full md:max-w-sm mx-auto md:mx-0 mb-4 sm:mb-6 relative z-10">
+              {/* Componente de rating adaptado para diferentes breakpoints */}
+              <div className="w-full max-w-xs sm:max-w-sm mx-auto lg:mx-0 mb-6 relative z-10">
                 <StarRating sourceId={source.id} />
               </div>
 
@@ -311,13 +312,13 @@ export default function SourcePageClient({
             </div>
 
             <div 
-              className={`w-full md:w-auto flex justify-center items-center mb-6 md:mb-0 rounded-xl overflow-hidden ${
+              className={`w-full lg:w-auto flex justify-center items-center mt-6 mb-4 lg:my-0 rounded-xl overflow-hidden ${
                 showComments ? "max-h-screen" : ""
               }`}
             >
               {source.imageUrl && (
-                <div className="md:ml-4 transform hover:scale-105 transition-transform duration-300">
-                  <div className="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden border-4 border-white/90 dark:border-white/10 shadow-2xl relative">
+                <div className="lg:ml-4 transform hover:scale-105 transition-transform duration-300">
+                  <div className="w-56 h-56 sm:w-64 sm:h-64 lg:w-80 lg:h-80 rounded-full overflow-hidden border-4 border-white/90 dark:border-white/10 shadow-2xl relative">
                     <SourceImage
                       imageUrl={source.imageUrl || ''}
                       name={source.name}
@@ -365,6 +366,7 @@ export default function SourcePageClient({
                       className="animate-spin h-8 w-8 text-blue-500 mb-4"
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
+                      stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
                       <circle
