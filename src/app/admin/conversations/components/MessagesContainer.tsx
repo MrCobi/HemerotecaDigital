@@ -6,7 +6,6 @@ import { format } from "date-fns/format";
 import Image from "next/image";
 import { Check, CheckCheck, File, Mic, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { CldImage } from "next-cloudinary";
 import { useState } from "react";
 import { toast } from "sonner";
 import { 
@@ -22,14 +21,15 @@ import {
 } from "@/src/app/components/ui/alert-dialog";
 import { Button } from "@/src/app/components/ui/button";
 
-type User = {
+// Exportar los tipos para poder usarlos en otros componentes
+export type User = {
   id: string;
   name: string | null;
   email: string | null;
   image: string | null;
 };
 
-type MessageRead = {
+export type MessageRead = {
   id: string;
   userId: string;
   messageId: string;
@@ -37,7 +37,7 @@ type MessageRead = {
   user: User;
 };
 
-type Message = {
+export type Message = {
   id: string;
   content: string | null;
   senderId: string;
@@ -53,7 +53,7 @@ type Message = {
   readBy: MessageRead[];
 };
 
-type ConversationParticipant = {
+export type ConversationParticipant = {
   userId: string;
   role: string;
   user: User;
@@ -67,7 +67,7 @@ type MessagesContainerProps = {
 
 export default function MessagesContainer({ 
   messages, 
-  participantMap,
+  participantMap: _participantMap, 
   onMessageDeleted 
 }: MessagesContainerProps) {
   const [messageIdToDelete, setMessageIdToDelete] = useState<string | null>(null);

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, Users, UserPlus, Search, Shield, CircleUser, X, Loader2, Check } from "lucide-react";
+import { ChevronLeft, Users, UserPlus, Search, Shield, CircleUser, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/src/app/components/ui/button";
 import { Badge } from "@/src/app/components/ui/badge";
@@ -44,35 +44,37 @@ type PageProps = {
   }>;
 };
 
-type Participant = {
+interface User {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  username?: string | null;
+}
+
+interface Participant {
   id: string;
   userId: string;
   conversationId: string;
-  isAdmin: boolean;
-  joinedAt: string;
   role: string;
-  user: {
-    id: string;
-    name: string | null;
-    email: string;
-    image: string | null;
-  };
-};
+  isAdmin?: boolean; // Para compatibilidad con código existente
+  createdAt: string;
+  user: User;
+}
 
-type Conversation = {
+interface Conversation {
   id: string;
   name: string | null;
   isGroup: boolean;
-  imageUrl: string | null;
-  description: string | null;
+  imageUrl?: string | null;
+  description?: string | null;
   participants: Participant[];
-  creator: {
-    id: string;
-    name: string | null;
-    email: string;
-    image: string | null;
-  } | null;
-};
+  creatorId?: string;
+  creator?: User | null;
+  _count?: {
+    participants: number;
+  };
+}
 
 export default function ConversationParticipantsPage({ params }: PageProps) {
   const router = useRouter();
@@ -82,12 +84,44 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [addingParticipant, setAddingParticipant] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<User[]>([]);
   const [searchingUsers, setSearchingUsers] = useState(false);
   const [removingParticipant, setRemovingParticipant] = useState<string | null>(null);
   const [changingRole, setChangingRole] = useState<string | null>(null);
+  const [_searching, _setSearching] = useState(false);
 
-  // Obtener el ID de la conversación de los parámetros de la URL
+  // Función para cargar la conversación (usando useCallback para evitar dependencias circulares)
+  const loadConversation = useCallback(async () => {
+    if (!conversationId) return;
+    
+    setLoading(true);
+    
+    try {
+      const sessionRes = await fetch('/api/auth/session');
+      const sessionData = await sessionRes.json();
+      
+      if (!sessionData.user) {
+        router.push('/auth/signin');
+        return;
+      }
+      
+      const response = await fetch(`/api/admin/conversations/${conversationId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Error al cargar la conversación: ${response.status}`);
+      }
+      
+      const data: Conversation = await response.json();
+      setConversation(data);
+      setLoading(false);
+    } catch (err) {
+      console.error("Error al cargar conversación:", err);
+      setError("Error al cargar los datos de la conversación");
+      setLoading(false);
+    }
+  }, [conversationId, router]);
+  
+  // Obtener el ID de la conversación desde los parámetros
   useEffect(() => {
     async function getParamId() {
       try {
@@ -106,35 +140,8 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
   // Cargar los datos de la conversación
   useEffect(() => {
     if (!conversationId) return;
-    
-    async function loadConversation() {
-      try {
-        const sessionRes = await fetch('/api/auth/session');
-        const sessionData = await sessionRes.json();
-        
-        if (!sessionData.user) {
-          router.push('/auth/signin');
-          return;
-        }
-        
-        const response = await fetch(`/api/admin/conversations/${conversationId}`);
-        
-        if (!response.ok) {
-          throw new Error(`Error al cargar la conversación: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        setConversation(data);
-        setLoading(false);
-      } catch (err) {
-        console.error("Error al cargar conversación:", err);
-        setError("Error al cargar los datos de la conversación");
-        setLoading(false);
-      }
-    }
-    
     loadConversation();
-  }, [conversationId, router]);
+  }, [conversationId, loadConversation]);
 
   // Filtrar participantes según el término de búsqueda
   const filteredParticipants = conversation?.participants?.filter(participant => {
@@ -148,7 +155,7 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
 
   // Buscar usuarios para añadir como participantes
   const searchUsers = async (query: string) => {
-    if (!query.trim() || query.length < 2) {
+    if (!query.trim()) {
       setSearchResults([]);
       return;
     }
@@ -162,11 +169,11 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
         throw new Error("Error al buscar usuarios");
       }
       
-      const data = await response.json();
+      const data: User[] = await response.json();
       
       // Filtrar usuarios que ya son participantes
       const existingUserIds = conversation?.participants.map(p => p.userId) || [];
-      const filteredResults = data.filter((user: any) => !existingUserIds.includes(user.id));
+      const filteredResults = data.filter((user: User) => !existingUserIds.includes(user.id));
       
       setSearchResults(filteredResults);
     } catch (err) {
@@ -178,7 +185,7 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
   };
 
   // Añadir un participante a la conversación
-  const addParticipant = async (userId: string) => {
+  const addParticipant = async (userId: string, role: string) => {
     if (!conversationId) return;
     
     try {
@@ -187,7 +194,7 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, role }),
       });
       
       if (!response.ok) {
@@ -195,24 +202,26 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
         throw new Error(errorData.error || "Error al añadir participante");
       }
       
-      const data = await response.json();
+      const newParticipant: Participant = await response.json();
       
       // Actualizar el estado local con la conversación actualizada
-      if (data.conversation) {
-        setConversation(data.conversation);
-        setSearchResults([]); // Limpiar resultados de búsqueda
+      if (newParticipant.conversationId) {
+        loadConversation();
+        setSearchTerm("");
+        toast.success("Participante añadido con éxito");
+      } else {
+        toast.error("Error al añadir participante");
       }
-      
-      toast.success("Participante añadido correctamente");
-      setAddingParticipant(false);
-    } catch (err: any) {
+    } catch (err: Error | unknown) {
       console.error("Error añadiendo participante:", err);
-      toast.error(err.message || "No se pudo añadir el participante");
+      toast.error(err instanceof Error ? err.message : "No se pudo añadir el participante");
+    } finally {
+      setAddingParticipant(false);
     }
   };
 
   // Eliminar un participante de la conversación
-  const removeParticipant = async (participantId: string) => {
+  const _removeParticipant = async (participantId: string) => {
     if (!conversationId) {
       toast.error("ID de conversación no disponible");
       return;
@@ -255,9 +264,9 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
       } else {
         toast.warning("Participante eliminado, pero no se pudo actualizar la interfaz");
       }
-    } catch (err: any) {
+    } catch (err: Error | unknown) {
       console.error("Error eliminando participante:", err);
-      toast.error(err.message || "No se pudo eliminar el participante");
+      toast.error(err instanceof Error ? err.message : "No se pudo eliminar el participante");
     } finally {
       setRemovingParticipant(null);
     }
@@ -307,7 +316,7 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
   };
 
   // Renderizar avatar de usuario
-  const renderUserAvatar = (user: any) => {
+  const renderUserAvatar = (user: User) => {
     const defaultImage = "/images/AvatarPredeterminado.webp";
     return (
       <div className="h-10 w-10 rounded-full overflow-hidden">
@@ -351,7 +360,7 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
   }
 
   // Determinar si la conversación es privada (1:1) o un grupo
-  const isPrivateChat = conversationId?.startsWith('conv_');
+  const _isPrivateChat = conversationId?.startsWith('conv_');
   const isGroupChat = conversationId?.startsWith('group_');
 
   return (
@@ -422,7 +431,7 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
                               <p className="text-sm text-muted-foreground">{user.email}</p>
                             </div>
                           </div>
-                          <Button size="sm" onClick={() => addParticipant(user.id)}>
+                          <Button size="sm" onClick={() => addParticipant(user.id, "member")}>
                             <UserPlus className="h-4 w-4 mr-2" />
                             Añadir
                           </Button>
@@ -480,7 +489,7 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
                           {participant.user.name || participant.user.email}
                         </Link>
                         
-                        {conversation?.creator?.id === participant.user.id && (
+                        {conversation?.creatorId === participant.user.id && (
                           <Badge variant="secondary" className="ml-2">Creador</Badge>
                         )}
                         
@@ -510,7 +519,7 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
                             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             
-                            {conversation?.creator?.id !== participant.user.id && (
+                            {conversation?.creatorId !== participant.user.id && (
                               <>
                                 {participant.isAdmin ? (
                                   <DropdownMenuItem onClick={() => changeParticipantRole(participant.id, false)}>

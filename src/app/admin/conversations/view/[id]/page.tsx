@@ -9,8 +9,48 @@ import { es } from "date-fns/locale";
 import { ChevronLeft, Users, MessageSquare, Trash2, PencilLine } from "lucide-react";
 import { Badge } from "@/src/app/components/ui/badge";
 import { toast } from "sonner";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
-import MessagesContainer from "../../components/MessagesContainer";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from "@/src/app/components/ui/alert-dialog";
+import MessagesContainer, { 
+  Message,
+  User as MessageUser,
+  ConversationParticipant
+} from "../../components/MessagesContainer";
+
+interface _User {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  username?: string | null;
+}
+
+interface Conversation {
+  id: string;
+  name: string | null;
+  isGroup: boolean;
+  createdAt: string;
+  lastMessageAt: string;
+  imageUrl?: string | null;
+  image?: string | null;
+  messages: Message[];
+  participants: ConversationParticipant[];
+  creator?: MessageUser;
+  _count?: {
+    messages?: number;
+    participants?: number;
+  };
+  description?: string;
+}
 
 type PageProps = {
   params: Promise<{
@@ -21,7 +61,7 @@ type PageProps = {
 export default function ViewConversationPage({ params }: PageProps) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [conversation, setConversation] = useState<any>(null);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -171,7 +211,7 @@ export default function ViewConversationPage({ params }: PageProps) {
     const defaultGroupImage = "/images/AvatarPredeterminado.webp";
     
     const isGroup = conversation.isGroup;
-    const imageUrl = conversation.imageUrl;
+    const imageUrl = conversation.imageUrl || conversation.image; 
     const alt = conversation.name || (isGroup ? "Grupo" : "Conversación");
     
     return (
@@ -385,21 +425,25 @@ export default function ViewConversationPage({ params }: PageProps) {
             <MessagesContainer 
               messages={conversation.messages} 
               participantMap={
-                conversation.participants.reduce((acc: any, participant: any) => {
+                conversation.participants.reduce((acc: Record<string, ConversationParticipant>, participant: ConversationParticipant) => {
                   acc[participant.userId] = participant;
                   return acc;
                 }, {})
               } 
               onMessageDeleted={(messageId: string) => {
                 // Actualizar el estado local para reflejar el mensaje eliminado
-                setConversation((prev: any) => ({
-                  ...prev,
-                  messages: prev.messages.filter((msg: any) => msg.id !== messageId),
-                  _count: {
-                    ...prev._count,
-                    messages: (prev._count?.messages || prev.messages.length) - 1
-                  }
-                }));
+                setConversation((prev: Conversation | null) => {
+                  if (!prev) return null;
+                  
+                  return {
+                    ...prev,
+                    messages: prev.messages.filter((msg: Message) => msg.id !== messageId),
+                    _count: {
+                      ...prev._count,
+                      messages: ((prev._count?.messages || prev.messages.length) - 1)
+                    }
+                  };
+                });
               }}
             />
           ) : (

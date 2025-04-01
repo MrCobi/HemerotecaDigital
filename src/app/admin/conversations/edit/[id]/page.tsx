@@ -2,19 +2,37 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import Image from "next/image";
 import { CldImage } from "next-cloudinary";
-import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
-import { es } from "date-fns/locale";
-import { ChevronLeft, Users, Check, X, Loader2, Upload } from "lucide-react";
+import { ChevronLeft, Users, Loader2, Upload, Check, X } from "lucide-react";
 import { Badge } from "@/src/app/components/ui/badge";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
 import { Label } from "@/src/app/components/ui/label";
-import { Switch } from "@/src/app/components/ui/switch";
 import { Textarea } from "@/src/app/components/ui/textarea";
 import { toast } from "sonner";
+
+interface User {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+}
+
+interface Conversation {
+  id: string;
+  name: string | null;
+  description: string | null;
+  isGroup: boolean;
+  image: string | null;
+  imageUrl?: string | null;
+  createdAt: string;
+  lastMessageAt: string;
+  creatorId?: string;
+  creator?: User;
+  isDirectConversation?: boolean;
+  isGroupConversation?: boolean;
+}
 
 type PageProps = {
   params: Promise<{
@@ -25,7 +43,7 @@ type PageProps = {
 export default function EditConversationPage({ params }: PageProps) {
   const router = useRouter();
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [conversation, setConversation] = useState<any>(null);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [formValues, setFormValues] = useState({
     name: "",
     description: "",
@@ -35,17 +53,14 @@ export default function EditConversationPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Estados para manejo de imágenes
+
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [uploadProgress, setUploadProgress] = useState(0);
-  
-  // Manejar selección de archivo para la imagen
+
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      // Verificar que sea un archivo de imagen
       if (!selectedFile.type.startsWith('image/')) {
         toast.error('Solo se permiten archivos de imagen');
         return;
@@ -58,13 +73,12 @@ export default function EditConversationPage({ params }: PageProps) {
     }
   }, []);
 
-  // Función para subir archivo a Cloudinary
   const uploadFile = useCallback((file: File) => {
     return new Promise<string>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("folder", "conversation_images"); // Carpeta específica para imágenes de conversaciones
+      formData.append("folder", "conversation_images");
 
       xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
@@ -77,7 +91,6 @@ export default function EditConversationPage({ params }: PageProps) {
         if (xhr.readyState === 4) {
           if (xhr.status === 200) {
             const response = JSON.parse(xhr.responseText);
-            // Construir la URL completa a partir del public_id
             const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'demo';
             const fullUrl = response.url || `https://res.cloudinary.com/${cloudName}/image/upload/${response.public_id}`;
             resolve(fullUrl);
@@ -92,7 +105,6 @@ export default function EditConversationPage({ params }: PageProps) {
     });
   }, []);
 
-  // Obtener el ID de la conversación de los parámetros de la URL
   useEffect(() => {
     async function getParamId() {
       try {
@@ -108,7 +120,6 @@ export default function EditConversationPage({ params }: PageProps) {
     getParamId();
   }, [params]);
 
-  // Cargar los datos de la conversación
   useEffect(() => {
     if (!conversationId) return;
     
@@ -130,11 +141,9 @@ export default function EditConversationPage({ params }: PageProps) {
         
         const data = await response.json();
         
-        // Determinar el tipo de conversación basado en el ID
         const isDirectConversation = data.id.startsWith("conv_");
         const isGroupConversation = data.id.startsWith("group_");
         
-        // Establecer la vista previa de la imagen si existe
         if (data.imageUrl) {
           setPreview(data.imageUrl);
         }
@@ -145,7 +154,6 @@ export default function EditConversationPage({ params }: PageProps) {
           isGroupConversation
         });
         
-        // Inicializar el formulario con los datos actuales
         setFormValues({
           name: data.name || "",
           description: data.description || "",
@@ -164,7 +172,6 @@ export default function EditConversationPage({ params }: PageProps) {
     loadConversation();
   }, [conversationId, router]);
 
-  // Manejar cambios en el formulario
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormValues(prev => ({
@@ -173,9 +180,7 @@ export default function EditConversationPage({ params }: PageProps) {
     }));
   };
 
-  // Manejar cambio en el switch de grupo
-  const handleSwitchChange = (checked: boolean) => {
-    // No permitir desactivar si es un grupo (group_)
+  const _handleSwitchChange = (checked: boolean) => {
     if (conversation?.isGroupConversation && !checked) {
       toast.error("No se puede cambiar el tipo de un grupo existente");
       return;
@@ -187,7 +192,6 @@ export default function EditConversationPage({ params }: PageProps) {
     }));
   };
 
-  // Enviar el formulario
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -196,16 +200,23 @@ export default function EditConversationPage({ params }: PageProps) {
     setSubmitting(true);
     
     try {
-      // Preparar los datos según el tipo de conversación
-      let dataToSubmit = { ...formValues };
-      let imageUrlToUse = formValues.imageUrl;
+      const dataToSubmit = {
+        name: formValues.name,
+        description: formValues.description || "",
+        // Solo incluimos image si el formulario tiene una URL de imagen
+        ...(formValues.imageUrl ? { imageUrl: formValues.imageUrl } : {}),
+        // Incluir isGroup con un valor por defecto
+        isGroup: false,
+      };
       
-      // Si hay un archivo seleccionado para subir (solo para grupos)
+      // Variable no utilizada, añadimos prefijo para evitar advertencia
+      let _imageUrlToUse = formValues.imageUrl;
+      
       if (file && conversation?.isGroupConversation) {
         try {
           setUploadProgress(0);
           const uploadedUrl = await uploadFile(file);
-          imageUrlToUse = uploadedUrl;
+          _imageUrlToUse = uploadedUrl;
           dataToSubmit.imageUrl = uploadedUrl;
         } catch (error) {
           console.error("Error al subir la imagen:", error);
@@ -213,12 +224,10 @@ export default function EditConversationPage({ params }: PageProps) {
         }
       }
       
-      // No permitir cambiar isGroup para conversaciones directas
       if (conversation?.isDirectConversation) {
         dataToSubmit.isGroup = false;
       }
       
-      // No permitir cambiar isGroup a false para grupos existentes
       if (conversation?.isGroupConversation) {
         dataToSubmit.isGroup = true;
       }
@@ -245,7 +254,6 @@ export default function EditConversationPage({ params }: PageProps) {
     }
   };
 
-  // Renderizar imagen de la conversación
   const renderImage = () => {
     const defaultUserImage = "/images/AvatarPredeterminado.webp";
     const defaultGroupImage = "/images/AvatarPredeterminado.webp";
@@ -340,7 +348,6 @@ export default function EditConversationPage({ params }: PageProps) {
     );
   };
 
-  // Mostrar pantalla de carga
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -350,7 +357,6 @@ export default function EditConversationPage({ params }: PageProps) {
     );
   }
 
-  // Mostrar error si ocurrió alguno
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -367,7 +373,6 @@ export default function EditConversationPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-6 max-w-5xl">
-        {/* Encabezado y navegación */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center">
             <Button
@@ -420,17 +425,13 @@ export default function EditConversationPage({ params }: PageProps) {
           </div>
         </div>
         
-        {/* Contenido principal */}
         <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-          {/* Formulario */}
           <form id="edit-form" onSubmit={handleSubmit}>
-            {/* Cabecera con imagen y nombre */}
             <div className="p-6 border-b border-border bg-muted/30">
               <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
                 {renderImage()}
                 
                 <div className="flex-1 space-y-4 w-full">
-                  {/* Nombre de la conversación o grupo */}
                   <div className="space-y-2">
                     <Label htmlFor="name">
                       {conversation?.isDirectConversation 
@@ -457,7 +458,6 @@ export default function EditConversationPage({ params }: PageProps) {
                     )}
                   </div>
                   
-                  {/* Campo de URL de imagen - Solo visible para grupos y oculto (no usado) para conversaciones directas */}
                   {conversation?.isGroupConversation && uploadProgress > 0 && uploadProgress < 100 && (
                     <div className="space-y-2">
                       <Label>Subiendo imagen</Label>
@@ -471,7 +471,6 @@ export default function EditConversationPage({ params }: PageProps) {
                     </div>
                   )}
                   
-                  {/* Badge de tipo de conversación */}
                   <div className="flex items-center space-x-2">
                     {conversation?.isDirectConversation ? (
                       <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200">
@@ -487,7 +486,6 @@ export default function EditConversationPage({ params }: PageProps) {
               </div>
             </div>
             
-            {/* Descripción y otros campos */}
             <div className="p-6">
               <div className="space-y-2 max-w-2xl">
                 <Label htmlFor="description">
