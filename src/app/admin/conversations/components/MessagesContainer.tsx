@@ -4,8 +4,23 @@ import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { es } from "date-fns/locale";
 import { format } from "date-fns/format";
 import Image from "next/image";
-import { Check, CheckCheck, File, Mic } from "lucide-react";
+import { Check, CheckCheck, File, Mic, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { CldImage } from "next-cloudinary";
+import { useState } from "react";
+import { toast } from "sonner";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from "@/src/app/components/ui/alert-dialog";
+import { Button } from "@/src/app/components/ui/button";
 
 type User = {
   id: string;
@@ -47,13 +62,22 @@ type ConversationParticipant = {
 type MessagesContainerProps = {
   messages: Message[];
   participantMap: Record<string, ConversationParticipant>;
+  onMessageDeleted?: (messageId: string) => void;
 };
 
-export default function MessagesContainer({ messages, participantMap }: MessagesContainerProps) {
+export default function MessagesContainer({ 
+  messages, 
+  participantMap,
+  onMessageDeleted 
+}: MessagesContainerProps) {
+  const [messageIdToDelete, setMessageIdToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletedMessages, setDeletedMessages] = useState<Set<string>>(new Set());
+
   // Ordenar mensajes por fecha (más antiguos primero)
-  const sortedMessages = [...messages].sort((a, b) => 
-    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-  );
+  const sortedMessages = [...messages]
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .filter(message => !deletedMessages.has(message.id));
 
   // Función para renderizar el avatar del usuario
   const renderAvatar = (user: User | null, size: number = 36) => {
@@ -94,7 +118,9 @@ export default function MessagesContainer({ messages, participantMap }: Messages
 
   // Función para renderizar el estado de lectura de un mensaje
   const renderReadStatus = (message: Message) => {
-    const readCount = message.readBy.length;
+    // Verificar que readBy existe y tiene la propiedad length
+    const readBy = message.readBy || [];
+    const readCount = readBy.length;
     
     if (readCount === 0) {
       return (
@@ -112,6 +138,40 @@ export default function MessagesContainer({ messages, participantMap }: Messages
     );
   };
 
+  // Manejar la eliminación de un mensaje
+  const handleDeleteMessage = async (messageId: string) => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/admin/messages/${messageId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+      }
+
+      // Actualizar la lista local de mensajes eliminados
+      setDeletedMessages(prev => {
+        const newSet = new Set(prev);
+        newSet.add(messageId);
+        return newSet;
+      });
+      
+      // Notificar a la página padre si se proporcionó la función de callback
+      if (onMessageDeleted) {
+        onMessageDeleted(messageId);
+      }
+      
+      toast.success("Mensaje eliminado correctamente");
+    } catch (error) {
+      console.error("Error al eliminar mensaje:", error);
+      toast.error("No se pudo eliminar el mensaje");
+    } finally {
+      setIsDeleting(false);
+      setMessageIdToDelete(null);
+    }
+  };
+
   // Renderizar contenido del mensaje según tipo
   const renderMessageContent = (message: Message) => {
     switch (message.messageType) {
@@ -123,13 +183,32 @@ export default function MessagesContainer({ messages, participantMap }: Messages
           <div>
             {message.content && <p className="text-sm mb-2">{message.content}</p>}
             <div className="relative rounded-lg overflow-hidden bg-gray-100 mt-1 max-w-xs">
-              <Image
-                src={message.mediaUrl || ""}
-                alt="Imagen compartida"
-                width={300}
-                height={200}
-                className="object-contain max-h-60"
-              />
+              {message.mediaUrl && message.mediaUrl.includes('cloudinary') ? (
+                // Extracción directa de la última parte de la URL (después de la última /)
+                <Image
+                  src={message.mediaUrl}
+                  alt="Imagen compartida"
+                  width={300}
+                  height={200}
+                  className="object-contain max-h-60"
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/ImagenPredeterminada.webp";
+                  }}
+                />
+              ) : (
+                <Image
+                  src={message.mediaUrl || "/images/ImagenPredeterminada.webp"}
+                  alt="Imagen compartida"
+                  width={300}
+                  height={200}
+                  className="object-contain max-h-60"
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/ImagenPredeterminada.webp";
+                  }}
+                />
+              )}
             </div>
           </div>
         );
@@ -155,18 +234,26 @@ export default function MessagesContainer({ messages, participantMap }: Messages
           </div>
         );
       
+      case "voice":
       case "audio":
         return (
           <div>
             {message.content && <p className="text-sm mb-2">{message.content}</p>}
             <div className="flex items-center p-3 rounded-md bg-gray-100 dark:bg-gray-800 mt-1 max-w-xs">
               <Mic className="h-6 w-6 text-blue-500 mr-2" />
-              <div>
+              <div className="w-full">
                 <p className="text-sm font-medium">Mensaje de voz</p>
-                <audio controls className="mt-2 max-w-full">
-                  <source src={message.mediaUrl || ""} />
-                  Tu navegador no soporta el elemento de audio.
-                </audio>
+                {message.mediaUrl ? (
+                  <audio controls className="mt-2 max-w-full w-full">
+                    <source src={message.mediaUrl} type="audio/mpeg" />
+                    <source src={message.mediaUrl} type="video/mp4" />
+                    <source src={message.mediaUrl} type="audio/wav" />
+                    <source src={message.mediaUrl} type="audio/ogg" />
+                    Tu navegador no soporta el elemento de audio.
+                  </audio>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-1">Audio no disponible</p>
+                )}
               </div>
             </div>
           </div>
@@ -188,7 +275,7 @@ export default function MessagesContainer({ messages, participantMap }: Messages
           const timeAgo = formatDistanceToNow(date, { locale: es, addSuffix: true });
           
           return (
-            <div key={message.id} className="flex items-start">
+            <div key={message.id} className="flex items-start group">
               <div className="mr-3">
                 <Link href={`/admin/users/view/${message.sender.id}`}>
                   {renderAvatar(message.sender)}
@@ -205,6 +292,53 @@ export default function MessagesContainer({ messages, participantMap }: Messages
                   <span className="text-xs text-muted-foreground" title={formattedDate}>
                     {timeAgo}
                   </span>
+                  
+                  {/* Botón de eliminar mensaje */}
+                  <AlertDialog open={messageIdToDelete === message.id} onOpenChange={(open) => {
+                    if (!open) setMessageIdToDelete(null);
+                  }}>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-0 h-6 w-6"
+                        onClick={() => setMessageIdToDelete(message.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Eliminar mensaje</span>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                          <Trash2 className="h-5 w-5 text-destructive" />
+                          Eliminar mensaje
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          ¿Estás seguro de que deseas eliminar este mensaje?
+                          <br />
+                          Esta acción no se puede deshacer.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleDeleteMessage(message.id);
+                          }}
+                          disabled={isDeleting}
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          {isDeleting ? (
+                            <span className="animate-pulse">Eliminando...</span>
+                          ) : (
+                            "Eliminar mensaje"
+                          )}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
                 
                 <div className="relative rounded-lg bg-gray-50 dark:bg-gray-900 p-3 mb-1">

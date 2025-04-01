@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 // GET - Obtener una conversación específica por ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verificar sesión y permisos de administrador
@@ -18,12 +18,16 @@ export async function GET(
       return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
     }
 
-    const { id } = params;
+    // Obtener el ID de conversación de los params
+    const { id: conversationId } = await params;
+    if (!conversationId) {
+      return NextResponse.json({ error: "ID de conversación no proporcionado" }, { status: 400 });
+    }
 
     // Obtener la conversación completa con todos los detalles
     const conversation = await prisma.conversation.findUnique({
       where: {
-        id,
+        id: conversationId,
       },
       include: {
         participants: {
@@ -34,6 +38,11 @@ export async function GET(
         messages: {
           include: {
             sender: true,
+            readBy: {
+              include: {
+                user: true,
+              }
+            },
           },
           orderBy: {
             createdAt: "asc",
@@ -53,17 +62,40 @@ export async function GET(
       return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
     }
 
-    return NextResponse.json(conversation);
+    // Obtener el creador de la conversación si existe creatorId
+    let creator = null;
+    if (conversation.creatorId) {
+      creator = await prisma.user.findUnique({
+        where: {
+          id: conversation.creatorId
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true
+        }
+      });
+    }
+
+    // Devolver la conversación con el creador
+    // Usamos JSON.parse(JSON.stringify()) para crear un objeto plano serializable
+    const conversationWithCreator = {
+      ...JSON.parse(JSON.stringify(conversation)),
+      creator
+    };
+    
+    return NextResponse.json(conversationWithCreator);
   } catch (error) {
     console.error("Error al obtener conversación:", error);
     return NextResponse.json({ error: "Error al obtener la conversación" }, { status: 500 });
   }
 }
 
-// DELETE - Eliminar una conversación
+// DELETE - Eliminar una conversación específica
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verificar sesión y permisos de administrador
@@ -76,12 +108,15 @@ export async function DELETE(
       return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
     }
 
-    const { id } = params;
+    const { id: conversationId } = await params;
+    if (!conversationId) {
+      return NextResponse.json({ error: "ID de conversación no proporcionado" }, { status: 400 });
+    }
 
     // Verificar si la conversación existe
     const conversation = await prisma.conversation.findUnique({
       where: {
-        id,
+        id: conversationId,
       },
     });
 
@@ -92,7 +127,7 @@ export async function DELETE(
     // Eliminar la conversación y toda su información relacionada
     await prisma.conversation.delete({
       where: {
-        id,
+        id: conversationId,
       },
     });
 
@@ -103,10 +138,10 @@ export async function DELETE(
   }
 }
 
-// PATCH - Actualizar información de la conversación
+// PATCH - Actualizar una conversación específica
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verificar sesión y permisos de administrador
@@ -119,13 +154,17 @@ export async function PATCH(
       return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
     }
 
-    const { id } = params;
+    const { id: conversationId } = await params;
+    if (!conversationId) {
+      return NextResponse.json({ error: "ID de conversación no proporcionado" }, { status: 400 });
+    }
+
     const data = await request.json();
 
     // Verificar si la conversación existe
     const conversationExists = await prisma.conversation.findUnique({
       where: {
-        id,
+        id: conversationId,
       },
     });
 
@@ -136,7 +175,7 @@ export async function PATCH(
     // Actualizar la conversación
     const updatedConversation = await prisma.conversation.update({
       where: {
-        id,
+        id: conversationId,
       },
       data,
       include: {

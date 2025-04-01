@@ -11,13 +11,15 @@ export default function AdminDashboard() {
     ratingCount: number;
     favoriteCount: number;
     messageCount: number;
+    conversationCount: number;
   }>({ 
     userCount: 0, 
     sourceCount: 0, 
     commentCount: 0, 
     ratingCount: 0, 
     favoriteCount: 0, 
-    messageCount: 0 
+    messageCount: 0,
+    conversationCount: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +54,8 @@ export default function AdminDashboard() {
           commentCount: statsData?.commentCount ?? statsData?.comments ?? 0,
           ratingCount: statsData?.ratingCount ?? statsData?.ratings ?? 0,
           favoriteCount: statsData?.favoriteCount ?? statsData?.favorites ?? 0,
-          messageCount: statsData?.messageCount ?? statsData?.messages ?? 0
+          messageCount: statsData?.messageCount ?? statsData?.messages ?? 0,
+          conversationCount: statsData?.conversationCount ?? statsData?.conversations ?? 0
         });
         setLoading(false);
       } catch (err) {
@@ -155,6 +158,18 @@ export default function AdminDashboard() {
       color: "bg-red-500"
     },
     {
+      title: "Conversaciones",
+      description: "Administrar las conversaciones entre usuarios",
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+        </svg>
+      ),
+      count: stats.conversationCount,
+      href: "/admin/conversations",
+      color: "bg-teal-500"
+    },
+    {
       title: "Mensajes",
       description: "Administrar mensajes directos entre usuarios",
       icon: (
@@ -204,7 +219,7 @@ export default function AdminDashboard() {
 
       <div className="mt-12 bg-card rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold mb-4 text-foreground">Acciones rápidas</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
             href="/admin/users/create"
             className="flex items-center p-3 rounded-md hover:bg-accent/50 transition-colors duration-200"
@@ -232,6 +247,22 @@ export default function AdminDashboard() {
             <div>
               <h3 className="text-sm font-medium text-foreground">Añadir fuente</h3>
               <p className="text-xs text-muted-foreground">Crear una nueva fuente de información</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/conversations"
+            className="flex items-center p-3 rounded-md hover:bg-accent/50 transition-colors duration-200"
+          >
+            <div className="flex-shrink-0 mr-3 h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z" />
+                <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-foreground">Gestionar conversaciones</h3>
+              <p className="text-xs text-muted-foreground">Ver y administrar conversaciones</p>
             </div>
           </Link>
 

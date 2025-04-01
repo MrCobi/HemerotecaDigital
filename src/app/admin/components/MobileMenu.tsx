@@ -96,6 +96,9 @@ export default function MobileMenu({
             </div>
 
             <div className="space-y-1">
+              <Link href="/admin/conversations" onClick={closeMenu} className="block px-4 py-2 text-sm font-medium text-foreground rounded-md hover:bg-primary/10 transition-colors">
+                Conversaciones
+              </Link>
               <Link href="/admin/messages" onClick={closeMenu} className="block px-4 py-2 text-sm font-medium text-foreground rounded-md hover:bg-primary/10 transition-colors">
                 Mensajes
               </Link>

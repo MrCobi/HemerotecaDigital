@@ -119,6 +119,12 @@ export default function AdminLayout({
 
           <p className="px-4 mt-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Social</p>
           <div className="space-y-1">
+            <Link href="/admin/conversations" className="group flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-accent transition-colors text-foreground">
+              <svg xmlns="http://www.w3.org/2000/svg" className="mr-3 h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h2v4l.586-.586z" />
+              </svg>
+              Conversaciones
+            </Link>
             <Link href="/admin/messages" className="group flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-accent transition-colors text-foreground">
               <svg xmlns="http://www.w3.org/2000/svg" className="mr-3 h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />

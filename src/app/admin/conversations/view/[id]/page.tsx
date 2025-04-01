@@ -168,7 +168,7 @@ export default function ViewConversationPage({ params }: PageProps) {
 
   const renderImage = () => {
     const defaultUserImage = "/images/AvatarPredeterminado.webp";
-    const defaultGroupImage = "/images/GroupPredeterminado.webp";
+    const defaultGroupImage = "/images/AvatarPredeterminado.webp";
     
     const isGroup = conversation.isGroup;
     const imageUrl = conversation.imageUrl;
@@ -360,6 +360,10 @@ export default function ViewConversationPage({ params }: PageProps) {
                       width={20}
                       height={20}
                       className="h-full w-full object-cover"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "/images/AvatarPredeterminado.webp";
+                      }}
                     />
                   </div>
                   <span className="text-sm">
@@ -378,12 +382,26 @@ export default function ViewConversationPage({ params }: PageProps) {
           <h2 className="text-lg font-medium mb-4">Mensajes recientes</h2>
           
           {conversation.messages && conversation.messages.length > 0 ? (
-            <MessagesContainer messages={conversation.messages} participantMap={
-              conversation.participants.reduce((acc: any, participant: any) => {
-                acc[participant.userId] = participant;
-                return acc;
-              }, {})
-            } />
+            <MessagesContainer 
+              messages={conversation.messages} 
+              participantMap={
+                conversation.participants.reduce((acc: any, participant: any) => {
+                  acc[participant.userId] = participant;
+                  return acc;
+                }, {})
+              } 
+              onMessageDeleted={(messageId: string) => {
+                // Actualizar el estado local para reflejar el mensaje eliminado
+                setConversation((prev: any) => ({
+                  ...prev,
+                  messages: prev.messages.filter((msg: any) => msg.id !== messageId),
+                  _count: {
+                    ...prev._count,
+                    messages: (prev._count?.messages || prev.messages.length) - 1
+                  }
+                }));
+              }}
+            />
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-30" />
