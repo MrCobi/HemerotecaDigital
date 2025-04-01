@@ -1398,46 +1398,60 @@ export default function HomePage() {
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
             >
-              {categories.map((category, i) => {
-                const englishCategory = category.toLowerCase();
-                const spanishCategory = getSpanishCategory(englishCategory);
-                const gradientClass = getCategoryGradient(englishCategory);
-                const resolvedBgImage = getCategoryImage(englishCategory, isDarkMode);
-                
-                return (
-                <motion.div
-                  key={i}
-                  initial={animationVariants.hidden}
-                  animate={animationVariants.visible}
-                  transition={animationTransition}
-                  className="snap-start flex-shrink-0 relative"
-                  style={{ width: "280px", minWidth: "180px" }}
-                >
-                  <div className="group relative rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-32 xs:h-36 sm:h-40 w-full">
-                    <div
-                      className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-110"
-                      style={{
-                        backgroundImage: `url(${resolvedBgImage})`,
-                      }}
-                    />
-                    <div className={`absolute inset-0 bg-gradient-to-t ${gradientClass} opacity-70`} />
-                    <div className="absolute bottom-0 left-0 right-0 p-3 xs:p-4 sm:p-5 select-none">
-                      <h3 className="text-base xs:text-lg sm:text-xl font-bold text-white">
-                        {spanishCategory}
-                      </h3>
-                      <div className="flex items-center mt-1 xs:mt-2 text-xs sm:text-sm text-blue-50">
-                        <Link
-                          href={`/categories/${encodeURIComponent(englishCategory)}`}
-                          className="flex items-center text-blue-100 hover:text-white transition-colors"
-                        >
-                          Explorar{" "}
-                          <ArrowRight className="ml-1 w-3 h-3 xs:w-4 xs:h-4 inline-block text-white" />
-                        </Link>
+              {categories.length > 0 ? (
+                categories.map((category, i) => {
+                  const englishCategory = category.toLowerCase();
+                  const spanishCategory = getSpanishCategory(englishCategory);
+                  const gradientClass = getCategoryGradient(englishCategory);
+                  const resolvedBgImage = getCategoryImage(englishCategory, isDarkMode);
+                  
+                  return (
+                  <motion.div
+                    key={i}
+                    initial={animationVariants.hidden}
+                    animate={animationVariants.visible}
+                    transition={animationTransition}
+                    className="snap-start flex-shrink-0 relative"
+                    style={{ width: "280px", minWidth: "180px" }}
+                  >
+                    <div className="group relative rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-32 xs:h-36 sm:h-40 w-full">
+                      <div
+                        className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-110"
+                        style={{
+                          backgroundImage: `url(${resolvedBgImage})`,
+                        }}
+                      />
+                      <div className={`absolute inset-0 bg-gradient-to-t ${gradientClass} opacity-70`} />
+                      <div className="absolute bottom-0 left-0 right-0 p-3 xs:p-4 sm:p-5 select-none">
+                        <h3 className="text-base xs:text-lg sm:text-xl font-bold text-white">
+                          {spanishCategory}
+                        </h3>
+                        <div className="flex items-center mt-1 xs:mt-2 text-xs sm:text-sm text-blue-50">
+                          <Link
+                            href={`/categories/${encodeURIComponent(englishCategory)}`}
+                            className="flex items-center text-blue-100 hover:text-white transition-colors"
+                          >
+                            Explorar{" "}
+                            <ArrowRight className="ml-1 w-3 h-3 xs:w-4 xs:h-4 inline-block text-white" />
+                          </Link>
+                        </div>
                       </div>
                     </div>
+                  </motion.div>
+                )})
+              ) : (
+                <div className="w-full py-12 flex flex-col items-center justify-center bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-800/30 mb-4">
+                    <Filter className="h-8 w-8 text-blue-500 dark:text-blue-400" />
                   </div>
-                </motion.div>
-              )})}
+                  <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">
+                    No hay categorías disponibles
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto text-center">
+                    En este momento no hay categorías para explorar. Vuelve a intentarlo más tarde.
+                  </p>
+                </div>
+              )}
             </div>
             
             {/* Controles de navegación */}
