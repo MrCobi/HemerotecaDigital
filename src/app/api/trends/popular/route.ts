@@ -74,7 +74,7 @@ async function _fetchWithRetry(url: string, retries = 3, delay = 1000) {
   throw new Error('Max retries reached');
 }
 
-export const GET = withAuth(async (req, { userId }: { userId: string }) => {
+export const GET = withAuth(async (_req, { userId: _userId }: { userId: string }) => {
   try {
     // 1. Fuentes más favoritadas
     const topFavorites = await prisma.favoriteSource.groupBy({
@@ -200,20 +200,6 @@ export const GET = withAuth(async (req, { userId }: { userId: string }) => {
       })
     );
 
-    // También cargar los favoritos del usuario actual
-    const userFavorites = await prisma.favoriteSource.findMany({
-      where: { userId },
-      select: { 
-        sourceId: true,
-        source: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      }
-    });
-
     // Obtener fuentes más comentadas
     const topComments = await prisma.comment.groupBy({
       by: ['sourceId'],
@@ -248,14 +234,25 @@ export const GET = withAuth(async (req, { userId }: { userId: string }) => {
       })
     );
 
-    // Formatear los favoritos para coincidir con la estructura esperada
-    const formattedFavorites = userFavorites.map(fav => ({
-      sourceId: fav.sourceId,
-      sourceName: fav.source?.name || "Fuente desconocida",
-      _count: {
-        sourceId: 1 // Conteo ficticio para mantener la estructura
-      }
-    }));
+    // Formatear los favoritos más populares para coincidir con la estructura esperada
+    const formattedTopFavorites = await Promise.all(
+      topFavorites.map(async (item) => {
+        const source = await prisma.source.findUnique({
+          where: { id: item.sourceId },
+          select: {
+            id: true,
+            name: true
+          }
+        });
+        return {
+          sourceId: item.sourceId,
+          sourceName: source?.name || "Fuente desconocida",
+          _count: {
+            sourceId: item._count.sourceId
+          }
+        };
+      })
+    );
 
     // Extraer los trends como objetos API compatible
     const apiTrends = [
@@ -291,7 +288,7 @@ export const GET = withAuth(async (req, { userId }: { userId: string }) => {
     return NextResponse.json({
       data: {
         trends: newsApiTrends.length > 0 ? newsApiTrends : apiTrends || [],
-        favorites: formattedFavorites || [],
+        favorites: formattedTopFavorites || [],
         comments: commentSourcesDetails || []
       }
     });
