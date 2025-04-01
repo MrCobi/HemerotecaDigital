@@ -164,7 +164,7 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
     const defaultImage = "/images/AvatarPredeterminado.webp";
     
     return (
-      <div className={`h-${Math.floor(size/4)} w-${Math.floor(size/4)} overflow-hidden rounded-full flex items-center justify-center bg-gray-100`}>
+      <div className="h-7 w-7 sm:h-8 sm:w-8 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
         {user.image ? (
           <Image
             src={user.image}
@@ -200,23 +200,24 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
         
         return (
           <div className="flex items-center">
-            <div className="h-8 w-8 flex-shrink-0 mr-3">
+            <div className="flex-shrink-0 mr-2 sm:mr-3">
               {renderUserImage(follower)}
             </div>
-            <div>
+            <div className="min-w-0">
               <Link
                 href={`/admin/users/view/${follower.id}`}
-                className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
+                className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
               >
                 {follower.name || follower.email || "Usuario sin nombre"}
               </Link>
               {follower.email && (
-                <div className="text-xs text-muted-foreground">{follower.email}</div>
+                <div className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-full">{follower.email}</div>
               )}
             </div>
           </div>
         );
       },
+      hideOnMobile: false,
     },
     {
       header: "Sigue a",
@@ -227,23 +228,24 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
         
         return (
           <div className="flex items-center">
-            <div className="h-8 w-8 flex-shrink-0 mr-3">
+            <div className="flex-shrink-0 mr-2 sm:mr-3">
               {renderUserImage(following)}
             </div>
-            <div>
+            <div className="min-w-0">
               <Link
                 href={`/admin/users/view/${following.id}`}
-                className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
+                className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
               >
                 {following.name || following.email || "Usuario sin nombre"}
               </Link>
               {following.email && (
-                <div className="text-xs text-muted-foreground">{following.email}</div>
+                <div className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-full">{following.email}</div>
               )}
             </div>
           </div>
         );
       },
+      hideOnMobile: false,
     },
     {
       header: "Fecha",
@@ -251,25 +253,26 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
       cell: (follow: Follow) => {
         const date = new Date(follow.createdAt);
         return (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
             {format(date, "dd/MM/yyyy")}
           </div>
         );
       },
+      hideOnMobile: true,
     },
     {
       header: "Acciones",
       id: "actions",
       cell: (follow: Follow) => {
         return (
-          <div className="flex items-center justify-start gap-1.5">
+          <div className="flex flex-wrap items-center justify-start gap-1.5">
             <Link
               href={`/admin/users/view/${follow.followerId}`}
               className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
               title="Ver perfil del seguidor"
             >
               <User className="h-3.5 w-3.5" />
-              <span className="ml-1 text-xs truncate">Seguidor</span>
+              <span className="ml-1 text-xs truncate hidden sm:inline">Seguidor</span>
             </Link>
             <Link
               href={`/admin/users/view/${follow.followingId}`}
@@ -277,7 +280,7 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
               title="Ver perfil del seguido"
             >
               <User className="h-3.5 w-3.5" />
-              <span className="ml-1 text-xs truncate">Seguido</span>
+              <span className="ml-1 text-xs truncate hidden sm:inline">Seguido</span>
             </Link>
             <DeleteFollowDialog 
               followId={follow.id} 
@@ -286,6 +289,7 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
           </div>
         );
       },
+      hideOnMobile: false,
     },
   ], [handleDelete]);
 

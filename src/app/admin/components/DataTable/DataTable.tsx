@@ -13,6 +13,8 @@ export type Column<T> = {
   cell: (item: T) => React.ReactNode;
   className?: string;
   filterElement?: React.ReactNode;
+  hideOnMobile?: boolean;
+  id?: string;
 };
 
 export type DataTableProps<T> = {
@@ -81,6 +83,9 @@ export default function DataTable<T>({
   const renderMobileRow = (item: T, index: number) => {
     const isExpanded = expandedRows[index] || false;
 
+    const visibleColumns = columns.filter(col => !col.hideOnMobile);
+    const hiddenColumns = columns.filter(col => col.hideOnMobile);
+
     return (
       <div key={index} className="block md:hidden">
         <div 
@@ -91,7 +96,7 @@ export default function DataTable<T>({
           onClick={() => onRowClick?.(item)}
         >
           <div className="flex justify-between items-center mb-3">
-            <div className="font-medium">{columns[0].cell(item)}</div>
+            <div className="font-medium">{visibleColumns[0]?.cell(item) || columns[0].cell(item)}</div>
             
             <button
               type="button"
@@ -114,48 +119,52 @@ export default function DataTable<T>({
           </div>
           
           <div className="flex flex-col gap-2 mb-3">
-            {columns.length > 1 && (
+            {visibleColumns.length > 1 && (
               <div className="flex items-center justify-between">
                 <div className="text-sm font-medium text-muted-foreground">
-                  {typeof columns[1].header === "string" ? columns[1].header : "Rol"}:
+                  {typeof visibleColumns[1].header === "string" ? visibleColumns[1].header : "Rol"}:
                 </div>
-                <div>{columns[1].cell(item)}</div>
+                <div>{visibleColumns[1].cell(item)}</div>
               </div>
             )}
           
-            {columns.length > 2 && (
+            {visibleColumns.length > 2 && (
               <div className="flex items-center justify-between">
                 <div className="text-sm font-medium text-muted-foreground">
-                  {typeof columns[2].header === "string" ? columns[2].header : "Estado"}:
+                  {typeof visibleColumns[2].header === "string" ? visibleColumns[2].header : "Estado"}:
                 </div>
-                <div>{columns[2].cell(item)}</div>
+                <div>{visibleColumns[2].cell(item)}</div>
               </div>
             )}
             
-            {columns.length > 3 && (
+            {visibleColumns.length > 3 && (
               <div className="flex items-center justify-between">
                 <div className="text-sm font-medium text-muted-foreground">
-                  {typeof columns[3].header === "string" ? columns[3].header : "Registro"}:
+                  {typeof visibleColumns[3].header === "string" ? visibleColumns[3].header : "Registro"}:
                 </div>
-                <div>{columns[3].cell(item)}</div>
+                <div>{visibleColumns[3].cell(item)}</div>
               </div>
             )}
           </div>
           
-          {columns.length > 4 && (
+          {visibleColumns.length > 4 && (
             <div className="flex flex-row justify-center space-x-2 mt-3 pt-3 border-t border-border">
-              {columns[4].cell(item)}
+              {visibleColumns[4].cell(item)}
             </div>
           )}
           
-          {isExpanded && columns.length > 5 && columns.slice(5).map((column, colIndex) => (
-            <div key={colIndex} className="mt-3 pt-3 border-t border-border">
-              <div className="text-xs font-medium text-muted-foreground uppercase mb-1">
-                {typeof column.header === "string" ? column.header : `Columna ${colIndex + 3}`}
-              </div>
-              <div>{column.cell(item)}</div>
+          {isExpanded && hiddenColumns.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              {hiddenColumns.map((column, colIndex) => (
+                <div key={colIndex} className="mt-3 pt-3 border-t border-border">
+                  <div className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                    {typeof column.header === "string" ? column.header : `Columna ${colIndex + 3}`}
+                  </div>
+                  <div>{column.cell(item)}</div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       </div>
     );

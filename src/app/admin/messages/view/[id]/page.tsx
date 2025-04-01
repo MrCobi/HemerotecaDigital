@@ -281,10 +281,10 @@ export default function MessageViewPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Detalle del Mensaje</h1>
-        <div className="flex gap-2">
+    <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Detalle del Mensaje</h1>
+        <div className="flex flex-wrap gap-2">
           <Link
             href="/admin/messages"
             className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-secondary/80 transition-colors duration-200"
@@ -304,7 +304,8 @@ export default function MessageViewPage() {
               ) : (
                 <CheckCircle className="h-4 w-4 mr-2" />
               )}
-              Marcar como leído
+              <span className="sm:inline hidden">Marcar como leído</span>
+              <span className="sm:hidden inline">Leído</span>
             </Button>
           )}
           <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -312,13 +313,14 @@ export default function MessageViewPage() {
               <Button 
                 variant="destructive" 
                 disabled={isDeleting}
+                className="px-3 py-2"
               >
                 {isDeleting ? (
-                  <div className="h-4 w-4 mr-2 animate-spin rounded-full border-b-2 border-white"></div>
+                  <div className="h-4 w-4 mr-0 sm:mr-2 animate-spin rounded-full border-b-2 border-white"></div>
                 ) : (
-                  <Trash2 className="h-4 w-4 mr-2" />
+                  <Trash2 className="h-4 w-4 mr-0 sm:mr-2" />
                 )}
-                Eliminar
+                <span className="sm:inline hidden">Eliminar</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -338,12 +340,12 @@ export default function MessageViewPage() {
       </div>
 
       <div className="bg-card shadow overflow-hidden rounded-lg">
-        <div className="p-6">
-          <div className="mb-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-start">
+        <div className="p-3 sm:p-6">
+          <div className="mb-4 sm:mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-0 mb-4">
+              <div className="flex flex-wrap items-center gap-2">
                 <span
-                  className={`px-2 py-1 mr-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                  className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     message.read 
                       ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" 
                       : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
@@ -351,65 +353,65 @@ export default function MessageViewPage() {
                 >
                   {message.read ? "Leído" : "No leído"}
                 </span>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   {formatDistanceToNow(new Date(message.createdAt), { 
                     locale: es, 
                     addSuffix: true 
                   })}
                 </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                ID: {message.id}
+              <p className="text-xs sm:text-sm text-muted-foreground overflow-hidden text-ellipsis">
+                ID: <span className="font-mono">{message.id}</span>
               </p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Remitente</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-medium">Remitente</h3>
                 {message.sender ? (
-                  <div className="flex items-center p-4 bg-card/50 rounded-lg border">
-                    <div className="h-12 w-12 flex-shrink-0 mr-4">
+                  <div className="flex items-center p-3 sm:p-4 bg-card/50 rounded-lg border">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 mr-3 sm:mr-4">
                       {renderUserImage(message.sender, 48)}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <Link
                         href={`/admin/users/view/${message.sender.id}`}
-                        className="text-primary hover:text-primary/80 transition-colors text-md font-medium"
+                        className="text-primary hover:text-primary/80 transition-colors text-sm sm:text-md font-medium truncate block"
                       >
                         {message.sender.name || message.sender.username || "Usuario sin nombre"}
                       </Link>
-                      <div className="text-sm text-muted-foreground">{message.sender.email}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground truncate">{message.sender.email}</div>
                     </div>
                   </div>
                 ) : (
-                  <div className="p-4 bg-card/50 rounded-lg border text-muted-foreground">
+                  <div className="p-3 sm:p-4 bg-card/50 rounded-lg border text-muted-foreground">
                     Usuario eliminado
                   </div>
                 )}
               </div>
               
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Destinatario</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-medium">Destinatario</h3>
                 {message.conversation?.isGroup ? (
                   // Es un mensaje de grupo
-                  <div className="p-4 bg-card/50 rounded-lg border">
+                  <div className="p-3 sm:p-4 bg-card/50 rounded-lg border">
                     <div className="flex items-center mb-3">
-                      <div className="h-12 w-12 flex-shrink-0 mr-4">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 mr-3 sm:mr-4">
                         {renderGroupImage(message.conversation, 48)}
                       </div>
-                      <div>
-                        <div className="text-primary text-md font-medium flex items-center">
-                          {message.conversation.name || "Grupo sin nombre"}
-                          <Badge className="ml-2" variant="secondary">Grupo</Badge>
+                      <div className="min-w-0">
+                        <div className="text-primary text-sm sm:text-md font-medium flex items-center">
+                          <span className="truncate">{message.conversation.name || "Grupo sin nombre"}</span>
+                          <Badge className="ml-2 flex-shrink-0" variant="secondary">Grupo</Badge>
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs sm:text-sm text-muted-foreground">
                           {message.conversation.participants.length} participantes
                         </div>
                       </div>
                     </div>
                     
                     <div className="mt-3 border-t pt-3">
-                      <p className="text-sm font-medium mb-2">Participantes:</p>
+                      <p className="text-xs sm:text-sm font-medium mb-2">Participantes:</p>
                       <div className="flex flex-wrap gap-2">
                         {message.conversation.participants.map((participant) => (
                           <Link 
@@ -417,10 +419,12 @@ export default function MessageViewPage() {
                             href={`/admin/users/view/${participant.user.id}`}
                             className="inline-flex items-center text-xs bg-card/80 hover:bg-card p-1 px-2 rounded-full border"
                           >
-                            <div className="h-5 w-5 mr-1">
+                            <div className="h-4 w-4 sm:h-5 sm:w-5 mr-1">
                               {renderUserImage(participant.user, 20)}
                             </div>
-                            {participant.user.name || participant.user.username || participant.user.email || "Usuario"}
+                            <span className="truncate max-w-[100px] sm:max-w-[150px]">
+                              {participant.user.name || participant.user.username || participant.user.email || "Usuario"}
+                            </span>
                           </Link>
                         ))}
                       </div>
@@ -428,23 +432,23 @@ export default function MessageViewPage() {
                   </div>
                 ) : message.receiver ? (
                   // Es un mensaje individual con receptor
-                  <div className="flex items-center p-4 bg-card/50 rounded-lg border">
-                    <div className="h-12 w-12 flex-shrink-0 mr-4">
+                  <div className="flex items-center p-3 sm:p-4 bg-card/50 rounded-lg border">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 mr-3 sm:mr-4">
                       {renderUserImage(message.receiver, 48)}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <Link
                         href={`/admin/users/view/${message.receiver.id}`}
-                        className="text-primary hover:text-primary/80 transition-colors text-md font-medium"
+                        className="text-primary hover:text-primary/80 transition-colors text-sm sm:text-md font-medium truncate block"
                       >
                         {message.receiver.name || message.receiver.username || "Usuario sin nombre"}
                       </Link>
-                      <div className="text-sm text-muted-foreground">{message.receiver.email}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground truncate">{message.receiver.email}</div>
                     </div>
                   </div>
                 ) : (
                   // Es un mensaje individual sin receptor (eliminado)
-                  <div className="p-4 bg-card/50 rounded-lg border text-muted-foreground">
+                  <div className="p-3 sm:p-4 bg-card/50 rounded-lg border text-muted-foreground">
                     Usuario eliminado
                   </div>
                 )}
@@ -452,8 +456,8 @@ export default function MessageViewPage() {
             </div>
             
             <div className="space-y-2">
-              <h3 className="text-lg font-medium">Contenido del mensaje</h3>
-              <div className="p-4 bg-card/50 rounded-lg border whitespace-pre-wrap">
+              <h3 className="text-base sm:text-lg font-medium">Contenido del mensaje</h3>
+              <div className="p-3 sm:p-4 bg-card/50 rounded-lg border whitespace-pre-wrap break-words">
                 {message.messageType && message.messageType !== 'text' && (
                   <Badge className="mb-2" variant="outline">
                     {message.messageType === 'image' && 'Imagen'}
@@ -488,7 +492,7 @@ export default function MessageViewPage() {
                   </div>
                 ) : null}
                 
-                {message.content}
+                <div className="text-sm sm:text-base">{message.content}</div>
               </div>
             </div>
           </div>

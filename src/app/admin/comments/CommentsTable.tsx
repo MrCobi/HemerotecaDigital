@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { Button } from "@/src/app/components/ui/button";
 import { Badge } from "@/src/app/components/ui/badge";
-import { ExternalLink, AlertTriangle, MessageSquare } from "lucide-react";
+import { ExternalLink, AlertTriangle, MessageSquare, Eye } from "lucide-react";
 import { toast } from "sonner";
 import SafeImage from "@/src/components/ui/SafeImage";
 import DeleteDialog from "@/src/components/ui/DeleteDialog";
@@ -156,11 +156,11 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
         accessorKey: "content",
         cell: (comment: Comment) => {
           return (
-            <div className="max-w-md">
-              <div className="text-sm text-foreground truncate">
+            <div className="max-w-[180px] sm:max-w-md">
+              <div className="text-sm text-foreground line-clamp-2 sm:truncate">
                 {comment.content}
               </div>
-              <div className="flex gap-2 mt-1">
+              <div className="flex flex-wrap gap-1 sm:gap-2 mt-1">
                 {comment._count && comment._count.replies > 0 && (
                   <Badge variant="outline" className="text-xs text-primary">
                     <MessageSquare className="h-3 w-3 mr-1" />
@@ -186,6 +186,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
       {
         header: "Fuente",
         accessorKey: "source",
+        hideOnMobile: true,
         cell: (comment: Comment) => {
           const { source } = comment;
           return (
@@ -196,7 +197,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
               >
                 {source.name}
               </Link>
-              <div className="text-xs text-muted-foreground mt-1 truncate max-w-xs">
+              <div className="text-xs text-muted-foreground mt-1 truncate max-w-[150px] sm:max-w-xs">
                 <a 
                   href={source.url} 
                   target="_blank" 
@@ -204,7 +205,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
                   className="hover:underline flex items-center"
                 >
                   <span className="truncate">{source.url}</span>
-                  <ExternalLink className="h-3 w-3 ml-1 inline-flex" />
+                  <ExternalLink className="h-3 w-3 ml-1 inline-flex flex-shrink-0" />
                 </a>
               </div>
             </div>
@@ -214,6 +215,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
       {
         header: "Usuario",
         accessorKey: "user",
+        hideOnMobile: true,
         cell: (comment: Comment) => {
           const { user } = comment;
           if (!user) return <span className="text-sm text-muted-foreground">Usuario eliminado</span>;
@@ -241,10 +243,10 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
                 )}
               </div>
               <div className="ml-3">
-                <div className="text-sm font-medium text-foreground">
+                <div className="text-sm font-medium text-foreground truncate max-w-[100px] sm:max-w-none">
                   {user.name || "Usuario sin nombre"}
                 </div>
-                <div className="text-xs text-muted-foreground">{user.email}</div>
+                <div className="text-xs text-muted-foreground truncate max-w-[100px] sm:max-w-none">{user.email}</div>
               </div>
             </div>
           );
@@ -253,6 +255,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
       {
         header: "Fecha",
         accessorKey: "createdAt",
+        hideOnMobile: true,
         cell: (comment: Comment) => {
           const { createdAt, updatedAt } = comment;
           return (
@@ -280,8 +283,8 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
                 className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
                 title="Ver comentario"
               >
-                <MessageSquare className="h-3.5 w-3.5" />
-                <span className="ml-1 text-xs truncate">Ver</span>
+                <Eye className="h-3.5 w-3.5 sm:mr-0 md:mr-1" />
+                <span className="hidden md:inline ml-1 text-xs truncate">Ver</span>
               </Link>
               {!comment.isDeleted && (
                 <DeleteDialog 
@@ -302,11 +305,12 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
 
   return (
     <div className="space-y-4">
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap gap-2 justify-center sm:justify-start">
         <Button
           variant={activeFilter === "all" ? "default" : "outline"}
           size="sm"
           onClick={() => setActiveFilter("all")}
+          className="w-full sm:w-auto"
         >
           Todos
         </Button>
@@ -314,6 +318,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
           variant={activeFilter === "replies" ? "default" : "outline"}
           size="sm"
           onClick={() => setActiveFilter("replies")}
+          className="w-full sm:w-auto"
         >
           Respuestas
         </Button>
@@ -321,6 +326,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
           variant={activeFilter === "deleted" ? "default" : "outline"}
           size="sm"
           onClick={() => setActiveFilter("deleted")}
+          className="w-full sm:w-auto"
         >
           Eliminados
         </Button>

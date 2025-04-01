@@ -232,16 +232,16 @@ export default function CommentViewPage() {
 
       <Card>
         <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
             <div>
-              <CardTitle>Comentario ID: {comment.id}</CardTitle>
+              <CardTitle className="break-all text-base sm:text-xl">ID: {comment.id}</CardTitle>
               <CardDescription className="mt-1">
                 {comment.parentId ? "Respuesta a otro comentario" : "Comentario principal"}
               </CardDescription>
             </div>
             <div className="flex gap-2">
               {comment.isDeleted && (
-                <Badge variant="destructive" className="flex gap-1 items-center">
+                <Badge variant="destructive" className="flex gap-1 items-center text-xs sm:text-sm">
                   <AlertTriangle className="h-3 w-3" />
                   Comentario eliminado
                 </Badge>
@@ -257,9 +257,10 @@ export default function CommentViewPage() {
                   <Button 
                     variant="destructive" 
                     size="sm"
+                    className="text-xs sm:text-sm"
                   >
                     <Trash2 className="h-4 w-4 mr-1" />
-                    Eliminar
+                    <span className="hidden xs:inline">Eliminar</span>
                   </Button>
                 </DeleteDialog>
               )}
@@ -271,7 +272,7 @@ export default function CommentViewPage() {
           <div className="space-y-6">
             {/* Si es una respuesta, mostrar el comentario padre */}
             {comment.parentId && comment.parent && (
-              <div className="bg-muted/50 p-4 rounded-md mb-6 border border-muted">
+              <div className="bg-muted/50 p-3 sm:p-4 rounded-md mb-4 sm:mb-6 border border-muted">
                 <div className="flex items-center gap-2 mb-2">
                   <MessageSquare className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium">En respuesta a:</span>
@@ -291,7 +292,7 @@ export default function CommentViewPage() {
             {/* Contenido del comentario */}
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-2">Contenido</h3>
-              <div className="bg-background p-4 rounded-md border text-foreground whitespace-pre-wrap">
+              <div className="bg-background p-3 sm:p-4 rounded-md border text-foreground whitespace-pre-wrap text-sm sm:text-base">
                 {comment.content}
               </div>
             </div>
@@ -301,8 +302,8 @@ export default function CommentViewPage() {
               <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
                 <User className="h-4 w-4" /> Usuario
               </h3>
-              <div className="flex items-center gap-3 p-3 bg-background rounded-md border">
-                <div className="relative h-12 w-12 rounded-full overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-background rounded-md border">
+                <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-full overflow-hidden">
                   <Image
                     src={comment.user?.image || "/images/AvatarPredeterminado.webp"}
                     alt={comment.user?.name || "Usuario"}
@@ -315,9 +316,9 @@ export default function CommentViewPage() {
                   />
                 </div>
                 <div>
-                  <p className="font-medium">{comment.user?.name || "Usuario eliminado"}</p>
+                  <p className="font-medium text-sm sm:text-base break-words">{comment.user?.name || "Usuario eliminado"}</p>
                   {comment.user?.email && (
-                    <p className="text-sm text-muted-foreground">{comment.user.email}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground break-words">{comment.user.email}</p>
                   )}
                   {comment.user?.id && (
                     <Link 
@@ -337,15 +338,15 @@ export default function CommentViewPage() {
                 <ExternalLink className="h-4 w-4" /> Fuente
               </h3>
               <div className="p-3 bg-background rounded-md border">
-                <p className="font-medium">{comment.source.name}</p>
+                <p className="font-medium text-sm sm:text-base">{comment.source.name}</p>
                 <a 
                   href={comment.source.url} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="text-sm text-primary hover:underline flex items-center gap-1 mt-1"
+                  className="text-xs sm:text-sm text-primary hover:underline flex items-center gap-1 mt-1 break-all"
                 >
-                  {comment.source.url}
-                  <ExternalLink className="h-3 w-3" />
+                  <span className="line-clamp-1">{comment.source.url}</span>
+                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
                 </a>
                 <Link 
                   href={`/admin/sources/edit/${comment.source.id}`}
@@ -364,14 +365,14 @@ export default function CommentViewPage() {
               <div className="p-3 bg-background rounded-md border grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <p className="text-sm text-muted-foreground">Creado:</p>
-                  <p>{format(new Date(comment.createdAt), "PPP 'a las' HH:mm:ss")}</p>
+                  <p className="text-xs sm:text-sm">{format(new Date(comment.createdAt), "PPP 'a las' HH:mm:ss")}</p>
                   <p className="text-xs text-muted-foreground">
                     ({formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })})
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Actualizado:</p>
-                  <p>{format(new Date(comment.updatedAt), "PPP 'a las' HH:mm:ss")}</p>
+                  <p className="text-xs sm:text-sm">{format(new Date(comment.updatedAt), "PPP 'a las' HH:mm:ss")}</p>
                   <p className="text-xs text-muted-foreground">
                     ({formatDistanceToNow(new Date(comment.updatedAt), { addSuffix: true })})
                   </p>

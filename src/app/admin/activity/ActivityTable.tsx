@@ -129,7 +129,10 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
         return (
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${className} flex items-center`}>
             {Icon && <Icon className="h-3 w-3 mr-1" />}
-            {type}
+            <span className="hidden sm:inline">{type}</span>
+            <span className="sm:hidden inline">
+              {type.length > 8 ? `${type.substring(0, 6)}...` : type}
+            </span>
           </span>
         );
       },
@@ -160,7 +163,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
 
         return (
           <div className="flex items-center">
-            <div className="flex-shrink-0 h-8 w-8">
+            <div className="flex-shrink-0 h-7 w-7 sm:h-8 sm:w-8">
               {user ? (
                 user.image ? (
                   user.image.includes('cloudinary.com') ? (
@@ -195,7 +198,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
                       height={32}
                       crop="fill"
                       gravity="face"
-                      className="h-8 w-8 rounded-full object-cover"
+                      className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover"
                       onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                         console.error('Error cargando imagen en ActivityTable:', user.image);
                         const target = e.target as HTMLImageElement;
@@ -208,7 +211,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
                       alt={user?.name || "Avatar"}
                       width={32}
                       height={32}
-                      className="h-8 w-8 rounded-full object-cover"
+                      className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover"
                       onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                         console.error('Error cargando imagen en ActivityTable:', user.image);
                         const target = e.target as HTMLImageElement;
@@ -222,7 +225,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
                     alt="Avatar por defecto"
                     width={32}
                     height={32}
-                    className="h-8 w-8 rounded-full object-cover"
+                    className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover"
                   />
                 )
               ) : (
@@ -231,19 +234,24 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
                   alt="Avatar por defecto"
                   width={32}
                   height={32}
-                  className="h-8 w-8 rounded-full object-cover"
+                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover"
                 />
               )}
             </div>
-            <div className="ml-3">
-              <div className="text-sm font-medium text-foreground">
+            <div className="ml-2 sm:ml-3 min-w-0">
+              <div className="text-xs sm:text-sm font-medium text-foreground truncate max-w-[120px] sm:max-w-full">
                 {user?.name || ""}
               </div>
-              {user?.email && <div className="text-xs text-muted-foreground">{user.email}</div>}
+              {user?.email && (
+                <div className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-full">
+                  {user.email}
+                </div>
+              )}
             </div>
           </div>
         );
-      }
+      },
+      hideOnMobile: false,
     },
     {
       accessorKey: "source",
@@ -252,12 +260,12 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
         // Para actividades de follow/unfollow, mostrar el usuario seguido/dejado de seguir
         if ((activity.type === 'follow' || activity.type === 'unfollow') && activity.targetName && activity.targetType === 'user') {
           return (
-            <div className="flex items-center">
-              <span className="text-indigo-600 dark:text-indigo-400 font-medium">
+            <div className="flex items-center flex-col sm:flex-row">
+              <span className="text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 font-medium truncate max-w-[120px] sm:max-w-full">
                 {activity.targetName}
               </span>
-              <span className="text-xs text-muted-foreground ml-2">
-                {activity.type === 'follow' ? '(Usuario seguido)' : '(Dejado de seguir)'}
+              <span className="text-xs text-muted-foreground sm:ml-2 truncate">
+                {activity.type === 'follow' ? '(Seguido)' : '(Dejó de seguir)'}
               </span>
             </div>
           );
@@ -270,7 +278,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
             return (
               <a
                 href={`/sources/${activity.targetId}`}
-                className="text-primary hover:text-primary/80 transition-colors"
+                className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm truncate block max-w-[150px] sm:max-w-full"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -279,7 +287,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
             );
           }
           return (
-            <span className="text-foreground">
+            <span className="text-xs sm:text-sm text-foreground truncate block max-w-[150px] sm:max-w-full">
               {activity.sourceName}
             </span>
           );
@@ -297,16 +305,17 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
         return sourceId && activity.targetType === 'source' ? (
           <a
             href={`/sources/${sourceId}`}
-            className="text-primary hover:text-primary/80 transition-colors"
+            className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm truncate block max-w-[150px] sm:max-w-full"
             target="_blank"
             rel="noopener noreferrer"
           >
             {sourceName}
           </a>
         ) : (
-          <span className="text-muted-foreground">N/A</span>
+          <span className="text-xs sm:text-sm text-muted-foreground">N/A</span>
         );
-      }
+      },
+      hideOnMobile: false,
     },
     {
       accessorKey: "date",
@@ -314,11 +323,12 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
       cell: (activity: ActivityItem) => {
         const date = new Date(activity.createdAt);
         return (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
             {format(date, "dd MMM yyyy")}
           </div>
         );
-      }
+      },
+      hideOnMobile: true,
     }
   ], [typeFilter]);
 

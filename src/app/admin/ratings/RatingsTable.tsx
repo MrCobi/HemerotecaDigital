@@ -200,7 +200,8 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
   const renderUserImage = (user: Rating['user'], size: number = 32) => {
     if (!user) return null;
 
-    if (user.image) {
+    // Si el usuario tiene una imagen válida de Cloudinary
+    if (user.image && user.image.includes('cloudinary.com')) {
       // Extraer el public_id limpio, manejando diferentes formatos
       let publicId = user.image;
 
@@ -223,27 +224,36 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
         publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
       }
 
-      console.log('Public ID extraído:', publicId);
-
-      return (
-        <CldImage
-          src={publicId}
-          alt={user?.name || "Avatar"}
-          width={size}
-          height={size}
-          crop="fill"
-          gravity="face"
-          className="h-8 w-8 rounded-full object-cover"
-          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-            console.error('Error cargando imagen:', publicId);
-            const target = e.target as HTMLImageElement;
-            target.src = "/images/AvatarPredeterminado.webp";
-          }}
-        />
-      );
+      try {
+        return (
+          <CldImage
+            src={publicId}
+            alt={user?.name || "Avatar"}
+            width={size}
+            height={size}
+            crop="fill"
+            gravity="face"
+            className="h-8 w-8 rounded-full object-cover"
+            onError={() => {
+              throw new Error('Falló carga de imagen Cloudinary');
+            }}
+          />
+        );
+      } catch (error) {
+        // Si hay algún error con Cloudinary, usamos la imagen predeterminada
+        return (
+          <Image
+            src="/images/AvatarPredeterminado.webp"
+            alt={user?.name || "Avatar"}
+            width={size}
+            height={size}
+            className="h-8 w-8 rounded-full object-cover"
+          />
+        );
+      }
     }
 
-    // Usar imagen predeterminada para usuarios sin imagen
+    // Usar imagen predeterminada para usuarios sin imagen de Cloudinary
     return (
       <Image
         src="/images/AvatarPredeterminado.webp"

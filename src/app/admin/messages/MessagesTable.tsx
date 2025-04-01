@@ -275,7 +275,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     const defaultImage = "/images/AvatarPredeterminado.webp";
     
     return (
-      <div className="h-8 w-8 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
+      <div className="h-7 w-7 sm:h-8 sm:w-8 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
         {user.image ? (
           <Image
             src={user.image}
@@ -308,7 +308,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     const defaultGroupImage = "/images/GroupPredeterminado.webp";
     
     return (
-      <div className="h-8 w-8 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
+      <div className="h-7 w-7 sm:h-8 sm:w-8 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
         {conversation.imageUrl ? (
           <Image
             src={conversation.imageUrl}
@@ -323,7 +323,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
           />
         ) : (
           <div className="h-full w-full flex items-center justify-center bg-primary text-white">
-            <Users className="h-5 w-5" />
+            <Users className="h-4 w-4" />
           </div>
         )}
       </div>
@@ -472,18 +472,21 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
             {message.conversation.isGroup ? (
               <>
                 <Users className="h-3.5 w-3.5 mr-1" />
-                Grupo
+                <span className="hidden sm:inline">Grupo</span>
+                <span className="sm:hidden">G</span>
               </>
             ) : (
               <>
                 <MessageSquare className="h-3.5 w-3.5 mr-1" />
-                Individual
+                <span className="hidden sm:inline">Individual</span>
+                <span className="sm:hidden">I</span>
               </>
             )}
           </span>
         );
       },
       filterElement: filterElement,
+      hideOnMobile: false,
     },
     {
       header: "Estado",
@@ -501,32 +504,36 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
           </span>
         );
       },
+      hideOnMobile: true,
     },
     {
       header: "Remitente",
       accessorKey: "sender",
       cell: (message: Message) => {
         if (!message.sender) {
-          return <span className="text-sm text-muted-foreground">Usuario eliminado</span>;
+          return <span className="text-xs sm:text-sm text-muted-foreground">Usuario eliminado</span>;
         }
         
         return (
           <div className="flex items-center">
-            <div className="h-8 w-8 flex-shrink-0 mr-3">
+            <div className="flex-shrink-0 mr-2 sm:mr-3">
               {renderUserImage(message.sender)}
             </div>
-            <div>
+            <div className="min-w-0">
               <Link
                 href={`/admin/users/view/${message.sender.id}`}
-                className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
+                className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
               >
                 {message.sender.name || "Usuario sin nombre"}
               </Link>
-              <div className="text-xs text-muted-foreground">{message.sender.email}</div>
+              {message.sender.email && (
+                <div className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-full">{message.sender.email}</div>
+              )}
             </div>
           </div>
         );
       },
+      hideOnMobile: false,
     },
     {
       header: "Destinatario",
@@ -535,17 +542,17 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         if (message.conversation.isGroup) {
           return (
             <div className="flex items-center">
-              <div className="h-8 w-8 flex-shrink-0 mr-3">
+              <div className="flex-shrink-0 mr-2 sm:mr-3">
                 {renderGroupImage(message.conversation)}
               </div>
-              <div>
+              <div className="min-w-0">
                 <Link
                   href={`/admin/messages/group/${message.conversation.id}`}
-                  className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
+                  className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
                 >
                   {message.conversation.name || "Grupo sin nombre"}
                 </Link>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-full">
                   {message.conversation.participants ? 
                     `${message.conversation.participants.length} participantes` : 
                     "Grupo"}
@@ -556,37 +563,41 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         }
         
         if (!message.receiver) {
-          return <span className="text-sm text-muted-foreground">Usuario eliminado</span>;
+          return <span className="text-xs sm:text-sm text-muted-foreground">Usuario eliminado</span>;
         }
         
         return (
           <div className="flex items-center">
-            <div className="h-8 w-8 flex-shrink-0 mr-3">
+            <div className="flex-shrink-0 mr-2 sm:mr-3">
               {renderUserImage(message.receiver)}
             </div>
-            <div>
+            <div className="min-w-0">
               <Link
                 href={`/admin/users/view/${message.receiver.id}`}
-                className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
+                className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
               >
                 {message.receiver.name || "Usuario sin nombre"}
               </Link>
-              <div className="text-xs text-muted-foreground">{message.receiver.email}</div>
+              {message.receiver.email && (
+                <div className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-full">{message.receiver.email}</div>
+              )}
             </div>
           </div>
         );
       },
+      hideOnMobile: false,
     },
     {
       header: "Mensaje",
       accessorKey: "content",
       cell: (message: Message) => {
         return (
-          <div className="text-sm text-foreground max-w-xs truncate">
+          <div className="text-xs sm:text-sm text-foreground max-w-[150px] sm:max-w-xs truncate">
             {renderMessageContent(message)}
           </div>
         );
       },
+      hideOnMobile: false,
     },
     {
       header: "Fecha",
@@ -594,39 +605,40 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       cell: (message: Message) => {
         const date = new Date(message.createdAt);
         return (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
             {formatDistanceToNow(date, { locale: es, addSuffix: true })}
           </div>
         );
       },
+      hideOnMobile: true,
     },
     {
       header: "Acciones",
       id: "actions",
       cell: (message: Message) => {
         return (
-          <div className="flex justify-end items-center space-x-2">
+          <div className="flex flex-wrap justify-end items-center gap-1.5">
             <Link
               href={`/admin/messages/view/${message.id}`}
-              className="inline-flex items-center justify-center h-8 py-0.5 px-2 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
+              className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
               title="Ver mensaje"
             >
               <Eye className="h-3.5 w-3.5" />
-              <span className="ml-1 text-xs font-medium">Ver</span>
+              <span className="ml-1 text-xs font-medium hidden sm:inline">Ver</span>
             </Link>
             {!message.read && (
               <button
                 onClick={() => handleMarkAsRead(message.id)}
                 disabled={isMarkingAsRead === message.id}
-                className="inline-flex items-center justify-center h-8 py-0.5 px-2 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors"
+                className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors"
                 title="Marcar como leído"
               >
                 {isMarkingAsRead === message.id ? (
-                  <div className="h-3.5 w-3.5 mr-1 animate-spin rounded-full border-b-2 border-green-800"></div>
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-green-800"></div>
                 ) : (
                   <CheckCircle className="h-3.5 w-3.5" />
                 )}
-                <span className="ml-1 text-xs font-medium">Marcar leído</span>
+                <span className="ml-1 text-xs font-medium hidden sm:inline">Marcar leído</span>
               </button>
             )}
             <DeleteMessageDialog 
@@ -636,11 +648,12 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
           </div>
         );
       },
+      hideOnMobile: false,
     },
   ], [isMarkingAsRead, filterElement, handleDelete]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-hidden">
       <DataTable<Message>
         data={paginatedMessages}
         columns={columns}
