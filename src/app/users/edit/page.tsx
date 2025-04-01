@@ -26,7 +26,7 @@ import { User } from "@/src/interface/user";
 import { updatePrivacySettings, getUserPrivacySettings } from "@/lib/api";
 import type { PrivacySettings } from "@/lib/api";
 
-// Extendimos el tipo de usuario para asegurarnos de que incluye bio
+// Extendimos el tipo de usuario para asegurarnos de que incluya bio
 type ExtendedUser = User & {
   bio?: string | null;
 };
@@ -56,6 +56,11 @@ export default function EditProfilePage() {
     showFavorites: false,
     showActivity: false,
   });
+  const [pendingPrivacySettings, setPendingPrivacySettings] = useState<PrivacySettings>({
+    showFavorites: false,
+    showActivity: false,
+  });
+  const [hasPrivacyChanges, setHasPrivacyChanges] = useState(false);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -91,6 +96,7 @@ export default function EditProfilePage() {
       try {
         const settings = await getUserPrivacySettings();
         setPrivacySettings(settings);
+        setPendingPrivacySettings(settings);
         setFormData(prev => ({
           ...prev,
           showFavorites: settings.showFavorites,
@@ -135,31 +141,36 @@ export default function EditProfilePage() {
     });
   };
 
-  const handlePrivacyChange = async (field: keyof PrivacySettings, value: boolean) => {
+  const handlePrivacyChange = (field: keyof PrivacySettings, value: boolean) => {
     const newSettings = {
-      ...privacySettings,
+      ...pendingPrivacySettings,
       [field]: value
     };
     
-    setPrivacySettings(newSettings);
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    
+    setPendingPrivacySettings(newSettings);
+    setHasPrivacyChanges(true);
+  };
+
+  const savePrivacySettings = async () => {
     try {
-      await updatePrivacySettings(newSettings);
+      await updatePrivacySettings(pendingPrivacySettings);
+      
+      // Actualizamos el estado real una vez guardado correctamente
+      setPrivacySettings(pendingPrivacySettings);
+      setFormData(prev => ({
+        ...prev,
+        showFavorites: pendingPrivacySettings.showFavorites,
+        showActivity: pendingPrivacySettings.showActivity
+      }));
+      
+      setHasPrivacyChanges(false);
       toast.success("Configuración de privacidad actualizada");
     } catch (error) {
       console.error("Error al actualizar la configuración de privacidad:", error);
       toast.error("Error al actualizar la configuración de privacidad");
       
-      // Revertir cambios en caso de error
-      setPrivacySettings({...privacySettings});
-      setFormData(prev => ({
-        ...prev,
-        [field]: !value
-      }));
+      // Revertimos los cambios pendientes al estado real
+      setPendingPrivacySettings({...privacySettings});
     }
   };
 
@@ -335,7 +346,16 @@ export default function EditProfilePage() {
         }));
         
         // Actualizar la sesión
-        update();
+        update({
+          ...session,
+          user: {
+            ...session?.user,
+            name: responseData.name,
+            username: responseData.username,
+            image: responseData.image,
+            bio: responseData.bio,
+          }
+        });
       }
     } catch (error) {
       console.error("Error en la actualización de perfil:", error);
@@ -602,8 +622,8 @@ export default function EditProfilePage() {
                                   <input
                                     type="checkbox"
                                     name="showFavorites"
-                                    checked={privacySettings.showFavorites}
-                                    onChange={() => handlePrivacyChange("showFavorites", !privacySettings.showFavorites)}
+                                    checked={pendingPrivacySettings.showFavorites}
+                                    onChange={() => handlePrivacyChange("showFavorites", !pendingPrivacySettings.showFavorites)}
                                     className="sr-only peer"
                                   />
                                   <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
@@ -618,14 +638,23 @@ export default function EditProfilePage() {
                                   <input
                                     type="checkbox"
                                     name="showActivity"
-                                    checked={privacySettings.showActivity}
-                                    onChange={() => handlePrivacyChange("showActivity", !privacySettings.showActivity)}
+                                    checked={pendingPrivacySettings.showActivity}
+                                    onChange={() => handlePrivacyChange("showActivity", !pendingPrivacySettings.showActivity)}
                                     className="sr-only peer"
                                   />
                                   <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                                 </label>
                               </div>
                             </div>
+                            {hasPrivacyChanges && (
+                              <Button
+                                type="button"
+                                onClick={savePrivacySettings}
+                                className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-600 dark:hover:bg-blue-500"
+                              >
+                                Guardar cambios de privacidad
+                              </Button>
+                            )}
                           </TabsContent>
                         </div>
                       </Tabs>
