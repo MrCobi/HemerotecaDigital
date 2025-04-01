@@ -215,8 +215,8 @@ export default function AdminDashboard() {
               </svg>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Añadir usuario</h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Crear una nueva cuenta de usuario</p>
+              <h3 className="text-sm font-medium text-foreground">Añadir usuario</h3>
+              <p className="text-xs text-muted-foreground">Crear una nueva cuenta de usuario</p>
             </div>
           </Link>
 
@@ -230,8 +230,8 @@ export default function AdminDashboard() {
               </svg>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Añadir fuente</h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Crear una nueva fuente de información</p>
+              <h3 className="text-sm font-medium text-foreground">Añadir fuente</h3>
+              <p className="text-xs text-muted-foreground">Crear una nueva fuente de información</p>
             </div>
           </Link>
 
@@ -245,8 +245,8 @@ export default function AdminDashboard() {
               </svg>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Moderar comentarios</h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Revisar los comentarios recientes</p>
+              <h3 className="text-sm font-medium text-foreground">Moderar comentarios</h3>
+              <p className="text-xs text-muted-foreground">Revisar los comentarios recientes</p>
             </div>
           </Link>
         </div>
