@@ -150,7 +150,7 @@ export default function ViewConversationPage({ params }: PageProps) {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-full p-8">
+      <div className="flex justify-center items-center min-h-[50vh] p-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
@@ -158,20 +158,20 @@ export default function ViewConversationPage({ params }: PageProps) {
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-700 p-4 rounded">
+          <div className="flex items-start">
+            <div className="flex-shrink-0 pt-0.5">
+              <svg className="h-5 w-5 text-red-400 dark:text-red-500" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
             </div>
           </div>
         </div>
-        <div className="mt-8">
+        <div className="mt-6">
           <Link href="/admin/conversations" className="flex items-center text-primary hover:text-primary/80 transition">
             <ChevronLeft className="h-4 w-4 mr-1" />
             Volver a conversaciones
@@ -183,20 +183,20 @@ export default function ViewConversationPage({ params }: PageProps) {
 
   if (!conversation) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-orange-50 border-l-4 border-orange-400 p-4 rounded">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <div className="bg-orange-50 dark:bg-orange-900/20 border-l-4 border-orange-400 dark:border-orange-700 p-4 rounded">
+          <div className="flex items-start">
+            <div className="flex-shrink-0 pt-0.5">
+              <svg className="h-5 w-5 text-orange-400 dark:text-orange-500" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-orange-700">No se pudo cargar la información de la conversación</p>
+              <p className="text-sm text-orange-700 dark:text-orange-300">No se pudo cargar la información de la conversación</p>
             </div>
           </div>
         </div>
-        <div className="mt-8">
+        <div className="mt-6">
           <Link href="/admin/conversations" className="flex items-center text-primary hover:text-primary/80 transition">
             <ChevronLeft className="h-4 w-4 mr-1" />
             Volver a conversaciones
@@ -246,8 +246,8 @@ export default function ViewConversationPage({ params }: PageProps) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
+      <div className="mb-4 sm:mb-6">
         <Link href="/admin/conversations" className="flex items-center text-primary hover:text-primary/80 transition">
           <ChevronLeft className="h-4 w-4 mr-1" />
           Volver a conversaciones
@@ -256,22 +256,22 @@ export default function ViewConversationPage({ params }: PageProps) {
       
       <div className="bg-card shadow rounded-xl overflow-hidden">
         {/* Cabecera */}
-        <div className="px-6 pt-6 pb-4 border-b border-border">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center">
+        <div className="px-4 sm:px-6 pt-6 pb-4 border-b border-border">
+          <div className="flex flex-col sm:flex-row items-center sm:items-center">
             {renderImage()}
             
             <div className="mt-4 sm:mt-0 sm:ml-6 flex-1">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between">
                 <div>
-                  <div className="flex items-center mb-1">
-                    <h1 className="text-2xl font-bold text-foreground">
+                  <div className="flex flex-wrap items-center mb-1">
+                    <h1 className="text-xl sm:text-2xl font-bold text-foreground mr-2">
                       {conversation.isGroup 
                         ? (conversation.name || "Grupo sin nombre") 
                         : "Conversación individual"}
                     </h1>
                     <Badge
                       variant="outline"
-                      className={`ml-3 ${
+                      className={`mt-1 sm:mt-0 ${
                         conversation.isGroup
                           ? "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800"
                           : "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/30 dark:text-gray-300 dark:border-gray-800"
@@ -303,19 +303,19 @@ export default function ViewConversationPage({ params }: PageProps) {
                 <div className="flex items-center mt-4 sm:mt-0 space-x-2">
                   <Link
                     href={`/admin/conversations/edit/${conversationId}`}
-                    className="inline-flex items-center justify-center py-2 px-3 rounded-md text-sm font-medium transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40"
+                    className="inline-flex items-center justify-center py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-md text-sm font-medium transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40"
                   >
-                    <PencilLine className="h-4 w-4 mr-1" />
-                    Editar
+                    <PencilLine className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+                    <span className="sm:inline">Editar</span>
                   </Link>
                   
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <button
-                        className="inline-flex items-center justify-center py-2 px-3 rounded-md text-sm font-medium transition-colors bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40"
+                        className="inline-flex items-center justify-center py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-md text-sm font-medium transition-colors bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40"
                       >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Eliminar
+                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+                        <span className="sm:inline">Eliminar</span>
                       </button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
@@ -358,100 +358,153 @@ export default function ViewConversationPage({ params }: PageProps) {
           </div>
         </div>
         
-        {/* Información y estadísticas */}
-        <div className="px-6 py-4 border-b border-border">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">Participantes</h3>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className="flex items-center">
-                  <Users className="h-3 w-3 mr-1" />
-                  {conversation._count?.participants || conversation.participants?.length || 0} personas
-                </Badge>
-                
-                <Link
-                  href={`/admin/conversations/participants/${conversationId}`}
-                  className="text-xs text-primary hover:text-primary/80 transition"
-                >
-                  Ver participantes
-                </Link>
+        {/* Pestañas de navegación */}
+        <div className="border-b border-border">
+          <nav className="flex overflow-x-auto scrollbar-none">
+            <div className="border-b-2 border-primary px-4 py-3 text-sm font-medium text-primary">
+              <span className="flex items-center">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Mensajes
+              </span>
+            </div>
+            
+            <Link 
+              href={`/admin/conversations/participants/${conversationId}`} 
+              className="border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-gray-300 transition-colors"
+            >
+              <span className="flex items-center">
+                <Users className="h-4 w-4 mr-2" />
+                <span>Participantes</span>
+                <span className="ml-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs">
+                  {conversation.participants?.length || 0}
+                </span>
+              </span>
+            </Link>
+          </nav>
+        </div>
+        
+        {/* Contenido - Mensajes */}
+        <div className="p-4 sm:p-6 max-h-[calc(100vh-300px)] sm:max-h-[calc(100vh-320px)]">
+          <h2 className="text-lg font-medium mb-4">Historial de mensajes</h2>
+          
+          {conversation.messages && conversation.messages.length > 0 ? (
+            <div className="rounded-lg overflow-hidden border border-border">
+              <MessagesContainer
+                messages={conversation.messages}
+                participantMap={conversation.participants.reduce((map, participant) => {
+                  map[participant.userId] = participant;
+                  return map;
+                }, {} as Record<string, ConversationParticipant>)}
+                onMessageDeleted={(messageId) => {
+                  setConversation(prev => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      messages: prev.messages.filter(m => m.id !== messageId)
+                    };
+                  });
+                }}
+              />
+            </div>
+          ) : (
+            <div className="py-12 text-center border border-border rounded-lg bg-muted/20">
+              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground opacity-50 mb-3" />
+              <p className="text-muted-foreground">No hay mensajes en esta conversación</p>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Información adicional */}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        <div className="bg-card shadow rounded-xl overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-border">
+            <h2 className="text-lg font-medium">Detalles de la conversación</h2>
+          </div>
+          <div className="p-4 sm:p-6">
+            <dl className="grid grid-cols-1 gap-4">
+              <div>
+                <dt className="text-sm font-medium text-muted-foreground">ID</dt>
+                <dd className="mt-1 text-sm text-foreground break-all">{conversation.id}</dd>
               </div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">Mensajes</h3>
-              <Badge variant="secondary" className="flex items-center">
-                <MessageSquare className="h-3 w-3 mr-1" />
-                {conversation._count?.messages || conversation.messages?.length || 0} mensajes
-              </Badge>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">Creado por</h3>
-              {conversation.creator ? (
-                <Link
-                  href={`/admin/users/view/${conversation.creator.id}`}
-                  className="flex items-center text-primary hover:text-primary/80 transition"
-                >
-                  <div className="h-5 w-5 overflow-hidden rounded-full mr-1">
-                    <Image
-                      src={conversation.creator.image || "/images/AvatarPredeterminado.webp"}
-                      alt={conversation.creator.name || "Usuario"}
-                      width={20}
-                      height={20}
-                      className="h-full w-full object-cover"
-                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/AvatarPredeterminado.webp";
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm">
-                    {conversation.creator.name || conversation.creator.email || "Usuario"}
-                  </span>
-                </Link>
-              ) : (
-                <span className="text-sm text-muted-foreground">No disponible</span>
-              )}
-            </div>
+              <div>
+                <dt className="text-sm font-medium text-muted-foreground">Tipo</dt>
+                <dd className="mt-1 text-sm text-foreground">
+                  {conversation.isGroup ? "Grupo" : "Conversación individual"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-muted-foreground">Fecha de creación</dt>
+                <dd className="mt-1 text-sm text-foreground">
+                  {new Date(conversation.createdAt).toLocaleDateString()}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-muted-foreground">Última actividad</dt>
+                <dd className="mt-1 text-sm text-foreground">
+                  {formatDistanceToNow(new Date(conversation.lastMessageAt || conversation.createdAt), { locale: es, addSuffix: true })}
+                </dd>
+              </div>
+            </dl>
           </div>
         </div>
         
-        {/* Mensajes de la conversación */}
-        <div className="px-6 py-4">
-          <h2 className="text-lg font-medium mb-4">Mensajes recientes</h2>
-          
-          {conversation.messages && conversation.messages.length > 0 ? (
-            <MessagesContainer 
-              messages={conversation.messages} 
-              participantMap={
-                conversation.participants.reduce((acc: Record<string, ConversationParticipant>, participant: ConversationParticipant) => {
-                  acc[participant.userId] = participant;
-                  return acc;
-                }, {})
-              } 
-              onMessageDeleted={(messageId: string) => {
-                // Actualizar el estado local para reflejar el mensaje eliminado
-                setConversation((prev: Conversation | null) => {
-                  if (!prev) return null;
-                  
-                  return {
-                    ...prev,
-                    messages: prev.messages.filter((msg: Message) => msg.id !== messageId),
-                    _count: {
-                      ...prev._count,
-                      messages: ((prev._count?.messages || prev.messages.length) - 1)
-                    }
-                  };
-                });
-              }}
-            />
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p>No hay mensajes en esta conversación</p>
+        <div className="bg-card shadow rounded-xl overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-border">
+            <h2 className="text-lg font-medium">Participantes</h2>
+          </div>
+          <div className="p-4 sm:p-6">
+            {conversation.participants && conversation.participants.length > 0 ? (
+              <ul className="space-y-3">
+                {conversation.participants.map(participant => (
+                  <li key={participant.userId} className="flex items-center">
+                    <div className="h-8 w-8 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+                      {participant.user.image ? (
+                        <Image
+                          src={participant.user.image}
+                          alt={participant.user.name || "Usuario"}
+                          width={32}
+                          height={32}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-primary text-white text-xs">
+                          {(participant.user.name || "U")[0].toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="ml-3 overflow-hidden">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {participant.user.name || "Usuario sin nombre"}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {participant.user.email || participant.userId}
+                      </p>
+                    </div>
+                    {participant.role === 'admin' && (
+                      <Badge variant="outline" className="ml-auto bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
+                        Admin
+                      </Badge>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="py-6 text-center">
+                <p className="text-muted-foreground">No hay participantes</p>
+              </div>
+            )}
+            
+            <div className="mt-4 pt-4 border-t border-border">
+              <Link
+                href={`/admin/conversations/participants/${conversationId}`}
+                className="inline-flex items-center justify-center w-full py-2 px-3 rounded-md text-sm font-medium transition-colors bg-card border border-input hover:bg-accent"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Gestionar participantes
+              </Link>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
