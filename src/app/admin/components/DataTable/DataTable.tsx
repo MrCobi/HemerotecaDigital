@@ -90,10 +90,14 @@ export default function DataTable<T>({
       <div key={index} className="block md:hidden">
         <div 
           className={cn(
-            "p-4 border-b border-border cursor-pointer hover:bg-muted/50 transition-colors bg-transparent",
+            "p-4 border-b border-border hover:bg-muted/50 transition-colors bg-transparent",
             onRowClick && "cursor-pointer"
           )}
-          onClick={() => onRowClick?.(item)}
+          onClick={onRowClick ? (e) => {
+            // No ejecutar onRowClick si se hizo clic en el botón de expandir
+            if (e.defaultPrevented) return;
+            onRowClick(item);
+          } : undefined}
         >
           <div className="flex justify-between items-center mb-3">
             <div className="font-medium">{visibleColumns[0]?.cell(item) || columns[0].cell(item)}</div>
@@ -102,6 +106,7 @@ export default function DataTable<T>({
               type="button"
               className="ml-2 p-1 rounded-full hover:bg-muted transition-colors"
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 toggleRowExpand(index);
               }}
@@ -147,7 +152,7 @@ export default function DataTable<T>({
             )}
           </div>
           
-          {visibleColumns.length > 4 && (
+          {isExpanded && visibleColumns.length > 4 && (
             <div className="flex flex-row justify-center space-x-2 mt-3 pt-3 border-t border-border">
               {visibleColumns[4].cell(item)}
             </div>
@@ -325,8 +330,8 @@ export default function DataTable<T>({
             </div>
           </div>
           
-          {/* Vista para tablets (768px-1080px) */}
-          <div className="md:block lg:hidden">
+          {/* Vista para tablets (768px-1079px) */}
+          <div className="hidden md:block lg:hidden">
             {data.map((item, index) => (
               <div key={index}>
                 {renderTabletRow(item, index)}
