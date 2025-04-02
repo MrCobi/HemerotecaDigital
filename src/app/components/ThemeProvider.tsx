@@ -40,12 +40,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const applyTheme = useCallback((newTheme: Theme) => {
     if (typeof window === "undefined") return;
 
+    // Añadir clase de transición antes de cambiar el tema
+    document.documentElement.classList.add("theme-transition");
+
     if (newTheme === "system") {
       applySystemTheme();
       
       // Agregar listener para cambios en la preferencia del sistema
       const matchMedia = window.matchMedia("(prefers-color-scheme: dark)");
-      const handleChange = () => applySystemTheme();
+      const handleChange = () => {
+        // Añadir clase de transición antes del cambio automático
+        document.documentElement.classList.add("theme-transition");
+        applySystemTheme();
+        // Eliminar la clase después de la transición
+        setTimeout(() => {
+          document.documentElement.classList.remove("theme-transition");
+        }, 500); // Tiempo igual a la duración de la transición
+      };
       
       // Eliminar listener anterior si existe
       matchMedia.removeEventListener("change", handleChange);
@@ -65,6 +76,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.setAttribute("data-theme", newTheme);
       document.documentElement.style.colorScheme = isDark ? "dark" : "light";
     }
+
+    // Quitar la clase de transición después de que se haya completado
+    setTimeout(() => {
+      document.documentElement.classList.remove("theme-transition");
+    }, 500); // Duración en ms igual a la variable CSS de transición
   }, [applySystemTheme]);
 
   // Cambiar el tema y guardarlo

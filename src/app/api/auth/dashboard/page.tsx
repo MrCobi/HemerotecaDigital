@@ -885,6 +885,14 @@ export default function DashboardPage() {
                             </div>
                             <div>
                               <p className="text-sm text-gray-600 dark:text-gray-400">
+                                {activity.type === "follow" &&
+                                  `Comenzaste a seguir a ${
+                                    activity.targetName || "un usuario"
+                                  }.`}
+                                {activity.type === "unfollow" &&
+                                  `Dejaste de seguir a ${
+                                    activity.targetName || "un usuario"
+                                  }.`}
                                 {activity.type === "favorite_added" &&
                                   `Agregaste ${
                                     activity.sourceName || "una fuente"
@@ -905,10 +913,6 @@ export default function DashboardPage() {
                                   `Eliminaste la valoración de ${
                                     activity.sourceName || "una fuente"
                                   }.`}
-                                {activity.type === "follow" &&
-                                  `Comenzaste a seguir a ${
-                                    activity.user.name || "un usuario"
-                                  }.`}
                                 {activity.type === "comment_reply" &&
                                   `Respondiste a un comentario en ${
                                     activity.sourceName || "una fuente"
@@ -916,10 +920,6 @@ export default function DashboardPage() {
                                 {activity.type === "comment_deleted" &&
                                   `Eliminaste un comentario en ${
                                     activity.sourceName || "una fuente"
-                                  }.`}
-                                {activity.type === "unfollow" &&
-                                  `Dejaste de seguir a ${
-                                    activity.user.name || "un usuario"
                                   }.`}
                                 {activity.type === "favorite" &&
                                   `Marcaste como favorito a ${

@@ -28,12 +28,22 @@ export function AppearanceSettings() {
   const applyChangesToDOM = useCallback(() => {
     if (typeof document === "undefined") return;
     
-    // Aplicar tamaño de fuente
-    document.documentElement.style.setProperty("--font-size-factor", fontSize === "small" ? "0.85" : fontSize === "medium" ? "1" : "1.2");
+    // Aplicar tamaño de fuente usando atributos de datos en lugar de propiedades CSS inline
+    // Esto permite que el CSS reaccione a los cambios inmediatamente
+    document.documentElement.setAttribute("data-font-size", fontSize);
     document.documentElement.setAttribute("data-font-family", fontFamily);
     
+    // También mantener la variable CSS para compatibilidad con código existente
+    document.documentElement.style.setProperty("--font-size-factor", 
+      fontSize === "small" ? "0.85" : fontSize === "medium" ? "1" : "1.2");
+    
     // Aplicar valores de animación
-    document.documentElement.dataset.animations = enableAnimations ? "true" : "false";
+    document.documentElement.setAttribute("data-animations", enableAnimations ? "true" : "false");
+    
+    // Emitir un evento personalizado para notificar a todos los componentes del cambio
+    window.dispatchEvent(new CustomEvent('appearancechange', { 
+      detail: { fontSize, fontFamily, enableAnimations } 
+    }));
   }, [fontSize, fontFamily, enableAnimations]);
 
   // Función para guardar en localStorage

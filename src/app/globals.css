@@ -44,6 +44,40 @@
     --transition-timing: ease;
   }
 
+  /* Transiciones suaves para cambios de tema */
+  .theme-transition,
+  .theme-transition *,
+  html.theme-transition,
+  html.theme-transition * {
+    transition-property: background-color, color, border-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+    transition-duration: var(--transition-duration);
+    transition-timing-function: var(--transition-timing);
+  }
+
+  /* Evitar transiciones en elementos que no deberían tenerlas */
+  .theme-transition .no-transition,
+  .theme-transition .no-transition * {
+    transition: none !important;
+  }
+
+  /* Configuraciones de tamaño de fuente basadas en atributos de datos */
+  html[data-font-size="small"] {
+    font-size: 85%;
+  }
+  
+  html[data-font-size="medium"] {
+    font-size: 100%;
+  }
+  
+  html[data-font-size="large"] {
+    font-size: 120%;
+  }
+  
+  /* Transiciones para cambios de tamaño de fuente */
+  html {
+    transition: font-size 0.3s ease;
+  }
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
