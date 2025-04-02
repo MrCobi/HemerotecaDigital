@@ -20,6 +20,7 @@ import { Avatar } from "@/src/app/components/ui/avatar";
 import { useToast } from "@/src/app/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
 import { useConversationUpdates } from "./hooks/useConversationUpdates";
+import { useGroupUpdates } from "./hooks/useGroupUpdates";
 
 // Función para formatear fechas
 const formatDate = (date: string | Date | undefined) => {
@@ -74,8 +75,8 @@ const EmptyState = ({ icon, title, description, action }: {
   <div className="flex h-full w-full flex-col items-center justify-center p-6">
     <div className="mb-4 text-blue-500 dark:text-blue-400">{icon}</div>
     <h2 className="mb-2 text-xl font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
-    <p className="mb-6 text-center text-gray-500 dark:text-gray-400">{description}</p>
-    {action && <div>{action}</div>}
+    <p className="mb-6 text-center text-gray-600 dark:text-gray-400">{description}</p>
+    {action}
   </div>
 );
 
@@ -122,12 +123,80 @@ export default function MessagesPage() {
     selectedConversationData,
     isGroupAdmin,
     selectConversation,
+    setSelectedConversationData,
     showGroupManagementModal,
     toggleGroupManagementModal,
   } = useMessagesState();
 
   // Usar el hook para actualizaciones en tiempo real
   useConversationUpdates(fetchConversations);
+  
+  // Usar el hook para actualizaciones de grupo en tiempo real
+  useGroupUpdates(selectedConversation, (updateType, data) => {
+    console.log(`[GroupUpdates] Actualización recibida: ${updateType}`, data);
+    
+    // Si hay una conversación seleccionada, verificar actualizaciones
+    if (selectedConversation) {
+      if (updateType === 'group_updated' || 
+          updateType === 'participants_added' || 
+          updateType === 'participant_removed' || 
+          updateType === 'participant_left') {
+        
+        // Aplicar actualización inmediata para la UI
+        if (updateType === 'group_updated' && typeof data === 'object') {
+          // Para actualizaciones de datos de grupo (nombre, descripción, etc.)
+          // Actualizar directamente seleccionando de nuevo la conversación para forzar una actualización
+          selectConversation(selectedConversation);
+          
+          // También actualizar los datos en tiempo real si es posible
+          if (selectedConversationData && 'name' in data) {
+            const updatedName = data.name as string;
+            console.log(`[GroupUpdates] Actualizando nombre de grupo a: ${updatedName}`);
+            // Forzar un refresco completo de la conversación desde el servidor
+            MessageService.fetchConversationById(selectedConversation)
+              .then((conversation) => {
+                if (conversation) {
+                  console.log('[GroupUpdates] Conversación actualizada desde servidor:', conversation);
+                }
+              });
+          }
+        } 
+        else if (updateType === 'participants_added' || 
+                updateType === 'participant_removed' || 
+                updateType === 'participant_left') {
+          // Para cambios en participantes, forzar una recarga desde el servidor
+          // ya que necesitamos información completa de los usuarios
+          MessageService.fetchConversationById(selectedConversation)
+            .then((conversation) => {
+              if (conversation) {
+                console.log('[GroupUpdates] Participantes actualizados desde servidor:', conversation);
+              }
+            })
+            .catch((error: Error) => {
+              console.error("Error actualizando datos de conversación:", error);
+            });
+        }
+        
+        // De todas formas, actualizar la lista completa desde el servidor
+        fetchConversations();
+      } else if (updateType === 'group_deleted') {
+        // Si el grupo fue eliminado, mostrar una notificación y redirigir
+        toast({
+          title: "Grupo eliminado",
+          description: "El grupo ha sido eliminado por el administrador."
+        });
+        
+        // Actualizar lista de conversaciones y volver a la pantalla principal
+        fetchConversations().then(() => {
+          selectConversation(null);
+          router.push('/messages', { scroll: false });
+        });
+      }
+    } else {
+      // Si no hay conversación seleccionada, simplemente actualizar la lista
+      fetchConversations();
+    }
+  });
 
   // Deselectionar conversación (usado en la vista móvil)
   const deselectConversation = useCallback(() => {
@@ -325,14 +394,14 @@ export default function MessagesPage() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       
-      // Crear URL para previsualización
       const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
+      reader.onload = (evt: ProgressEvent<FileReader>) => {
+        const target = evt.target;
+        if (target && target.result) {
           setCreateGroupState(prev => ({
             ...prev,
             image: file,
-            imagePreview: e.target!.result as string
+            imagePreview: typeof target.result === 'string' ? target.result : null
           }));
         }
       };
@@ -346,17 +415,14 @@ export default function MessagesPage() {
       const existingParticipant = prev.participants.find(p => p.userId === participant.id);
       
       if (existingParticipant) {
-        // Si ya existe, lo quitamos
-        return {
-          ...prev,
-          participants: prev.participants.filter(p => p.userId !== participant.id)
-        };
+        // Si el participante ya existe, no hacemos nada
+        return prev;
       } else {
         // Si no existe, lo añadimos
         const newParticipant: Participant = {
           id: `temp-${participant.id}`,
           userId: participant.id,
-          role: 'member',
+          role: 'member' as 'admin' | 'member' | 'moderator' | 'owner',
           user: participant
         };
         
@@ -559,7 +625,7 @@ export default function MessagesPage() {
                   const isConversation = item.isConversation;
                   const conversation = isConversation ? item.data as Conversation : null;
                   const user = isConversation ? (item.data as Conversation).otherUser : item.data as User;
-                  const isGroup = isConversation && ((item.data as Conversation).isGroup || (item.data as Conversation).id.startsWith('group_'));
+                  const isGroup = isConversation && ((conversation?.isGroup) || (conversation?.id.startsWith('group_')));
                   
                   return (
                     <div
@@ -813,7 +879,7 @@ export default function MessagesPage() {
                 placeholder="Nombre del grupo"
                 className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                 value={createGroupState.name}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreateGroupState(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => setCreateGroupState(prev => ({ ...prev, name: e.target.value }))}
               />
             </div>
             
@@ -825,7 +891,7 @@ export default function MessagesPage() {
                 placeholder="Descripción del grupo"
                 className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                 value={createGroupState.description}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCreateGroupState(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) => setCreateGroupState(prev => ({ ...prev, description: e.target.value }))}
               />
             </div>
             
@@ -969,21 +1035,48 @@ export default function MessagesPage() {
           onConversationUpdate={(updatedData) => {
             console.log("[DEBUG] Recibiendo datos actualizados de la conversación:", updatedData);
             
-            // Forzar una actualización completa desde el servidor
-            if (selectedConversation) {
-              // Actualizar la vista con los datos recibidos inmediatamente si están completos
-              if (updatedData && Object.keys(updatedData).length > 0) {
-                // Si recibimos una conversación completa desde el servidor, seleccionarla directamente
-                if (updatedData.id && updatedData.participants) {
-                  // Esta llamada actualiza el selectedConversationData internamente
-                  selectConversation(updatedData.id);
+            // SOLUCIÓN MEJORADA: Actualización inmediata de datos 
+            if (updatedData && updatedData.id) {
+              // 1. Actualizar la lista de conversaciones y forzar la actualización
+              const conversationId = updatedData.id; // Guardar el ID en una variable
+              
+              // Actualizar manualmente la conversación en la lista de conversaciones
+              const updatedConversations = conversations.map(conv => {
+                if (conv.id === conversationId) {
+                  // Crear una copia actualizada con los nuevos datos
+                  return {
+                    ...conv,
+                    name: updatedData.name || conv.name,
+                    description: updatedData.description || conv.description,
+                    imageUrl: updatedData.imageUrl || conv.imageUrl,
+                    participants: updatedData.participants || conv.participants
+                  };
                 }
+                return conv;
+              });
+              
+              // Forzar re-renderización inmediata con los datos actualizados
+              // Esto simula una actualización completa sin necesidad de acceder a la API
+              if (typeof window !== 'undefined') {
+                // Disparar un evento personalizado para forzar la actualización
+                window.dispatchEvent(new CustomEvent('conversation-updated', { 
+                  detail: { 
+                    conversationId: conversationId,
+                    updatedData: updatedData 
+                  } 
+                }));
               }
               
-              // De todas formas, refrescar desde el servidor para mantener consistencia
-              fetchConversations().then(() => {
-                selectConversation(selectedConversation);
-              });
+              // 2. Refrescar datos completos del servidor (en segundo plano)
+              setTimeout(() => {
+                fetchConversations().then(() => {
+                  // Asegurarse de que el ID es un string válido
+                  if (typeof conversationId === 'string') {
+                    // 3. Volver a seleccionar para asegurar consistencia total
+                    selectConversation(conversationId);
+                  }
+                });
+              }, 300);
             }
           }}
         />

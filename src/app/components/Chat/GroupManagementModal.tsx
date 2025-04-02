@@ -12,6 +12,7 @@ import { CldImage } from 'next-cloudinary';
 import Image from 'next/image';
 import { API_ROUTES } from '@/src/config/api-routes';
 import { useToast } from '@/src/app/hooks/use-toast';
+import { useRef } from 'react';
 
 export type User = {
   id: string;
@@ -60,10 +61,9 @@ export const GroupManagementModal = ({
   const { data: _session } = useSession();
   const { toast } = useToast();
   
-  // Estados locales
-  const [groupNameEdit, setGroupNameEdit] = useState("");
-  const [groupDescriptionEdit, setGroupDescriptionEdit] = useState("");
-  const [_isGroupAdmin, setIsGroupAdmin] = useState(false);
+  // Estados locales simplificados - USANDO REFS para preservar los valores entre renderizados
+  const [groupName, setGroupName] = useState("");
+  const [groupDescription, setGroupDescription] = useState("");
   const [isUpdatingGroup, setIsUpdatingGroup] = useState(false);
   const [showAddParticipantsModal, setShowAddParticipantsModal] = useState(false);
   const [possibleParticipants, setPossibleParticipants] = useState<User[]>([]);
@@ -73,30 +73,48 @@ export const GroupManagementModal = ({
   const [_groupImageFile, setGroupImageFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [localConversationData, setLocalConversationData] = useState<ConversationData | null>(null);
   
-  // Actualizar nuestro estado local cuando los datos de la conversación cambian desde el exterior
+  // IMPORTANTE: Guardar los valores actuales para que no se pierdan en renderizados
+  const savedNameRef = useRef(groupName);
+  const savedDescriptionRef = useRef(groupDescription);
+  
+  // Función para obtener el ID sin prefijo
+  const getIdForApi = useCallback((id: string): string => {
+    if (!id) return '';
+    return id.replace(/^(group_|conv_)/, '');
+  }, []);
+  
+  // Actualizar referencias cuando el usuario modifica los campos
   useEffect(() => {
-    if (conversationData) {
-      setLocalConversationData(conversationData);
-      // También actualizar otros estados importantes
-      setGroupNameEdit(conversationData.name || "");
-      setGroupDescriptionEdit(conversationData.description || "");
-      setPreviewImage(null);
-      setGroupImageFile(null);
-      setUploadProgress(0);
+    savedNameRef.current = groupName;
+  }, [groupName]);
+  
+  useEffect(() => {
+    savedDescriptionRef.current = groupDescription;
+  }, [groupDescription]);
+  
+  // Inicializar los datos del formulario cuando se abre el modal
+  useEffect(() => {
+    if (isOpen && conversationData) {
+      // SOLUCIÓN: Si ya tenemos valores anteriores, los mantenemos
+      if (savedNameRef.current) {
+        setGroupName(savedNameRef.current);
+      } else {
+        setGroupName(conversationData.name || "");
+      }
       
-      // Verificar si el usuario actual es administrador
-      const currentUserParticipant = conversationData.participants.find(
-        p => p.userId === currentUserId
-      );
-      const userIsAdmin = !!currentUserParticipant && ['admin', 'owner'].includes(currentUserParticipant.role);
-      setIsGroupAdmin(userIsAdmin);
+      if (savedDescriptionRef.current) {
+        setGroupDescription(savedDescriptionRef.current);
+      } else {
+        setGroupDescription(conversationData.description || "");
+      }
       
-      console.log("[DEBUG] Datos de conversación actualizados:", conversationData, "Usuario es admin:", userIsAdmin);
+      console.log("[DEBUG] Modal abierto: usando valores guardados:", 
+        { savedName: savedNameRef.current || conversationData.name, 
+          savedDescription: savedDescriptionRef.current || conversationData.description });
     }
-  }, [conversationData, currentUserId]);
-
+  }, [isOpen, conversationData]);
+  
   // Limpiar estado al cerrar
   useEffect(() => {
     if (!isOpen) {
@@ -105,100 +123,136 @@ export const GroupManagementModal = ({
       setPreviewImage(null);
       setGroupImageFile(null);
       setUploadProgress(0);
+      
+      // NO RESETEAMOS los valores guardados para preservarlos
     }
   }, [isOpen]);
 
-  // Crear una función para notificar a los demás participantes de los cambios
-  const notifyGroupUpdated = useCallback(async (updateType: string, updatedData: unknown) => {
-    if (!conversationData) return;
-    
-    try {
-      await fetch('/api/socket/group-update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          conversationId: conversationData.id,
-          updateType,
-          data: updatedData
-        })
-      });
-    } catch (err) {
-      console.error('Error al notificar actualización:', err);
-    }
-  }, [conversationData]);
-
-  // Función para obtener el ID para la API (sin prefijos)
-  const getIdForApi = useCallback((id: string): string => {
-    if (!id) return '';
-    return id.replace(/^(group_|conv_)/, '');
-  }, []);
-
   // Función para actualizar la información del grupo
-  const updateGroupInfo = useCallback(async (data: { name?: string, description?: string, imageUrl?: string }) => {
-    if (!conversationData) return;
+  const handleSaveChanges = async () => {
+    if (!conversationData || !initialIsAdmin) return false;
+    
+    // Validar que el nombre no esté vacío
+    if (groupName.trim() === "") {
+      toast({
+        title: "Error",
+        description: "El nombre del grupo no puede estar vacío",
+        variant: "destructive"
+      });
+      return false;
+    }
     
     setIsUpdatingGroup(true);
     
     try {
-      // Obtenemos solo el ID sin prefijo para enviarlo a la API
-      const groupId = getIdForApi(conversationData.id);
-      console.log(`[Cliente] Actualizando grupo con ID: ${groupId} (original: ${conversationData.id})`);
-      console.log(`[Cliente] Datos a enviar:`, data);
+      // Preparar datos para actualización
+      const updateData = {
+        name: groupName,
+        description: groupDescription
+      };
       
+      // Actualizar en el servidor
+      const groupId = getIdForApi(conversationData.id);
       const response = await fetch(`${API_ROUTES.messages.group.update(groupId)}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(updateData)
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Error al actualizar grupo:', errorData);
         throw new Error('Error al actualizar el grupo');
       }
       
-      const responseData = await response.json();
+      // IMPORTANTE: Guardar los valores actuales en las referencias
+      savedNameRef.current = groupName;
+      savedDescriptionRef.current = groupDescription;
       
-      // Actualizar datos en la interfaz
-      if (responseData.success) {
-        toast({
-          title: "Grupo actualizado",
-          description: "La información del grupo ha sido actualizada correctamente"
-        });
-        
-        // Notificar a los demás participantes usando notifyGroupUpdated
-        try {
-          notifyGroupUpdated('info_updated', data);
-          console.log(`[Cliente] Notificación enviada para el grupo: ${conversationData.id}`);
-        } catch (notifyError) {
-          console.error('[Cliente] Error al notificar actualización:', notifyError);
-        }
-        
-        // Actualizar la conversación en el contexto
-        if (responseData.conversation) {
-          onConversationUpdate(responseData.conversation);
-        } else {
-          onConversationUpdate(data);
-        }
-        
-        setIsUpdatingGroup(false);
-        return true;
-      }
-    } catch (err) {
-      console.error('Error:', err);
+      // SOLUCIÓN CLAVE: Crear un objeto completo con TODOS los datos de la conversación
+      // pero sustituyendo name y description con los nuevos valores
+      const updatedConversationData = {
+        ...conversationData,
+        name: groupName,
+        description: groupDescription,
+        // Aseguramos que todas las propiedades importantes estén presentes
+        id: conversationData.id,
+        isGroup: true,
+        participants: conversationData.participants,
+        imageUrl: conversationData.imageUrl
+      };
+      
+      console.log("[DEBUG] Enviando datos actualizados al OptimizedChatWindow:", updatedConversationData);
+      
+      // Notificar al padre (page.tsx) sobre la actualización para que actualice
+      // todos los componentes que usan estos datos (incluyendo OptimizedChatWindow)
+      onConversationUpdate(updatedConversationData);
+      
+      toast({
+        title: "Grupo actualizado",
+        description: "La información del grupo ha sido actualizada correctamente"
+      });
+      
+      setIsUpdatingGroup(false);
+      return true;
+    } catch (error) {
+      console.error('Error al actualizar grupo:', error);
       toast({
         title: "Error",
-        description: err instanceof Error ? err.message : "No se pudo actualizar la información del grupo",
+        description: "No se pudo actualizar la información del grupo",
         variant: "destructive"
       });
       setIsUpdatingGroup(false);
       return false;
     }
-  }, [conversationData, getIdForApi, notifyGroupUpdated, onConversationUpdate, toast]);
+  };
+
+  // Función para notificar a los demás participantes de los cambios
+  const notifyGroupUpdated = useCallback(async (updateType: string, updatedData: unknown) => {
+    if (!conversationData) return;
+    
+    try {
+      // SOLUCIÓN: Ahora usamos el nuevo endpoint SSE para notificar actualizaciones de grupo
+      await fetch('/api/messages/group/updates/sse', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          groupId: conversationData.id,
+          updateType,
+          data: updatedData
+        })
+      });
+      
+      console.log(`[DEBUG] Notificación SSE enviada para actualización de grupo: ${updateType}`, updatedData);
+      
+      // También despachamos un evento local para actualizaciones inmediatas
+      if (typeof window !== 'undefined') {
+        // Disparar un evento personalizado para notificar a los componentes locales
+        window.dispatchEvent(new CustomEvent('group-data-updated', { 
+          detail: { 
+            conversationId: conversationData.id,
+            updateType,
+            data: updatedData
+          }
+        }));
+      }
+    } catch (err) {
+      console.error('Error al notificar actualización:', err);
+      
+      // Si falla la notificación por SSE, al menos actualizamos localmente
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('group-data-updated', { 
+          detail: { 
+            conversationId: conversationData.id,
+            updateType,
+            data: updatedData
+          }
+        }));
+      }
+    }
+  }, [conversationData]);
   
   // Función para manejar la subida de imágenes
   const handleImageUpload = useCallback(async (e: Event) => {
@@ -254,11 +308,41 @@ export const GroupManagementModal = ({
               
               // Actualizar la información del grupo con la nueva URL de imagen
               if (response.url) {
-                const success = await updateGroupInfo({ imageUrl: response.url });
-                if (success) {
+                try {
+                  if (!conversationData) return;
+                  
+                  const groupId = getIdForApi(conversationData.id);
+                  const updateResponse = await fetch(`${API_ROUTES.messages.group.update(groupId)}`, {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ imageUrl: response.url })
+                  });
+                  
+                  if (updateResponse.ok) {
+                    // Crear una copia actualizada de los datos de conversación
+                    const updatedConversationData = {
+                      ...conversationData,
+                      imageUrl: response.url
+                    };
+                    
+                    // Notificar al padre sobre la actualización
+                    onConversationUpdate(updatedConversationData);
+                    
+                    toast({
+                      title: "Imagen actualizada",
+                      description: "La imagen del grupo ha sido actualizada correctamente"
+                    });
+                  } else {
+                    throw new Error('Error al actualizar la imagen');
+                  }
+                } catch (error) {
+                  console.error('Error al actualizar imagen:', error);
                   toast({
-                    title: "Imagen actualizada",
-                    description: "La imagen del grupo ha sido actualizada correctamente"
+                    title: "Error",
+                    description: "No se pudo actualizar la imagen del grupo",
+                    variant: "destructive"
                   });
                 }
               }
@@ -288,38 +372,7 @@ export const GroupManagementModal = ({
         setIsUploadingImage(false);
       }
     }
-  }, [toast, updateGroupInfo]);
-  
-  // Función para actualizar el nombre del grupo
-  const handleUpdateGroupName = async () => {
-    if (groupNameEdit.trim() === "") {
-      toast({
-        title: "Error",
-        description: "El nombre del grupo no puede estar vacío",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const success = await updateGroupInfo({ name: groupNameEdit });
-    if (success) {
-      toast({
-        title: "Nombre actualizado",
-        description: "El nombre del grupo ha sido actualizado correctamente"
-      });
-    }
-  };
-
-  // Función para actualizar la descripción del grupo
-  const handleUpdateGroupDescription = async () => {
-    const success = await updateGroupInfo({ description: groupDescriptionEdit });
-    if (success) {
-      toast({
-        title: "Descripción actualizada",
-        description: "La descripción del grupo ha sido actualizada correctamente"
-      });
-    }
-  };
+  }, [toast, conversationData, getIdForApi, onConversationUpdate]);
   
   // Función para cargar los posibles participantes (seguidores mutuos)
   const loadPossibleParticipants = useCallback(async () => {
@@ -376,6 +429,7 @@ export const GroupManagementModal = ({
       // Obtenemos solo el ID sin prefijo para enviarlo a la API
       const groupId = getIdForApi(conversationData.id);
       console.log(`[Cliente] Añadiendo participantes al grupo: ${groupId} (original: ${conversationData.id})`);
+      console.log(`[Cliente] Participantes seleccionados:`, selectedNewParticipants);
       
       const response = await fetch(
         API_ROUTES.messages.group.addParticipants(groupId),
@@ -388,14 +442,24 @@ export const GroupManagementModal = ({
         }
       );
       
+      // Obtener los datos de error o respuesta
+      const responseText = await response.text();
+      let responseData = {};
+      
+      try {
+        // Intentar parsear como JSON solo si hay contenido
+        if (responseText) {
+          responseData = JSON.parse(responseText);
+        }
+      } catch (parseError) {
+        console.error('Error al parsear respuesta JSON:', parseError);
+      }
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Error al añadir participantes:', errorData);
+        console.error('Error al añadir participantes:', responseData);
         throw new Error('Error al añadir participantes');
       }
       
-      // Obtener los datos actualizados de la respuesta
-      const responseData = await response.json();
       console.log('[DEBUG] Respuesta de añadir participantes:', responseData);
       
       // Cerrar modal y limpiar selección
@@ -403,9 +467,9 @@ export const GroupManagementModal = ({
       setSelectedNewParticipants([]);
       
       // Usar los datos completos de la conversación que devuelve el servidor
-      if (responseData && responseData.conversation) {
+      if (responseData && 'conversation' in responseData) {
         // Llamar a la función de actualización del componente padre con los datos completos
-        onConversationUpdate(responseData.conversation);
+        onConversationUpdate(responseData.conversation as ConversationData);
       }
       
       // Notificar a los demás participantes
@@ -456,18 +520,46 @@ export const GroupManagementModal = ({
       const responseData = await response.json();
       console.log('[DEBUG] Respuesta de eliminar participante:', responseData);
       
-      // Usar los datos completos de la conversación que devuelve el servidor
-      if (responseData && responseData.conversation) {
-        // Llamar a la función de actualización del componente padre con los datos completos
-        onConversationUpdate(responseData.conversation);
+      // SOLUCIÓN MEJORADA: Actualización optimista y consistente
+      // Crear una versión actualizada de los participantes eliminando el usuario
+      const updatedParticipants = conversationData.participants.filter(p => p.userId !== userId);
+      
+      // Crear un objeto completo de conversación para asegurar que la UI se actualice correctamente
+      const updatedConversationData = {
+        ...conversationData,
+        participants: updatedParticipants,
+        // Asegurar que mantenemos todas las propiedades importantes
+        id: conversationData.id,
+        name: conversationData.name,
+        description: conversationData.description,
+        imageUrl: conversationData.imageUrl,
+        isGroup: true
+      };
+      
+      // Si tenemos datos completos en la respuesta, usar esos para mayor precisión
+      if (responseData && responseData.conversation && responseData.conversation.participants) {
+        // Crear un nuevo objeto combinando los datos locales con la respuesta del servidor
+        const serverData = responseData.conversation;
+        const fullUpdatedData = {
+          ...updatedConversationData,
+          participants: serverData.participants,
+          name: serverData.name || updatedConversationData.name,
+          description: serverData.description || updatedConversationData.description,
+          imageUrl: serverData.imageUrl || updatedConversationData.imageUrl
+        };
+        
+        // Enviar la actualización completa al componente padre
+        onConversationUpdate(fullUpdatedData);
       } else {
-        // Si no hay datos completos en la respuesta, actualizar localmente
-        const updatedParticipants = conversationData.participants.filter(p => p.userId !== userId);
-        onConversationUpdate({ participants: updatedParticipants });
+        // Si no hay datos completos, usar nuestra versión actualizada localmente
+        onConversationUpdate(updatedConversationData);
       }
       
-      // Notificar a los demás participantes
-      notifyGroupUpdated('participant_removed', userId);
+      // Notificar a todos los componentes a través del evento personalizado
+      notifyGroupUpdated('participant_removed', {
+        userId,
+        updatedConversation: updatedConversationData
+      });
       
       toast({
         title: "Participante eliminado",
@@ -485,7 +577,7 @@ export const GroupManagementModal = ({
       setIsUpdatingGroup(false);
     }
   };
-  
+
   // Función para eliminar el grupo
   const handleDeleteGroup = async () => {
     if (!conversationData || !initialIsAdmin) return;
@@ -660,59 +752,61 @@ export const GroupManagementModal = ({
             </Button>
           </div>
           
-          {/* Nombre del grupo */}
-          <div>
-            <h3 className="text-sm font-medium mb-2">Nombre del grupo</h3>
-            <div className="flex space-x-2">
+          {/* Sección de Información del Grupo con un solo botón para guardar */}
+          <div className="border rounded-lg p-4 space-y-4">
+            <h3 className="text-sm font-medium mb-2 text-center">Información del Grupo</h3>
+            
+            {/* Nombre del grupo */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Nombre del grupo</label>
               <Input 
-                value={groupNameEdit}
-                onChange={(e) => setGroupNameEdit(e.target.value)}
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
                 placeholder="Nombre del grupo"
                 disabled={!initialIsAdmin || isUpdatingGroup}
-                className="flex-1"
+                className="w-full"
               />
-              {initialIsAdmin && (
-                <Button 
-                  size="sm" 
-                  onClick={handleUpdateGroupName}
-                  disabled={isUpdatingGroup}
-                >
-                  <Pencil className="h-4 w-4 mr-1" />
-                  Guardar
-                </Button>
-              )}
             </div>
-          </div>
-          
-          {/* Descripción del grupo */}
-          <div>
-            <h3 className="text-sm font-medium mb-2">Descripción</h3>
-            <div className="flex flex-col space-y-2">
+            
+            {/* Descripción del grupo */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Descripción</label>
               <Textarea 
-                value={groupDescriptionEdit}
-                onChange={(e) => setGroupDescriptionEdit(e.target.value)}
+                value={groupDescription}
+                onChange={(e) => setGroupDescription(e.target.value)}
                 placeholder="Descripción del grupo"
                 disabled={!initialIsAdmin || isUpdatingGroup}
-                className="min-h-[80px]"
+                className="min-h-[80px] w-full"
               />
-              {initialIsAdmin && (
-                <Button 
-                  size="sm" 
-                  onClick={handleUpdateGroupDescription}
-                  disabled={isUpdatingGroup}
-                  className="self-end"
-                >
-                  <Pencil className="h-4 w-4 mr-1" />
-                  Guardar
-                </Button>
-              )}
             </div>
+            
+            {/* Botón unificado para guardar cambios */}
+            {initialIsAdmin && (
+              <Button 
+                className="w-full"
+                onClick={handleSaveChanges}
+                disabled={isUpdatingGroup}
+                variant="default"
+              >
+                {isUpdatingGroup ? (
+                  <>
+                    <span className="mr-2">Guardando...</span>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Guardar Cambios
+                  </>
+                )}
+              </Button>
+            )}
           </div>
           
           {/* Participantes */}
           <div>
             <div className="flex justify-between items-center mb-3">
-              <h3 className="text-sm font-medium">Participantes ({localConversationData?.participants.length || 0})</h3>
+              <h3 className="text-sm font-medium">Participantes ({conversationData?.participants.length || 0})</h3>
               {initialIsAdmin && (
                 <Button 
                   size="sm" 
@@ -726,7 +820,7 @@ export const GroupManagementModal = ({
               )}
             </div>
             <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
-              {localConversationData?.participants?.map((participant) => (
+              {conversationData?.participants?.map((participant) => (
                 <div key={participant.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-800 rounded-md">
                   <div className="flex items-center space-x-2">
                     <Avatar className="h-8 w-8">

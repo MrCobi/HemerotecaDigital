@@ -35,13 +35,18 @@ export class MessageService {
    */
   static async fetchConversationById(conversationId: string): Promise<ConversationData> {
     try {
-      const response = await fetch(`/api/messages/conversations/${conversationId}`);
+      // Obtener todas las conversaciones y filtrar localmente
+      // ya que no hay un endpoint específico para obtener una conversación por ID
+      const allConversations = await this.fetchConversations();
       
-      if (!response.ok) {
-        throw new Error(`Error al cargar la conversación: ${response.status}`);
+      // Buscar la conversación por ID
+      const conversation = allConversations.find(conv => conv.id === conversationId);
+      
+      if (!conversation) {
+        throw new Error(`Conversación no encontrada: ${conversationId}`);
       }
       
-      return await response.json();
+      return conversation;
     } catch (_e) {
       console.error(`Error fetching conversation ${conversationId}:`, _e);
       throw _e;

@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/ava
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
 // Importar los iconos directamente desde Lucide React para mejor compatibilidad
-import { ArrowLeft, ArrowUp, Image as ImageIcon, Settings, X, Mic } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Image as ImageIcon, Settings, X, Mic, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
@@ -318,6 +318,29 @@ const OptimizedChatWindow = ({
   // Referencia para controlar si es la primera carga
   const isFirstLoadRef = React.useRef(true);
   
+  // Estado local para la información de la conversación actual
+  const [localConversationData, setLocalConversationData] = React.useState<ConversationData | null>(conversation);
+  
+  // Efecto para mantener sincronizada la información de la conversación actual
+  React.useEffect(() => {
+    if (conversation) {
+      // Forzar una actualización completa del estado con un nuevo objeto
+      setLocalConversationData(prevData => {
+        // Si los datos son iguales, no actualizar para evitar renderizados innecesarios
+        if (prevData?.id === conversation.id && 
+            prevData?.name === conversation.name && 
+            prevData?.description === conversation.description) {
+          return prevData;
+        }
+        
+        // Crear un nuevo objeto para forzar la re-renderización
+        const updatedData = {...conversation};
+        console.log("[OptimizedChatWindow] Datos de conversación actualizados:", updatedData);
+        return updatedData;
+      });
+    }
+  }, [conversation]);
+  
   // Forzar un scroll suave al final (para conversaciones de grupo)
   const forceMultipleScrollAttempts = React.useCallback((targetConversationId: string | undefined) => {
     if (!targetConversationId?.startsWith('group_')) return;
@@ -365,7 +388,107 @@ const OptimizedChatWindow = ({
       }
     }, 350);
   }, [messagesEndRef, messagesContainerRef]);
-
+  
+  // Escuchar eventos de actualización de grupo en tiempo real
+  React.useEffect(() => {
+    if (!conversationId || !conversationId.startsWith('group_')) return;
+    
+    const handleGroupUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { conversationId: updatedGroupId, updateType, data } = customEvent.detail;
+      
+      // Solo actualizar si es este grupo
+      if (updatedGroupId !== conversationId) return;
+      
+      console.log(`[OptimizedChatWindow] Actualizando local desde evento: ${updateType}`, data);
+      
+      // Actualizar los datos locales de la conversación
+      setLocalConversationData(prevData => {
+        if (!prevData) return prevData;
+        
+        // Siempre crear un nuevo objeto para forzar la re-renderización
+        const updatedData = {...prevData};
+        
+        // Actualizar según el tipo de evento
+        if (updateType === 'group_updated') {
+          if (data.name) updatedData.name = data.name;
+          if (data.description) updatedData.description = data.description;
+          // Forzar una actualización inmediata
+          console.log('[OptimizedChatWindow] Nombre/descripción actualizados:', updatedData.name);
+        } 
+        else if (updateType === 'participants_added') {
+          // Recibimos un array de IDs de usuario en lugar de objetos de participante
+          console.log('[OptimizedChatWindow] Usuarios añadidos:', data);
+          
+          // Verificar el formato de los datos recibidos
+          if (Array.isArray(data)) {
+            // Formato: array de IDs de usuario
+            const existingParticipantIds = new Set(updatedData.participants.map(p => p.userId));
+            
+            // Convertir los IDs a objetos de participante completos
+            const newParticipantsToAdd = data
+              .filter(userId => !existingParticipantIds.has(userId))
+              .map(userId => ({
+                id: `temp_participant_${userId}`, // Añadir id requerido por la interfaz Participant
+                userId,
+                user: { 
+                  id: userId,
+                  name: 'Usuario Añadido', // Nombre temporal hasta que se obtenga el real
+                  email: '',
+                  emailVerified: null,
+                  image: null
+                },
+                role: 'member' as const // Forzar como valor literal de tipo role
+              }));
+            
+            if (newParticipantsToAdd.length > 0) {
+              updatedData.participants = [...updatedData.participants, ...newParticipantsToAdd];
+              // Forzar actualización del UI para la lista de participantes
+              console.log(`[OptimizedChatWindow] ${newParticipantsToAdd.length} participantes añadidos, total: ${updatedData.participants.length}`);
+            }
+          } 
+          else if (data.participants && Array.isArray(data.participants)) {
+            // Formato anterior: objeto con array de participantes
+            const existingParticipantIds = new Set(updatedData.participants.map(p => p.userId));
+            const newParticipants = data.participants.filter((p: { userId: string }) => 
+              !existingParticipantIds.has(p.userId)
+            );
+            
+            if (newParticipants.length > 0) {
+              updatedData.participants = [...updatedData.participants, ...newParticipants];
+            }
+          }
+        } 
+        else if (updateType === 'participant_removed' || updateType === 'participant_left') {
+          // Eliminar participante
+          const participantIdToRemove = data.userId;
+          
+          // Verificar que el participante existe antes de intentar eliminarlo
+          const participantExists = updatedData.participants.some(p => p.userId === participantIdToRemove);
+          
+          if (participantExists) {
+            updatedData.participants = updatedData.participants.filter(
+              p => p.userId !== participantIdToRemove
+            );
+            // Forzar actualización del UI para la lista de participantes
+            console.log(`[OptimizedChatWindow] Participante eliminado/salió, total: ${updatedData.participants.length}`);
+          } else {
+            console.log(`[OptimizedChatWindow] Participante no encontrado: ${participantIdToRemove}`);
+          }
+        }
+        
+        return updatedData;
+      });
+    };
+    
+    // Escuchar el evento personalizado
+    window.addEventListener('group-data-updated', handleGroupUpdate);
+    
+    return () => {
+      window.removeEventListener('group-data-updated', handleGroupUpdate);
+    };
+  }, [conversationId]);
+  
   // Función para desplazarse al final del chat
   const scrollToBottom = React.useCallback((behavior: ScrollBehavior = 'auto') => {
     if (messagesEndRef.current) {
@@ -659,25 +782,29 @@ const OptimizedChatWindow = ({
     <div className={cn("flex flex-col h-full bg-white dark:bg-gray-950", className)}>
       {/* Cabecera del chat con información del usuario/grupo */}
       <div className="p-3 border-b flex items-center justify-between gap-3 bg-white dark:bg-gray-900 shadow-sm">
-        <div className="flex items-center gap-3">
-          {/* Botón de volver */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onBackClick}
-            className="mr-2"
-          >
-            <ArrowLeft className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          </Button>
-          
-          <Avatar className="h-10 w-10" onClick={() => {
-            if (conversation?.isGroup || !otherUser) return;
-            _onUserProfileClick?.(otherUser);
-          }}>
-            {conversation?.isGroup ? (
-              <AvatarImage src={conversation.imageUrl || "/images/AvatarPredeterminado.webp"} alt={conversation.name || 'Grupo'} />
+        <div className="flex items-center space-x-3">
+          {onBackClick && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onBackClick}
+              className="mr-1"
+              aria-label="Volver"
+            >
+              <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            </Button>
+          )}
+          <Avatar className="h-10 w-10">
+            {localConversationData?.isGroup ? (
+              localConversationData?.imageUrl ? (
+                <AvatarImage src={localConversationData.imageUrl} alt={localConversationData.name || 'Grupo'} />
+              ) : (
+                <AvatarFallback>
+                  <Users className="h-5 w-5" />
+                </AvatarFallback>
+              )
             ) : otherUser?.image ? (
-              <AvatarImage src={otherUser.image} alt={otherUser?.username || 'Usuario'} />
+              <AvatarImage src={otherUser.image} alt={otherUser.username || 'Usuario'} />
             ) : (
               <AvatarFallback>
                 {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
@@ -686,13 +813,13 @@ const OptimizedChatWindow = ({
           </Avatar>
           <div className="flex flex-col flex-1 min-w-0">
             <span className="font-medium truncate">
-              {conversation?.isGroup 
-                ? conversation.name 
+              {localConversationData?.isGroup 
+                ? localConversationData.name 
                 : otherUser?.username || 'Usuario'}
             </span>
-            {conversation?.isGroup && (
+            {localConversationData?.isGroup && (
               <span className="text-xs text-gray-500">
-                {conversation.participants?.length || 0} participantes
+                {localConversationData.participants?.length || 0} participantes
               </span>
             )}
           </div>
@@ -754,7 +881,7 @@ const OptimizedChatWindow = ({
                     message={message}
                     currentUserId={currentUserId}
                     otherUser={otherUser}
-                    conversation={conversation}
+                    conversation={localConversationData}
                     showDateSeparator={false} /* Ya lo manejamos arriba */
                     currentUserImage={session?.user?.image || null}
                     currentUserName={session?.user?.name || null}

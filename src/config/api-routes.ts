@@ -99,6 +99,7 @@ export const API_ROUTES = {
     group: {
       update: (groupId: string) => `/api/messages/group/${groupId}`,
       delete: (groupId: string) => `/api/messages/group/${groupId}`,
+      get: (groupId: string) => `/api/messages/group/${groupId}`,
       addParticipants: (groupId: string) => `/api/messages/group/${groupId}/participants`,
       removeParticipant: (groupId: string, participantId: string) => 
         `/api/messages/group/${groupId}/participants/${participantId}`,
