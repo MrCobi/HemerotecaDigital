@@ -19,7 +19,8 @@ export default function ClientLayout({
       <UnreadMessagesProvider>
         <Navbar />
 
-        <main className="flex-1 mt-12 xs:mt-14 sm:mt-16 md:mt-20 px-3 sm:px-4 md:px-6">
+        <main className="flex-1 mt-16 sm:mt-16 md:mt-20">
+
           <Suspense
             fallback={
               <div className="flex items-center justify-center min-h-[60vh]">
@@ -31,7 +32,8 @@ export default function ClientLayout({
           </Suspense>
         </main>
 
-        <footer className="bg-gradient-to-br from-blue-600 to-indigo-700 dark:from-blue-900 dark:to-indigo-950 text-white py-4 sm:py-6 md:py-8 w-full mt-8">
+        <footer className="bg-gradient-to-br from-blue-600 to-indigo-700 dark:from-blue-900 dark:to-indigo-950 text-white py-6 sm:py-8 w-full">
+
           <div className="border-blue-400/20 dark:border-blue-800/20 text-center text-sm text-blue-100 px-4">
             <p> 2025 Hemeroteca Digital. Todos los derechos reservados.</p>
           </div>
@@ -58,8 +60,8 @@ function Navbar() {
   return (
     <header
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${isScrolled
-          ? "bg-gradient-to-r from-blue-600 to-indigo-700 shadow-lg dark:from-blue-900 dark:to-indigo-950"
-          : "bg-gradient-to-r from-blue-600/95 to-indigo-700/95 backdrop-blur-sm dark:from-blue-900/95 dark:to-indigo-950/95"
+        ? "bg-gradient-to-r from-blue-600 to-indigo-700 shadow-lg dark:from-blue-900 dark:to-indigo-950"
+        : "bg-gradient-to-r from-blue-600/95 to-indigo-700/95 backdrop-blur-sm dark:from-blue-900/95 dark:to-indigo-950/95"
         }`}
     >
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
@@ -158,8 +160,8 @@ function Navbar() {
       {session && (
         <div
           className={`sm:hidden transition-all duration-300 ease-in-out ${isMenuOpen
-              ? "max-h-[18rem] opacity-100 shadow-lg border-t border-blue-500/30"
-              : "max-h-0 opacity-0 overflow-hidden"
+            ? "max-h-[18rem] opacity-100 shadow-lg border-t border-blue-500/30"
+            : "max-h-0 opacity-0 overflow-hidden"
             }`}
         >
           <div className="px-3 pt-3 pb-4 space-y-2 bg-gradient-to-r from-blue-600 to-indigo-700 dark:from-blue-900 dark:to-indigo-950">
