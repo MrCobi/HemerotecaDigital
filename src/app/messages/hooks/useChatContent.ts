@@ -851,19 +851,38 @@ export function useChatContent(
 
   // Manejar scroll para cargar más mensajes
   const handleScroll = useCallback(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
+    // Eliminar la carga automática de mensajes en scroll
+    // Ahora la carga de mensajes anteriores sólo ocurrirá cuando se pulse el botón explícitamente
     
-    // Si el usuario está cerca de la parte superior, cargar más mensajes
-    if (container.scrollTop < 100 && hasMoreMessages && !loading) {
-      loadMoreMessages();
-    }
-  }, [hasMoreMessages, loading, loadMoreMessages]);
+    // Código original comentado:
+    // const container = messagesContainerRef.current;
+    // if (!container) return;
+    // 
+    // // Si el usuario está cerca de la parte superior, cargar más mensajes
+    // if (container.scrollTop < 100 && hasMoreMessages && !loading) {
+    //   loadMoreMessages();
+    // }
+  }, []);
 
   // Efecto para desplazar al final al cargar inicialmente
   useEffect(() => {
-    if (firstLoadRef.current && messages.length > 0) {
+    if (messages.length > 0) {
+      // Siempre desplazar al último mensaje al cargar la conversación, sin importar si es la primera carga
       scrollToBottom();
+    }
+  }, [messages.length, scrollToBottom]);
+
+  // Efecto para desplazar al final cuando llegan nuevos mensajes
+  useEffect(() => {
+    // Verificar si estamos cerca del final antes de que lleguen nuevos mensajes
+    const container = messagesContainerRef.current;
+    if (container) {
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      
+      // Si estamos cerca del final o es la carga inicial, desplazar automáticamente
+      if (isNearBottom || firstLoadRef.current) {
+        scrollToBottom();
+      }
     }
   }, [messages, scrollToBottom]);
 

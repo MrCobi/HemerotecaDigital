@@ -1681,7 +1681,7 @@ const isExternalImageValid = (url: string): boolean => {
   try {
     const urlObj = new URL(url);
     return !blockedDomains.some(domain => urlObj.hostname.includes(domain));
-  } catch (e) {
+  } catch  {
     return false;
   }
 };

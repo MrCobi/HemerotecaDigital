@@ -41,14 +41,21 @@ const DateSeparator = React.memo(({ date }: { date: Date | string }) => {
   } else if (isYesterday(dateObj)) {
     displayDate = 'Ayer';
   } else {
+    // Formato más natural: "20 de abril" o "20 de abril de 2024" si no es el año actual
+    const currentYear = new Date().getFullYear();
+    const messageYear = dateObj.getFullYear();
     const day = dateObj.getDate();
     const month = dateObj.toLocaleString('es-ES', { month: 'long' });
-    const year = dateObj.getFullYear();
-    displayDate = `${day} ${month} ${year}`;
+    
+    if (currentYear === messageYear) {
+      displayDate = `${day} de ${month}`;
+    } else {
+      displayDate = `${day} de ${month} de ${messageYear}`;
+    }
   }
   
   return (
-    <div className="flex items-center justify-center my-4">
+    <div className="flex items-center justify-center my-3">
       <div className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-3 py-1 rounded-full">
         {displayDate}
       </div>
@@ -64,7 +71,6 @@ const MessageItem = React.memo(({
   currentUserId, 
   otherUser, 
   conversation,
-  showDateSeparator,
   currentUserImage,
   currentUserName,
   _onPlayAudio,
@@ -127,10 +133,6 @@ const MessageItem = React.memo(({
 
   return (
     <>
-      {showDateSeparator && (
-        <DateSeparator date={messageDate} />
-      )}
-      
       <div
         key={`${message.id || message.tempId || 'msg'}-${index}`}
         className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} items-end gap-2 mb-2`}
@@ -190,7 +192,6 @@ const MessageItem = React.memo(({
                     height={300}
                     quality={100}
                     onError={() => {
-                      console.log("Error cargando imagen de Cloudinary, usando fallback");
                       setImageLoaded(true);
                       setUseCloudinary(false);
                     }}
@@ -301,7 +302,7 @@ const OptimizedChatWindow = ({
     uploadProgress,
     
     setNewMessageContent,
-    handleSendMessage,
+    handleSendMessage: originalHandleSendMessage,
     handleImageChange,
     loadMoreMessages: _loadMoreMessages,
     handleScroll: _handleScroll,
@@ -312,6 +313,128 @@ const OptimizedChatWindow = ({
 
   // Extraer el otherUser del conversation
   const otherUser = conversation?.participants.find(p => p.userId !== currentUserId)?.user || null;
+
+  // Referencia para controlar si es la primera carga
+  const isFirstLoadRef = React.useRef(true);
+  
+  // Forzar un scroll suave al final (para conversaciones de grupo)
+  const forceMultipleScrollAttempts = React.useCallback((targetConversationId: string | undefined) => {
+    if (!targetConversationId?.startsWith('group_')) return;
+    
+    // Primer intento: scrollIntoView con behavior smooth
+    setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+    
+    // Segundo intento: scrollTo con animación
+    setTimeout(() => {
+      if (messagesContainerRef.current) {
+        const container = messagesContainerRef.current;
+        const targetScrollTop = container.scrollHeight - container.clientHeight;
+        
+        // Implementar scroll suave manual para mayor control
+        const startPosition = container.scrollTop;
+        const distance = targetScrollTop - startPosition;
+        const duration = 300; // duración en ms
+        let startTime: number | null = null;
+        
+        // Función de animación de scroll
+        const scrollAnimation = (timestamp: number) => {
+          if (!startTime) startTime = timestamp;
+          const elapsed = timestamp - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // Función de easing para movimiento más natural
+          const easeInOutQuad = (t: number) => 
+            t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          
+          if (container) {
+            container.scrollTop = startPosition + distance * easeInOutQuad(progress);
+            
+            if (progress < 1) {
+              requestAnimationFrame(scrollAnimation);
+            }
+          }
+        };
+        
+        // Iniciar animación
+        requestAnimationFrame(scrollAnimation);
+      }
+    }, 350);
+  }, [messagesEndRef, messagesContainerRef]);
+
+  // Función para desplazarse al final del chat
+  const scrollToBottom = React.useCallback((behavior: ScrollBehavior = 'auto') => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior });
+    }
+  }, [messagesEndRef]);
+
+  // Aplicar forzado de scroll después de enviar un mensaje
+  const _handleAfterSendMessage = React.useCallback(() => {
+    if (conversationId?.startsWith('group_')) {
+      setTimeout(() => forceMultipleScrollAttempts(conversationId), 100);
+    }
+  }, [conversationId, forceMultipleScrollAttempts]);
+
+  // Modificar la función de envío original para incluir el scroll forzado
+  const _originalHandleSendMessage = originalHandleSendMessage;
+  const handleSendMessage = React.useCallback(() => {
+    _originalHandleSendMessage();
+    _handleAfterSendMessage();
+  }, [_originalHandleSendMessage, _handleAfterSendMessage]);
+
+  // Efecto para asegurar scroll al último mensaje al abrir la conversación o cambiar de conversación
+  React.useEffect(() => {
+    if (messages.length > 0) {
+      // Scroll sin importar si es primera carga o no
+      setTimeout(() => {
+        scrollToBottom('auto');
+        // Ya no es la primera carga después del primer scroll
+        isFirstLoadRef.current = false;
+      }, 300); // Aumentar a 300ms para dar más tiempo
+    }
+  }, [conversationId, messages.length, scrollToBottom]);
+
+  // Efecto para manejar nuevos mensajes y hacer scroll automático
+  React.useEffect(() => {
+    if (!messagesContainerRef.current || messages.length === 0) return;
+    
+    // Determinar si es una conversación grupal por el ID
+    const isGroupConversation = conversationId?.startsWith('group_');
+    
+    // Para conversaciones de grupo, siempre hacer scroll al final
+    if (isGroupConversation) {
+      setTimeout(() => {
+        scrollToBottom('smooth');
+      }, 300);
+      return;
+    }
+    
+    // Para conversaciones privadas, solo hacer scroll si estaba cerca del final
+    const container = messagesContainerRef.current;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+    
+    if (isNearBottom || isFirstLoadRef.current) {
+      setTimeout(() => {
+        scrollToBottom('smooth');
+      }, 300);
+    }
+  }, [messages, conversationId, messagesContainerRef, scrollToBottom]);
+
+  // Efecto para hacer scroll forzado en conversaciones de grupo
+  React.useEffect(() => {
+    if (conversationId?.startsWith('group_') && messages.length > 0) {
+      forceMultipleScrollAttempts(conversationId);
+    }
+  }, [conversationId, messages.length, forceMultipleScrollAttempts]);
+
+  // Resetear la referencia de primera carga cuando cambia la conversación
+  React.useEffect(() => {
+    isFirstLoadRef.current = true;
+  }, [conversationId]);
 
   // Iniciar grabación de voz
   const handleStartVoiceRecording = React.useCallback(() => {
@@ -347,7 +470,6 @@ const OptimizedChatWindow = ({
       formData.append('type', 'audio');
       
       // 1. Subir el archivo de audio a Cloudinary
-      console.log('Subiendo audio a Cloudinary...');
       const uploadResponse = await fetch('/api/messages/upload', {
         method: 'POST',
         body: formData,
@@ -358,7 +480,6 @@ const OptimizedChatWindow = ({
       }
       
       const { url: audioUrl } = await uploadResponse.json();
-      console.log('Audio subido con éxito:', audioUrl);
       
       if (!audioUrl) {
         throw new Error('No se recibió URL del servidor');
@@ -384,8 +505,6 @@ const OptimizedChatWindow = ({
         messagePayload.receiverId = otherUser.id;
       }
       
-      console.log('Enviando mensaje con payload:', messagePayload);
-      
       // Enviar el mensaje con la URL del audio
       const messageResponse = await fetch('/api/messages', {
         method: 'POST',
@@ -399,8 +518,6 @@ const OptimizedChatWindow = ({
         const errorText = await messageResponse.text();
         throw new Error(`Error al enviar mensaje de voz (${messageResponse.status}): ${errorText}`);
       }
-      
-      console.log('Mensaje de voz enviado con éxito');
     } catch (error) {
       console.error('Error al enviar mensaje de voz:', error);
     }
@@ -508,11 +625,11 @@ const OptimizedChatWindow = ({
     );
   }
 
-  // Mostrar un indicador de carga si está cargando
+  // Mostrar un indicador de carga si está cargando y no hay mensajes
   if (loading && !messages.length) {
     return (
       <div className={cn("flex flex-col h-full justify-center items-center p-4", className)}>
-        <LoadingSpinner className="h-8 w-8 mb-2" />
+        <LoadingSpinner className="h-8 w-8" />
 
       </div>
     );
@@ -578,10 +695,19 @@ const OptimizedChatWindow = ({
 
       {/* Contenedor de mensajes */}
       <div
-        className="flex-1 overflow-y-auto p-3 space-y-2"
+        className="flex-1 overflow-y-auto p-3 flex flex-col"
         ref={messagesContainerRef}
+        onScroll={_handleScroll}
       >
-        {messages.length === 0 ? (
+        {loading && !messages.length ? (
+          <div className="flex h-full items-center justify-center">
+            <LoadingSpinner className="h-8 w-8" />
+          </div>
+        ) : error ? (
+          <div className="flex h-full items-center justify-center text-center text-red-500">
+            <p>{error}</p>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="h-full flex flex-col justify-center items-center text-gray-500">
             <p>No hay mensajes. Comienza la conversación ahora!</p>
           </div>
@@ -598,27 +724,42 @@ const OptimizedChatWindow = ({
             const _isLastInSequence = !nextMessage || nextMessage.senderId !== message.senderId;
             
             return (
-              <div 
-                key={`${message.id || message.tempId || 'msg'}-${index}`}
-                className={`flex ${message.senderId === session?.user?.id ? 'justify-end' : 'justify-start'} mb-4`}
-              >
-                <MessageItem
-                  message={message}
-                  currentUserId={currentUserId}
-                  otherUser={otherUser}
-                  conversation={conversation}
-                  showDateSeparator={showDateSeparator}
-                  currentUserImage={session?.user?.image || null}
-                  currentUserName={session?.user?.name || null}
-                  _onPlayAudio={_onPlayAudio ?? handlePlayAudio}
-                  index={index}
-                />
-              </div>
+              <React.Fragment key={`${message.id || message.tempId || 'msg'}-${index}`}>
+                {showDateSeparator && (
+                  <DateSeparator date={new Date(message.createdAt)} />
+                )}
+                <div 
+                  className={`flex ${message.senderId === session?.user?.id ? 'justify-end' : 'justify-start'} mb-4`}
+                >
+                  <MessageItem
+                    message={message}
+                    currentUserId={currentUserId}
+                    otherUser={otherUser}
+                    conversation={conversation}
+                    showDateSeparator={false} /* Ya lo manejamos arriba */
+                    currentUserImage={session?.user?.image || null}
+                    currentUserName={session?.user?.name || null}
+                    _onPlayAudio={_onPlayAudio ?? handlePlayAudio}
+                    index={index}
+                  />
+                </div>
+              </React.Fragment>
             );
           })
         )}
+        {/* Elemento final para el scroll */}
+        {messages.length > 0 && (
+          <div 
+            ref={messagesEndRef} 
+            className="h-10 flex items-center justify-center" 
+            id="scroll-target"
+          >
+            {/* Marcador invisible para asegurar que el elemento sea visible */}
+            <div className="invisible text-xs">Fin de la conversación</div>
+          </div>
+        )}
       </div>
-
+      
       {/* Reproductor de audio oculto */}
       <audio ref={audioRef} className="hidden" />
       
@@ -751,7 +892,6 @@ const OptimizedChatWindow = ({
           </div>
         </div>
       </div>
-      <div ref={messagesEndRef} />
     </div>
   );
 };

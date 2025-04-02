@@ -60,14 +60,21 @@ const DateSeparator = React.memo(({ date }: { date: Date | string }) => {
   } else if (isYesterday(dateObj)) {
     displayDate = 'Ayer';
   } else {
+    // Formato más natural: "20 de abril" o "20 de abril de 2024" si no es el año actual
+    const currentYear = new Date().getFullYear();
+    const messageYear = dateObj.getFullYear();
     const day = dateObj.getDate();
     const month = dateObj.toLocaleString('es-ES', { month: 'long' });
-    const year = dateObj.getFullYear();
-    displayDate = `${day} ${month} ${year}`;
+    
+    if (currentYear === messageYear) {
+      displayDate = `${day} de ${month}`;
+    } else {
+      displayDate = `${day} de ${month} de ${messageYear}`;
+    }
   }
   
   return (
-    <div className="flex items-center justify-center my-4">
+    <div className="flex items-center justify-center my-3">
       <div className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-3 py-1 rounded-full">
         {displayDate}
       </div>
@@ -294,6 +301,36 @@ const PrivateChatWindow = ({
     messagesEndRef,
     messagesContainerRef,
   } = useChatContent(conversation, conversationId);
+
+  // Estado para controlar la carga de mensajes más antiguos
+  const [loadingOlderMessages, setLoadingOlderMessages] = React.useState(false);
+
+  // Función para cargar mensajes más antiguos
+  const handleLoadMoreMessages = React.useCallback(async () => {
+    setLoadingOlderMessages(true);
+    try {
+      // Guardar la posición de scroll actual para mantenerla después de cargar nuevos mensajes
+      const scrollContainer = messagesContainerRef.current;
+      const scrollHeight = scrollContainer?.scrollHeight || 0;
+      const scrollTop = scrollContainer?.scrollTop || 0;
+      
+      // Llamar a la función de cargar más mensajes del hook
+      await _loadMoreMessages();
+      
+      // Restaurar la posición de scroll (con un pequeño retraso para permitir el renderizado)
+      setTimeout(() => {
+        if (scrollContainer) {
+          const newScrollHeight = scrollContainer.scrollHeight;
+          const heightDifference = newScrollHeight - scrollHeight;
+          scrollContainer.scrollTop = scrollTop + heightDifference;
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Error al cargar mensajes más antiguos:', error);
+    } finally {
+      setLoadingOlderMessages(false);
+    }
+  }, [_loadMoreMessages, messagesContainerRef]);
 
   // Manejar cambio de texto en el input
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -610,12 +647,44 @@ const PrivateChatWindow = ({
       {/* Contenedor de mensajes */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-3 space-y-2"
+        className="flex-1 overflow-y-auto bg-white dark:bg-gray-900 px-4 pb-4"
         onScroll={handleScroll}
       >
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col justify-center items-center text-gray-500">
-            <p>No hay mensajes. Comienza la conversación ahora!</p>
+        {/* Botón de cargar mensajes más antiguos */}
+        {!loading && (
+          <div className="sticky top-0 z-10 flex justify-center py-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+            {loadingOlderMessages ? (
+              <div className="flex justify-center p-2">
+                <LoadingSpinner className="h-5 w-5" />
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLoadMoreMessages}
+                className="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                Cargar mensajes anteriores
+              </Button>
+            )}
+          </div>
+        )}
+        
+        {loading ? (
+          <div className="flex h-full items-center justify-center">
+            <LoadingSpinner className="h-8 w-8" />
+          </div>
+        ) : error ? (
+          <div className="flex h-full items-center justify-center text-center text-red-500">
+            <p>{error}</p>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-center">
+            <div className="max-w-md p-4">
+              <p className="text-gray-500 dark:text-gray-400">
+                No hay mensajes aún. ¡Envía el primero!
+              </p>
+            </div>
           </div>
         ) : (
           messages.map((message, index) => {
