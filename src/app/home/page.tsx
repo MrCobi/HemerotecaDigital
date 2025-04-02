@@ -1268,13 +1268,23 @@ export default function HomePage() {
               >
                 <figure className="relative h-40 sm:h-48">
                   {article.urlToImage ? (
-                    <Image
-                      src={article.urlToImage}
-                      alt={article.title}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    />
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={isExternalImageValid(article.urlToImage) 
+                          ? article.urlToImage 
+                          : '/images/article_placeholder.jpg'}
+                        alt={article.title}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        onError={(e) => {
+                          // Si la imagen falla, cambiar src a imagen de fallback
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null; // Prevenir loop infinito
+                          target.src = '/images/article_placeholder.jpg';
+                        }}
+                      />
+                    </div>
                   ) : (
                     <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                       <svg
@@ -1658,3 +1668,20 @@ export default function HomePage() {
     </main>
   );
 }
+
+// Hook para verificar si una URL de imagen es válida (no bloqueada por CORS)
+const isExternalImageValid = (url: string): boolean => {
+  // URLs conocidas que suelen bloquear el hotlinking
+  const blockedDomains = [
+    'i-invdn-com.investing.com',
+    'investing.com',
+    'i-invdn-com',
+  ];
+  
+  try {
+    const urlObj = new URL(url);
+    return !blockedDomains.some(domain => urlObj.hostname.includes(domain));
+  } catch (e) {
+    return false;
+  }
+};
