@@ -19,6 +19,7 @@ import { Input } from "@/src/app/components/ui/input";
 import { Avatar } from "@/src/app/components/ui/avatar";
 import { useToast } from "@/src/app/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
+import { useConversationUpdates } from "./hooks/useConversationUpdates";
 
 // Función para formatear fechas
 const formatDate = (date: string | Date | undefined) => {
@@ -124,6 +125,9 @@ export default function MessagesPage() {
     showGroupManagementModal,
     toggleGroupManagementModal,
   } = useMessagesState();
+
+  // Usar el hook para actualizaciones en tiempo real
+  useConversationUpdates(fetchConversations);
 
   // Deselectionar conversación (usado en la vista móvil)
   const deselectConversation = useCallback(() => {

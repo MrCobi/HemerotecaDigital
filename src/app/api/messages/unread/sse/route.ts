@@ -86,7 +86,7 @@ export const GET = withAuth(async (
   };
 
   // Función para enviar un evento SSE de manera segura
-  const sendEvent = (data: any) => {
+  const sendEvent = (data: { type: string; count: number | null }) => {
     if (!controller) return;
     
     try {

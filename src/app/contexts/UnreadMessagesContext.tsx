@@ -1,8 +1,7 @@
 "use client";
 
-import { createContext, useState, useEffect, useCallback, useRef } from "react";
+import { createContext, useState, useEffect, useCallback, useRef, useContext } from "react";
 import { useSession } from "next-auth/react";
-import { API_ROUTES } from "@/src/config/api-routes";
 
 // Definir la interfaz del contexto
 export interface UnreadMessagesContextType {
@@ -80,3 +79,12 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
     </UnreadMessagesContext.Provider>
   );
 }
+
+// Exportar el hook para usar el contexto
+export const useUnreadMessages = () => {
+  const context = useContext(UnreadMessagesContext);
+  if (!context) {
+    throw new Error('useUnreadMessages debe ser usado dentro de un UnreadMessagesProvider');
+  }
+  return context;
+};

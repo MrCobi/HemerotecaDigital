@@ -1,5 +1,5 @@
 // src/app/messages/hooks/useMessagesState.ts
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { API_ROUTES } from '@/src/config/api-routes';
 import { 
@@ -56,6 +56,9 @@ export function useMessagesState() {
   // Estado para vista móvil
   const [mobileView, setMobileView] = useState(false);
   
+  // Referencia para saber si es la carga inicial
+  const _isInitialLoadRef = useRef(true);
+
   // Función para procesar la respuesta de conversaciones
   const processConvResponse = useCallback(async (conversationsRes: Response): Promise<Conversation[]> => {
     if (!conversationsRes.ok) {
@@ -200,11 +203,13 @@ export function useMessagesState() {
   }, [session?.user?.id]);
 
   // Función para cargar conversaciones
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (isInitialLoad = false) => {
     if (status !== 'authenticated' || !session?.user?.id) return;
 
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       
       // Obtener conversaciones
       const conversationsRes = await fetch(
@@ -316,7 +321,7 @@ export function useMessagesState() {
       // Si no está en la lista actual, intentamos cargarla desde la API
       try {
         // Primero actualizamos la lista completa de conversaciones
-        await fetchConversations();
+        await fetchConversations(false);
         
         // Intentamos encontrar la conversación de nuevo después de la actualización
         const updatedExistingConv = conversations.find(c => c.id === conversationId);
@@ -382,7 +387,7 @@ export function useMessagesState() {
           
           // Intentar una última recarga de conversaciones
           setTimeout(() => {
-            fetchConversations().then(() => {
+            fetchConversations(false).then(() => {
               const delayedExistingConv = conversations.find(c => c.id === conversationId);
               if (delayedExistingConv) {
                 selectConversation(conversationId);
@@ -682,11 +687,11 @@ export function useMessagesState() {
   // Cargar datos iniciales
   useEffect(() => {
     if (status === 'authenticated') {
-      fetchConversations();
+      fetchConversations(true);
       
       // Configurar actualización periódica
       const intervalId = setInterval(() => {
-        fetchConversations();
+        fetchConversations(false);
       }, REFRESH_INTERVAL);
       
       return () => clearInterval(intervalId);
