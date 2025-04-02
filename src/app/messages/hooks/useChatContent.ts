@@ -93,9 +93,8 @@ export function useChatContent(
     }
     
     try {
-      // Obtener la URL base correcta (evitar hardcodear el puerto)
-      const baseUrl = window.location.origin;
-      const response = await fetch(`${baseUrl}/api/messages/${messageId}/read`, {
+      // Usar el nuevo endpoint messages/read/message?messageId=XXX
+      const response = await fetch(`/api/messages/read/message?messageId=${messageId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store'
@@ -108,6 +107,16 @@ export function useChatContent(
         if (conversationId) {
           localStorage.removeItem(`chat_access_error_${conversationId}`);
         }
+        
+        // Actualizar el estado local también
+        setMessages(prevMessages => 
+          prevMessages.map(msg => {
+            if (msg.id === messageId && !msg.read) {
+              return { ...msg, read: true };
+            }
+            return msg;
+          })
+        );
       } else if (response.status === 403) {
         // Si recibimos un 403, significa que el usuario no tiene permisos
         // Guardamos este mensaje para no intentar marcarlo como leído nuevamente
@@ -129,6 +138,67 @@ export function useChatContent(
       console.error('Error al marcar mensaje como leído:', error);
     }
   }, [conversationId, session?.user?.id]);
+
+  // Marcar todas los mensajes no leídos como leídos
+  const markAllMessagesAsRead = useCallback(async () => {
+    if (!conversationId || !session?.user?.id || !messages.length) return;
+    
+    console.log(`[useChatContent] Marcando todos los mensajes como leídos en conversación: ${conversationId}`);
+    
+    try {
+      // Primero intentamos marcar toda la conversación como leída
+      await markConversationAsRead(conversationId);
+      
+      // Además, marcamos individualmente los mensajes no leídos que no son del usuario actual
+      // Esto es importante especialmente para grupos
+      const unreadMessages = messages.filter(
+        msg => !msg.read && msg.senderId !== session.user?.id
+      );
+      
+      if (unreadMessages.length > 0) {
+        console.log(`[useChatContent] Marcando ${unreadMessages.length} mensajes individuales como leídos`);
+        
+        // Marcamos los mensajes en paralelo
+        await Promise.all(
+          unreadMessages.map(msg => 
+            msg.id ? _markMessageAsRead(msg.id) : Promise.resolve()
+          )
+        );
+        
+        // Actualizamos el estado local de los mensajes
+        setMessages(prevMessages => 
+          prevMessages.map(msg => {
+            if (!msg.read && msg.senderId !== session.user?.id) {
+              return { ...msg, read: true };
+            }
+            return msg;
+          })
+        );
+      }
+    } catch (error) {
+      console.error('[useChatContent] Error al marcar mensajes como leídos:', error);
+    }
+  }, [conversationId, session?.user?.id, messages, markConversationAsRead, _markMessageAsRead]);
+
+  // Auto-marcar mensajes como leídos cuando la conversación cambia o se carga
+  useEffect(() => {
+    if (conversationId && messages.length > 0 && !loading) {
+      // Pequeño retraso para asegurar que la UI se haya renderizado
+      const timer = setTimeout(() => {
+        markAllMessagesAsRead();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [conversationId, messages.length, loading, markAllMessagesAsRead]);
+
+  // Marcar mensajes como leídos cuando llegan nuevos
+  const markNewMessageAsRead = useCallback((messageId: string, senderId: string) => {
+    // Solo marcar mensajes de otros usuarios y si estamos en la misma conversación
+    if (senderId !== session?.user?.id && messageId) {
+      _markMessageAsRead(messageId);
+    }
+  }, [_markMessageAsRead, session?.user?.id]);
 
   // Función auxiliar para determinar si se debe actualizar el estado del mensaje
   const shouldUpdateStatus = useCallback((currentStatus?: string, newStatus?: string) => {
@@ -907,6 +977,7 @@ export function useChatContent(
     
     messagesEndRef,
     messagesContainerRef,
-    sendVoiceMessage
+    sendVoiceMessage,
+    markNewMessageAsRead
   };
 }

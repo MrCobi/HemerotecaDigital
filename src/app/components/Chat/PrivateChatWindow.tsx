@@ -300,6 +300,7 @@ const PrivateChatWindow = ({
     
     messagesEndRef,
     messagesContainerRef,
+    markNewMessageAsRead,
   } = useChatContent(conversation, conversationId);
 
   // Estado para controlar la carga de mensajes más antiguos
@@ -556,6 +557,24 @@ const PrivateChatWindow = ({
   React.useEffect(() => {
     setRecordingTime(hookRecordingTime);
   }, [hookRecordingTime]);
+
+  // Efecto para marcar mensajes como leídos cuando se abren o llegan nuevos
+  React.useEffect(() => {
+    // Solo marcar mensajes si hay mensajes y no están en carga
+    if (messages.length > 0 && !loading) {
+      // Marcar todos los mensajes que no son del usuario actual
+      const unreadMessages = messages.filter(
+        msg => !msg.read && msg.senderId !== session?.user?.id && msg.id
+      );
+      
+      // Marcar cada mensaje no leído
+      unreadMessages.forEach(msg => {
+        if (msg.id) {
+          markNewMessageAsRead(msg.id, msg.senderId);
+        }
+      });
+    }
+  }, [messages, loading, session?.user?.id, markNewMessageAsRead]);
 
   // Mostrar un mensaje si no hay conversación seleccionada
   if (!conversationId || !conversation) {

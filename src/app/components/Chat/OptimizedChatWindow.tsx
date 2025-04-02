@@ -309,6 +309,7 @@ const OptimizedChatWindow = ({
     
     messagesEndRef,
     messagesContainerRef,
+    markNewMessageAsRead,
   } = useChatContent(conversation, conversationId);
 
   // Extraer el otherUser del conversation
@@ -435,6 +436,24 @@ const OptimizedChatWindow = ({
   React.useEffect(() => {
     isFirstLoadRef.current = true;
   }, [conversationId]);
+
+  // Efecto para marcar mensajes como leídos cuando llegan nuevos
+  React.useEffect(() => {
+    // Solo marcar mensajes si hay mensajes y no están en carga
+    if (messages.length > 0 && !loading) {
+      // Marcar todos los mensajes que no son del usuario actual
+      const unreadMessages = messages.filter(
+        msg => !msg.read && msg.senderId !== currentUserId && msg.id
+      );
+      
+      // Marcar cada mensaje no leído
+      unreadMessages.forEach(msg => {
+        if (msg.id) {
+          markNewMessageAsRead(msg.id, msg.senderId);
+        }
+      });
+    }
+  }, [messages, loading, currentUserId, markNewMessageAsRead]);
 
   // Iniciar grabación de voz
   const handleStartVoiceRecording = React.useCallback(() => {
