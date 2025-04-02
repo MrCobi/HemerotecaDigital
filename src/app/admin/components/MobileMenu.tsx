@@ -35,7 +35,7 @@ export default function MobileMenu({
       </button>
 
       {isOpen && (
-        <div className="absolute top-16 left-0 right-0 bg-card shadow-lg border-t border-border z-50">
+        <div className="absolute top-0 mt-12 left-0 right-0 bg-card shadow-lg border-t border-border z-50">
           <div className="p-4 border-b border-border flex items-center justify-between">
             <div className="flex items-center">
               <div className="flex-shrink-0 h-10 w-10">

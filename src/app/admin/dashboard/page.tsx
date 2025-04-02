@@ -3,6 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+// Función para formatear números grandes
+const formatNumber = (num: number): string => {
+  if (num >= 10000) {
+    return (num / 1000).toFixed(num % 1000 > 0 ? 1 : 0).replace(/\.0$/, '') + 'k';
+  }
+  return num.toString();
+};
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<{
     userCount: number;
@@ -191,7 +199,7 @@ export default function AdminDashboard() {
                 <div className="flex-shrink-0">
                   {module.icon}
                 </div>
-                <span className="text-2xl font-bold">{module.count}</span>
+                <span className="text-2xl font-bold">{formatNumber(module.count)}</span>
               </div>
               <div className="p-4">
                 <h3 className="text-lg font-medium text-foreground">{module.title}</h3>
