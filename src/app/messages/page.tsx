@@ -750,7 +750,7 @@ export default function MessagesPage() {
               key={selectedConversation}
               _selectedConversation={selectedConversation}
               _selectedConversationData={selectedConversationData}
-              _onBackClick={mobileView ? () => deselectConversation() : () => {}}
+              _onBackClick={() => deselectConversation()}
               _onSettingsClick={
                 selectedConversationData.isGroup ? () => toggleGroupManagementModal() : () => {}
               }

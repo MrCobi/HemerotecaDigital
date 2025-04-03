@@ -624,7 +624,7 @@ const PrivateChatWindow = ({
             variant="ghost" 
             size="icon" 
             onClick={onBackClick}
-            className="mr-1 md:hidden" // Solo visible en móviles
+            className="mr-1" // Siempre visible (como en grupos)
             aria-label="Volver"
           >
             <ArrowLeft className="h-5 w-5 text-blue-600 dark:text-blue-400" />
