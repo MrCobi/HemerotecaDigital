@@ -123,7 +123,7 @@ export default function UserProfilePage() {
         if (mutualResponse.ok) {
           const mutualUsers = await mutualResponse.json();
           // Comprobar si el usuario actual está en la lista de seguidores mutuos
-          setIsMutualFollow(mutualUsers.some((user: any) => user.id === data.id));
+          setIsMutualFollow(mutualUsers.some((user: { id: string }) => user.id === data.id));
         }
         
         setFavorites(data.favorites || []);
@@ -323,7 +323,7 @@ export default function UserProfilePage() {
                               const mutualUsers = await checkMutualStatus.json();
                               
                               // Comprobar si el usuario del perfil está entre los seguidores mutuos
-                              setIsMutualFollow(mutualUsers.some((mutualUser: any) => mutualUser.id === user.id));
+                              setIsMutualFollow(mutualUsers.some((mutualUser: { id: string }) => mutualUser.id === user.id));
                             } else {
                               // Si deja de seguir, ya no hay seguimiento mutuo
                               setIsMutualFollow(false);
@@ -347,7 +347,7 @@ export default function UserProfilePage() {
                               }
                               
                               const mutualUsers = await mutualResponse.json();
-                              const isMutual = mutualUsers.some((mutualUser: any) => mutualUser.id === user.id);
+                              const isMutual = mutualUsers.some((mutualUser: { id: string }) => mutualUser.id === user.id);
                               
                               if (!isMutual) {
                                 alert("Solo puedes enviar mensajes a usuarios que te siguen mutuamente");

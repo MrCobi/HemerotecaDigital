@@ -10,7 +10,6 @@ import {
   Participant,
   GroupCreationState
 } from '../types';
-import { MessageService } from '../services/messageService';
 import { API_ROUTES } from '@/src/config/api-routes';
 
 // Configuración
@@ -272,10 +271,10 @@ export function useMessagesState() {
       setError('No se pudieron cargar las conversaciones');
       setLoading(false);
     }
-  }, [status, session?.user?.id, processConvResponse, processMutualResponse, page, selectedFilter, generalSearchTerm, CONVERSATIONS_PER_PAGE]);
+  }, [status, session?.user?.id, processConvResponse, processMutualResponse, page, selectedFilter, generalSearchTerm]);
 
   // Manejar cambio de filtro
-  const handleFilterChange = useCallback((filter: FilterType) => {
+  const _handleFilterChange = useCallback((filter: FilterType) => {
     console.log(`Hook: Cambiando filtro a ${filter}`);
     setSelectedFilter(filter);
     // La recarga se hará por el efecto cuando cambie selectedFilter

@@ -25,7 +25,6 @@ import MessagesContainer, {
   User as MessageUser,
   ConversationParticipant
 } from "../../components/MessagesContainer";
-import { Separator } from "@/src/app/components/ui/separator";
 
 interface _User {
   id: string;

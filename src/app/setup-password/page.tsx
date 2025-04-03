@@ -3,7 +3,7 @@
 import SetupPasswordForm from './setup-password-form';
 import PasswordProtection from './PasswordProtection';
 import { Metadata } from 'next';
-import Image from 'next/image';
+
 
 export const metadata: Metadata = {
   title: 'Configurar contraseña | Hemeroteca Digital',

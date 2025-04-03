@@ -11,16 +11,7 @@ import MessagesContainer, {
   ConversationParticipant
 } from "../../components/MessagesContainer";
 import { Button } from "@/src/app/components/ui/button";
-import { Separator } from "@/src/app/components/ui/separator";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/src/app/components/ui/pagination";
+
 
 interface Conversation {
   id: string;
@@ -223,7 +214,7 @@ export default function ConversationMessagesPage({ params }: PageProps) {
   }, [conversationId, loadConversation]);
   
   // Función para recargar la conversación cuando sea necesario
-  const refreshConversation = useCallback(() => {
+  const _refreshConversation = useCallback(() => {
     if (conversationId) {
       loadConversation();
     }
