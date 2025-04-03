@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { Suspense } from "react";
 import { MessageBadge } from "@/src/app/components/MessageBadge";
 import { UnreadMessagesProvider } from "@/src/app/contexts/UnreadMessagesContext";
+import PasswordRequired from "@/src/app/components/PasswordRequired";
 
 export default function ClientLayout({
   children,
@@ -17,27 +18,30 @@ export default function ClientLayout({
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
       <UnreadMessagesProvider>
-        <Navbar />
+        {/* El componente PasswordRequired se asegurará de que los usuarios configuren su contraseña */}
+        <PasswordRequired>
+          <Navbar />
 
-        <main className="flex-1 mt-16 sm:mt-16 md:mt-20">
+          <main className="flex-1 mt-16 sm:mt-16 md:mt-20">
 
-          <Suspense
-            fallback={
-              <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="animate-pulse text-blue-600 dark:text-blue-400">Cargando...</div>
-              </div>
-            }
-          >
-            {children}
-          </Suspense>
-        </main>
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center min-h-[60vh]">
+                  <div className="animate-pulse text-blue-600 dark:text-blue-400">Cargando...</div>
+                </div>
+              }
+            >
+              {children}
+            </Suspense>
+          </main>
 
         <footer className="bg-gradient-to-br from-blue-600 to-indigo-700 dark:from-blue-900 dark:to-indigo-950 text-white py-6 sm:py-8 w-full">
 
           <div className="border-blue-400/20 dark:border-blue-800/20 text-center text-sm text-blue-100 px-4">
             <p> 2025 Hemeroteca Digital. Todos los derechos reservados.</p>
           </div>
-        </footer>
+          </footer>
+        </PasswordRequired>
       </UnreadMessagesProvider>
     </div>
   );

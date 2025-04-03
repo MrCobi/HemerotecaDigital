@@ -582,152 +582,6 @@ const TrendsSection = () => {
   );
 };
 
-// Hook no utilizado actualmente - se mantiene por si se necesita en el futuro
-// const useHorizontalScroll = () => {
-//   const scrollRef = useRef<HTMLDivElement>(null);
-//   const [isDragging, setIsDragging] = useState(false);
-//   const [startX, setStartX] = useState(0);
-//   const [scrollLeft, setScrollLeft] = useState(0);
-//   const [momentum, setMomentum] = useState({ x: 0, timestamp: 0 });
-//   const animationRef = useRef<number | null>(null);
-//   const velocityRef = useRef(0);
-//   const lastTimeRef = useRef(0);
-//   const lastPositionRef = useRef(0);
-
-//   // Función para aplicar inercia al scroll
-//   const applyMomentum = () => {
-//     if (!scrollRef.current || Math.abs(velocityRef.current) < 0.5) {
-//       animationRef.current = null;
-//       return;
-//     }
-
-//     // Aplicar fricción para desacelerar gradualmente
-//     velocityRef.current *= 0.95;
-
-//     // Aplicar el desplazamiento basado en la velocidad actual
-//     if (scrollRef.current) {
-//       scrollRef.current.scrollLeft -= velocityRef.current;
-//     }
-
-//     // Continuar la animación
-//     animationRef.current = requestAnimationFrame(applyMomentum);
-//   };
-
-//   const onMouseDown = (e: React.MouseEvent) => {
-//     if (!scrollRef.current) return;
-
-//     // Detener cualquier animación de inercia en curso
-//     if (animationRef.current) {
-//       cancelAnimationFrame(animationRef.current);
-//       animationRef.current = null;
-//     }
-
-//     setIsDragging(true);
-//     setStartX(e.clientX);
-//     setScrollLeft(scrollRef.current.scrollLeft);
-//     lastTimeRef.current = Date.now();
-//     lastPositionRef.current = e.clientX;
-//     velocityRef.current = 0;
-
-//     // Cambiar el cursor durante el arrastre
-//     document.body.style.cursor = "grabbing";
-//   };
-
-//   const onMouseMove = (e: React.MouseEvent) => {
-//     if (!isDragging || !scrollRef.current) return;
-//     e.preventDefault();
-
-//     // Calcular la velocidad del movimiento
-//     const now = Date.now();
-//     const dt = now - lastTimeRef.current;
-//     const dx = e.clientX - lastPositionRef.current;
-
-//     if (dt > 0) {
-//       // Suavizar la velocidad con un factor de amortiguación
-//       velocityRef.current = 0.8 * velocityRef.current + 0.2 * (dx / dt) * 16;
-//     }
-
-//     lastTimeRef.current = now;
-//     lastPositionRef.current = e.clientX;
-
-//     // Aplicar un factor de suavizado para el desplazamiento
-//     const walk = (e.clientX - startX) * 1.2; // Factor reducido para mayor suavidad
-//     scrollRef.current.scrollLeft = scrollLeft - walk;
-//   };
-
-//   const onMouseUp = () => {
-//     setIsDragging(false);
-//     document.body.style.cursor = "";
-
-//     // Iniciar la animación de inercia cuando se suelta el mouse
-//     if (Math.abs(velocityRef.current) > 0.5) {
-//       animationRef.current = requestAnimationFrame(applyMomentum);
-//     }
-//   };
-
-//   const onTouchStart = (e: React.TouchEvent) => {
-//     if (!scrollRef.current) return;
-
-//     if (animationRef.current) {
-//       cancelAnimationFrame(animationRef.current);
-//       animationRef.current = null;
-//     }
-
-//     setIsDragging(true);
-//     setStartX(e.touches[0].clientX);
-//     setScrollLeft(scrollRef.current.scrollLeft);
-//     lastTimeRef.current = Date.now();
-//     lastPositionRef.current = e.touches[0].clientX;
-//     velocityRef.current = 0;
-//   };
-
-//   const onTouchMove = (e: React.TouchEvent) => {
-//     if (!isDragging || !scrollRef.current) return;
-
-//     const now = Date.now();
-//     const dt = now - lastTimeRef.current;
-//     const dx = e.touches[0].clientX - lastPositionRef.current;
-
-//     if (dt > 0) {
-//       velocityRef.current = 0.8 * velocityRef.current + 0.2 * (dx / dt) * 16;
-//     }
-
-//     lastTimeRef.current = now;
-//     lastPositionRef.current = e.touches[0].clientX;
-
-//     const walk = (e.touches[0].clientX - startX) * 1.2;
-//     scrollRef.current.scrollLeft = scrollLeft - walk;
-//   };
-
-//   const onTouchEnd = () => {
-//     setIsDragging(false);
-
-//     if (Math.abs(velocityRef.current) > 0.5) {
-//       animationRef.current = requestAnimationFrame(applyMomentum);
-//     }
-//   };
-
-//   // Limpiar animaciones al desmontar
-//   useEffect(() => {
-//     return () => {
-//       if (animationRef.current) {
-//         cancelAnimationFrame(animationRef.current);
-//       }
-//     };
-//   }, []);
-
-//   return {
-//     scrollRef,
-//     onMouseDown,
-//     onMouseUp,
-//     onMouseMove,
-//     onTouchStart,
-//     onTouchMove,
-//     onTouchEnd,
-//     isDragging,
-//   };
-// };
-
 export default function HomePage() {
   const { data: session } = useSession();
   const router = useRouter();
@@ -1489,11 +1343,12 @@ export default function HomePage() {
 
       <section id="recent-section" className="py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <motion.div
               initial={animationVariants.hidden}
               animate={animationVariants.visible}
               transition={animationTransition}
+              className="lg:col-span-2"
             >
               <Card className="border-blue-100 dark:border-blue-900/30 h-full">
                 <CardHeader className="pb-2">
@@ -1659,6 +1514,7 @@ export default function HomePage() {
               initial={animationVariants.hidden}
               animate={animationVariants.visible}
               transition={animationTransition}
+              className="lg:col-span-1"
             >
               <TrendsSection />
             </motion.div>
@@ -1676,6 +1532,8 @@ const isExternalImageValid = (url: string): boolean => {
     'i-invdn-com.investing.com',
     'investing.com',
     'i-invdn-com',
+    'politico.com',
+    'static.politico.com',
   ];
   
   try {

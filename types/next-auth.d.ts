@@ -9,6 +9,7 @@ declare module "next-auth" {
     username?: string | null;
     createdAt?: Date;
     favoriteSourceIds?: string[];
+    needsPasswordChange?: boolean;
   }
 
   interface Session extends DefaultSession {
@@ -18,6 +19,7 @@ declare module "next-auth" {
       username?: string | null;
       createdAt?: Date;
       favoriteSourceIds?: string[];
+      needsPasswordChange?: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -29,5 +31,7 @@ declare module "next-auth/jwt" {
     username?: string | null;
     createdAt?: Date;
     favoriteSourceIds?: string[];
+    needsPasswordChange?: boolean;
+    emailVerified?: Date | null;
   }
 }

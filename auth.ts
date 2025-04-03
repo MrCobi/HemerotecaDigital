@@ -10,8 +10,44 @@ import { loginSchema } from "@/lib/zod";
 import jwt from "jsonwebtoken";
 import { isProduction } from "@/lib/environment";
 
+// Adaptador personalizado para manejar correctamente emailVerified
+const customAdapter = {
+  ...PrismaAdapter(prisma),
+  createUser: async (data: any) => {
+    // Asegurar que emailVerified esté establecido si viene de un proveedor OAuth
+    if (data.email && !data.emailVerified) {
+      data.emailVerified = new Date();
+    }
+    
+    // Generar una contraseña temporal aleatoria para usuarios OAuth
+    if (!data.password) {
+      // Generar una contraseña temporal compleja
+      const tempPassword = Math.random().toString(36).substring(2, 15) + 
+                           Math.random().toString(36).substring(2, 15);
+      
+      // Hash de la contraseña temporal
+      const bcrypt = require('bcryptjs');
+      data.password = await bcrypt.hash(tempPassword, 10);
+      
+      // Guardar que este usuario necesita establecer una contraseña
+      // Establecer explícitamente a true para evitar valores nulos/indefinidos
+      data.needsPasswordChange = true;
+      console.log("Usuario OAuth creado con needsPasswordChange = true");
+    } else {
+      // En el caso de un registro directo, no necesita cambiar contraseña
+      data.needsPasswordChange = false;
+      console.log("Usuario normal creado con needsPasswordChange = false");
+    }
+    
+    // Llamar al adaptador original
+    return await prisma.user.create({
+      data
+    });
+  },
+};
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma) as any,
+  adapter: customAdapter as any,
   trustHost: true,
   secret: process.env.AUTH_SECRET, // Asegúrate de tener esto en tu .env
   pages: {
@@ -30,8 +66,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         params: {
           prompt: "consent",
           access_type: "offline",
-          response_type: "code"
+          response_type: "code",
+          scope: "openid email profile"
         }
+      },
+      profile(profile) {
+        // Generar username a partir del email o nombre
+        const username = profile.email
+          ? profile.email.split('@')[0] + Math.floor(Math.random() * 1000).toString()
+          : (profile.name || 'user') + Math.floor(Math.random() * 1000).toString();
+        
+        return {
+          id: profile.sub,
+          name: profile.name || profile.given_name + ' ' + profile.family_name,
+          email: profile.email,
+          image: profile.picture,
+          // Agregar campos adicionales que tu modelo User requiere
+          role: "user",
+          emailVerified: new Date(), // Marcar como verificado automáticamente
+          username: username.toLowerCase().replace(/[^a-z0-9]/g, ''), // Username sin caracteres especiales
+        };
       }
     }),
     Credentials({
@@ -163,16 +217,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async signIn({ account, profile, user }) {
-      // Para usuarios que se autentican con Google, marcarlos automáticamente como verificados
+      // Para usuarios que se autentican con Google
       if (account?.provider === "google") {
-        // Si el correo está verificado en Google, lo consideramos verificado en nuestra app
+        // Si el correo está verificado en Google, procedemos con la autenticación
         if (profile?.email_verified) {
-          // Si es la primera vez que el usuario inicia sesión con Google
-          if (user) {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { emailVerified: new Date() }
-            });
+          try {
+            // Si el usuario no existe, NextAuth + PrismaAdapter lo crearán automáticamente
+            if (user && profile?.email) {
+              // Buscar si existe un usuario con este email
+              const existingUser = await prisma.user.findUnique({
+                where: { email: profile.email.toLowerCase() }
+              });
+              
+              // Si el usuario ya existe, asegúrate de que tenga email verificado
+              if (existingUser) {
+                if (!existingUser.emailVerified) {
+                  await prisma.user.update({
+                    where: { id: existingUser.id },
+                    data: { emailVerified: new Date() }
+                  });
+                }
+              }
+              // Si no existe, el adapter se encargará de crearlo
+            }
+          } catch (error) {
+            // Registra el error pero permite continuar la autenticación
+            console.error('Error procesando OAuth de Google:', error);
           }
           return true;
         }
@@ -180,7 +250,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       
       return true; // Para otros providers, seguimos el flujo normal
     },
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, account, trigger, session }) {
       // Actualización inicial cuando el usuario hace login
       if (user) {
         token.id = user.id;
@@ -191,9 +261,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.image = user.image;
         token.createdAt = user.createdAt;
         token.emailVerified = (user as any).emailVerified;
+        
+        // Si tenemos información de la cuenta, guardar el proveedor
+        if (account) {
+          token.provider = account.provider;
+          console.log(`JWT: Usuario logueado con proveedor ${account.provider}`);
+        }
+        
+        // Asegurar que needsPasswordChange siempre tenga un valor booleano
+        // Importante: convertir explícitamente a booleano para evitar nulos/undefined
+        token.needsPasswordChange = (user as any).needsPasswordChange === true;
+        console.log(`JWT: Estableciendo needsPasswordChange = ${token.needsPasswordChange} para ${user.email}`);
+        
         token.favoriteSourceIds = (user as any).favoriteSourceIds;
         token.accessToken = (user as any).accessToken;
         token.bio = (user as any).bio;
+        
+        // Agregar información sobre el estado de la contraseña 
+        // (solo si hay o no contraseña, no su valor)
+        if ((user as any).password) {
+          token.hasPassword = true;
+        } else {
+          token.hasPassword = false;
+        }
       }
 
       // Si se está actualizando la sesión manualmente con el método update()
@@ -202,13 +292,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         
         // Actualizar los campos del token con los datos del nuevo session
         if (session.user) {
+          // Capturar el antiguo valor de needsPasswordChange antes de la actualización
+          const oldNeedsPasswordChange = token.needsPasswordChange;
+          
           Object.assign(token, {
             name: session.user.name,
             username: session.user.username,
             image: session.user.image,
             bio: session.user.bio,
-            // No actualizamos email ni campos sensibles
+            // Actualizar needsPasswordChange si está presente en la actualización
+            ...(session.user.needsPasswordChange !== undefined && {
+              needsPasswordChange: session.user.needsPasswordChange
+            }),
+            // No actualizamos email ni otros campos sensibles
           });
+          
+          // Registrar cambios en needsPasswordChange para debugging
+          if (oldNeedsPasswordChange !== token.needsPasswordChange) {
+            console.log(`JWT: Valor de needsPasswordChange cambiado de ${oldNeedsPasswordChange} a ${token.needsPasswordChange}`);
+          }
         }
       }
       
@@ -228,6 +330,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           bio: token.bio as string | null,
           createdAt: token.createdAt as Date,
           emailVerified: token.emailVerified as Date | null,
+          needsPasswordChange: token.needsPasswordChange as boolean | undefined,
           favoriteSourceIds: token.favoriteSourceIds as string[] | undefined
         },
         accessToken: token.accessToken as string

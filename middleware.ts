@@ -16,6 +16,8 @@ export async function middleware(request: NextRequest) {
     '/auth/verification-pending',
     '/auth/resend-verification',
     '/auth/reset-password',
+    '/api/auth/setup-password',
+    '/setup-password', // Nueva ruta para establecer contraseña
   ];
   
   // Lista de patrones que deberían ser públicos
@@ -45,6 +47,38 @@ export async function middleware(request: NextRequest) {
     const url = new URL('/api/auth/signin', request.url);
     url.searchParams.set('callbackUrl', encodeURI(request.url));
     return NextResponse.redirect(url);
+  }
+  
+  // Verificar si el usuario necesita establecer una contraseña (para usuarios de OAuth)
+  // Log detallado para depuración de todos los campos relevantes
+  console.log('Middleware: Token JWT:', { 
+    needsPasswordChange: token.needsPasswordChange, 
+    provider: token.provider,
+    email: token.email,
+    emailVerified: !!token.emailVerified,
+    path: pathname
+  });
+
+  // Comprobación estricta: solo redirigir si needsPasswordChange es exactamente true
+  if (token.needsPasswordChange === true && pathname !== '/setup-password') {
+    console.log('Middleware: Redirigiendo usuario a setup-password - needsPasswordChange es true');
+    return NextResponse.redirect(new URL('/setup-password', request.url));
+  }
+  
+  // Verificación alternativa basada en OAuth
+  // Esta es una forma alternativa de detectar si el usuario necesita establecer contraseña
+  // en caso de que needsPasswordChange no se haya establecido correctamente
+  if (pathname !== '/setup-password' && 
+      token.provider === 'google' && 
+      token.emailVerified) {
+    // Verificar si es un usuario nuevo de Google que no ha completado el proceso
+    // El campo hasPassword se establece en auth.ts como verificación adicional
+    const needsSetup = token.needsPasswordChange === true || token.hasPassword === false;
+    
+    if (needsSetup) {
+      console.log('Middleware: Redirigiendo usuario a setup-password - Usuario OAuth detectado');
+      return NextResponse.redirect(new URL('/setup-password', request.url));
+    }
   }
   
   // Verificar si el email está verificado para rutas que lo requieran

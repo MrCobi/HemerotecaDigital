@@ -21,6 +21,7 @@ model User {
   bio                 String?
   showActivity        Boolean                   @default(true) @map("show_activity")
   showFavorites       Boolean                   @default(true) @map("show_favorites")
+  needsPasswordChange Boolean                   @default(false) @map("needs_password_change")
   accounts            Account[]
   activityHistory     ActivityHistory[]
   comments            Comment[]
