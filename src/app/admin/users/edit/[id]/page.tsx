@@ -42,6 +42,7 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
     showActivity: true,
     showFavorites: true
   });
+  const [isVerifying, setIsVerifying] = useState(false);
   const [userInfo, setUserInfo] = useState<User | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
@@ -173,6 +174,37 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
 
   const handleToggleChange = (name: string, value: boolean) => {
     setForm({ ...form, [name]: value });
+  };
+  
+  const handleVerifyEmail = async () => {
+    if (!id) return;
+    
+    setIsVerifying(true);
+    try {
+      const res = await fetch(`/api/admin/users/${id}/verify-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      if (res.ok) {
+        // Actualizar el estado local
+        if (userInfo) {
+          setUserInfo({
+            ...userInfo,
+            emailVerified: new Date().toISOString()
+          });
+        }
+        toast.success("Correo electrónico verificado correctamente");
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || "Error al verificar el correo electrónico");
+      }
+    } catch (error) {
+      console.error("Error al verificar correo:", error);
+      toast.error(error instanceof Error ? error.message : "Error al verificar el correo electrónico");
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -526,6 +558,47 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {userInfo && !userInfo.emailVerified && (
+                      <div className="mt-4">
+                        <Label className="mb-2 block">Estado de verificación</Label>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center">
+                            <div className="w-2 h-2 rounded-full mr-2 bg-amber-500"></div>
+                            <span className="text-xs">Correo no verificado</span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleVerifyEmail}
+                            disabled={isVerifying}
+                            className="ml-2 h-8 py-0 px-3"
+                          >
+                            {isVerifying ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                                Verificando...
+                              </>
+                            ) : (
+                              "Verificar ahora"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {userInfo && userInfo.emailVerified && (
+                      <div className="mt-4">
+                        <Label className="mb-2 block">Estado de verificación</Label>
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 rounded-full mr-2 bg-green-500"></div>
+                          <span className="text-xs">Correo verificado</span>
+                          <span className="text-xs ml-2 text-muted-foreground">
+                            {new Date(userInfo.emailVerified).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                   <CardFooter className="flex flex-wrap justify-end gap-3 pt-4 border-t">
                     <Button
