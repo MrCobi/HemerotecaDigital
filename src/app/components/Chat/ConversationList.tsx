@@ -328,7 +328,7 @@ const ConversationList = React.memo(({
     }
     
     return filtered;
-  }, [combinedList, selectedFilter, generalSearchTerm, session.user?.id]);
+  }, [combinedList, selectedFilter, generalSearchTerm]);
 
   return (
     <div className="flex flex-col h-full w-full bg-white dark:bg-gray-800">

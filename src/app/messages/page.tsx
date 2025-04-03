@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/src/app/components/ui/button";
 import { MessageSquarePlus, Users, MessageCircle, Plus } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import _NewMessageModal from "../components/Chat/NewMessageModal";
 import _CreateGroupModal from "../components/Chat/CreateGroupModal";
 import Image from "next/image";
@@ -15,41 +13,13 @@ import MessageContainer from "../components/Chat/MessageContainer";
 import GroupManagementModal from '../components/Chat/GroupManagementModal';
 import ConversationList from '../components/Chat/ConversationList';
 import { MessageService } from "./services/messageService";
-import { FilterType, User, Participant, Conversation } from "./types";
-import { Input } from "@/src/app/components/ui/input";
-import { Avatar } from "@/src/app/components/ui/avatar";
+import { FilterType, User, Participant } from "./types";
 import { useToast } from "@/src/app/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
 import { useConversationUpdates } from "./hooks/useConversationUpdates";
 import { useGroupUpdates } from "./hooks/useGroupUpdates";
 
-// Función para formatear fechas
-const formatDate = (date: string | Date | undefined) => {
-  if (!date) return '';
-  
-  const messageDate = new Date(date);
-  const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  const isToday = messageDate.getDate() === now.getDate() && 
-                   messageDate.getMonth() === now.getMonth() && 
-                   messageDate.getFullYear() === now.getFullYear();
-                   
-  const isYesterday = messageDate.getDate() === yesterday.getDate() && 
-                      messageDate.getMonth() === yesterday.getMonth() && 
-                      messageDate.getFullYear() === yesterday.getFullYear();
-  
-  if (isToday) {
-    return format(messageDate, 'HH:mm', { locale: es });
-  } else if (isYesterday) {
-    return 'Ayer';
-  } else if (now.getFullYear() === messageDate.getFullYear()) {
-    return format(messageDate, 'd MMM', { locale: es });
-  } else {
-    return format(messageDate, 'd MMM yyyy', { locale: es });
-  }
-};
+
 
 // Componente de spinner de carga
 const LoadingSpinner = ({ size = "medium" }: { size?: "small" | "medium" | "large" }) => {
@@ -127,9 +97,7 @@ export default function MessagesPage() {
     showGroupManagementModal,
     toggleGroupManagementModal,
     // Añadir estados y funciones de paginación
-    hasMore,
     loadingMore,
-    loadMoreConversations,
     // Añadir estados y funciones de filtrado
     generalSearchTerm,
     setGeneralSearchTerm,
