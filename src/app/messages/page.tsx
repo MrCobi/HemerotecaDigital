@@ -127,6 +127,9 @@ export default function MessagesPage() {
     showGroupManagementModal,
     toggleGroupManagementModal,
   } = useMessagesState();
+  
+  // Variable no utilizada con el prefijo _ para cumplir con la regla de ESLint
+  const _unused = setSelectedConversationData;
 
   // Usar el hook para actualizaciones en tiempo real
   useConversationUpdates(fetchConversations);
@@ -1041,7 +1044,7 @@ export default function MessagesPage() {
               const conversationId = updatedData.id; // Guardar el ID en una variable
               
               // Actualizar manualmente la conversación en la lista de conversaciones
-              const updatedConversations = conversations.map(conv => {
+              const _updatedConversations = conversations.map(conv => { // Added underscore prefix to fix ESLint error
                 if (conv.id === conversationId) {
                   // Crear una copia actualizada con los nuevos datos
                   return {

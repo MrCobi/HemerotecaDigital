@@ -32,11 +32,13 @@ async function isGroupAdmin(groupId: string, userId: string) {
 export const DELETE = withAuth(async (
   req: Request,
   auth: AuthParams,
-  { params }: { params: { groupId: string; participantId: string } }
+  { params }: { params: Promise<{ groupId: string; participantId: string }> }
 ) => {
   try {
-    const groupId = ensureIdFormat(params.groupId);
-    const { participantId } = params;
+    // En Next.js 15, params es una promesa que debe resolverse primero
+    const resolvedParams = await params;
+    const groupId = ensureIdFormat(resolvedParams.groupId);
+    const participantId = resolvedParams.participantId;
     const currentUserId = auth.user.id;
     
     console.log(`[DEBUG] Eliminando participante: ${participantId} del grupo: ${groupId}`);

@@ -48,8 +48,10 @@ export const PATCH = withAuth(async (
     console.log(`[DEBUG-INICIO] Recibiendo solicitud PATCH para grupo. Params:`, params);
     
     // Asegurar que el ID tiene el formato correcto para la base de datos
-    const groupId = ensureIdFormat(params.groupId);
-    console.log(`[DEBUG] Actualizando grupo con ID formateado: ${groupId}, ID original: ${params.groupId}`);
+    // En Next.js 15, params es una promesa que debe esperarse
+    const resolvedParams = await params;
+    const groupId = ensureIdFormat(resolvedParams.groupId);
+    console.log(`[DEBUG] Actualizando grupo con ID formateado: ${groupId}, ID original: ${resolvedParams.groupId}`);
     
     const userId = auth.user.id;
     console.log(`[DEBUG] Usuario que realiza la solicitud: ${userId}`);
@@ -192,7 +194,8 @@ export const DELETE = withAuth(async (
   { params }: { params: { groupId: string } }
 ) => {
   try {
-    const groupId = ensureIdFormat(params.groupId);
+    const resolvedParams = await params;
+    const groupId = ensureIdFormat(resolvedParams.groupId);
     const userId = auth.user.id;
     
     // Verificar si el usuario es administrador

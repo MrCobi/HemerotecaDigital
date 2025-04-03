@@ -32,11 +32,13 @@ async function isGroupAdmin(groupId: string, userId: string) {
 export const POST = withAuth(async (
   req: Request,
   auth: AuthParams,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) => {
   try {
     const nextReq = req as unknown as NextRequest;
-    const groupId = ensureIdFormat(params.groupId);
+    // En Next.js 15, params es una promesa que debe resolverse primero
+    const resolvedParams = await params;
+    const groupId = ensureIdFormat(resolvedParams.groupId);
     console.log(`[DEBUG] Añadiendo participantes al grupo: ${groupId}`);
     
     const userId = auth.user.id;

@@ -1,6 +1,11 @@
 import { useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 
+// Define a type for group update data
+interface GroupUpdateData {
+  [key: string]: string | number | boolean | object | null;
+}
+
 /**
  * Hook para escuchar actualizaciones de grupo en tiempo real mediante Server-Sent Events (SSE)
  * 
@@ -9,7 +14,7 @@ import { useSession } from 'next-auth/react';
  */
 export function useGroupUpdates(
   groupId: string | null,
-  onUpdate: (updateType: string, data: any) => void
+  onUpdate: (updateType: string, data: GroupUpdateData) => void
 ) {
   const { data: session } = useSession();
   

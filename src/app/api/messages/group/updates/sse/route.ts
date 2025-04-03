@@ -2,11 +2,24 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { withAuth } from "../../../../../../lib/auth-utils";
 
-// Mapa para almacenar eventos pendientes por usuario
-const pendingGroupUpdates: Map<string, Array<{type: string, data: any}>> = new Map();
+// Definir interfaces para los tipos
+interface GroupEventData {
+  [key: string]: string | number | boolean | object | null;
+}
 
-// Función para agregar un evento para un grupo
-export const addGroupUpdateEvent = (groupId: string, eventType: string, eventData: any) => {
+interface SSEEvent {
+  type: string;
+  event: string;
+  data: GroupEventData;
+}
+
+// Mapa para almacenar eventos pendientes por usuario
+const pendingGroupUpdates: Map<string, Array<{type: string, data: GroupEventData}>> = new Map();
+
+/**
+ * Función para agregar un evento para un grupo - solo para uso interno
+ */
+const addGroupUpdateEvent = (groupId: string, eventType: string, eventData: GroupEventData): void => {
   // Convertimos el ID del grupo a formato sin prefijo
   const cleanGroupId = groupId.replace(/^group_/, '');
   
@@ -102,7 +115,7 @@ export const GET = withAuth(async (
   };
 
   // Función para enviar un evento SSE
-  const sendEvent = (data: { type: string; event: string; data: any }) => {
+  const sendEvent = (data: SSEEvent) => {
     if (!controller) return;
     
     try {
@@ -199,7 +212,7 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('Error procesando la solicitud:', error);
     return NextResponse.json(
-      { error: 'Error al procesar la solicitud' },
+      { error: 'Error interno del servidor' },
       { status: 500 }
     );
   }

@@ -18,10 +18,12 @@ function ensureIdFormat(id: string | null | undefined) {
 export const POST = withAuth(async (
   req: Request,
   auth: AuthParams,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) => {
   try {
-    const groupId = ensureIdFormat(params.groupId);
+    // En Next.js 15, params es una promesa que debe resolverse primero
+    const resolvedParams = await params;
+    const groupId = ensureIdFormat(resolvedParams.groupId);
     const userId = auth.user.id;
     
     console.log(`[DEBUG] Usuario ${userId} intentando abandonar grupo: ${groupId}`);
