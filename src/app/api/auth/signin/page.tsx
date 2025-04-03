@@ -25,6 +25,19 @@ function SignInContent() {
           </div>
         </div>
       )}
+      {error === "OAuthAccountNotLinked" && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-amber-100 dark:bg-amber-900/80 border-l-4 border-amber-500 dark:border-amber-700 text-amber-700 dark:text-amber-400 p-4 rounded-md shadow-lg max-w-md w-full mx-auto z-50">
+          <div className="flex">
+            <svg className="h-5 w-5 text-amber-500 dark:text-amber-400 mr-2 flex-shrink-0 mt-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <div className="font-medium mb-1">No se pudo vincular la cuenta</div>
+              <p className="text-sm">Ya existe una cuenta con este email. Inicia sesión con email y contraseña en lugar de usar Google.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
