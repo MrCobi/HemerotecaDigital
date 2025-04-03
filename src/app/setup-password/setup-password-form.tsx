@@ -92,9 +92,9 @@ export default function SetupPasswordForm() {
 
         setSuccess("¡Contraseña configurada correctamente!");
         
-        // Usar un enfoque combinado para limpiar y actualizar la sesión
+        // Usar un enfoque más directo para actualizar la sesión
         try {
-          // 1. Primero, actualizar la sesión local
+          // 1. Actualizar la sesión local primero
           await update({
             ...session,
             user: {
@@ -103,23 +103,20 @@ export default function SetupPasswordForm() {
             }
           });
           
-          console.log("Sesión local actualizada");
+          console.log("Sesión local actualizada correctamente");
           
-          // 2. Mostrar el mensaje de éxito por un momento
+          // 2. Esperar un poco para asegurar que el usuario vea el mensaje de éxito
+          // y para dar tiempo a que la sesión se actualice completamente
           setTimeout(() => {
-            console.log("Redirigiendo a la ruta de limpieza de sesión");
-            
-            // 3. Redirigir a través de nuestra API de limpieza de sesión
-            // Esto forzará la limpieza de cookies y obtendrá una sesión totalmente nueva
-            window.location.href = '/api/auth/clear-session';
-          }, 1000);
+            // 3. Redirigir directamente a home sin pasar por la limpieza de sesión
+            // La sesión ya ha sido actualizada correctamente
+            router.push('/home');
+          }, 1500);
         } catch (updateError) {
           console.error("Error al actualizar la sesión:", updateError);
           
-          // Si hay un error, intentar la limpieza de sesión de todas formas
-          setTimeout(() => {
-            window.location.href = '/api/auth/clear-session';
-          }, 1000);
+          // Si hay un error al actualizar la sesión, mostrar un mensaje adicional
+          setError("Se configuró la contraseña pero hubo un problema al actualizar la sesión. Por favor, intenta iniciar sesión nuevamente.");
         }
         
       } catch (err) {

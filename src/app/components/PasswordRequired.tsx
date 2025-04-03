@@ -10,23 +10,28 @@ export default function PasswordRequired({ children }: { children: React.ReactNo
   const pathname = usePathname();
 
   useEffect(() => {
-    // Log para debugging
-    console.log("Estado actual de la sesión:", session?.user?.needsPasswordChange);
-    
     // Ignorar la verificación si ya estamos en la página de configuración de contraseña
-    if (pathname === "/setup-password") {
+    // o si la sesión aún está cargando
+    if (pathname === "/setup-password" || status === "loading") {
       return;
     }
 
     // Verificar si el usuario necesita configurar una contraseña
-    // Re-activado para nuevos usuarios de Google
     if (
       status === "authenticated" && 
       session?.user && 
       session.user.needsPasswordChange === true
     ) {
-      console.log("Redirigiendo a setup-password desde el componente cliente");
-      router.push("/setup-password");
+      // Prevenir redirecciones múltiples con una bandera local
+      const redirectFlag = sessionStorage.getItem('redirectingToPasswordSetup');
+      if (!redirectFlag) {
+        console.log("Redirigiendo a setup-password");
+        sessionStorage.setItem('redirectingToPasswordSetup', 'true');
+        router.push("/setup-password");
+      }
+    } else if (status === "authenticated") {
+      // Limpiar la bandera si ya no necesita cambiar contraseña
+      sessionStorage.removeItem('redirectingToPasswordSetup');
     }
   }, [session, status, router, pathname]);
 
