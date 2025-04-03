@@ -22,7 +22,7 @@ export default function ClientLayout({
         <PasswordRequired>
           <Navbar />
 
-          <main className="flex-1 mt-16 sm:mt-16 md:mt-20">
+          <main className="flex-1 mt-12 sm:mt-16 md:mt-20">
 
             <Suspense
               fallback={
