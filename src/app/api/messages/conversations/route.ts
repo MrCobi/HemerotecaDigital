@@ -52,7 +52,7 @@ interface _ConversationResponse {
   participantsCount?: number;
 }
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -62,10 +62,44 @@ export async function GET(_request: NextRequest) {
       );
     }
 
-    console.log(`Obteniendo conversaciones para usuario: ${session.user.id}`);
+    // Obtener parámetros de paginación y búsqueda
+    const searchParams = request.nextUrl.searchParams;
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '5');
+    const searchTerm = searchParams.get('search') || '';
+    const filter = searchParams.get('filter') || 'all';
+    
+    const offset = (page - 1) * limit;
+    
+    console.log(`Obteniendo conversaciones para usuario: ${session.user.id}, página: ${page}, límite: ${limit}, filtro: ${filter}, búsqueda: '${searchTerm}'`);
 
-    // 1. Obtener TODAS las conversaciones en las que el usuario es participante
-    const userConversations = await prisma.$queryRaw`
+    // Base de la consulta
+    let whereClause = `WHERE cp.user_id = '${session.user.id}'`;
+    
+    // Añadir filtros por tipo
+    if (filter === 'private') {
+      whereClause += " AND c.is_group = false";
+    } else if (filter === 'group') {
+      whereClause += " AND c.is_group = true";
+    }
+    
+    // Añadir búsqueda si existe un término
+    if (searchTerm) {
+      whereClause += ` AND (
+        (c.is_group = true AND c.name LIKE '%${searchTerm}%')
+        OR
+        (c.is_group = false AND EXISTS (
+          SELECT 1 FROM conversation_participants cp2
+          JOIN users u ON cp2.user_id = u.id
+          WHERE cp2.conversation_id = c.id
+          AND cp2.user_id != '${session.user.id}'
+          AND (u.username LIKE '%${searchTerm}%' OR u.name LIKE '%${searchTerm}%')
+        ))
+      )`;
+    }
+    
+    // 1. Obtener conversaciones paginadas
+    const userConversations = await prisma.$queryRawUnsafe(`
       SELECT 
         c.id as conversationId,
         c.created_at as createdAt, 
@@ -76,14 +110,34 @@ export async function GET(_request: NextRequest) {
         c.image_url as imageUrl
       FROM conversations c
       JOIN conversation_participants cp ON c.id = cp.conversation_id
-      WHERE cp.user_id = ${session.user.id}
-    `;
+      ${whereClause}
+      ORDER BY c.updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
 
-    console.log(`Encontradas ${Array.isArray(userConversations) ? userConversations.length : 0} conversaciones`);
+    // Obtener el total para calcular si hay más páginas
+    const totalCountResult = await prisma.$queryRawUnsafe(`
+      SELECT COUNT(*) as total
+      FROM conversations c
+      JOIN conversation_participants cp ON c.id = cp.conversation_id
+      ${whereClause}
+    `);
+    
+    const totalCount = Array.isArray(totalCountResult) && totalCountResult.length > 0 
+      ? Number(totalCountResult[0].total)
+      : 0;
+    
+    console.log(`Encontradas ${Array.isArray(userConversations) ? userConversations.length : 0} conversaciones de un total de ${totalCount}`);
 
     if (!Array.isArray(userConversations) || userConversations.length === 0) {
       // No hay conversaciones
-      return NextResponse.json([]);
+      return NextResponse.json({
+        conversations: [],
+        page,
+        limit,
+        totalCount,
+        hasMore: false
+      });
     }
 
     // 2. Para cada conversación, obtener al otro participante
@@ -258,7 +312,14 @@ export async function GET(_request: NextRequest) {
       return dateB.getTime() - dateA.getTime();
     });
 
-    return NextResponse.json(sortedConversations);
+    // Devolver con metadatos de paginación
+    return NextResponse.json({
+      conversations: sortedConversations,
+      page,
+      limit,
+      totalCount,
+      hasMore: offset + sortedConversations.length < totalCount
+    });
 
   } catch (error) {
     console.error("Error al obtener conversaciones:", error);

@@ -14,7 +14,7 @@ import { useMessagesState } from "./hooks/useMessagesState";
 import MessageContainer from "../components/Chat/MessageContainer";
 import GroupManagementModal from '../components/Chat/GroupManagementModal';
 import { MessageService } from "./services/messageService";
-import { FilterType, User, Participant, Conversation, CombinedItem } from "./types";
+import { FilterType, User, Participant, Conversation } from "./types";
 import { Input } from "@/src/app/components/ui/input";
 import { Avatar } from "@/src/app/components/ui/avatar";
 import { useToast } from "@/src/app/components/ui/use-toast";
@@ -114,7 +114,6 @@ export default function MessagesPage() {
   const {
     conversations,
     fetchConversations,
-    combinedList,
     mutualFollowers,
     mutualFollowersForGroups,
     loading,
@@ -126,6 +125,14 @@ export default function MessagesPage() {
     setSelectedConversationData,
     showGroupManagementModal,
     toggleGroupManagementModal,
+    // Añadir estados y funciones de paginación
+    hasMore,
+    loadingMore,
+    loadMoreConversations,
+    // Añadir estados y funciones de filtrado
+    generalSearchTerm,
+    setGeneralSearchTerm,
+    filteredConversations
   } = useMessagesState();
   
   // Variable no utilizada con el prefijo _ para cumplir con la regla de ESLint
@@ -222,21 +229,6 @@ export default function MessagesPage() {
   const _searchMutualFollowers = useCallback((_term: string) => {
     // Esta función solo se mantiene por compatibilidad, pero ya no es necesaria
     // Ya que usamos el filtrado directamente en los componentes
-  }, []);
-
-  // Función para filtrar conversaciones basado en el tipo seleccionado
-  const filterConversations = useCallback((items: CombinedItem[], filter: FilterType): CombinedItem[] => {
-    if (filter === 'all') return items;
-    
-    return items.filter(item => {
-      if (!item.isConversation) return false;
-      
-      const conversation = item.data as Conversation;
-      if (filter === 'private') return !conversation.isGroup;
-      if (filter === 'group') return !!conversation.isGroup;
-      
-      return true;
-    });
   }, []);
 
   // Manejar click en nuevo mensaje
@@ -580,7 +572,7 @@ export default function MessagesPage() {
         {(!mobileView || !selectedConversation) && (
           <div className="flex flex-col w-full h-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-700">
             {/* Filtros de conversación únicos */}
-            <div className="flex space-x-1 border-b border-gray-200 p-2 dark:border-gray-700">
+            <div className="flex p-2 space-x-2 border-b border-gray-200 dark:border-gray-700">
               <Button
                 variant={selectedFilter === 'all' ? 'default' : 'outline'}
                 size="sm"
@@ -614,17 +606,28 @@ export default function MessagesPage() {
               <Input
                 placeholder="Buscar..."
                 className="w-full"
+                value={generalSearchTerm}
+                onChange={(e) => setGeneralSearchTerm(e.target.value)}
               />
             </div>
             
             {/* Contenedor de lista de conversaciones */}
-            <div className="flex-1 overflow-y-auto">
+            <div 
+              className="flex-1 overflow-y-auto" 
+              onScroll={(e) => {
+                // Detectar cuando llega al final para cargar más conversaciones
+                const target = e.target as HTMLDivElement;
+                if (!loadingMore && hasMore && target.scrollHeight - target.scrollTop - target.clientHeight < 100) {
+                  loadMoreConversations();
+                }
+              }}
+            >
               {loading ? (
                 <div className="h-full flex items-center justify-center">
                   <LoadingSpinner />
                 </div>
-              ) : combinedList.length > 0 ? (
-                filterConversations(combinedList, selectedFilter).map((item) => {
+              ) : filteredConversations.length > 0 ? (
+                filteredConversations.map((item) => {
                   const isConversation = item.isConversation;
                   const conversation = isConversation ? item.data as Conversation : null;
                   const user = isConversation ? (item.data as Conversation).otherUser : item.data as User;
@@ -727,6 +730,13 @@ export default function MessagesPage() {
                       </Button>
                     )}
                   </div>
+                </div>
+              )}
+              
+              {/* Indicador de carga al cargar más conversaciones */}
+              {loadingMore && (
+                <div className="py-3 text-center">
+                  <LoadingSpinner size="small" />
                 </div>
               )}
             </div>

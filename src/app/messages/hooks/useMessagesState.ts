@@ -13,7 +13,7 @@ import {
 } from '../types';
 
 // Configuración
-const CONVERSATIONS_PER_PAGE = 15;
+const CONVERSATIONS_PER_PAGE = 5;
 const REFRESH_INTERVAL = 60000; // 60 segundos
 
 export function useMessagesState() {
@@ -25,6 +25,11 @@ export function useMessagesState() {
   const [mutualFollowersForGroups, setMutualFollowersForGroups] = useState<User[]>([]);
   const [combinedList, setCombinedList] = useState<CombinedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Estados de paginación
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   
   // Estados de filtrado y búsqueda
   const [generalSearchTerm, setGeneralSearchTerm] = useState("");
@@ -209,32 +214,76 @@ export function useMessagesState() {
     try {
       if (isInitialLoad) {
         setLoading(true);
+        setPage(1);
       }
       
+      // Construir URL con parámetros de paginación, filtrado y búsqueda
+      let url = `/api/messages/conversations?limit=${CONVERSATIONS_PER_PAGE}&page=${isInitialLoad ? 1 : page}`;
+      
+      // Añadir filtro seleccionado
+      if (selectedFilter !== 'all') {
+        url += `&filter=${selectedFilter}`;
+      }
+      
+      // Añadir término de búsqueda si existe
+      if (generalSearchTerm.trim()) {
+        url += `&search=${encodeURIComponent(generalSearchTerm.trim())}`;
+      }
+      
+      console.log(`Solicitando conversaciones: ${url}`);
+      
       // Obtener conversaciones
-      const conversationsRes = await fetch(
-        `/api/messages/conversations?limit=${CONVERSATIONS_PER_PAGE}`
-      );
+      const conversationsRes = await fetch(url);
       
       if (!conversationsRes.ok) {
         throw new Error(`Error al cargar conversaciones: ${conversationsRes.status}`);
       }
       
-      const convData = await processConvResponse(conversationsRes);
-      setConversations(convData);
+      // Extraer datos de la respuesta
+      const responseData = await conversationsRes.json();
+      
+      // La respuesta ahora incluye: conversations, totalCount, hasMore, page, limit
+      const convData = await processConvResponse(
+        new Response(JSON.stringify(responseData.conversations || []))
+      );
+      
+      console.log(`Procesadas ${convData.length} conversaciones válidas, total: ${responseData.totalCount}`);
+      
+      // Si es carga inicial o página 1, reemplazar conversaciones
+      // Si no, agregar a las existentes
+      if (isInitialLoad || page === 1) {
+        setConversations(convData);
+      } else {
+        setConversations(prev => [...prev, ...convData]);
+      }
+      
+      // Determinar si hay más conversaciones para cargar
+      setHasMore(responseData.hasMore || false);
       
       // Obtener seguidores mutuos (para la creación de nuevas conversaciones)
-      const mutualRes = await fetch('/api/relationships/mutual');
-      const mutualData = await processMutualResponse(mutualRes);
-      setMutualFollowers(mutualData);
-      setMutualFollowersForGroups(mutualData);
+      if (isInitialLoad) {
+        const mutualRes = await fetch('/api/relationships/mutual');
+        const mutualData = await processMutualResponse(mutualRes);
+        setMutualFollowers(mutualData);
+        setMutualFollowersForGroups(mutualData);
+      }
       
     } catch (error) {
       console.error("Error loading conversations:", error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [status, session?.user?.id, processConvResponse, processMutualResponse]);
+  }, [status, session?.user?.id, processConvResponse, processMutualResponse, page, selectedFilter, generalSearchTerm]);
+
+  // Función para cargar más conversaciones
+  const loadMoreConversations = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
+    setPage(prevPage => prevPage + 1);
+    fetchConversations(false);
+  }, [fetchConversations, hasMore, loadingMore]);
 
   // Función para cargar una conversación específica
   const fetchConversationById = useCallback(async (conversationId: string) => {
@@ -346,9 +395,8 @@ export function useMessagesState() {
             // Añadir a la lista de conversaciones
             setConversations(prev => {
               // Evitar duplicados
-              if (prev.some(c => c.id === newConv.id)) {
-                return prev.map(c => c.id === newConv.id ? newConv : c);
-              }
+              const exists = prev.some(c => c.id === newConv.id);
+              if (exists) return prev.map(c => c.id === newConv.id ? newConv : c);
               return [newConv, ...prev];
             });
             
@@ -566,36 +614,40 @@ export function useMessagesState() {
       
       if (item.isConversation) {
         const conv = item.data as Conversation;
-        if (selectedFilter === 'private') return !conv.isGroup;
-        if (selectedFilter === 'group') return Boolean(conv.isGroup);
-      }
-      
-      return true;
-    });
-    
-    // Luego filtramos por texto de búsqueda
-    if (generalSearchTerm.trim()) {
-      const searchTermLower = generalSearchTerm.toLowerCase().trim();
-      
-      filtered = filtered.filter(item => {
-        if (item.isConversation) {
-          const conv = item.data as Conversation;
-          
-          // Buscar en todos los campos posibles
-          const groupName = conv.isGroup && conv.name ? conv.name.toLowerCase() : '';
-          const username = conv.otherUser?.username?.toLowerCase() || '';
-          const fullname = conv.otherUser?.name?.toLowerCase() || '';
-          const lastMessageContent = conv.lastMessage?.content?.toLowerCase() || '';
-          
-          return (
-            groupName.includes(searchTermLower) || 
-            username.includes(searchTermLower) || 
-            fullname.includes(searchTermLower) || 
-            lastMessageContent.includes(searchTermLower)
-          );
+        
+        if (selectedFilter === 'private') {
+          // Es privado si no es un grupo y/o si el ID comienza con 'conv_'
+          return !conv.isGroup;
         }
         
-        return false; // Ya no tenemos usuarios en la lista combinada
+        if (selectedFilter === 'group') {
+          // Es grupo si tiene la propiedad isGroup true o si el ID comienza con 'group_'
+          return !!conv.isGroup;
+        }
+      }
+      
+      return false;
+    });
+    
+    // Si hay un término de búsqueda, filtrar por él
+    if (generalSearchTerm && generalSearchTerm.trim() !== '') {
+      const searchTerm = generalSearchTerm.toLowerCase().trim();
+      
+      filtered = filtered.filter(item => {
+        if (!item.isConversation) return false;
+        
+        const conv = item.data as Conversation;
+        
+        // Si es grupo, buscar en el nombre del grupo
+        if (conv.isGroup) {
+          return conv.name?.toLowerCase().includes(searchTerm);
+        }
+        
+        // Si es conversación privada, buscar en el nombre/username del otro usuario
+        return (
+          conv.otherUser?.username?.toLowerCase().includes(searchTerm) || 
+          false
+        );
       });
     }
     
@@ -717,6 +769,12 @@ export function useMessagesState() {
     groupCreationState,
     showGroupManagementModal,
     isGroupAdmin,
+    
+    // Estados de paginación
+    page,
+    hasMore,
+    loadingMore,
+    loadMoreConversations,
     
     // Acciones
     fetchConversations,
