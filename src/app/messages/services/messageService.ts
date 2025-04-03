@@ -8,20 +8,58 @@ import { ConversationData, User } from '../types';
 export class MessageService {
   /**
    * Obtiene la lista de conversaciones del usuario
+   * @param offset Número de conversaciones a omitir
    * @param limit Número máximo de conversaciones a obtener
-   * @returns Lista de conversaciones
+   * @param searchTerm Término de búsqueda para filtrar conversaciones
+   * @param filter Tipo de filtro para las conversaciones (all, private, group)
+   * @param forceRefresh Forzar recarga del caché
+   * @returns Lista de conversaciones y indicador de si hay más
    */
-  static async fetchConversations(limit = 15): Promise<ConversationData[]> {
+  static async fetchConversations(
+    offset: number = 0,
+    limit: number = 20,
+    searchTerm: string = '',
+    filter: 'all' | 'private' | 'group' = 'all',
+    forceRefresh: boolean = false
+  ): Promise<{ conversations: ConversationData[]; hasMore: boolean; page: number; limit: number; totalCount: number }> {
     try {
-      const response = await fetch(
-        `/api/messages/conversations?limit=${limit}`
-      );
+      // Construir los parámetros de la petición
+      const params = new URLSearchParams({
+        offset: offset.toString(),
+        limit: limit.toString(),
+        filter: filter, // Asegurar que el filtro siempre está incluido
+        page: '1' // Incluir page para compatibilidad con el backend
+      });
+
+      // Añadir término de búsqueda si existe
+      if (searchTerm && searchTerm.trim() !== '') {
+        params.append('search', searchTerm.trim());
+      }
+
+      // Forzar recarga del caché si se solicita
+      if (forceRefresh) {
+        params.append('timestamp', Date.now().toString());
+      }
+
+      console.log(`Fetching conversations with filter: ${filter}, URL: /api/messages/conversations?${params.toString()}`);
+      
+      const response = await fetch(`/api/messages/conversations?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!response.ok) {
+        // Manejar errores de respuesta
+        if (response.status === 401) {
+          throw new Error('No autorizado para ver las conversaciones');
+        }
         throw new Error(`Error al cargar conversaciones: ${response.status}`);
       }
-      
-      return await response.json();
+
+      const data = await response.json();
+      return data;
     } catch (_e) {
       console.error('Error fetching conversations:', _e);
       throw _e;
@@ -40,7 +78,7 @@ export class MessageService {
       const allConversations = await this.fetchConversations();
       
       // Buscar la conversación por ID
-      const conversation = allConversations.find(conv => conv.id === conversationId);
+      const conversation = allConversations.conversations.find(conv => conv.id === conversationId);
       
       if (!conversation) {
         throw new Error(`Conversación no encontrada: ${conversationId}`);

@@ -1,16 +1,17 @@
 // src/app/messages/hooks/useMessagesState.ts
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSession } from 'next-auth/react';
-import { API_ROUTES } from '@/src/config/api-routes';
 import { 
   User, 
-  Conversation, 
-  ConversationData, 
+  Conversation,
+  ConversationData,
   CombinedItem,
-  GroupCreationState,
   FilterType,
-  Participant
+  Participant,
+  GroupCreationState
 } from '../types';
+import { MessageService } from '../services/messageService';
+import { API_ROUTES } from '@/src/config/api-routes';
 
 // Configuración
 const CONVERSATIONS_PER_PAGE = 5;
@@ -25,6 +26,7 @@ export function useMessagesState() {
   const [mutualFollowersForGroups, setMutualFollowersForGroups] = useState<User[]>([]);
   const [combinedList, setCombinedList] = useState<CombinedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Estados de paginación
   const [page, setPage] = useState(1);
@@ -208,73 +210,82 @@ export function useMessagesState() {
   }, [session?.user?.id]);
 
   // Función para cargar conversaciones
-  const fetchConversations = useCallback(async (isInitialLoad = false) => {
+  const fetchConversations = useCallback(async (forceRefresh = false) => {
     if (status !== 'authenticated' || !session?.user?.id) return;
 
     try {
-      if (isInitialLoad) {
+      if (forceRefresh) {
         setLoading(true);
         setPage(1);
       }
       
-      // Construir URL con parámetros de paginación, filtrado y búsqueda
-      let url = `/api/messages/conversations?limit=${CONVERSATIONS_PER_PAGE}&page=${isInitialLoad ? 1 : page}`;
-      
-      // Añadir filtro seleccionado
-      if (selectedFilter !== 'all') {
-        url += `&filter=${selectedFilter}`;
-      }
+      // Construir URL con los parámetros necesarios, asegurando que filter siempre está incluido
+      const params = new URLSearchParams({
+        limit: CONVERSATIONS_PER_PAGE.toString(),
+        page: forceRefresh ? '1' : page.toString(),
+        filter: selectedFilter // Incluir el filtro seleccionado siempre
+      });
       
       // Añadir término de búsqueda si existe
       if (generalSearchTerm.trim()) {
-        url += `&search=${encodeURIComponent(generalSearchTerm.trim())}`;
+        params.append('search', encodeURIComponent(generalSearchTerm.trim()));
       }
       
+      const url = `/api/messages/conversations?${params.toString()}`;
       console.log(`Solicitando conversaciones: ${url}`);
       
       // Obtener conversaciones
-      const conversationsRes = await fetch(url);
+      const response = await fetch(url);
       
-      if (!conversationsRes.ok) {
-        throw new Error(`Error al cargar conversaciones: ${conversationsRes.status}`);
+      if (!response.ok) {
+        throw new Error(`Error al cargar conversaciones: ${response.status}`);
       }
       
-      // Extraer datos de la respuesta
-      const responseData = await conversationsRes.json();
+      const data = await response.json();
+      console.log(`Recibidas ${data.conversations.length} conversaciones con filtro: ${selectedFilter}`);
       
-      // La respuesta ahora incluye: conversations, totalCount, hasMore, page, limit
-      const convData = await processConvResponse(
-        new Response(JSON.stringify(responseData.conversations || []))
+      // Procesar las conversaciones de forma síncrona
+      const conversationsData = data.conversations || [];
+      const processedConversations = await processConvResponse(
+        new Response(JSON.stringify(conversationsData))
       );
       
-      console.log(`Procesadas ${convData.length} conversaciones válidas, total: ${responseData.totalCount}`);
-      
       // Si es carga inicial o página 1, reemplazar conversaciones
-      // Si no, agregar a las existentes
-      if (isInitialLoad || page === 1) {
-        setConversations(convData);
+      if (forceRefresh || page === 1) {
+        setConversations(processedConversations);
       } else {
-        setConversations(prev => [...prev, ...convData]);
+        setConversations(prev => [...prev, ...processedConversations]);
       }
       
-      // Determinar si hay más conversaciones para cargar
-      setHasMore(responseData.hasMore || false);
+      setHasMore(data.hasMore || false);
       
-      // Obtener seguidores mutuos (para la creación de nuevas conversaciones)
-      if (isInitialLoad) {
+      // Obtener seguidores mutuos
+      if (forceRefresh) {
         const mutualRes = await fetch('/api/relationships/mutual');
         const mutualData = await processMutualResponse(mutualRes);
         setMutualFollowers(mutualData);
         setMutualFollowersForGroups(mutualData);
+        setLoading(false);
       }
-      
     } catch (error) {
-      console.error("Error loading conversations:", error);
-    } finally {
+      console.error('Error al cargar conversaciones:', error);
+      setError('No se pudieron cargar las conversaciones');
       setLoading(false);
-      setLoadingMore(false);
     }
-  }, [status, session?.user?.id, processConvResponse, processMutualResponse, page, selectedFilter, generalSearchTerm]);
+  }, [status, session?.user?.id, processConvResponse, processMutualResponse, page, selectedFilter, generalSearchTerm, CONVERSATIONS_PER_PAGE]);
+
+  // Manejar cambio de filtro
+  const handleFilterChange = useCallback((filter: FilterType) => {
+    console.log(`Hook: Cambiando filtro a ${filter}`);
+    setSelectedFilter(filter);
+    // La recarga se hará por el efecto cuando cambie selectedFilter
+  }, []);
+
+  // Efecto para cargar conversaciones cuando cambia el filtro
+  useEffect(() => {
+    console.log(`Filtro seleccionado cambiado a: ${selectedFilter}, recargando...`);
+    fetchConversations(true);
+  }, [fetchConversations, selectedFilter]);
 
   // Función para cargar más conversaciones
   const loadMoreConversations = useCallback(() => {
@@ -608,51 +619,70 @@ export function useMessagesState() {
 
   // Filtrado de conversaciones
   const filteredConversations = useMemo(() => {
-    // Primero filtramos por tipo (todo, privado, grupo)
-    let filtered = combinedList.filter(item => {
+    let filtered = combinedList;
+    
+    // Filtro por tipo
+    filtered = filtered.filter(item => {
       if (selectedFilter === 'all') return true;
       
       if (item.isConversation) {
         const conv = item.data as Conversation;
         
-        if (selectedFilter === 'private') {
-          // Es privado si no es un grupo y/o si el ID comienza con 'conv_'
-          return !conv.isGroup;
-        }
+        // Filtro para grupos
+        if (selectedFilter === 'group') return conv.isGroup === true;
         
-        if (selectedFilter === 'group') {
-          // Es grupo si tiene la propiedad isGroup true o si el ID comienza con 'group_'
-          return !!conv.isGroup;
+        // Filtro para privados (chats 1:1 y grupos privados donde el usuario es miembro)
+        if (selectedFilter === 'private') {
+          // Chats 1:1
+          if (conv.isGroup !== true) return true;
+          
+          // Grupos privados donde el usuario es miembro
+          if (!conv.participants || !session?.user?.id) return false;
+          return conv.participants.some(p => p.userId === session.user?.id);
         }
+      } else {
+        // Usuarios solo se muestran en filtro privado
+        return selectedFilter === 'private';
       }
       
       return false;
     });
     
-    // Si hay un término de búsqueda, filtrar por él
-    if (generalSearchTerm && generalSearchTerm.trim() !== '') {
+    // Filtro por búsqueda
+    if (generalSearchTerm.trim()) {
       const searchTerm = generalSearchTerm.toLowerCase().trim();
       
       filtered = filtered.filter(item => {
-        if (!item.isConversation) return false;
-        
-        const conv = item.data as Conversation;
-        
-        // Si es grupo, buscar en el nombre del grupo
-        if (conv.isGroup) {
-          return conv.name?.toLowerCase().includes(searchTerm);
+        if (item.isConversation) {
+          const conv = item.data as Conversation;
+          
+          if (conv.isGroup) {
+            // Búsqueda en grupos
+            return (conv.name || '').toLowerCase().includes(searchTerm);
+          } else {
+            // Búsqueda en conversaciones 1:1
+            const otherUser = conv.otherUser;
+            const lastMessageContent = (conv.lastMessage?.content || '').toLowerCase();
+            
+            return (
+              (otherUser?.username || '').toLowerCase().includes(searchTerm) ||
+              (otherUser?.name || '').toLowerCase().includes(searchTerm) ||
+              lastMessageContent.includes(searchTerm)
+            );
+          }
+        } else {
+          // Búsqueda en usuarios
+          const user = item.data as User;
+          return (
+            (user.username || '').toLowerCase().includes(searchTerm) ||
+            (user.name || '').toLowerCase().includes(searchTerm)
+          );
         }
-        
-        // Si es conversación privada, buscar en el nombre/username del otro usuario
-        return (
-          conv.otherUser?.username?.toLowerCase().includes(searchTerm) || 
-          false
-        );
       });
     }
     
     return filtered;
-  }, [combinedList, selectedFilter, generalSearchTerm]);
+  }, [combinedList, selectedFilter, generalSearchTerm, session?.user?.id]);
 
   // Actualizar tamaño de pantalla
   useEffect(() => {
@@ -758,6 +788,7 @@ export function useMessagesState() {
     combinedList,
     filteredConversations,
     loading,
+    error,
     generalSearchTerm,
     selectedFilter,
     selectedConversation,

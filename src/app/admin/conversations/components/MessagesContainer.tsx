@@ -176,12 +176,12 @@ export default function MessagesContainer({
   const renderMessageContent = (message: Message) => {
     switch (message.messageType) {
       case "text":
-        return <p className="text-sm whitespace-pre-wrap overflow-hidden break-words">{message.content}</p>;
+        return <p className="text-sm whitespace-pre-wrap break-words" style={{ wordBreak: 'break-all', maxWidth: '100%' }}>{message.content}</p>;
       
       case "image":
         return (
           <div>
-            {message.content && <p className="text-sm mb-2">{message.content}</p>}
+            {message.content && <p className="text-sm mb-2 whitespace-pre-wrap break-words" style={{ wordBreak: 'break-all', maxWidth: '100%' }}>{message.content}</p>}
             <div className="relative rounded-lg overflow-hidden bg-gray-100 mt-1 max-w-xs">
               {message.mediaUrl && message.mediaUrl.includes('cloudinary') ? (
                 // Extracción directa de la última parte de la URL (después de la última /)
@@ -216,7 +216,7 @@ export default function MessagesContainer({
       case "file":
         return (
           <div>
-            {message.content && <p className="text-sm mb-2">{message.content}</p>}
+            {message.content && <p className="text-sm mb-2 whitespace-pre-wrap break-words" style={{ wordBreak: 'break-all', maxWidth: '100%' }}>{message.content}</p>}
             <a 
               href={message.mediaUrl || "#"} 
               target="_blank" 
@@ -238,7 +238,7 @@ export default function MessagesContainer({
       case "audio":
         return (
           <div>
-            {message.content && <p className="text-sm mb-2">{message.content}</p>}
+            {message.content && <p className="text-sm mb-2 whitespace-pre-wrap break-words" style={{ wordBreak: 'break-all', maxWidth: '100%' }}>{message.content}</p>}
             <div className="flex items-center p-3 rounded-md bg-gray-100 dark:bg-gray-800 mt-1 max-w-xs">
               <Mic className="h-6 w-6 text-blue-500 mr-2" />
               <div className="w-full">
@@ -260,7 +260,7 @@ export default function MessagesContainer({
         );
       
       default:
-        return <p className="text-sm">{message.content || "[Contenido no disponible]"}</p>;
+        return <p className="text-sm whitespace-pre-wrap break-words" style={{ wordBreak: 'break-all', maxWidth: '100%' }}>{message.content || "[Contenido no disponible]"}</p>;
     }
   };
 
@@ -269,19 +269,20 @@ export default function MessagesContainer({
       {sortedMessages.length === 0 ? (
         <p className="text-center text-muted-foreground">No hay mensajes para mostrar</p>
       ) : (
-        sortedMessages.map((message) => {
+        <div className="space-y-3 sm:space-y-6 max-w-full overflow-hidden" style={{ wordWrap: 'break-word', wordBreak: 'break-word' }}>
+          {sortedMessages.map((message) => {
           const date = new Date(message.createdAt);
           const formattedDate = format(date, "dd/MM/yyyy HH:mm");
           const timeAgo = formatDistanceToNow(date, { locale: es, addSuffix: true });
           
           return (
-            <div key={message.id} className="flex items-start group">
+            <div key={message.id} className="flex items-start group max-w-full">
               <div className="mr-3">
                 <Link href={`/admin/users/view/${message.sender.id}`}>
                   {renderAvatar(message.sender)}
                 </Link>
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 max-w-[calc(100%-3rem)]" style={{ overflowWrap: 'break-word', wordBreak: 'break-all' }}>
                 <div className="flex flex-wrap items-center gap-x-2 mb-1">
                   <Link 
                     href={`/admin/users/view/${message.sender.id}`}
@@ -341,7 +342,7 @@ export default function MessagesContainer({
                   </AlertDialog>
                 </div>
                 
-                <div className="relative rounded-lg bg-gray-50 dark:bg-gray-900 p-3 mb-1">
+                <div className="relative rounded-lg bg-gray-50 dark:bg-gray-900 p-3 mb-1" style={{ wordBreak: 'break-all', overflowWrap: 'break-word', maxWidth: '100%' }}>
                   {renderMessageContent(message)}
                 </div>
                 
@@ -351,7 +352,8 @@ export default function MessagesContainer({
               </div>
             </div>
           );
-        })
+        })}
+        </div>
       )}
     </div>
   );

@@ -76,6 +76,7 @@ export default function UserProfilePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isMutualFollow, setIsMutualFollow] = useState(false);
 
   // Verificación de autenticación
   useEffect(() => {
@@ -116,6 +117,15 @@ export default function UserProfilePage() {
         );
         const followStatus = await followStatusResponse.json();
         setIsFollowing(followStatus[data.id] || false);
+        
+        // Verificar si hay seguimiento mutuo
+        const mutualResponse = await fetch('/api/relationships/mutual');
+        if (mutualResponse.ok) {
+          const mutualUsers = await mutualResponse.json();
+          // Comprobar si el usuario actual está en la lista de seguidores mutuos
+          setIsMutualFollow(mutualUsers.some((user: any) => user.id === data.id));
+        }
+        
         setFavorites(data.favorites || []);
         setActivity(data.activity || []);
         setPrivacy(
@@ -284,7 +294,7 @@ export default function UserProfilePage() {
                       <FollowButton
                         targetUserId={user.id}
                         isFollowing={isFollowing}
-                        onSuccess={(newStatus, serverFollowerCount) => {
+                        onSuccess={async (newStatus, serverFollowerCount) => {
                           setIsFollowing(newStatus);
                           setUserData((prev) => {
                             if (!prev) return prev;
@@ -301,44 +311,81 @@ export default function UserProfilePage() {
                               },
                             };
                           });
+                          
+                          // Actualizar estado de seguimiento mutuo al cambiar estado de follow
+                          try {
+                            // Si lo sigue, comprueba si el otro usuario también le sigue (para activar seguimiento mutuo)
+                            if (newStatus) {
+                              // Verificar si el otro usuario ya me seguía
+                              // El endpoint espera que el usuario actual (session) sea el follower
+                              // y queremos comprobar si el usuario del perfil (user) nos sigue
+                              const checkMutualStatus = await fetch(`/api/relationships/mutual`);
+                              const mutualUsers = await checkMutualStatus.json();
+                              
+                              // Comprobar si el usuario del perfil está entre los seguidores mutuos
+                              setIsMutualFollow(mutualUsers.some((mutualUser: any) => mutualUser.id === user.id));
+                            } else {
+                              // Si deja de seguir, ya no hay seguimiento mutuo
+                              setIsMutualFollow(false);
+                            }
+                          } catch (error) {
+                            console.error("Error al comprobar estado de seguimiento mutuo:", error);
+                          }
                         }}
                       />
                       
-                      {/* Botón de Enviar Mensaje */}
-                      <Button
-                        onClick={async () => {
-                          // Llamar a la API para iniciar o recuperar una conversación
-                          try {
-                            const createConvRes = await fetch('/api/messages/conversations', {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json'
-                              },
-                              body: JSON.stringify({
-                                receiverId: user.id
-                              })
-                            });
-                            
-                            if (!createConvRes.ok) {
-                              const errorData = await createConvRes.json();
-                              throw new Error(errorData.error || "Error al iniciar conversación");
+                      {/* Botón de Enviar Mensaje - Solo visible si hay seguimiento mutuo */}
+                      {isMutualFollow && (
+                        <Button
+                          onClick={async () => {
+                            // Verificar nuevamente si hay seguimiento mutuo antes de crear la conversación
+                            try {
+                              // Primero verificamos si hay seguimiento mutuo
+                              const mutualResponse = await fetch('/api/relationships/mutual');
+                              if (!mutualResponse.ok) {
+                                throw new Error("Error al verificar seguimiento mutuo");
+                              }
+                              
+                              const mutualUsers = await mutualResponse.json();
+                              const isMutual = mutualUsers.some((mutualUser: any) => mutualUser.id === user.id);
+                              
+                              if (!isMutual) {
+                                alert("Solo puedes enviar mensajes a usuarios que te siguen mutuamente");
+                                return;
+                              }
+                              
+                              // Si hay seguimiento mutuo, procedemos a crear la conversación
+                              const createConvRes = await fetch('/api/messages/conversations', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                  receiverId: user.id
+                                })
+                              });
+                              
+                              if (!createConvRes.ok) {
+                                const errorData = await createConvRes.json();
+                                throw new Error(errorData.error || "Error al iniciar conversación");
+                              }
+                              
+                              const convData = await createConvRes.json();
+                              console.log('Conversación creada o recuperada:', convData);
+                              
+                              // Redirigir a la página de mensajes con el ID de conversación
+                              router.push(`/messages?convId=${convData.id}`);
+                            } catch (error) {
+                              console.error("Error al crear conversación:", error);
+                              alert("Ha ocurrido un error al iniciar la conversación");
                             }
-                            
-                            const convData = await createConvRes.json();
-                            console.log('Conversación creada o recuperada:', convData);
-                            
-                            // Redirigir a la página de mensajes con el ID de conversación
-                            router.push(`/messages?convId=${convData.id}`);
-                          } catch (error) {
-                            console.error("Error al crear conversación:", error);
-                            alert("Ha ocurrido un error al iniciar la conversación");
-                          }
-                        }}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-all duration-200 ease-in-out transform hover:-translate-y-0.5"
-                      >
-                        <MessageSquare className="h-5 w-5" />
-                        <span>Enviar mensaje</span>
-                      </Button>
+                          }}
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-all duration-200 ease-in-out transform hover:-translate-y-0.5"
+                        >
+                          <MessageSquare className="h-5 w-5" />
+                          <span>Enviar mensaje</span>
+                        </Button>
+                      )}
                     </div>
                   )}
                   {/* Stats Grid */}

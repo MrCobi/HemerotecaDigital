@@ -50,6 +50,13 @@ interface _ConversationResponse {
     };
   }[];
   participantsCount?: number;
+  settings?: {
+    isPrivate: boolean;
+    onlyAdminsCanInvite: boolean;
+    onlyAdminsCanMessage: boolean;
+    onlyAdminsCanEdit: boolean;
+    maxParticipants: number;
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -64,39 +71,52 @@ export async function GET(request: NextRequest) {
 
     // Obtener parámetros de paginación y búsqueda
     const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '5');
     const searchTerm = searchParams.get('search') || '';
+    
+    // Soportar tanto el formato page/limit como offset/limit
+    const limitParam = parseInt(searchParams.get('limit') || '20');
+    const page = parseInt(searchParams.get('page') || '1');
+    const offsetParam = parseInt(searchParams.get('offset') || '0');
+    
+    // Calcular el offset real (priorizar offset si está presente, de lo contrario usar page)
+    const offset = searchParams.has('offset') ? offsetParam : (page - 1) * limitParam;
+    const limit = limitParam;
+    
+    // Obtener el filtro (all, private, group)
     const filter = searchParams.get('filter') || 'all';
     
-    const offset = (page - 1) * limit;
-    
-    console.log(`Obteniendo conversaciones para usuario: ${session.user.id}, página: ${page}, límite: ${limit}, filtro: ${filter}, búsqueda: '${searchTerm}'`);
+    console.log(`API Request - User: ${session.user.id}, Filter: ${filter}, Search: '${searchTerm}', Limit: ${limit}, Page: ${page}, Offset: ${offset}`);
 
-    // Base de la consulta
+    // Construir la cláusula WHERE según el filtro seleccionado
     let whereClause = `WHERE cp.user_id = '${session.user.id}'`;
     
-    // Añadir filtros por tipo
+    // Aplicar filtro según el tipo seleccionado
     if (filter === 'private') {
-      whereClause += " AND c.is_group = false";
+      console.log("Aplicando filtro PRIVADO: is_group = 0");
+      whereClause += ` AND c.is_group = 0`;
     } else if (filter === 'group') {
-      whereClause += " AND c.is_group = true";
+      console.log("Aplicando filtro GRUPO: is_group = 1");
+      whereClause += ` AND c.is_group = 1`;
+    } else {
+      console.log("Sin filtro específico (all): mostrando todas las conversaciones");
     }
     
-    // Añadir búsqueda si existe un término
+    // Aplicar búsqueda si hay término
     if (searchTerm) {
+      // Buscar por nombre en grupos o por nombre de usuario en conversaciones 1:1
       whereClause += ` AND (
-        (c.is_group = true AND c.name LIKE '%${searchTerm}%')
-        OR
-        (c.is_group = false AND EXISTS (
-          SELECT 1 FROM conversation_participants cp2
-          JOIN users u ON cp2.user_id = u.id
-          WHERE cp2.conversation_id = c.id
-          AND cp2.user_id != '${session.user.id}'
-          AND (u.username LIKE '%${searchTerm}%' OR u.name LIKE '%${searchTerm}%')
-        ))
+        c.name LIKE '%${searchTerm}%' OR 
+        EXISTS (
+          SELECT 1 FROM users u 
+          JOIN conversation_participants cp2 ON u.id = cp2.user_id 
+          WHERE cp2.conversation_id = c.id 
+          AND cp2.user_id != '${session.user.id}' 
+          AND (u.name LIKE '%${searchTerm}%' OR u.username LIKE '%${searchTerm}%')
+        )
       )`;
     }
+    
+    console.log(`Ejecutando consulta con WHERE: ${whereClause}`);
     
     // 1. Obtener conversaciones paginadas
     const userConversations = await prisma.$queryRawUnsafe(`
@@ -107,9 +127,15 @@ export async function GET(request: NextRequest) {
         c.is_group as isGroup,
         c.name as name,
         c.description as description,
-        c.image_url as imageUrl
+        c.image_url as imageUrl,
+        gs.is_private as isPrivate,
+        gs.only_admins_can_invite as onlyAdminsCanInvite,
+        gs.only_admins_can_message as onlyAdminsCanMessage,
+        gs.only_admins_can_edit as onlyAdminsCanEdit,
+        gs.max_participants as maxParticipants
       FROM conversations c
       JOIN conversation_participants cp ON c.id = cp.conversation_id
+      LEFT JOIN group_settings gs ON c.id = gs.conversation_id
       ${whereClause}
       ORDER BY c.updated_at DESC
       LIMIT ${limit} OFFSET ${offset}
@@ -150,6 +176,11 @@ export async function GET(request: NextRequest) {
         updatedAt?: Date;
         created_at?: Date;
         updated_at?: Date;
+        isPrivate?: boolean;
+        onlyAdminsCanInvite?: boolean;
+        onlyAdminsCanMessage?: boolean;
+        onlyAdminsCanEdit?: boolean;
+        maxParticipants?: number;
       }[]).map(async (conv) => {
         try {
           // Determinar si es un grupo basado en el ID
@@ -217,7 +248,14 @@ export async function GET(request: NextRequest) {
               } : null,
               unreadCount,
               createdAt: conv.createdAt,
-              updatedAt: conv.updatedAt
+              updatedAt: conv.updatedAt,
+              settings: {
+                isPrivate: conv.isPrivate,
+                onlyAdminsCanInvite: conv.onlyAdminsCanInvite,
+                onlyAdminsCanMessage: conv.onlyAdminsCanMessage,
+                onlyAdminsCanEdit: conv.onlyAdminsCanEdit,
+                maxParticipants: conv.maxParticipants
+              }
             };
             
             console.log(`[DEBUG] Devolviendo grupo formateado:`, JSON.stringify({

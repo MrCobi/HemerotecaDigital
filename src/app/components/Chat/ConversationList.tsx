@@ -36,6 +36,7 @@ interface ConversationListProps {
   };
   showHeader?: boolean;
   showFilters?: boolean;
+  showSearchInput?: boolean;
 }
 
 interface ConversationItemProps {
@@ -249,25 +250,44 @@ const ConversationList = React.memo(({
   onSearchChange,
   session,
   showHeader = true,
-  showFilters = true
+  showFilters = true,
+  showSearchInput = true
 }: ConversationListProps) => {
   
   // Filtrar las conversaciones según los criterios seleccionados
   const filteredConversations = useMemo(() => {
     // Primero filtramos por tipo (todo, privado, grupo)
     let filtered = combinedList.filter(item => {
+      // Para filtro "todos" - mostrar todo sin filtrar
       if (selectedFilter === 'all') return true;
       
       if (item.isConversation) {
         const conv = item.data as Conversation;
-        if (selectedFilter === 'private') return !conv.isGroup;
-        if (selectedFilter === 'group') return Boolean(conv.isGroup);
+        
+        // Para filtro de grupos - mostrar sólo grupos
+        if (selectedFilter === 'group') {
+          return conv.isGroup === true;
+        }
+        
+        // Para filtro de privados - mostrar chats 1:1 y grupos privados donde el usuario es miembro
+        if (selectedFilter === 'private') {
+          // Conversaciones directas 1:1 (no son grupos)
+          if (conv.isGroup !== true) return true;
+          
+          // Si no estamos en una conversación de grupo o falta el ID del usuario, excluir
+          if (!conv.participants || !session.user?.id) return false;
+          
+          // Verificar si el usuario es miembro del grupo
+          const isUserMember = conv.participants.some(p => p.userId === session.user?.id);
+          
+          return isUserMember;
+        }
       } else {
-        // Si no es una conversación (es un usuario)
-        return selectedFilter === 'private'; // Los usuarios solo aparecen en modo privado
+        // Si es un usuario (no conversación), solo se muestra en filtro 'private'
+        return selectedFilter === 'private';
       }
       
-      return true;
+      return false;
     });
     
     // Luego filtramos por texto de búsqueda con criterios específicos según el tipo
@@ -316,7 +336,7 @@ const ConversationList = React.memo(({
     }
     
     return filtered;
-  }, [combinedList, selectedFilter, generalSearchTerm]);
+  }, [combinedList, selectedFilter, generalSearchTerm, session.user?.id]);
 
   return (
     <div className="flex flex-col h-full w-full bg-white dark:bg-gray-800">
@@ -402,14 +422,16 @@ const ConversationList = React.memo(({
       )}
 
       {/* Entrada de búsqueda */}
-      <div className="p-2 border-b border-gray-200 dark:border-gray-700">
-        <Input
-          value={generalSearchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Buscar..."
-          className="w-full"
-        />
-      </div>
+      {showSearchInput && (
+        <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+          <Input
+            value={generalSearchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Buscar..."
+            className="w-full"
+          />
+        </div>
+      )}
 
       {/* Lista de conversaciones */}
       <div className="flex-1 overflow-y-auto">

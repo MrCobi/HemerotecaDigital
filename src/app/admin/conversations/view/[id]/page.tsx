@@ -25,6 +25,7 @@ import MessagesContainer, {
   User as MessageUser,
   ConversationParticipant
 } from "../../components/MessagesContainer";
+import { Separator } from "@/src/app/components/ui/separator";
 
 interface _User {
   id: string;
@@ -364,9 +365,22 @@ export default function ViewConversationPage({ params }: PageProps) {
             <div className="border-b-2 border-primary px-4 py-3 text-sm font-medium text-primary">
               <span className="flex items-center">
                 <MessageSquare className="h-4 w-4 mr-2" />
-                Mensajes
+                Detalles
               </span>
             </div>
+            
+            <Link 
+              href={`/admin/conversations/messages/${conversationId}`} 
+              className="border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-gray-300 transition-colors"
+            >
+              <span className="flex items-center">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                <span>Mensajes</span>
+                <span className="ml-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs">
+                  {conversation._count?.messages || conversation.messages?.length || 0}
+                </span>
+              </span>
+            </Link>
             
             <Link 
               href={`/admin/conversations/participants/${conversationId}`} 
@@ -383,28 +397,50 @@ export default function ViewConversationPage({ params }: PageProps) {
           </nav>
         </div>
         
-        {/* Contenido - Mensajes */}
-        <div className="p-4 sm:p-6 max-h-[calc(100vh-300px)] sm:max-h-[calc(100vh-320px)]">
-          <h2 className="text-lg font-medium mb-4">Historial de mensajes</h2>
+        {/* Contenido - Mensajes (Vista previa) */}
+        <div className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium">Mensajes recientes</h2>
+            <Link 
+              href={`/admin/conversations/messages/${conversationId}`}
+              className="text-sm text-primary hover:text-primary/80 transition-colors"
+            >
+              Ver todos los mensajes
+            </Link>
+          </div>
           
           {conversation.messages && conversation.messages.length > 0 ? (
-            <div className="rounded-lg overflow-hidden border border-border">
-              <MessagesContainer
-                messages={conversation.messages}
-                participantMap={conversation.participants.reduce((map, participant) => {
-                  map[participant.userId] = participant;
-                  return map;
-                }, {} as Record<string, ConversationParticipant>)}
-                onMessageDeleted={(messageId) => {
-                  setConversation(prev => {
-                    if (!prev) return prev;
-                    return {
-                      ...prev,
-                      messages: prev.messages.filter(m => m.id !== messageId)
-                    };
-                  });
-                }}
-              />
+            <div>
+              {/* Mostrar solo los últimos 5 mensajes como vista previa */}
+              <div className="rounded-lg overflow-hidden border border-border mb-4">
+                <MessagesContainer
+                  messages={conversation.messages.slice(0, 5)}
+                  participantMap={conversation.participants.reduce((map, participant) => {
+                    map[participant.userId] = participant;
+                    return map;
+                  }, {} as Record<string, ConversationParticipant>)}
+                  onMessageDeleted={(messageId) => {
+                    setConversation(prev => {
+                      if (!prev) return prev;
+                      return {
+                        ...prev,
+                        messages: prev.messages.filter(m => m.id !== messageId)
+                      };
+                    });
+                  }}
+                />
+              </div>
+              
+              {/* Enlace para ver todos los mensajes */}
+              <div className="text-center">
+                <Link
+                  href={`/admin/conversations/messages/${conversationId}`}
+                  className="inline-flex items-center justify-center py-2 px-4 rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Ver todos los mensajes ({conversation._count?.messages || conversation.messages.length})
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="py-12 text-center border border-border rounded-lg bg-muted/20">

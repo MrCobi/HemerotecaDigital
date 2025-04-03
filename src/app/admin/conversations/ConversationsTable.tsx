@@ -408,43 +408,89 @@ export default function ConversationsTable({ conversations }: ConversationsTable
       header: "Creador",
       accessorKey: "creator",
       cell: (conversation: Conversation) => {
-        if (!conversation.creator) {
-          return <span className="text-xs sm:text-sm text-muted-foreground">No disponible</span>;
-        }
-        
-        return (
-          <div className="flex items-center">
-            <div className="flex-shrink-0 mr-2">
-              <div className="h-6 w-6 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
-                {conversation.creator.image ? (
-                  <Image
-                    src={conversation.creator.image}
-                    alt={conversation.creator.name || "Avatar"}
-                    width={24}
-                    height={24}
-                    className="h-full w-full object-cover rounded-full"
-                  />
-                ) : (
-                  <Image
-                    src="/images/AvatarPredeterminado.webp"
-                    alt="Avatar predeterminado"
-                    width={24}
-                    height={24}
-                    className="h-full w-full object-cover rounded-full"
-                  />
-                )}
+        // Si tenemos el creador directamente (objeto completo)
+        if (conversation.creator) {
+          return (
+            <div className="flex items-center">
+              <div className="flex-shrink-0 mr-2">
+                <div className="h-6 w-6 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
+                  {conversation.creator.image ? (
+                    <Image
+                      src={conversation.creator.image}
+                      alt={conversation.creator.name || "Avatar"}
+                      width={24}
+                      height={24}
+                      className="h-full w-full object-cover rounded-full"
+                    />
+                  ) : (
+                    <Image
+                      src="/images/AvatarPredeterminado.webp"
+                      alt="Avatar predeterminado"
+                      width={24}
+                      height={24}
+                      className="h-full w-full object-cover rounded-full"
+                    />
+                  )}
+                </div>
+              </div>
+              <div className="min-w-0">
+                <Link
+                  href={`/admin/users/view/${conversation.creator.id}`}
+                  className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
+                >
+                  {conversation.creator.name || conversation.creator.email || "Usuario sin nombre"}
+                </Link>
               </div>
             </div>
-            <div className="min-w-0">
-              <Link
-                href={`/admin/users/view/${conversation.creator.id}`}
-                className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
-              >
-                {conversation.creator.name || conversation.creator.email || "Usuario sin nombre"}
-              </Link>
-            </div>
-          </div>
-        );
+          );
+        }
+        
+        // Si el creador está disponible en los participantes
+        if (conversation.participants && conversation.participants.length > 0) {
+          // Buscar el creador entre los participantes (por lo general será un administrador o el dueño)
+          const creatorParticipant = conversation.participants.find(
+            p => p.isAdmin || p.role === "owner" || (conversation.creatorId && p.userId === conversation.creatorId)
+          );
+          
+          if (creatorParticipant) {
+            return (
+              <div className="flex items-center">
+                <div className="flex-shrink-0 mr-2">
+                  <div className="h-6 w-6 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
+                    {creatorParticipant.user.image ? (
+                      <Image
+                        src={creatorParticipant.user.image}
+                        alt={creatorParticipant.user.name || "Avatar"}
+                        width={24}
+                        height={24}
+                        className="h-full w-full object-cover rounded-full"
+                      />
+                    ) : (
+                      <Image
+                        src="/images/AvatarPredeterminado.webp"
+                        alt="Avatar predeterminado"
+                        width={24}
+                        height={24}
+                        className="h-full w-full object-cover rounded-full"
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <Link
+                    href={`/admin/users/view/${creatorParticipant.user.id}`}
+                    className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
+                  >
+                    {creatorParticipant.user.name || creatorParticipant.user.email || "Usuario sin nombre"}
+                  </Link>
+                </div>
+              </div>
+            );
+          }
+        }
+        
+        // Si no encontramos información del creador
+        return <span className="text-xs sm:text-sm text-muted-foreground">No disponible</span>;
       },
       hideOnMobile: true,
     },
