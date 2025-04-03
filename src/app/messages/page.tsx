@@ -13,6 +13,7 @@ import Image from "next/image";
 import { useMessagesState } from "./hooks/useMessagesState";
 import MessageContainer from "../components/Chat/MessageContainer";
 import GroupManagementModal from '../components/Chat/GroupManagementModal';
+import ConversationList from '../components/Chat/ConversationList';
 import { MessageService } from "./services/messageService";
 import { FilterType, User, Participant, Conversation } from "./types";
 import { Input } from "@/src/app/components/ui/input";
@@ -571,175 +572,31 @@ export default function MessagesPage() {
         {/* Lista de conversaciones (oculta en móvil cuando hay una conversación seleccionada) */}
         {(!mobileView || !selectedConversation) && (
           <div className="flex flex-col w-full h-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-700">
-            {/* Filtros de conversación únicos */}
-            <div className="flex p-2 space-x-2 border-b border-gray-200 dark:border-gray-700">
-              <Button
-                variant={selectedFilter === 'all' ? 'default' : 'outline'}
-                size="sm"
-                className={`flex-1 ${selectedFilter === 'all' ? 'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700' : 'border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800'}`}
-                onClick={() => setSelectedFilter('all')}
-              >
-                Todos
-              </Button>
-              
-              <Button
-                variant={selectedFilter === 'private' ? 'default' : 'outline'}
-                size="sm"
-                className={`flex-1 ${selectedFilter === 'private' ? 'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700' : 'border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800'}`}
-                onClick={() => setSelectedFilter('private')}
-              >
-                Privados
-              </Button>
-              
-              <Button
-                variant={selectedFilter === 'group' ? 'default' : 'outline'}
-                size="sm"
-                className={`flex-1 ${selectedFilter === 'group' ? 'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700' : 'border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800'}`}
-                onClick={() => setSelectedFilter('group')}
-              >
-                Grupos
-              </Button>
-            </div>
-
-            {/* Campo de búsqueda directo sin pasar por ConversationList */}
-            <div className="p-2 border-b border-gray-200 dark:border-gray-700">
-              <Input
-                placeholder="Buscar..."
-                className="w-full"
-                value={generalSearchTerm}
-                onChange={(e) => setGeneralSearchTerm(e.target.value)}
-              />
-            </div>
+            <ConversationList
+              loading={loading}
+              combinedList={filteredConversations}
+              selectedConversation={selectedConversation}
+              onConversationSelect={(conversation) => selectConversation(conversation.id)}
+              onUserSelect={handleUserSelection}
+              onNewMessage={handleNewMessageClick}
+              onNewGroup={handleCreateGroupClick}
+              onRefresh={fetchConversations}
+              onFilterChange={setSelectedFilter}
+              selectedFilter={selectedFilter}
+              generalSearchTerm={generalSearchTerm}
+              onSearchChange={setGeneralSearchTerm}
+              session={{user: session?.user ? {id: session.user.id} : undefined}}
+              showHeader={false}
+              showFilters={true}
+              showSearchInput={true}
+            />
             
-            {/* Contenedor de lista de conversaciones */}
-            <div 
-              className="flex-1 overflow-y-auto" 
-              onScroll={(e) => {
-                // Detectar cuando llega al final para cargar más conversaciones
-                const target = e.target as HTMLDivElement;
-                if (!loadingMore && hasMore && target.scrollHeight - target.scrollTop - target.clientHeight < 100) {
-                  loadMoreConversations();
-                }
-              }}
-            >
-              {loading ? (
-                <div className="h-full flex items-center justify-center">
-                  <LoadingSpinner />
-                </div>
-              ) : filteredConversations.length > 0 ? (
-                filteredConversations.map((item) => {
-                  const isConversation = item.isConversation;
-                  const conversation = isConversation ? item.data as Conversation : null;
-                  const user = isConversation ? (item.data as Conversation).otherUser : item.data as User;
-                  const isGroup = isConversation && ((conversation?.isGroup) || (conversation?.id.startsWith('group_')));
-                  
-                  return (
-                    <div
-                      key={item.id}
-                      className={`p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer flex items-start space-x-3 ${selectedConversation === item.id ? "bg-blue-50 dark:bg-gray-800" : ""}`}
-                      onClick={() => {
-                        if (isConversation && conversation) {
-                          selectConversation(conversation.id);
-                        } else if (!isConversation && user) {
-                          handleUserSelection(user);
-                        }
-                      }}
-                    >
-                      {/* Avatar */}
-                      <Avatar className="h-12 w-12 border-2 border-gray-200 dark:border-gray-700 overflow-hidden flex items-center justify-center">
-                        {isGroup ? (
-                          <Image 
-                            src={conversation?.imageUrl || "/images/AvatarPredeterminado.webp"}
-                            width={48}
-                            height={48}
-                            alt={conversation?.name || "Grupo"}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <Image
-                            src={user?.image || "/images/AvatarPredeterminado.webp"} 
-                            alt={user?.username || "Usuario"}
-                            width={48}
-                            height={48}
-                            className="h-full w-full object-cover"
-                          />
-                        )}
-                      </Avatar>
-                      
-                      {/* Información de conversación */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start">
-                          <h4 className="font-medium truncate">
-                            {isGroup 
-                              ? conversation?.name || "Grupo sin nombre" 
-                              : user?.username || user?.name || "Usuario"}
-                          </h4>
-                          {conversation?.lastMessage && (
-                            <span className="text-xs text-gray-500">
-                              {formatDate(conversation.lastMessage.createdAt)}
-                            </span>
-                          )}
-                        </div>
-                        
-                        <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                          {conversation?.lastMessage ? (
-                            conversation.lastMessage.messageType === 'voice' ? (
-                              <span className="flex items-center">
-                                🎤 Mensaje de voz
-                              </span>
-                            ) : conversation.lastMessage.content
-                          ) : (
-                            <span className="italic">Sin mensajes</span>
-                          )}
-                        </p>
-                        
-                        {/* Contador de mensajes no leídos */}
-                        {conversation?.unreadCount && conversation.unreadCount > 0 && (
-                          <span className="bg-blue-500 text-white px-2 py-0.5 rounded-full text-xs mt-1 inline-block">
-                            {conversation.unreadCount}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="h-full flex items-center justify-center p-4">
-                  <div className="text-center text-gray-500 dark:text-gray-400">
-                    <p className="mb-2">No hay conversaciones disponibles</p>
-                    {selectedFilter === 'all' ? (
-                      <div className="flex flex-col space-y-2">
-                        <Button variant="outline" onClick={handleNewMessageClick} className={`border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800`}>
-                          <MessageSquarePlus className="mr-2 h-4 w-4" /> 
-                          Iniciar nueva conversación
-                        </Button>
-                        <Button variant="outline" onClick={() => setShowCreateGroupModal(true)} className={`border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800`}>
-                          <Users className="mr-2 h-4 w-4" /> 
-                          Crear grupo
-                        </Button>
-                      </div>
-                    ) : selectedFilter === 'private' ? (
-                      <Button variant="outline" onClick={handleNewMessageClick} className={`border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800`}>
-                        <MessageSquarePlus className="mr-2 h-4 w-4" /> 
-                        Iniciar nueva conversación
-                      </Button>
-                    ) : (
-                      <Button variant="outline" onClick={() => setShowCreateGroupModal(true)} className={`border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800`}>
-                        <Users className="mr-2 h-4 w-4" /> 
-                        Crear grupo
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {/* Indicador de carga al cargar más conversaciones */}
-              {loadingMore && (
-                <div className="py-3 text-center">
-                  <LoadingSpinner size="small" />
-                </div>
-              )}
-            </div>
+            {/* Indicador de carga al cargar más conversaciones */}
+            {loadingMore && (
+              <div className="py-3 text-center">
+                <LoadingSpinner size="small" />
+              </div>
+            )}
           </div>
         )}
         

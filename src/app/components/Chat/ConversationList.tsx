@@ -269,18 +269,10 @@ const ConversationList = React.memo(({
           return conv.isGroup === true;
         }
         
-        // Para filtro de privados - mostrar chats 1:1 y grupos privados donde el usuario es miembro
+        // Para filtro de privados - mostrar SOLO chats 1:1 (no grupos)
         if (selectedFilter === 'private') {
-          // Conversaciones directas 1:1 (no son grupos)
-          if (conv.isGroup !== true) return true;
-          
-          // Si no estamos en una conversación de grupo o falta el ID del usuario, excluir
-          if (!conv.participants || !session.user?.id) return false;
-          
-          // Verificar si el usuario es miembro del grupo
-          const isUserMember = conv.participants.some(p => p.userId === session.user?.id);
-          
-          return isUserMember;
+          // Solo mostramos conversaciones directas 1:1 (que no son grupos)
+          return conv.isGroup !== true;
         }
       } else {
         // Si es un usuario (no conversación), solo se muestra en filtro 'private'
