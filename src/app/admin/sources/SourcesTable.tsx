@@ -137,7 +137,7 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
             <div className="h-10 w-10 flex-shrink-0 rounded-md bg-muted flex items-center justify-center mr-3">
               {source.imageUrl ? (
                 <SafeImage
-                  src={source.imageUrl}
+                  src={source.imageUrl.replace('http:', 'https:')} // Agregar protocolo HTTPS
                   alt={source.name}
                   width={40}
                   height={40}

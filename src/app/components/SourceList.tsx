@@ -30,6 +30,7 @@ import { debounce } from "lodash";
 import { API_ROUTES } from "@/src/config/api-routes";
 import { motion } from "framer-motion";
 import { useAnimationSettings } from "@/src/app/hooks/useAnimationSettings";
+import SafeImage from "@/src/components/ui/SafeImage";
 
 const languages = [
   { code: "es", name: "Español", flag: "🇪🇸" },
@@ -320,11 +321,13 @@ export default function SourcesPage({
               >
                 <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-blue-100 dark:border-gray-700 dark:bg-gray-800 group hover:scale-[1.02]">
                   <div className="relative h-48">
-                    <div
-                      className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
-                      style={{
-                        backgroundImage: `url(${source.imageUrl})`,
-                      }}
+                    <SafeImage
+                      src={source.imageUrl}
+                      alt={source.name}
+                      className="absolute inset-0 object-cover transition-transform duration-300 group-hover:scale-105"
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      fallbackSrc="/images/placeholder.webp"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     <div className="absolute top-4 right-4 bg-white/90 dark:bg-gray-800/90 px-3 py-1 rounded-full text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center shadow-lg">

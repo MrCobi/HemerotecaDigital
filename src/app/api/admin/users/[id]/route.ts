@@ -3,11 +3,88 @@ import prisma from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from 'bcryptjs';
 import { Role } from "@prisma/client";
+import { v2 as cloudinary } from 'cloudinary';
+
+// Definir la interfaz para el resultado de Cloudinary
+interface CloudinaryUploadResult {
+  secure_url: string;
+  public_id: string;
+  resource_type: string;
+  format: string;
+  width: number;
+  height: number;
+  // Para otras propiedades que podría devolver Cloudinary
+  [key: string]: string | number | boolean | Record<string, unknown>;
+}
 
 // Función auxiliar para verificar si el usuario es administrador
 async function isAdmin() {
   const session = await auth();
   return session?.user?.role === "admin";
+}
+
+// Función para procesar imágenes de Cloudinary
+async function processImageUrl(imageUrl: string, userId: string): Promise<string> {
+  // Verificar si la imagen ya es una URL de Cloudinary y evitar duplicación
+  if (imageUrl && imageUrl.includes('cloudinary.com')) {
+    // Extraer la URL real si hay duplicación
+    if (imageUrl.indexOf('https://res.cloudinary.com') !== imageUrl.lastIndexOf('https://res.cloudinary.com')) {
+      // Hay duplicación, extraer la segunda URL
+      const secondUrlStart = imageUrl.lastIndexOf('https://res.cloudinary.com');
+      return imageUrl.substring(secondUrlStart);
+    }
+    // No hay duplicación, devolver la URL original
+    return imageUrl;
+  }
+  
+  // Si es una imagen en base64, procesarla
+  if (imageUrl && imageUrl.startsWith('data:image')) {
+    try {
+      // Configurar Cloudinary
+      cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+      });
+      
+      // Extraer la parte de base64
+      const base64Data = imageUrl.split(',')[1];
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      // Generar ID único
+      const timestamp = Date.now();
+      const uniqueId = `user_profile/admin_update_user_${userId}_${timestamp}`;
+      
+      // Subir a Cloudinary
+      const result: CloudinaryUploadResult = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+          {
+            public_id: uniqueId,
+            folder: 'hemeroteca_digital',
+            resource_type: 'image',
+          },
+          (error, result) => {
+            if (error) {
+              console.error('Error al subir imagen a Cloudinary:', error);
+              reject(error);
+            } else if (result) {
+              console.log('Imagen de usuario subida con éxito a Cloudinary');
+              resolve(result);
+            } else {
+              reject(new Error('No se recibió respuesta de Cloudinary'));
+            }
+          }
+        ).end(buffer);
+      });
+      
+      return result.secure_url;
+    } catch (error) {
+      console.error('Error al procesar imagen:', error);
+      throw error;
+    }
+  }
+  
+  return imageUrl;
 }
 
 // GET: Obtener detalles de un usuario por ID
@@ -89,7 +166,6 @@ export async function PATCH(
       name: body.name,
       username: body.username,
       email: body.email,
-      image: body.image, // No establecer imagen predeterminada automáticamente
       role: body.role as Role,
       bio: body.bio,
     };
@@ -101,6 +177,11 @@ export async function PATCH(
     
     if (body.showFavorites !== undefined) {
       updateData.showFavorites = body.showFavorites;
+    }
+
+    // Procesar imagen
+    if (body.image) {
+      updateData.image = await processImageUrl(body.image, userId);
     }
 
     // Manejar cambio de contraseña si se proporciona (los admins pueden cambiar sin verificar la actual)

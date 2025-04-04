@@ -7,7 +7,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
 import Link from "next/link";
-import Image from "next/image";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import {
   Form,
@@ -34,6 +33,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/src/app/components/ui/card";
+import SafeImage from "@/src/components/ui/SafeImage";
 
 // Categorías disponibles
 const CATEGORIES = [
@@ -367,16 +367,12 @@ export default function EditSourcePage() {
                         {/* Vista previa de la imagen */}
                         {imagePreview && (
                           <div className="mx-auto max-w-[200px] max-h-[200px] overflow-hidden rounded-md border border-gray-200 shadow-sm">
-                            <Image
+                            <SafeImage
                               src={imagePreview || "/placeholder-image.jpg"}
                               alt="Vista previa"
                               width={200}
                               height={150}
                               className="h-auto w-full object-cover"
-                              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = "/placeholder-image.jpg";
-                              }}
                             />
                           </div>
                         )}

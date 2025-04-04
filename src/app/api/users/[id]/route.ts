@@ -5,6 +5,70 @@ import bcrypt from "bcryptjs";
 import { Prisma, User } from "@prisma/client";
 import { withAuth } from "../../../../lib/auth-utils";
 import { auth } from "@/auth";
+import cloudinary from 'cloudinary';
+
+// Definir la interfaz para el resultado de Cloudinary
+interface CloudinaryUploadResult {
+  secure_url: string;
+  public_id: string;
+  resource_type: string;
+  format: string;
+  width: number;
+  height: number;
+  // Para otras propiedades que podría devolver Cloudinary
+  [key: string]: string | number | boolean | Record<string, unknown>;
+}
+
+// Función para procesar imágenes en Cloudinary
+async function processImage(image: string, id: string): Promise<string> {
+  try {
+    // Extraer la parte de base64 (eliminar el prefijo data:image/...)
+    const imageString = image as string;
+    const base64Data = imageString.split(',')[1];
+    
+    // Crear un buffer desde el base64
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    // Configurar Cloudinary si no está ya configurado
+    cloudinary.v2.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    
+    // Generar un identificador único para la imagen
+    const timestamp = Date.now();
+    const uniqueId = `user_profile/user_${id}_${timestamp}`;
+    
+    // Subir la imagen a Cloudinary
+    const uploadResult = await new Promise<CloudinaryUploadResult>((resolve, reject) => {
+      cloudinary.v2.uploader.upload_stream(
+        {
+          public_id: uniqueId,
+          folder: 'hemeroteca_digital',
+          resource_type: 'image',
+        },
+        (err, result) => {
+          if (err) {
+            console.error('Error al subir a Cloudinary:', err);
+            reject(err);
+          } else if (result) {
+            console.log('Imagen subida con éxito a Cloudinary');
+            resolve(result as CloudinaryUploadResult);
+          } else {
+            reject(new Error('No se recibió respuesta de Cloudinary'));
+          }
+        }
+      ).end(buffer);
+    });
+    
+    // Reemplazar la imagen en base64 por la URL de Cloudinary
+    return uploadResult.secure_url;
+  } catch (error) {
+    console.error("Error al procesar la imagen con Cloudinary:", error);
+    throw error;
+  }
+}
 
 // GET para obtener detalles de un usuario específico
 export async function GET(req: Request, context: { params: Promise<{ id?: string }> }) {
@@ -79,7 +143,6 @@ export const PUT = withAuth(async (req: Request, { userId, user }: { userId: str
       name,
       email,
       username,
-      image,
       bio
     };
 
@@ -125,6 +188,16 @@ export const PUT = withAuth(async (req: Request, { userId, user }: { userId: str
       updatedData.password = await bcrypt.hash(newPassword, 10);
     }
 
+    // Procesar imagen si es necesaria
+    if (image && typeof image === 'string' && image.startsWith('data:image')) {
+      try {
+        updatedData.image = await processImage(image, id);
+      } catch (error) {
+        console.error("Error al procesar la imagen:", error);
+        return NextResponse.json({ error: "Error al procesar la imagen" }, { status: 500 });
+      }
+    }
+
     // Actualizar usuario
     try {
       const updatedUser = await prisma.user.update({
@@ -149,11 +222,11 @@ export const PUT = withAuth(async (req: Request, { userId, user }: { userId: str
       }
 
       return NextResponse.json(updatedUser, { status: 200 });
-    } catch (updateError) {
-      console.error("Error al actualizar usuario:", updateError);
+    } catch (error) {
+      console.error("Error al actualizar usuario:", error);
       
       // Manejar error de duplicación
-      if (typeof updateError === 'object' && updateError !== null && 'code' in updateError && updateError.code === 'P2002') {
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
         return NextResponse.json(
           { error: "El email o username ya está en uso" },
           { status: 409 }
@@ -239,7 +312,6 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     const updatedData: Prisma.UserUpdateInput = {
       name,
       username,
-      image,
       bio
     };
 
@@ -285,6 +357,16 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
       updatedData.password = await bcrypt.hash(newPassword, 10);
     }
 
+    // Procesar imagen si es necesaria
+    if (image && typeof image === 'string' && image.startsWith('data:image')) {
+      try {
+        updatedData.image = await processImage(image, id);
+      } catch (error) {
+        console.error("Error al procesar la imagen:", error);
+        return NextResponse.json({ error: "Error al procesar la imagen" }, { status: 500 });
+      }
+    }
+
     // Actualizar usuario
     try {
       const updatedUser = await prisma.user.update({
@@ -309,11 +391,11 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
       }
 
       return NextResponse.json(updatedUser, { status: 200 });
-    } catch (updateError) {
-      console.error("Error al actualizar usuario:", updateError);
+    } catch (error) {
+      console.error("Error al actualizar usuario:", error);
       
       // Manejar error de duplicación
-      if (typeof updateError === 'object' && updateError !== null && 'code' in updateError && updateError.code === 'P2002') {
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
         return NextResponse.json(
           { error: "El email o username ya está en uso" },
           { status: 409 }

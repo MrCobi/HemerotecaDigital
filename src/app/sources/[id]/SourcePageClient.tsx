@@ -110,6 +110,12 @@ export default function SourcePageClient({
   };
 
   const loadArticles = async (order: typeof sortBy = sortBy) => {
+    // Si la fuente no existe o no tiene ID válido, no intentar cargar artículos
+    if (!source || !source.id) {
+      setArticles([]);
+      return;
+    }
+    
     const cacheKey = `source_${source.id}_articles_${order}`;
     const cachedData = sessionStorage.getItem(cacheKey);
 
@@ -119,6 +125,8 @@ export default function SourcePageClient({
         return;
       } catch (error) {
         console.error("Error parsing cached articles:", error);
+        // Limpiar el caché corrupto
+        sessionStorage.removeItem(cacheKey);
       }
     }
 
@@ -128,13 +136,23 @@ export default function SourcePageClient({
         `${window.location.origin}${API_ROUTES.sources.articles(source.id, order, source.language)}`
       );
 
-      if (!response.ok) throw new Error("Error fetching articles");
+      // Si no es exitosa la petición, establecer un array vacío sin lanzar error
+      if (!response.ok) {
+        console.warn(`No se pudieron cargar artículos para la fuente ID: ${source.id}. Código: ${response.status}`);
+        setArticles([]);
+        return;
+      }
 
       const fetchedArticles = await response.json();
       setArticles(fetchedArticles);
-      sessionStorage.setItem(cacheKey, JSON.stringify(fetchedArticles));
+      
+      // Solo guardar en caché si hay artículos
+      if (fetchedArticles && fetchedArticles.length > 0) {
+        sessionStorage.setItem(cacheKey, JSON.stringify(fetchedArticles));
+      }
     } catch (error) {
-      console.error("Error fetching articles:", error);
+      console.warn("No se pudieron cargar artículos:", error);
+      // Establecer un array vacío en lugar de propagar el error
       setArticles([]);
     }
   };
