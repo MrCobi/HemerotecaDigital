@@ -10,10 +10,10 @@ export class MessageService {
    * Obtiene la lista de conversaciones del usuario
    * @param offset Número de conversaciones a omitir
    * @param limit Número máximo de conversaciones a obtener
-   * @param searchTerm Término de búsqueda para filtrar conversaciones
+   * @param searchTerm Término de búsqueda para filtrar conversaciones (busca en nombres de usuarios/grupos y contenido)
    * @param filter Tipo de filtro para las conversaciones (all, private, group)
    * @param forceRefresh Forzar recarga del caché
-   * @returns Lista de conversaciones y indicador de si hay más
+   * @returns Lista de conversaciones y metadatos de paginación (hasMore, totalCount, etc.)
    */
   static async fetchConversations(
     offset: number = 0,
@@ -41,7 +41,7 @@ export class MessageService {
         params.append('timestamp', Date.now().toString());
       }
 
-      console.log(`Fetching conversations with filter: ${filter}, URL: /api/messages/conversations?${params.toString()}`);
+      console.log(`Fetching conversations with filter: ${filter}, search: "${searchTerm}", offset: ${offset}, limit: ${limit}, URL: /api/messages/conversations?${params.toString()}`);
       
       const response = await fetch(`/api/messages/conversations?${params.toString()}`, {
         method: 'GET',

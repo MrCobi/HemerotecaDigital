@@ -49,15 +49,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
   
-  // Verificar si el usuario necesita establecer una contraseña (para usuarios de OAuth)
-  // Log detallado para depuración de todos los campos relevantes
-  console.log('Middleware: Token JWT:', { 
-    needsPasswordChange: token.needsPasswordChange, 
-    provider: token.provider,
-    email: token.email,
-    emailVerified: !!token.emailVerified,
-    path: pathname
-  });
+
 
   // Comprobación estricta: solo redirigir si needsPasswordChange es exactamente true
   if (token.needsPasswordChange === true && pathname !== '/setup-password') {
