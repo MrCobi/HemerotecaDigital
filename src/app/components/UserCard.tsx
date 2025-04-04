@@ -147,12 +147,10 @@ export const UserCard = memo(function UserCard({ user, action }: UserCardProps) 
         {user.stats?.followers !== undefined && (
           <div className="absolute top-3 right-3 z-10">
             <Badge 
-              className="bg-white/30 backdrop-blur-sm text-white border-none shadow-lg px-2.5 py-1 flex items-center gap-1.5"
+              className="bg-white/90 dark:bg-gray-800 text-gray-700 dark:text-gray-300 shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800/95 transition-colors"
             >
-              <Users className="h-3 w-3" /> 
-              <span className="text-xs font-medium">
-                {user.stats.followers} {user.stats.followers === 1 ? "seguidor" : "seguidores"}
-              </span>
+              <Users className="w-3.5 h-3.5 mr-1" />
+              {user.stats.followers === 1 ? '1 seguidor' : `${user.stats.followers} seguidores`}
             </Badge>
           </div>
         )}
