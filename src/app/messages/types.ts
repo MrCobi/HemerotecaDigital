@@ -46,8 +46,8 @@ export interface Message {
     image?: string | null;
   };
   messageType?: 'text' | 'image' | 'voice' | 'file' | 'video';
-  mediaUrl?: string;
-  imageUrl?: string; // URL para imágenes adjuntas
+  mediaUrl?: string; // URL para audios o imágenes (principal)
+  imageUrl?: string; // Deprecated - usar mediaUrl para imágenes
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   conversationId?: string;
   receiverId?: string;

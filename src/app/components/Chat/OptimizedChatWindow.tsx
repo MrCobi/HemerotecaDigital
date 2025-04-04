@@ -124,13 +124,53 @@ const MessageItem = React.memo(({
     }
   };
   
-  // Determinar si es un mensaje de voz
+  // Determinar si es un mensaje de voz o imagen
   const isVoiceMessage = message.messageType === 'voice';
-  const isImageMessage = message.messageType === 'image' && message.mediaUrl;
+  const _isImageMessage = message.messageType === 'image';
   
-  const [imageLoaded, setImageLoaded] = React.useState(false);
-  const [useCloudinary, setUseCloudinary] = React.useState(true);
+  // Verificar si realmente tenemos una URL de imagen
+  const hasValidMediaUrl = React.useMemo(() => {
+    if (!message.mediaUrl) return false;
+    
+    // Si es un Data URL (mensaje temporal), considerarlo válido
+    if (message.mediaUrl.startsWith('data:') || message.mediaUrl.startsWith('blob:')) return true;
+    
+    // Para URLs normales, comprobar que sea una string no vacía
+    return message.mediaUrl.trim().length > 0;
+  }, [message.mediaUrl]);
 
+  const [imageLoaded, setImageLoaded] = React.useState(false);
+  const [imageError, setImageError] = React.useState(false);
+  
+  // Función auxiliar para extraer ID de Cloudinary si es necesario
+  const getCloudinaryId = (url: string): string => {
+    if (!url) return '';
+    
+    // Verificar si es una URL de Cloudinary
+    if (url.includes('cloudinary.com')) {
+      const match = url.match(/\/upload\/(?:v\d+\/)?(.+)$/);
+      return match ? match[1] : '';
+    }
+    return '';
+  };
+  
+  // Determinar si usar Cloudinary para renderizado
+  const isCloudinaryUrl = message.mediaUrl?.includes('cloudinary.com');
+  const [useCloudinary, setUseCloudinary] = React.useState(isCloudinaryUrl);
+  
+  // Determinar si es una URL relativa o absoluta
+  const getImageUrl = (url: string): string => {
+    if (!url) return '';
+    
+    // Si ya es una URL completa (http/https o data:)
+    if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:')) {
+      return url;
+    }
+    
+    // Si es una ruta relativa, convertirla en absoluta
+    return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+  
   return (
     <>
       <div
@@ -175,40 +215,79 @@ const MessageItem = React.memo(({
                   audioUrl={message.mediaUrl || ''}
                   messageId={message.id || message.tempId || `msg-${index}`}
                   isSender={isCurrentUser}
+                  className={isCurrentUser ? 'text-white' : ''}
                 />
               </div>
-            ) : isImageMessage ? (
-              <div
-                className={`relative overflow-hidden rounded-lg ${
-                  !imageLoaded ? 'bg-gray-200 dark:bg-gray-700 animate-pulse h-[150px]' : ''
-                }`}
-              >
+            ) : hasValidMediaUrl ? (
+              <div className="relative rounded-lg overflow-hidden max-w-[300px] min-w-[150px] max-h-[400px]">
+                {!imageLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-200 dark:bg-gray-800">
+                    <LoadingSpinner className="h-6 w-6 animate-spin text-gray-500" />
+                  </div>
+                )}
+                
                 {message.mediaUrl && message.mediaUrl.includes('cloudinary.com') && useCloudinary ? (
                   <CldImage 
-                    src={extractCloudinaryId(message.mediaUrl)}
+                    src={getCloudinaryId(message.mediaUrl)}
                     alt="Imagen adjunta" 
                     className="rounded-lg object-cover w-full h-full"
                     width={400}
-                    height={300}
-                    quality={100}
-                    onError={() => {
-                      setImageLoaded(true);
-                      setUseCloudinary(false);
-                    }}
+                    height={400}
+                    crop="limit"
                     onLoad={() => setImageLoaded(true)}
+                    onError={() => {
+                      console.error('Error loading Cloudinary image, falling back to standard image');
+                      setUseCloudinary(false);
+                      setImageError(true);
+                    }}
                   />
                 ) : (
-                  <NextImage 
-                    src={message.mediaUrl!} 
-                    alt="Imagen adjunta"
-                    className="rounded-lg object-cover w-full h-full"
-                    width={400}
-                    height={300}
-                    quality={100}
-                    unoptimized={true}
-                    onLoad={() => setImageLoaded(true)}
-                    onError={() => setImageLoaded(true)}
-                  />
+                  <div className="relative rounded-lg overflow-hidden max-w-[300px] min-h-[150px]">
+                    {/* Usar img nativa para blob URLs y NextImage para URLs regulares */}
+                    {message.mediaUrl && (message.mediaUrl.startsWith('data:') || message.mediaUrl.startsWith('blob:')) ? (
+                      <NextImage 
+                        src={message.mediaUrl}
+                        alt="Imagen adjunta" 
+                        className="rounded-lg object-cover w-full h-auto max-h-[400px]"
+                        width={400}
+                        height={400}
+                        quality={100}
+                        onLoad={() => setImageLoaded(true)}
+                        onError={() => {
+                          console.error('Error loading image:', message.mediaUrl);
+                          setImageLoaded(false);
+                          setImageError(true);
+                        }}
+                      />
+                    ) : (
+                      <NextImage 
+                        src={getImageUrl(message.mediaUrl ?? '')}
+                        alt="Imagen adjunta" 
+                        className="rounded-lg object-cover"
+                        width={400}
+                        height={400}
+                        onLoad={() => setImageLoaded(true)}
+                        onError={() => {
+                          console.error('Error loading image:', message.mediaUrl);
+                          setImageLoaded(false);
+                          setImageError(true);
+                        }}
+                      />
+                    )}
+                    {imageError && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-200 dark:bg-gray-800 p-2 text-center">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                          No se pudo cargar la imagen
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {message.status === 'sending' && (
+                  <div className="absolute bottom-2 right-2 bg-black/50 rounded-full p-1">
+                    <LoadingSpinner className="h-4 w-4 animate-spin text-white" />
+                  </div>
                 )}
               </div>
             ) : (
@@ -247,17 +326,18 @@ const MessageItem = React.memo(({
 
 MessageItem.displayName = 'MessageItem';
 
-const extractCloudinaryId = (url: string): string => {
-  // Ejemplo: https://res.cloudinary.com/dlg8j3g5k/image/upload/v1/path/to/image.jpg
-  const regex = /\/image\/upload\/(?:v\d+\/)?(.+)$/;
-  const match = url.match(regex);
-  if (match && match[1]) {
-    return match[1];
-  }
-  // Fallback: devolver la última parte de la URL
-  const parts = url.split('/');
-  return parts[parts.length - 1];
-};
+// Eliminar la función extractCloudinaryId ya que no se está utilizando
+// const extractCloudinaryId = (url: string): string => {
+//   // Ejemplo: https://res.cloudinary.com/dlg8j3g5k/image/upload/v1/path/to/image.jpg
+//   const regex = /\/image\/upload\/(?:v\d+\/)?(.+)$/;
+//   const match = url.match(regex);
+//   if (match && match[1]) {
+//     return match[1];
+//   }
+//   // Fallback: devolver la última parte de la URL
+//   const parts = url.split('/');
+//   return parts[parts.length - 1];
+// };
 
 // Componente principal de la ventana de chat
 const OptimizedChatWindow = ({
@@ -588,23 +668,57 @@ const OptimizedChatWindow = ({
   const sendVoiceMessage = React.useCallback(async (blob: Blob) => {
     if (!conversationId) return;
     
+    // Crear un ID temporal único para este mensaje
+    const tempId = `temp-${Date.now()}`;
+    let tempUrl: string | null = null;
+    
     try {
       // Crear URL para mostrar temporalmente mientras se envía
-      const tempUrl = URL.createObjectURL(blob);
-      
-      // Crear un ID temporal único para este mensaje
-      const tempId = `temp-${Date.now()}`;
+      tempUrl = URL.createObjectURL(blob);
       
       // Añadir mensaje optimista a la interfaz
-      const _tempMessage: Message = {
+      const tempMessage: Message = {
+        id: tempId,
         tempId,
         content: '',
         mediaUrl: tempUrl,
         senderId: currentUserId,
         createdAt: new Date(),
         status: 'sending',
-        messageType: 'voice'
+        messageType: 'voice',
+        // Añadir información del remitente para mostrar correctamente en la UI
+        sender: {
+          id: currentUserId,
+          name: session?.user?.name || '',
+          username: session?.user?.username || '',
+          image: session?.user?.image || null
+        }
       };
+      
+      // IMPORTANTE: Añadir el mensaje a la lista de mensajes antes de enviarlo
+      // Esto hará que aparezca inmediatamente en la interfaz
+      const messagesContainer = document.querySelector('.messages-container');
+      if (messagesContainer) {
+        // Crear nueva entrada para el mensaje
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `flex mb-4 ${currentUserId === tempMessage.senderId ? 'justify-end' : 'justify-start'}`;
+        messageDiv.dataset.messageId = tempId;
+        
+        // Crear el contenido del mensaje según sea un remitente o un receptor
+        messageDiv.innerHTML = `
+          <div class="flex-shrink-0 ml-auto">
+            <div class="bg-blue-500 text-white rounded-l-lg rounded-tr-lg p-2 max-w-[240px]">
+              <div class="voice-message min-w-[200px]">
+                <audio src="${tempUrl}" controls class="max-w-[200px] voice-message-player"></audio>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        // Añadir al contenedor de mensajes y hacer scroll
+        messagesContainer.appendChild(messageDiv);
+        setTimeout(() => scrollToBottom('smooth'), 50);
+      }
       
       // Crear FormData para subir el archivo
       const formData = new FormData();
@@ -639,7 +753,7 @@ const OptimizedChatWindow = ({
         conversationId,
         messageType: 'voice',
         mediaUrl: audioUrl,
-        tempId: `temp-${Date.now()}`,
+        tempId: tempId,
       };
       
       // Si es conversación privada, agregar el receiverId
@@ -660,10 +774,52 @@ const OptimizedChatWindow = ({
         const errorText = await messageResponse.text();
         throw new Error(`Error al enviar mensaje de voz (${messageResponse.status}): ${errorText}`);
       }
+      
+      // Actualizar el mensaje temporal con la URL real
+      const audioElement = document.querySelector(`[data-message-id="${tempId}"] audio`) as HTMLAudioElement | null;
+      if (audioElement && audioUrl) {
+        // Guardar la posición de reproducción actual
+        const currentTime = audioElement.currentTime;
+        const wasPlaying = !audioElement.paused;
+        
+        // Actualizar la fuente del audio
+        audioElement.src = audioUrl;
+        
+        // Restaurar la posición de reproducción
+        audioElement.currentTime = currentTime;
+        
+        // Si estaba reproduciéndose, continuar la reproducción
+        if (wasPlaying) {
+          audioElement.play().catch(err => console.error('Error al reanudar reproducción:', err));
+        }
+        
+        // Actualizar la clase para mostrar que ya no está en estado "enviando"
+        const messageContainer = document.querySelector(`[data-message-id="${tempId}"]`);
+        if (messageContainer) {
+          messageContainer.classList.remove('sending');
+          messageContainer.classList.add('sent');
+        }
+      }
     } catch (error) {
       console.error('Error al enviar mensaje de voz:', error);
+      
+      // Manejo de errores - asegurándonos de que tempId está disponible
+      const messageElement = document.querySelector(`[data-message-id="${tempId}"]`);
+      if (messageElement) {
+        messageElement.classList.add('error');
+        // Opcional: añadir icono de error o mensaje
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'text-xs text-red-500 mt-1';
+        errorDiv.textContent = 'Error al enviar. Inténtalo de nuevo.';
+        messageElement.appendChild(errorDiv);
+      }
+      
+      // Liberar recursos si hay error
+      if (tempUrl) {
+        URL.revokeObjectURL(tempUrl);
+      }
     }
-  }, [conversationId, currentUserId, otherUser]);
+  }, [conversationId, currentUserId, otherUser, session, scrollToBottom]);
 
   // Detener grabación de voz y enviar
   const handleStopVoiceRecording = React.useCallback(async () => {
@@ -946,12 +1102,23 @@ const OptimizedChatWindow = ({
             <div
               className="relative w-24 h-24 overflow-hidden rounded-md border border-gray-300 dark:border-gray-700"
             >
-              <NextImage
-                src={imagePreview}
-                alt="Preview"
-                fill
-                style={{ objectFit: 'cover' }}
-              />
+              {imagePreview.startsWith('data:') || imagePreview.startsWith('blob:') ? (
+                <CldImage
+                  src={imagePreview}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                  width={150}
+                  height={150}
+                />
+              ) : (
+                <NextImage
+                  src={imagePreview ?? ''}
+                  alt="Preview"
+                  fill
+                  style={{ objectFit: 'cover' }}
+                  
+                />
+              )}
               <Button
                 variant="destructive"
                 size="icon"

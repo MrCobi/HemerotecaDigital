@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 
-type MessageType = 'text' | 'voice';
+type MessageType = 'text' | 'voice' | 'image';
 
 // Para forzar que la ruta sea dinámica
 export const dynamic = 'force-dynamic';
@@ -74,6 +74,7 @@ export async function POST(
       const formData = await request.formData();
       messageText = formData.get('message')?.toString() || '';
       const audioFile = formData.get('audio') as File | null;
+      const imageFile = formData.get('image') as File | null;
       
       if (audioFile) {
         messageType = 'voice';
@@ -94,6 +95,25 @@ export async function POST(
         
         mediaUrl = `/uploads/audio/${fileName}`;
         console.log(`Audio guardado en: ${mediaUrl}`);
+      } else if (imageFile) {
+        messageType = 'image';
+        const generateId = () => crypto.randomBytes(16).toString('hex');
+        const fileName = `${Date.now()}_${generateId()}.${imageFile.name.split('.').pop() || 'jpg'}`;
+        const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'images');
+        
+        // Asegurar que existe el directorio
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        
+        const filePath = path.join(uploadsDir, fileName);
+        
+        // Guardar archivo
+        const imageBuffer = Buffer.from(await imageFile.arrayBuffer());
+        fs.writeFileSync(filePath, imageBuffer);
+        
+        mediaUrl = `/uploads/images/${fileName}`;
+        console.log(`Imagen guardada en: ${mediaUrl}`);
       }
     } catch (error) {
       // Si falla FormData, intentar con JSON
@@ -101,6 +121,13 @@ export async function POST(
         const jsonBody = await requestClone.json();
         messageText = jsonBody.content || '';
         messageType = jsonBody.messageType || 'text';
+        mediaUrl = jsonBody.mediaUrl || null;
+        
+        console.log('Procesando mensaje JSON:', { 
+          messageType, 
+          content: messageText.substring(0, 20) + (messageText.length > 20 ? '...' : ''), 
+          mediaUrl 
+        });
       } catch (jsonError) {
         console.error('Error procesando el cuerpo del mensaje:', {
           formDataError: error instanceof Error ? error.message : 'Error desconocido',

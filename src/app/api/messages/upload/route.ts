@@ -34,6 +34,9 @@ export async function POST(request: NextRequest): Promise<NextResponse>  {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    // Obtener formato solicitado si existe
+    const requestedFormat = formData.get('format') as string || '';
+
     // Generar un nombre de archivo único basado en timestamp y usuario
     const timestamp = new Date().getTime();
     const userId = session.user.id;
@@ -48,12 +51,17 @@ export async function POST(request: NextRequest): Promise<NextResponse>  {
       const uploadOptions = {
         public_id: `groups/${filename}`,
         folder: 'hemeroteca/groups',
-        resource_type: resourceType as 'image' | 'video',
+        resource_type: resourceType as 'image' | 'video' | 'raw' | 'auto',
         // Solo aplicar transformaciones si es una imagen
         ...(resourceType === 'image' && {
           transformation: [
             { width: 500, height: 500, crop: 'limit', quality: 'auto:good' }
           ]
+        }),
+        // Para archivos de audio, usar formato compatible
+        ...(resourceType === 'video' && {
+          format: requestedFormat || 'mp3',  // Preferir mp3 que es compatible con la mayoría de navegadores
+          audio_codec: 'mp3'  // Usar mp3 como codec por compatibilidad
         })
       };
 
@@ -68,7 +76,11 @@ export async function POST(request: NextRequest): Promise<NextResponse>  {
             }, { status: 500 }));
             return;
           } else {
-            resolve(NextResponse.json({ url: result?.secure_url }));
+            resolve(NextResponse.json({ 
+              url: result?.secure_url || '',
+              secure_url: result?.secure_url || '',
+              public_id: result?.public_id || ''
+            }));
           }
         }
       ).end(buffer);
@@ -78,4 +90,3 @@ export async function POST(request: NextRequest): Promise<NextResponse>  {
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }
-

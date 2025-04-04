@@ -7,6 +7,23 @@ import cuid from 'cuid';
 
 const MESSAGE_PAGE_SIZE = 20;
 
+// Tipos para payloads de mensajes
+interface MessagePayload {
+  conversationId: string;
+  content: string;
+  messageType: 'text';
+  senderId: string;
+}
+
+interface ImageMessagePayload {
+  conversationId: string;
+  content: string;
+  mediaUrl: string;
+  messageType: 'image';
+  senderId: string;
+  tempId: string;
+}
+
 export function useChatContent(
   conversation: ConversationData | null,
   conversationId: string | null,
@@ -20,7 +37,7 @@ export function useChatContent(
   const [newMessageContent, setNewMessageContent] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [imageToSend, setImageToSend] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [participants, setParticipants] = useState<User[]>([]);
   const [hasMutualFollow, setHasMutualFollow] = useState<boolean | null>(null);
@@ -31,6 +48,21 @@ export function useChatContent(
   const readStatusRef = useRef<Record<string, boolean>>({});
   const failedMarkReadAttempts = useRef<Record<string, boolean>>({});
   const failedMessageMarkReadAttempts = useRef<Record<string, boolean>>({});
+
+  // Función para actualizar las URL temporales por las finales
+  const updateMediaUrlInMessage = useCallback((tempId: string, mediaUrl: string) => {
+    console.log(`Actualizando mensaje temporal ${tempId} con URL real:`, mediaUrl);
+    setMessages(prev => prev.map(msg => {
+      if (msg.id === tempId || msg.tempId === tempId) {
+        return { 
+          ...msg, 
+          mediaUrl,
+          status: 'sent'
+        };
+      }
+      return msg;
+    }));
+  }, []);
 
   // Función para desplazarse al final de los mensajes
   const scrollToBottom = useCallback(() => {
@@ -709,7 +741,7 @@ export function useChatContent(
     // Limpiar estado
     setNewMessageContent('');
     setImageToSend(null);
-    setImagePreview(null);
+    setImagePreview('');
     setUploadProgress(0);
     
     return () => {
@@ -746,7 +778,7 @@ export function useChatContent(
           image: session.user.image || null
         },
         messageType: 'text'
-      };
+      } as Message; // Forzar el tipo para evitar problemas de tipado
       
       // Añadir mensaje temporalmente a la lista
       setMessages(prev => [...prev, tempMessage]);
@@ -761,7 +793,7 @@ export function useChatContent(
           content: newMessageContent,
           messageType: 'text',
           senderId: session.user.id
-        });
+        } as MessagePayload); // Usar un tipo más específico en lugar de any
       } else {
         // Fallback si no hay conexión socket
         await fetch(`/api/messages/conversations/${conversationId}/messages`, {
@@ -781,7 +813,7 @@ export function useChatContent(
     } finally {
       setSendingMessage(false);
     }
-  }, [conversationId, session?.user, newMessageContent, connected, sendMessage, scrollToBottom, conversation?.type, hasMutualFollow]);
+  }, [conversationId, session?.user, newMessageContent, connected, sendMessage, scrollToBottom, hasMutualFollow, conversation?.type]);
 
   // Enviar mensaje de imagen
   const sendImageMessage = useCallback(async (file: File) => {
@@ -789,136 +821,132 @@ export function useChatContent(
     
     // Verificar si hay seguimiento mutuo para conversaciones privadas
     if (conversation?.type === 'private' && hasMutualFollow === false) {
-      console.log('[useChatContent] No se puede enviar imagen: no hay seguimiento mutuo');
+      setError('No puedes enviar mensajes a este usuario hasta que os sigáis mutuamente');
       return;
     }
-    
-    // Generar un ID temporal único para identificar este mensaje
-    const tempId = cuid();
-    
-    // Crear un mensaje temporal para mostrar en la UI mientras se envía
-    const tempMessage: Message = {
-      tempId,
-      content: '',
-      mediaUrl: URL.createObjectURL(file),
-      senderId: session.user.id,
-      receiverId: conversation?.otherId,
-      conversationId: conversation?.id || '',
-      messageType: 'image',
-      status: 'sending',
-      createdAt: new Date().toISOString(),
-    };
-    
-    // Agregar a la lista de mensajes localmente (actualización optimista)
-    setMessages(prev => [...prev, tempMessage]);
+
+    setSendingMessage(true);
+    const tempId = `temp-${cuid()}`;
     
     try {
-      // Establecer estado de envío
-      setSendingMessage(true);
+      // Crear una URL temporal para mostrar la imagen durante la carga
+      const tempImageUrl = URL.createObjectURL(file);
       
-      // Subir la imagen a Cloudinary mediante la API de upload
+      // Crear mensaje temporal con fecha válida y tipos correctos
+      const tempMessage: Message = {
+        id: tempId,
+        content: '',
+        mediaUrl: tempImageUrl,
+        messageType: 'image',
+        senderId: session.user.id,
+        conversationId: conversationId,
+        createdAt: new Date().toISOString(),
+        status: 'sending',
+        tempId
+      } as Message; // Forzar el tipo para evitar problemas de tipado
+      
+      // Añadir mensaje temporal a la lista
+      setMessages(prev => [...prev, tempMessage]);
+      
+      // Crear FormData para la imagen
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('type', 'image');
       
-      const uploadRes = await fetch('/api/messages/upload', {
+      // Subir imagen a Cloudinary a través de nuestra API de mensajes
+      const uploadResponse = await fetch('/api/messages/upload', {
         method: 'POST',
-        body: formData,
+        body: formData
       });
       
-      if (!uploadRes.ok) {
-        throw new Error('Error al subir la imagen');
+      if (!uploadResponse || !uploadResponse.ok) {
+        throw new Error('Error al subir imagen');
       }
       
-      const { url: imageUrl } = await uploadRes.json();
+      const { url: cloudinaryUrl } = await uploadResponse.json();
       
-      if (!imageUrl) {
-        throw new Error('No se obtuvo URL de la imagen');
+      if (!cloudinaryUrl) {
+        throw new Error('No se recibió URL de imagen');
       }
       
-      // Ahora, enviar el mensaje con la URL de Cloudinary
+      // Actualizar mensaje temporal con la URL real de Cloudinary
+      updateMediaUrlInMessage(tempId, cloudinaryUrl);
+      
+      // Enviar mensaje por socket o API REST
       if (connected) {
-        // Enviar mediante Socket.io usando la URL de Cloudinary
-        sendMessage({
+        await sendMessage({
+          conversationId,
+          content: '',
+          mediaUrl: cloudinaryUrl,
           messageType: 'image',
-          conversationId: conversation?.id,
           senderId: session.user.id,
-          receiverId: conversation?.otherId,
-          tempId,
-          content: '', // Contenido vacío para imágenes
-          mediaUrl: imageUrl, // Usar la URL de Cloudinary en lugar del base64
-          createdAt: new Date().toISOString(),
-          status: 'sending'
-        });
+          tempId
+        } as ImageMessagePayload); // Usar un tipo más específico en lugar de any
       } else {
-        // Fallback: Enviar por API REST
-        const payload = {
-          messageType: 'image',
-          conversationId: conversation?.id,
-          senderId: session.user.id,
-          receiverId: conversation?.otherId,
-          mediaUrl: imageUrl,
-          content: ''
-        };
-        
-        const response = await fetch('/api/messages', {
+        // Fallback si no hay conexión socket
+        const response = await fetch(`/api/messages/conversations/${conversationId}/messages`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: '',
+            mediaUrl: cloudinaryUrl,
+            messageType: 'image',
+            tempId
+          })
         });
         
         if (!response.ok) {
-          throw new Error('Error al enviar la imagen');
+          throw new Error('Error al enviar mensaje de imagen');
         }
         
-        const data = await response.json();
+        const savedMessage = await response.json();
         
-        // Actualizar el mensaje temporal con la información real
+        // Actualizar el mensaje temporal con los datos del mensaje guardado
         setMessages(prev => prev.map(msg => 
-          msg.tempId === tempId 
-            ? { ...data.message, status: 'delivered' } 
+          msg.id === tempId 
+            ? { 
+                ...savedMessage,
+                mediaUrl: cloudinaryUrl, // Asegurar que mediaUrl esté presente
+                status: 'sent',
+                createdAt: savedMessage.createdAt || new Date().toISOString()
+              } 
             : msg
         ));
+        
+        console.log('Respuesta del servidor (fallback HTTP):', savedMessage);
       }
       
-      // Limpiar la vista previa y restablecer estados
+      // Limpiar estado de imagen
       setImageToSend(null);
-      setImagePreview(null);
+      setImagePreview('');
       setUploadProgress(0);
       
-      // Desplazar al final después de enviar
+      // Desplazar al final
       scrollToBottom();
       
     } catch (error) {
-      console.error('Error enviando imagen:', error);
-      
-      // Marcar el mensaje como fallido
-      setMessages(prev => prev.map(msg => 
-        msg.tempId === tempId 
-          ? { ...msg, status: 'failed' } 
-          : msg
-      ));
-      
-      // Mostrar mensaje de error en UI
-      // toast?.({
-      //   title: "Error",
-      //   description: "No se pudo enviar la imagen",
-      //   variant: "destructive",
-      // });
+      console.error('Error sending image:', error);
+      // Eliminar mensaje temporal en caso de error
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
+      setError('Error al enviar la imagen');
     } finally {
       setSendingMessage(false);
     }
-  }, [conversation, session?.user?.id, connected, sendMessage, scrollToBottom, hasMutualFollow]);
+  }, [conversationId, session?.user?.id, connected, sendMessage, scrollToBottom, hasMutualFollow, updateMediaUrlInMessage, conversation?.type]);
 
   // Enviar mensaje de voz
   const sendVoiceMessage = useCallback(async (audioBlob: Blob) => {
     if (!conversationId || !session?.user?.id || !audioBlob) return;
     
+    // Verificar si hay seguimiento mutuo para conversaciones privadas
+    if (conversation?.type === 'private' && hasMutualFollow === false) {
+      setError('No puedes enviar mensajes a este usuario hasta que os sigáis mutuamente');
+      return;
+    }
+    
+    setSendingMessage(true);
+    const tempId = `temp-voice-${cuid()}`;
+    
     try {
-      setSendingMessage(true);
-      
       // Crear un data URL temporal para mostrar en la UI inmediatamente
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
@@ -929,74 +957,143 @@ export function useChatContent(
         reader.onerror = reject;
       });
       
-      // ID temporal para el mensaje
-      const tempId = `temp-voice-${Date.now()}`;
-      
-      // Crear objeto de mensaje temporal para UI
+      // Crear objeto de mensaje temporal para UI con todos los campos necesarios
+      const now = new Date();
       const tempMessage: Message = {
         id: tempId,
-        content: audioDataUrl,
-        createdAt: new Date(),
-        read: true,
+        content: '',
+        mediaUrl: audioDataUrl,
+        messageType: 'voice',
         senderId: session.user.id,
+        conversationId: conversationId,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        status: 'sending',
+        read: false,
+        tempId,
         sender: {
           id: session.user.id,
-          username: session.user.name || session.user.username || 'Usuario',
+          name: session.user.name || '',
+          username: session.user.username || session.user.name || 'Usuario',
           image: session.user.image || null
-        },
-        messageType: 'voice'
-      };
+        }
+      } as Message;
       
       // Añadir mensaje temporalmente a la lista
       setMessages(prev => [...prev, tempMessage]);
       
-      // Iniciar carga a Cloudinary
+      // Crear FormData para el audio
       const formData = new FormData();
-      formData.append('file', audioBlob, 'voice-message.webm');
-      formData.append('upload_preset', 'hemeroteca_digital');
-      formData.append('resource_type', 'video'); // Para archivos de audio
       
-      // Cargar archivo a Cloudinary
-      const cloudinaryResponse = await fetch('https://api.cloudinary.com/v1_1/hemeroteca-digital/upload', {
-        method: 'POST',
-        body: formData
-      });
-      
-      const cloudinaryData = await cloudinaryResponse.json();
-      
-      if (!cloudinaryData.secure_url) {
-        throw new Error('Error al cargar archivo de audio');
+      // Convertir a mp3 o formato compatible si es posible
+      // Si es webm u otro formato, Cloudinary lo convertirá, pero asignemos un nombre con extensión apropiada
+      let fileName = 'voice-message.mp3';
+      if (audioBlob.type.includes('webm')) {
+        fileName = 'voice-message.webm';
+      } else if (audioBlob.type.includes('mp4')) {
+        fileName = 'voice-message.mp4';
       }
       
-      // URL del audio en Cloudinary
-      const audioUrl = cloudinaryData.secure_url;
+      formData.append('file', audioBlob, fileName);
       
-      // Enviar mensaje por socket
+      // Opcionalmente agregar metadatos para indicar formato deseado
+      formData.append('format', 'mp3');
+      
+      // Intentar subir hasta 3 veces en caso de errores
+      let uploadResponse = null;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount < maxRetries && !uploadResponse) {
+        try {
+          if (retryCount > 0) {
+            console.log(`Reintentando subida de audio (intento ${retryCount + 1}/${maxRetries})...`);
+          }
+          
+          // Subir audio a Cloudinary a través de nuestra API
+          uploadResponse = await fetch('/api/messages/upload', {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!uploadResponse || !uploadResponse.ok) {
+            const errorData = await uploadResponse?.json().catch(() => ({}));
+            console.error('Error en respuesta de API:', errorData);
+            const errorMessage = uploadResponse ? `Error al subir archivo de audio: ${uploadResponse.statusText}` : 'Error al conectar con el servidor';
+            uploadResponse = null; // Para que siga reintentando
+            throw new Error(errorMessage);
+          }
+        } catch (error) {
+          console.error(`Error en intento ${retryCount + 1}:`, error);
+          retryCount++;
+          
+          if (retryCount >= maxRetries) {
+            throw error;
+          }
+          
+          // Esperar antes de reintentar (backoff exponencial)
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+        }
+      }
+      
+      if (!uploadResponse || !uploadResponse.ok) {
+        throw new Error('No se pudo subir el archivo de audio después de varios intentos');
+      }
+      
+      const responseData = await uploadResponse.json();
+      const cloudinaryUrl = responseData.url;
+      
+      if (!cloudinaryUrl) {
+        throw new Error('No se recibió URL de audio');
+      }
+      
+      console.log("URL de Cloudinary recibida:", cloudinaryUrl);
+      
+      // Actualizar mensaje temporal con la URL real de Cloudinary
+      updateMediaUrlInMessage(tempId, cloudinaryUrl);
+      
+      // Enviar mensaje por socket o API REST
       if (connected) {
         await sendMessage({
           conversationId,
-          content: audioUrl,
+          content: '',
+          mediaUrl: cloudinaryUrl,
           messageType: 'voice',
-          senderId: session.user.id
+          senderId: session.user.id,
+          tempId
         });
       } else {
         // Fallback si no hay conexión socket
-        await fetch(`/api/messages/conversations/${conversationId}/messages`, {
+        const response = await fetch(`/api/messages/conversations/${conversationId}/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            content: audioUrl, 
-            messageType: 'voice' 
+            content: '',
+            mediaUrl: cloudinaryUrl, 
+            messageType: 'voice',
+            tempId
           })
         });
+        
+        if (!response.ok) {
+          throw new Error('Error al enviar mensaje de voz');
+        }
+        
+        const savedMessage = await response.json();
+        console.log('Respuesta del servidor (fallback HTTP):', savedMessage);
+        
+        // Actualizar el mensaje temporal con los datos del mensaje guardado
+        setMessages(prev => prev.map(msg => 
+          msg.id === tempId 
+            ? { 
+                ...savedMessage,
+                mediaUrl: cloudinaryUrl, // Asegurar que mediaUrl esté presente
+                status: 'sent',
+                createdAt: savedMessage.createdAt || new Date().toISOString()
+              } 
+            : msg
+        ));
       }
-      
-      // Actualizar el mensaje temporal con la URL de Cloudinary
-      setMessages(prev => prev.map(msg => 
-        msg.id === tempId 
-          ? { ...msg, content: audioUrl } 
-          : msg
-      ));
       
       // Desplazar al final después de enviar
       scrollToBottom();
@@ -1004,11 +1101,12 @@ export function useChatContent(
     } catch (error) {
       console.error('Error sending voice message:', error);
       // Eliminar mensaje temporal en caso de error
-      setMessages(prev => prev.filter(msg => !msg.id?.startsWith('temp-voice-')));
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
+      setError('Error al enviar el mensaje de voz');
     } finally {
       setSendingMessage(false);
     }
-  }, [conversationId, session?.user, connected, sendMessage, scrollToBottom]);
+  }, [conversationId, session?.user, connected, sendMessage, scrollToBottom, hasMutualFollow, updateMediaUrlInMessage, conversation?.type]);
 
   // Enviar mensaje (texto o imagen)
   const handleSendMessage = useCallback(async () => {
@@ -1028,7 +1126,7 @@ export function useChatContent(
       const previewUrl = URL.createObjectURL(file);
       setImagePreview(previewUrl);
     } else {
-      setImagePreview(null);
+      setImagePreview('');
     }
     
     setUploadProgress(0);

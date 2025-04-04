@@ -111,6 +111,17 @@ const PrivateMessageItem = React.memo(({
   const [imageLoaded, setImageLoaded] = React.useState(false);
   const [useCloudinary, setUseCloudinary] = React.useState(true);
 
+  // Verificar si el mensaje tiene una URL de medios válida
+  const hasValidMediaUrl = React.useMemo(() => {
+    if (!message.mediaUrl) return false;
+    
+    // Si es un Data URL o blob URL (mensaje temporal), considerarlo válido
+    if (message.mediaUrl.startsWith('data:') || message.mediaUrl.startsWith('blob:')) return true;
+    
+    // Para URLs normales, comprobar que sea una string no vacía
+    return message.mediaUrl.trim().length > 0;
+  }, [message.mediaUrl]);
+
   // Función para determinar el texto de estado del mensaje
   const getMessageStatusText = () => {
     if (!isCurrentUser) return null;
@@ -132,7 +143,7 @@ const PrivateMessageItem = React.memo(({
   
   // Determinar si es un mensaje de voz
   const isVoiceMessage = message.messageType === 'voice';
-  const isImageMessage = message.messageType === 'image' && message.mediaUrl;
+  const isImageMessage = message.messageType === 'image' && hasValidMediaUrl;
 
   return (
     <>
@@ -192,6 +203,17 @@ const PrivateMessageItem = React.memo(({
                       setImageLoaded(true);
                       setUseCloudinary(false);
                     }}
+                    onLoad={() => setImageLoaded(true)}
+                  />
+                ) : message.mediaUrl && (message.mediaUrl.startsWith('data:') || message.mediaUrl.startsWith('blob:')) ? (
+                  <CldImage 
+                    src={message.mediaUrl}
+                    alt="Imagen adjunta"
+                    className="rounded-lg object-cover w-full h-auto max-h-[400px]"
+                    width={400}
+                    height={300}
+                    quality={100}
+                    onError={() => setImageLoaded(true)}
                     onLoad={() => setImageLoaded(true)}
                   />
                 ) : (
@@ -609,7 +631,7 @@ const PrivateChatWindow = ({
   if (loading && !messages.length) {
     return (
       <div className={cn("flex flex-col h-full justify-center items-center p-4", className)}>
-        <LoadingSpinner className="h-8 w-8 mb-2" />
+        <LoadingSpinner className="h-8 w-8" />
       </div>
     );
   }
@@ -737,6 +759,19 @@ const PrivateChatWindow = ({
         <div className="p-2 border-t dark:border-gray-700">
           <div className="relative inline-block">
             {imagePreview && imagePreview.includes('cloudinary.com') && previewUseCloudinary ? (
+              <CldImage 
+                src={extractCloudinaryId(imagePreview)}
+                alt="Vista previa" 
+                className="max-h-40 max-w-full rounded-lg"
+                width={150}
+                height={150}
+                quality={100}
+                onError={() => {
+                  console.log("Error cargando imagen de Cloudinary, usando fallback");
+                  setPreviewUseCloudinary(false);
+                }}
+              />
+            ) : imagePreview && (imagePreview.startsWith('data:') || imagePreview.startsWith('blob:')) ? (
               <CldImage 
                 src={extractCloudinaryId(imagePreview)}
                 alt="Vista previa" 
