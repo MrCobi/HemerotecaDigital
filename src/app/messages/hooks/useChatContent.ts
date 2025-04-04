@@ -401,8 +401,6 @@ export function useChatContent(
       loadingMoreRef.current = false;
     }
   }, [conversationId, session?.user?.id, page, scrollToBottom, markConversationAsRead]);
-  
-
 
   // Cargar participantes de la conversación
   const fetchParticipants = useCallback(async () => {
@@ -476,7 +474,7 @@ export function useChatContent(
       // Encontrar el participante que no es el usuario actual
       const currentUserId = session.user?.id;
       const otherParticipant = participantsData.participants?.find(
-        (p: any) => p.userId !== currentUserId
+        (p: { userId: string }) => p.userId !== currentUserId
       );
       
       if (!otherParticipant) {
@@ -513,7 +511,7 @@ export function useChatContent(
       console.error('[useChatContent] Error al verificar seguimiento mutuo:', error);
       setHasMutualFollow(false);
     }
-  }, [conversationId, session?.user?.id, conversation?.type, participants, fetchParticipants]);
+  }, [conversationId, session?.user?.id, participants]);
 
   // Socket para mensajes en tiempo real
   const { 
@@ -783,7 +781,7 @@ export function useChatContent(
     } finally {
       setSendingMessage(false);
     }
-  }, [conversationId, session?.user, newMessageContent, connected, sendMessage, scrollToBottom]);
+  }, [conversationId, session?.user, newMessageContent, connected, sendMessage, scrollToBottom, conversation?.type, hasMutualFollow]);
 
   // Enviar mensaje de imagen
   const sendImageMessage = useCallback(async (file: File) => {
@@ -912,7 +910,7 @@ export function useChatContent(
     } finally {
       setSendingMessage(false);
     }
-  }, [conversation, session?.user?.id, connected, sendMessage, scrollToBottom]);
+  }, [conversation, session?.user?.id, connected, sendMessage, scrollToBottom, hasMutualFollow]);
 
   // Enviar mensaje de voz
   const sendVoiceMessage = useCallback(async (audioBlob: Blob) => {
