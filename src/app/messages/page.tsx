@@ -1,25 +1,22 @@
 // src/app/messages/page.optimized.tsx
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/src/app/components/ui/button";
 import { MessageSquarePlus, Users, MessageCircle, Plus } from "lucide-react";
-import _NewMessageModal from "../components/Chat/NewMessageModal";
-import _CreateGroupModal from "../components/Chat/CreateGroupModal";
 import Image from "next/image";
 import { useMessagesState } from "./hooks/useMessagesState";
 import MessageContainer from "../components/Chat/MessageContainer";
 import GroupManagementModal from '../components/Chat/GroupManagementModal';
 import ConversationList from '../components/Chat/ConversationList';
-import { MessageService } from "./services/messageService";
-import { FilterType, User, Participant } from "./types";
+import { User, Participant } from "./types";
 import { useToast } from "@/src/app/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
 import { useConversationUpdates } from "./hooks/useConversationUpdates";
 import { useGroupUpdates } from "./hooks/useGroupUpdates";
 
-
+const CONVERSATIONS_PER_PAGE = 20;
 
 // Componente de spinner de carga
 const LoadingSpinner = ({ size = "medium" }: { size?: "small" | "medium" | "large" }) => {
@@ -64,7 +61,6 @@ export default function MessagesPage() {
   // Estados para modales
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
   const [createGroupState, setCreateGroupState] = useState<{
     name: string;
     description: string;
@@ -83,29 +79,141 @@ export default function MessagesPage() {
 
   // Usar el hook personalizado para el estado principal de mensajes
   const {
+    loading,
     conversations,
     fetchConversations,
-    mutualFollowers,
-    mutualFollowersForGroups,
-    loading,
-    mobileView,
     selectedConversation,
+    selectConversation, // Esta es la función correcta para seleccionar conversaciones
     selectedConversationData,
     isGroupAdmin,
-    selectConversation,
-    setSelectedConversationData,
+    mobileView,
+    mutualFollowers,
+    mutualFollowersForGroups,
     showGroupManagementModal,
     toggleGroupManagementModal,
-    // Añadir estados y funciones de paginación
-    loadingMore,
-    // Añadir estados y funciones de filtrado
+    // Estados y funciones de paginación
+    loadingPage,
+    currentPage,
+    totalPages,
+    totalConversations,
+    changePage,
+    // Estados y funciones de filtrado
     generalSearchTerm,
     setGeneralSearchTerm,
-    filteredConversations
+    combinedList,
+    setSelectedFilter: _setSelectedFilter, // Función para cambiar el filtro en el hook
+    selectedFilter: _selectedFilter, // Renombrado para evitar redeclaración
   } = useMessagesState();
   
-  // Variable no utilizada con el prefijo _ para cumplir con la regla de ESLint
-  const _unused = setSelectedConversationData;
+  // Para servicios de mensajes que no están en el hook
+  const MessageService = useMemo(() => ({
+    fetchConversationById: async (conversationId: string | null) => {
+      if (!conversationId) return null;
+      try {
+        const response = await fetch(`/api/messages/conversations/${conversationId}`);
+        if (response.ok) {
+          return await response.json();
+        }
+        return null;
+      } catch (error) {
+        console.error("Error fetching conversation:", error);
+        return null;
+      }
+    },
+    
+    // Obtener el conteo de mensajes no leídos
+    getUnreadCount: async () => {
+      try {
+        const response = await fetch('/api/messages/unread/count');
+        if (response.ok) {
+          const data = await response.json();
+          return data.count || 0;
+        }
+        return 0;
+      } catch (error) {
+        console.error("Error fetching unread count:", error);
+        return 0;
+      }
+    },
+    
+    // Crear una nueva conversación
+    createConversation: async (userId: string) => {
+      try {
+        const response = await fetch('/api/messages/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        
+        if (response.ok) {
+          return await response.json();
+        }
+        return null;
+      } catch (error) {
+        console.error("Error creating conversation:", error);
+        return null;
+      }
+    },
+    
+    // Crear un nuevo grupo
+    createGroup: async (groupData: {
+      name: string;
+      description?: string;
+      participants?: string[];
+      image?: File | null;
+    }) => {
+      try {
+        const formData = new FormData();
+        formData.append('name', groupData.name);
+        formData.append('description', groupData.description || '');
+        
+        // Añadir participantes
+        if (groupData.participants && groupData.participants.length > 0) {
+          groupData.participants.forEach((participant: string) => {
+            formData.append('participants', participant);
+          });
+        }
+        
+        // Añadir imagen si existe
+        if (groupData.image instanceof File) {
+          formData.append('image', groupData.image);
+        }
+        
+        const response = await fetch('/api/messages/groups', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (response.ok) {
+          return await response.json();
+        }
+        
+        return null;
+      } catch (error) {
+        console.error("Error creating group:", error);
+        return null;
+      }
+    },
+    
+    // Añadir participantes a un grupo
+    addGroupParticipants: async (groupId: string, participantIds: string[]) => {
+      try {
+        const response = await fetch(`/api/messages/groups/${groupId}/participants`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ participantIds })
+        });
+        
+        if (response.ok) {
+          return await response.json();
+        }
+        return null;
+      } catch (error) {
+        console.error("Error adding participants:", error);
+        return null;
+      }
+    }
+  }), []);
 
   // Usar el hook para actualizaciones en tiempo real
   useConversationUpdates(fetchConversations);
@@ -192,7 +300,7 @@ export default function MessagesPage() {
     } catch (error) {
       console.error('Error al obtener contadores de mensajes no leídos:', error);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, MessageService]);
 
   // Función para buscar seguidores mutuos basado en término de búsqueda
   const _searchMutualFollowers = useCallback((_term: string) => {
@@ -250,7 +358,7 @@ export default function MessagesPage() {
         variant: "destructive",
       });
     }
-  }, [fetchConversations, toast, setShowNewMessageModal]);
+  }, [fetchConversations, toast, setShowNewMessageModal, MessageService]);
 
   // Procesar el ID de conversación de la URL al cargar
   useEffect(() => {
@@ -293,7 +401,7 @@ export default function MessagesPage() {
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, [mobileView]);
+  }, []);
 
   // Función para crear un nuevo grupo
   const handleCreateGroup = useCallback(async () => {
@@ -317,8 +425,6 @@ export default function MessagesPage() {
         description: createGroupState.description,
         participants: participantIds,
         image: createGroupState.image || undefined
-      }, (progress) => {
-        console.log(`Progreso de carga: ${progress}%`);
       });
       
       // Actualizar la lista de conversaciones
@@ -351,7 +457,7 @@ export default function MessagesPage() {
     } finally {
       setCreateGroupState(prev => ({ ...prev, isCreating: false }));
     }
-  }, [createGroupState, toast, fetchConversations]);
+  }, [createGroupState, toast, fetchConversations, MessageService]);
 
   // Función para manejar la selección de imagen de grupo
   const handleGroupImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -430,7 +536,7 @@ export default function MessagesPage() {
         variant: "destructive",
       });
     }
-  }, [selectedConversationData, selectedConversation, toast, fetchConversations, selectConversation]);
+  }, [selectedConversationData, selectedConversation, toast, fetchConversations, selectConversation, MessageService]);
 
   // Función para abrir el modal de crear grupo
   const handleCreateGroupClick = useCallback(async () => {
@@ -542,25 +648,43 @@ export default function MessagesPage() {
           <div className="flex flex-col w-full h-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-700">
             <ConversationList
               loading={loading}
-              combinedList={filteredConversations}
+              combinedList={combinedList}
               selectedConversation={selectedConversation}
               onConversationSelect={(conversation) => selectConversation(conversation.id)}
               onUserSelect={handleUserSelection}
-              onNewMessage={handleNewMessageClick}
-              onNewGroup={handleCreateGroupClick}
-              onRefresh={fetchConversations}
-              onFilterChange={setSelectedFilter}
-              selectedFilter={selectedFilter}
+              onNewMessage={() => setShowNewMessageModal(true)}
+              onNewGroup={() => setShowCreateGroupModal(true)}
+              onRefresh={() => fetchConversations(true)}
+              onFilterChange={(filter) => {
+                console.log(`MessagesPage: Cambiando filtro a ${filter} (filtro actual: ${_selectedFilter})`);
+                _setSelectedFilter(filter);
+                
+                // Forzar fetch inmediato después de cambiar el filtro
+                setTimeout(() => {
+                  console.log(`Forzando actualización para filtro: ${filter} (filtro actual: ${_selectedFilter})`);
+                  fetchConversations(true, true, filter); // Pasar el filtro explícitamente
+                }, 100);
+              }}
+              selectedFilter={_selectedFilter}
               generalSearchTerm={generalSearchTerm}
               onSearchChange={setGeneralSearchTerm}
               session={{user: session?.user ? {id: session.user.id} : undefined}}
               showHeader={false}
               showFilters={true}
               showSearchInput={true}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalConversations={totalConversations}
+              onPageChange={(page) => {
+                console.log(`MessagesPage: Solicitud de cambio a página ${page}`);
+                changePage(page);
+              }}
+              itemsPerPage={CONVERSATIONS_PER_PAGE}
+              loadingPage={loadingPage}
             />
             
             {/* Indicador de carga al cargar más conversaciones */}
-            {loadingMore && (
+            {loadingPage && (
               <div className="py-3 text-center">
                 <LoadingSpinner size="small" />
               </div>

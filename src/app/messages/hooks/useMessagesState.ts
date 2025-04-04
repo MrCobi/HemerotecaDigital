@@ -12,13 +12,12 @@ import {
 } from '../types';
 import { API_ROUTES } from '@/src/config/api-routes';
 
-// Configuración
-const CONVERSATIONS_PER_PAGE = 5;
-const REFRESH_INTERVAL = 60000; // 60 segundos
-
 export function useMessagesState() {
   const { data: session, status } = useSession();
   
+  // Configuración
+  const CONVERSATIONS_PER_PAGE = 5;
+
   // Estados principales de conversación
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [mutualFollowers, setMutualFollowers] = useState<User[]>([]);
@@ -28,13 +27,34 @@ export function useMessagesState() {
   const [error, setError] = useState<string | null>(null);
   
   // Estados de paginación
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalConversations, setTotalConversations] = useState(0);
+  const [loadingPage, setLoadingPage] = useState(false);
   
   // Estados de filtrado y búsqueda
-  const [generalSearchTerm, setGeneralSearchTerm] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
+  const [generalSearchTerm, setGeneralSearchTermState] = useState("");
+  const [selectedFilterState, setSelectedFilterState] = useState<FilterType>('all');
+
+  // Estado real del filtro, recuperándolo de sessionStorage si existe
+  const selectedFilter = useMemo(() => {
+    // Ejecutar solo en el cliente
+    if (typeof window !== 'undefined') {
+      const savedFilter = sessionStorage.getItem('messagesFilter');
+      if (savedFilter && (savedFilter === 'all' || savedFilter === 'private' || savedFilter === 'group')) {
+        console.log(`Recuperando filtro guardado: ${savedFilter}`);
+        return savedFilter as FilterType;
+      }
+    }
+    return selectedFilterState;
+  }, [selectedFilterState]);
+
+  // Guardar el filtro en sessionStorage cuando cambie
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.log(`Guardando filtro en sessionStorage: ${selectedFilter}`);
+      sessionStorage.setItem('messagesFilter', selectedFilter);
+    }
+  }, [selectedFilter]);
   
   // Estados de conversación seleccionada
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
@@ -64,6 +84,18 @@ export function useMessagesState() {
   
   // Referencia para saber si es la carga inicial
   const _isInitialLoadRef = useRef(true);
+
+  // Referencia para evitar solicitudes simultáneas
+  const isLoadingRef = useRef(false);
+
+  // Referencia para ignorar la siguiente actualización periódica
+  const ignoreNextRefreshRef = useRef(false);
+
+  // Variable compartida a nivel de aplicación para evitar solicitudes duplicadas
+  const paginationRequestInProgressRef = useRef(false);
+
+  // Referencia para mantener el valor actualizado de currentPage entre renders
+  const currentPageRef = useRef(1);
 
   // Función para procesar la respuesta de conversaciones
   const processConvResponse = useCallback(async (conversationsRes: Response): Promise<Conversation[]> => {
@@ -209,29 +241,40 @@ export function useMessagesState() {
   }, [session?.user?.id]);
 
   // Función para cargar conversaciones
-  const fetchConversations = useCallback(async (forceRefresh = false) => {
+  const fetchConversations = useCallback(async (forceRefresh = false, resetToPage1 = false, explicitFilter?: FilterType) => {
     if (status !== 'authenticated' || !session?.user?.id) return;
+    if (isLoadingRef.current) {
+      console.log('Ya hay una solicitud en curso, ignorando llamada redundante');
+      return;
+    }
 
     try {
+      isLoadingRef.current = true;
+      
       if (forceRefresh) {
         setLoading(true);
-        setPage(1);
       }
       
-      // Construir URL con los parámetros necesarios, asegurando que filter siempre está incluido
-      const params = new URLSearchParams({
-        limit: CONVERSATIONS_PER_PAGE.toString(),
-        page: forceRefresh ? '1' : page.toString(),
-        filter: selectedFilter // Incluir el filtro seleccionado siempre
-      });
+      // Solo resetear a página 1 si se indica explícitamente
+      if (resetToPage1) {
+        console.log(`Reseteando página a 1 desde ${currentPageRef.current} (resetToPage1=${resetToPage1})`);
+        currentPageRef.current = 1;
+      }
+      
+      // Usar el filtro explícito si se proporciona (para cambios de filtro inmediatos)
+      // De lo contrario, usar el estado actual
+      const activeFilter = explicitFilter || selectedFilter;
+      console.log(`Filtro a utilizar en la petición: ${activeFilter} (selectedFilter: ${selectedFilter}, explicitFilter: ${explicitFilter || 'no proporcionado'})`);
+      
+      // Construir la URL directamente para mayor control y depuración
+      let url = `/api/messages/conversations?page=${currentPageRef.current}&limit=${CONVERSATIONS_PER_PAGE}&filter=${activeFilter}`;
       
       // Añadir término de búsqueda si existe
       if (generalSearchTerm.trim()) {
-        params.append('search', encodeURIComponent(generalSearchTerm.trim()));
+        url += `&search=${encodeURIComponent(generalSearchTerm.trim())}`;
       }
       
-      const url = `/api/messages/conversations?${params.toString()}`;
-      console.log(`Solicitando conversaciones: ${url}`);
+      console.log(`Solicitando conversaciones: ${url} (forceRefresh=${forceRefresh}, resetToPage1=${resetToPage1}, página actual=${currentPageRef.current}, filtro=${activeFilter})`);
       
       // Obtener conversaciones
       const response = await fetch(url);
@@ -241,7 +284,7 @@ export function useMessagesState() {
       }
       
       const data = await response.json();
-      console.log(`Recibidas ${data.conversations.length} conversaciones con filtro: ${selectedFilter}`);
+      console.log(`Recibidas ${data.conversations.length} conversaciones de un total de ${data.totalCount}`);
       
       // Procesar las conversaciones de forma síncrona
       const conversationsData = data.conversations || [];
@@ -250,50 +293,168 @@ export function useMessagesState() {
       );
       
       // Si es carga inicial o página 1, reemplazar conversaciones
-      if (forceRefresh || page === 1) {
+      if (forceRefresh) {
         setConversations(processedConversations);
       } else {
-        setConversations(prev => [...prev, ...processedConversations]);
+        // Evitar duplicados al agregar más conversaciones
+        const existingIds = new Set(conversations.map(c => c.id));
+        const newConversations = processedConversations.filter(c => !existingIds.has(c.id));
+        
+        if (newConversations.length > 0) {
+          setConversations(prev => [...prev, ...newConversations]);
+        }
       }
       
-      setHasMore(data.hasMore || false);
+      // Actualizar estado de paginación
+      setTotalPages(Math.ceil(data.totalCount / CONVERSATIONS_PER_PAGE));
+      setTotalConversations(data.totalCount || 0);
       
-      // Obtener seguidores mutuos
+      // Obtener seguidores mutuos solo en carga inicial
       if (forceRefresh) {
         const mutualRes = await fetch('/api/relationships/mutual');
         const mutualData = await processMutualResponse(mutualRes);
         setMutualFollowers(mutualData);
         setMutualFollowersForGroups(mutualData);
-        setLoading(false);
       }
     } catch (error) {
       console.error('Error al cargar conversaciones:', error);
       setError('No se pudieron cargar las conversaciones');
+    } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
-  }, [status, session?.user?.id, processConvResponse, processMutualResponse, page, selectedFilter, generalSearchTerm]);
+  }, [status, session?.user?.id, processConvResponse, processMutualResponse, selectedFilter, generalSearchTerm, conversations]);
 
   // Manejar cambio de filtro
   const _handleFilterChange = useCallback((filter: FilterType) => {
     console.log(`Hook: Cambiando filtro a ${filter}`);
-    setSelectedFilter(filter);
-    // La recarga se hará por el efecto cuando cambie selectedFilter
-  }, []);
+    setSelectedFilterState(filter);
+  }, [setSelectedFilterState]);
 
-  // Efecto para cargar conversaciones cuando cambia el filtro
+  // Actualizaciones para controlar las conversaciones
   useEffect(() => {
-    console.log(`Filtro seleccionado cambiado a: ${selectedFilter}, recargando...`);
-    fetchConversations(true);
-  }, [fetchConversations, selectedFilter]);
+    // Solo cargar conversaciones cuando la sesión está autenticada
+    if (status === 'authenticated' && session?.user?.id) {
+      // Cargar conversaciones iniciales solo si no hay una solicitud de paginación en curso
+      if (!paginationRequestInProgressRef.current) {
+        fetchConversations(true);
+      }
+      
+      // IMPORTANTE: Se deshabilitan TODAS las actualizaciones automáticas
+      // para resolver el problema de paginación. Estas se pueden reactivar
+      // después cuando se solucione el problema principal.
+      
+      /* DESACTIVADO TEMPORALMENTE
+      const intervalId = setInterval(() => {
+        if (!loadingPage && !paginationRequestInProgressRef.current) {
+          console.log(`Actualización periódica - manteniendo página ${currentPageRef.current}`);
+          fetchConversations(false, false);
+        }
+      }, REFRESH_INTERVAL);
+      
+      return () => clearInterval(intervalId);
+      */
+    }
+  }, [status, session?.user?.id, fetchConversations]);
 
-  // Función para cargar más conversaciones
-  const loadMoreConversations = useCallback(() => {
-    if (loadingMore || !hasMore) return;
+  // Actualizaciones cuando el filtro o la búsqueda cambian
+  useEffect(() => {
+    // Este efecto se disparará cuando cambie el filtro o término de búsqueda
+    // Ignoramos este efecto durante la carga inicial
+    if (!_isInitialLoadRef.current && !ignoreNextRefreshRef.current) {
+      console.log(`Cambio explícito de filtro/búsqueda: ${selectedFilter}, búsqueda: '${generalSearchTerm}'`);
+      // Reiniciar página y cargar desde el inicio cuando cambia el filtro o la búsqueda
+      currentPageRef.current = 1;
+      fetchConversations(true);
+    }
+    _isInitialLoadRef.current = false;
+  }, [selectedFilter, generalSearchTerm, fetchConversations]);
+
+  // Función para cambiar de página de conversaciones
+  const changePage = useCallback(async (page: number) => {
+    console.log(`Cambiando a la página ${page} (actual en ref: ${currentPageRef.current})`);
     
-    setLoadingMore(true);
-    setPage(prevPage => prevPage + 1);
-    fetchConversations(false);
-  }, [fetchConversations, hasMore, loadingMore]);
+    // Comprobar si ya está en proceso otra solicitud
+    if (paginationRequestInProgressRef.current) {
+      console.log('Ignorando cambio de página - ya hay una solicitud en curso');
+      return;
+    }
+    
+    // IMPORTANTE: No ignorar nunca el cambio a la página 1, incluso si currentPageRef.current es 1
+    // porque puede haber desincronización entre la UI y el estado.
+    if (page !== 1 && page === currentPageRef.current) {
+      console.log(`La página solicitada ${page} es igual a la actual ${currentPageRef.current}, pero continuando por si acaso hay desincronización`);
+    }
+    
+    // Registrar que hay una solicitud de paginación en curso
+    paginationRequestInProgressRef.current = true;
+    setLoadingPage(true);
+    
+    try {
+      // IMPORTANTE: Actualizar la página actual inmediatamente, antes incluso de la petición
+      // para evitar cualquier interferencia y asegurar que la UI refleje el cambio inmediatamente
+      currentPageRef.current = page;
+      
+      // Construir URL con los parámetros usando la página solicitada
+      const params = new URLSearchParams({
+        page: page.toString(), // La página solicitada ya es correcta (base 1)
+        limit: CONVERSATIONS_PER_PAGE.toString(),
+        filter: selectedFilter
+      });
+      
+      // Añadir término de búsqueda si existe
+      if (generalSearchTerm.trim()) {
+        params.append('search', encodeURIComponent(generalSearchTerm.trim()));
+      }
+      
+      const url = `/api/messages/conversations?${params.toString()}`;
+      console.log(`Solicitando conversaciones para página ${page}: ${url}`);
+      
+      // Obtener conversaciones
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Error al cargar conversaciones: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log(`Recibidas ${data.conversations.length} conversaciones de un total de ${data.totalCount}`);
+      
+      // Procesar las conversaciones
+      const conversationsData = data.conversations || [];
+      const processedConversations = await processConvResponse(
+        new Response(JSON.stringify(conversationsData))
+      );
+      
+      // Actualizar los datos
+      setConversations(processedConversations);
+      setTotalPages(Math.ceil(data.totalCount / CONVERSATIONS_PER_PAGE));
+      setTotalConversations(data.totalCount || 0);
+      
+      // Asegurar que la página actual siga siendo correcta (doble comprobación)
+      console.log(`Estado de página actualizado a: ${page}`);
+      
+      // IMPORTANTE: Cancelar cualquier efecto secundario o actualización pendiente
+      // que pudiera interferir con nuestra navegación
+      ignoreNextRefreshRef.current = true;
+      setTimeout(() => {
+        ignoreNextRefreshRef.current = false;
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error al cambiar de página:', error);
+      setError('No se pudieron cargar las conversaciones para esta página');
+    } finally {
+      setLoadingPage(false);
+      paginationRequestInProgressRef.current = false;
+    }
+  }, [currentPageRef, selectedFilter, generalSearchTerm, processConvResponse]);
+
+  // Cargar más conversaciones (incrementar página)
+  const loadMoreConversations = useCallback(() => {
+    // Usar la nueva función changePage para navegar a la siguiente página
+    changePage(currentPageRef.current + 1);
+  }, [changePage, currentPageRef]);
 
   // Función para cargar una conversación específica
   const fetchConversationById = useCallback(async (conversationId: string) => {
@@ -410,8 +571,12 @@ export function useMessagesState() {
               return [newConv, ...prev];
             });
             
-            // Formatear para el componente
-            const formattedData: ConversationData = {
+            // Para conversaciones nuevas, seleccionamos directamente usando los datos que ya tenemos
+            // en lugar de hacer un fetch adicional
+            setSelectedConversation(newConv.id);
+            
+            // Crear el objeto ConversationData directamente
+            const convData: ConversationData = {
               id: newConv.id,
               name: newConv.name || null,
               description: newConv.description || null,
@@ -425,11 +590,11 @@ export function useMessagesState() {
               unreadCount: newConv.unreadCount
             };
             
-            setSelectedConversationData(formattedData);
+            setSelectedConversationData(convData);
             
             // Verificar permisos de administrador
-            if (formattedData.isGroup && formattedData.participants) {
-              const currentUserParticipant = formattedData.participants.find(
+            if (convData.isGroup && convData.participants) {
+              const currentUserParticipant = convData.participants.find(
                 p => p.userId === session?.user?.id
               );
               
@@ -693,6 +858,34 @@ export function useMessagesState() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Wrapper para manejar el cambio de términos de búsqueda
+  const setGeneralSearchTerm = useCallback((term: string) => {
+    setGeneralSearchTermState(term);
+    // Al cambiar el término de búsqueda, reiniciar a página 1 y hacer nueva solicitud
+    currentPageRef.current = 1;
+    // Pequeño retraso para evitar múltiples solicitudes al escribir rápidamente
+    setTimeout(() => {
+      fetchConversations(true); // true = forceRefresh
+    }, 300);
+  }, [fetchConversations]);
+
+  // Wrapper para manejar el cambio de filtro
+  const setSelectedFilter = useCallback((filter: FilterType) => {
+    console.log(`useMessagesState: Estableciendo filtro a ${filter}`);
+    
+    // Guardar filtro en sessionStorage inmediatamente para evitar condiciones de carrera
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('messagesFilter', filter);
+      console.log(`Filtro guardado en sessionStorage: ${filter}`);
+    }
+    
+    setSelectedFilterState(filter);
+    // Al cambiar el filtro, reiniciamos a página 1 y forzamos actualización
+    currentPageRef.current = 1;
+    // Usamos el nuevo valor directamente
+    fetchConversations(true, true, filter);
+  }, [fetchConversations]);
+
   // Métodos para manipular estados
   const toggleNewMessageModal = useCallback(() => {
     setShowNewMessageModal(prev => !prev);
@@ -731,7 +924,7 @@ export function useMessagesState() {
         const newParticipant: Participant = {
           id: crypto.randomUUID(),
           userId: user.id,
-          role: 'member',
+          role: 'member' as const,
           user
         };
         
@@ -768,16 +961,37 @@ export function useMessagesState() {
   // Cargar datos iniciales
   useEffect(() => {
     if (status === 'authenticated') {
+      // Carga inicial normal (reset a página 1)
       fetchConversations(true);
       
-      // Configurar actualización periódica
+      // IMPORTANTE: Se deshabilitan TODAS las actualizaciones automáticas
+      // para resolver el problema de paginación. Estas se pueden reactivar
+      // después cuando se solucione el problema principal.
+      
+      /* DESACTIVADO TEMPORALMENTE
       const intervalId = setInterval(() => {
-        fetchConversations(false);
+        console.log(`Actualización periódica - manteniendo página ${currentPageRef.current}`);
+        fetchConversations(false, false);
       }, REFRESH_INTERVAL);
       
       return () => clearInterval(intervalId);
+      */
     }
   }, [status, fetchConversations]);
+
+  // Manejar cambio de filtro
+  useEffect(() => {
+    // Solo ejecutar este efecto cuando cambie explícitamente el filtro o la búsqueda
+    // y no durante la carga inicial o durante una solicitud de paginación en curso
+    if (!_isInitialLoadRef.current && !paginationRequestInProgressRef.current) {
+      console.log(`Cambio EXPLÍCITO de filtro: ${selectedFilter}, búsqueda: '${generalSearchTerm}'`);
+      
+      // Aquí SÍ debemos resetear a página 1 (es comportamiento esperado con filtros)
+      currentPageRef.current = 1;
+      // Importante: llamar a fetchConversations con resetToPage1=false para evitar doble reset
+      fetchConversations(true, false);
+    }
+  }, [selectedFilter, generalSearchTerm, fetchConversations]);
 
   return {
     // Estados
@@ -801,10 +1015,12 @@ export function useMessagesState() {
     isGroupAdmin,
     
     // Estados de paginación
-    page,
-    hasMore,
-    loadingMore,
+    currentPage: currentPageRef.current,
+    totalPages,
+    totalConversations,
+    loadingPage,
     loadMoreConversations,
+    changePage,
     
     // Acciones
     fetchConversations,

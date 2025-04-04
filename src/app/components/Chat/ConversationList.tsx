@@ -10,6 +10,7 @@ import Image from "next/image";
 import { CldImage } from "next-cloudinary";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import ConversationPagination from './ConversationPagination';
 
 // Importamos los tipos
 import { User, Conversation, CombinedItem } from '@/src/app/messages/types';
@@ -37,6 +38,13 @@ interface ConversationListProps {
   showHeader?: boolean;
   showFilters?: boolean;
   showSearchInput?: boolean;
+  // Props para nueva paginación numerada
+  currentPage?: number;
+  totalPages?: number;
+  totalConversations?: number;
+  onPageChange?: (page: number) => void;
+  itemsPerPage?: number;
+  loadingPage?: boolean;
 }
 
 interface ConversationItemProps {
@@ -251,84 +259,21 @@ const ConversationList = React.memo(({
   session,
   showHeader = true,
   showFilters = true,
-  showSearchInput = true
+  showSearchInput = true,
+  currentPage,
+  totalPages,
+  totalConversations,
+  onPageChange,
+  itemsPerPage,
+  loadingPage
 }: ConversationListProps) => {
   
   // Filtrar las conversaciones según los criterios seleccionados
   const filteredConversations = useMemo(() => {
-    // Primero filtramos por tipo (todo, privado, grupo)
-    let filtered = combinedList.filter(item => {
-      // Para filtro "todos" - mostrar todo sin filtrar
-      if (selectedFilter === 'all') return true;
-      
-      if (item.isConversation) {
-        const conv = item.data as Conversation;
-        
-        // Para filtro de grupos - mostrar sólo grupos
-        if (selectedFilter === 'group') {
-          return conv.isGroup === true;
-        }
-        
-        // Para filtro de privados - mostrar SOLO chats 1:1 (no grupos)
-        if (selectedFilter === 'private') {
-          // Solo mostramos conversaciones directas 1:1 (que no son grupos)
-          return conv.isGroup !== true;
-        }
-      } else {
-        // Si es un usuario (no conversación), solo se muestra en filtro 'private'
-        return selectedFilter === 'private';
-      }
-      
-      return false;
-    });
-    
-    // Luego filtramos por texto de búsqueda con criterios específicos según el tipo
-    if (generalSearchTerm.trim()) {
-      const searchTermLower = generalSearchTerm.toLowerCase().trim();
-      
-      filtered = filtered.filter(item => {
-        if (item.isConversation) {
-          const conv = item.data as Conversation;
-          
-          if (conv.isGroup) {
-            // Criterios específicos para grupos
-            const name = conv.name || '';
-            const participants = conv.participants || [];
-            const lastMessageContent = conv.lastMessage?.content || '';
-            
-            // Buscar en nombre del grupo, participantes o último mensaje
-            return (
-              name.toLowerCase().includes(searchTermLower) ||
-              lastMessageContent.toLowerCase().includes(searchTermLower) ||
-              participants.some(p => 
-                (p.user?.username || '').toLowerCase().includes(searchTermLower) ||
-                (p.user?.name || '').toLowerCase().includes(searchTermLower)
-              )
-            );
-          } else {
-            // Criterios específicos para conversaciones privadas
-            const otherUser = conv.otherUser || {};
-            const lastMessageContent = conv.lastMessage?.content || '';
-            
-            return (
-              (otherUser.username || '').toLowerCase().includes(searchTermLower) ||
-              (otherUser.name || '').toLowerCase().includes(searchTermLower) ||
-              lastMessageContent.toLowerCase().includes(searchTermLower)
-            );
-          }
-        } else {
-          // Criterios específicos para usuarios (no conversaciones)
-          const user = item.data as User;
-          return (
-            (user.username || '').toLowerCase().includes(searchTermLower) ||
-            (user.name || '').toLowerCase().includes(searchTermLower)
-          );
-        }
-      });
-    }
-    
-    return filtered;
-  }, [combinedList, selectedFilter, generalSearchTerm]);
+    // Ya no filtramos nada localmente, usamos directamente lo que viene del backend
+    // El backend ya aplica los filtros de tipo (all/private/group) y búsqueda
+    return combinedList;
+  }, [combinedList]);  
 
   return (
     <div className="flex flex-col h-full w-full bg-white dark:bg-gray-800">
@@ -388,7 +333,10 @@ const ConversationList = React.memo(({
             variant={selectedFilter === 'all' ? 'default' : 'ghost'}
             size="sm"
             className="flex-1"
-            onClick={() => onFilterChange('all')}
+            onClick={() => {
+              console.log('ConversationList: Botón TODOS clickeado, llamando a onFilterChange("all")');
+              onFilterChange('all');
+            }}
           >
             Todos
           </Button>
@@ -397,7 +345,10 @@ const ConversationList = React.memo(({
             variant={selectedFilter === 'private' ? 'default' : 'ghost'}
             size="sm"
             className="flex-1"
-            onClick={() => onFilterChange('private')}
+            onClick={() => {
+              console.log('ConversationList: Botón PRIVADOS clickeado, llamando a onFilterChange("private")');
+              onFilterChange('private');
+            }}
           >
             Privados
           </Button>
@@ -406,7 +357,10 @@ const ConversationList = React.memo(({
             variant={selectedFilter === 'group' ? 'default' : 'ghost'}
             size="sm"
             className="flex-1"
-            onClick={() => onFilterChange('group')}
+            onClick={() => {
+              console.log('ConversationList: Botón GRUPOS clickeado, llamando a onFilterChange("group")');
+              onFilterChange('group');
+            }}
           >
             Grupos
           </Button>
@@ -477,6 +431,18 @@ const ConversationList = React.memo(({
           </div>
         )}
       </div>
+      
+      {/* Paginación - Ahora fuera del contenedor de desplazamiento */}
+      {filteredConversations.length > 0 && (
+        <ConversationPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalConversations}
+          onPageChange={onPageChange}
+          itemsPerPage={itemsPerPage}
+          loadingPage={loadingPage}
+        />
+      )}
     </div>
   );
 });

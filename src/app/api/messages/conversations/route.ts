@@ -69,56 +69,156 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Obtener parámetros de paginación y búsqueda
+    // Obtener parámetros de paginación y filtrado
     const searchParams = request.nextUrl.searchParams;
-    const searchTerm = searchParams.get('search') || '';
+    
+    // Extraer y validar parámetros
+    const page = Math.max(1, Number(searchParams.get('page') || 1));
+    const limit = Math.min(50, Math.max(1, Number(searchParams.get('limit') || 10)));
+    const offset = (page - 1) * limit;
+    
+    // Extraer parámetro de filtro y decodificarlo correctamente
+    const filterRaw = searchParams.get('filter');
+    const filter = filterRaw || 'all';
+    
+    // Debug detallado
+    console.log(`API: Parámetro raw de filtro: "${filterRaw}"`);
+    console.log(`API: Tipo de filterRaw: ${typeof filterRaw}`);
+    console.log(`API: Filtro normalizado: "${filter}"`);
+    console.log(`API: searchParams completo:`, Object.fromEntries(searchParams.entries()));
+    
+    // Extraer término de búsqueda y decodificarlo
+    let searchTerm = searchParams.get('search') || '';
+    searchTerm = decodeURIComponent(searchTerm.trim());
+    if (searchTerm) {
+      console.log(`API: Término de búsqueda: "${searchTerm}"`);
+    }
     
     // Soportar tanto el formato page/limit como offset/limit
-    const limitParam = parseInt(searchParams.get('limit') || '20');
-    const page = parseInt(searchParams.get('page') || '1');
-    const offsetParam = parseInt(searchParams.get('offset') || '0');
+    const limitParam = limit;
+    const offsetParam = offset;
     
     // Calcular el offset real (priorizar offset si está presente, de lo contrario usar page)
-    const offset = searchParams.has('offset') ? offsetParam : (page - 1) * limitParam;
-    const limit = limitParam;
+    const offsetReal = offsetParam;
+    const limitReal = limitParam;
     
-    // Obtener el filtro (all, private, group)
-    const filter = searchParams.get('filter') || 'all';
-    
-    console.log(`API Request - User: ${session.user.id}, Filter: ${filter}, Search: '${searchTerm}', Limit: ${limit}, Page: ${page}, Offset: ${offset}`);
+    console.log(`API Request - User: ${session.user.id}, Filter: ${filter}, Search: '${searchTerm}', Limit: ${limitReal}, Page: ${page}, Offset: ${offsetReal}`);
 
     // Construir la cláusula WHERE según el filtro seleccionado
     let whereClause = `WHERE cp.user_id = '${session.user.id}'`;
     
-    // Aplicar filtro según el tipo seleccionado
+    // Aplicar filtro de tipo según lo solicitado
     if (filter === 'private') {
-      console.log("Aplicando filtro PRIVADO: is_group = 0");
+      console.log(`API: Aplicando filtro PRIVATE`);
+      // Solo conversaciones privadas (no grupales)
       whereClause += ` AND c.is_group = 0`;
     } else if (filter === 'group') {
-      console.log("Aplicando filtro GRUPO: is_group = 1");
+      console.log(`API: Aplicando filtro GROUP`);
+      // Solo conversaciones grupales
       whereClause += ` AND c.is_group = 1`;
     } else {
-      console.log("Sin filtro específico (all): mostrando todas las conversaciones");
+      console.log(`API: Aplicando filtro ALL (sin restricción de tipo)`);
+      // Todos los tipos
     }
     
-    // Aplicar búsqueda si hay término
+    // Aplicar búsqueda si hay término, RESPETANDO el filtro ya aplicado
     if (searchTerm) {
-      // Buscar por nombre en grupos o por nombre de usuario en conversaciones 1:1
-      whereClause += ` AND (
-        c.name LIKE '%${searchTerm}%' OR 
-        EXISTS (
+      // Cambiamos completamente la estrategia de búsqueda
+      console.log(`Buscando conversaciones con término: "${searchTerm}"`);
+      
+      // NUEVA LÓGICA: Solo mostrar lo que corresponda según el filtro
+      if (filter === 'private') {
+        // En modo privado solo buscamos conversaciones 1:1 con ese usuario
+        whereClause += ` AND EXISTS (
           SELECT 1 FROM users u 
           JOIN conversation_participants cp2 ON u.id = cp2.user_id 
           WHERE cp2.conversation_id = c.id 
           AND cp2.user_id != '${session.user.id}' 
-          AND (u.name LIKE '%${searchTerm}%' OR u.username LIKE '%${searchTerm}%')
-        )
-      )`;
+          AND (
+            u.name LIKE '%${searchTerm}%' OR 
+            u.username LIKE '%${searchTerm}%'
+          )
+        )`;
+      } else if (filter === 'group') {
+        // En modo grupo solo buscamos grupos cuyo nombre coincida
+        whereClause += ` AND c.name LIKE '%${searchTerm}%'`;
+      } else {
+        // En modo "todos", aplicamos la lógica combinada
+        whereClause += ` AND (
+          /* CASO 1: Grupos cuyo NOMBRE coincide con el término (ignorando participantes) */
+          (c.is_group = 1 AND c.name LIKE '%${searchTerm}%')
+          
+          OR
+          
+          /* CASO 2: Conversaciones privadas 1:1 con un usuario cuyo nombre/username coincide */
+          (c.is_group = 0 AND EXISTS (
+            SELECT 1 FROM users u 
+            JOIN conversation_participants cp2 ON u.id = cp2.user_id 
+            WHERE cp2.conversation_id = c.id 
+            AND cp2.user_id != '${session.user.id}' 
+            AND (
+              u.name LIKE '%${searchTerm}%' OR 
+              u.username LIKE '%${searchTerm}%'
+            )
+          ))
+        )`;
+      }
     }
     
     console.log(`Ejecutando consulta con WHERE: ${whereClause}`);
     
     // 1. Obtener conversaciones paginadas
+    // Modificamos el ORDER BY para priorizar conversaciones 1:1 con el usuario buscado
+    const orderByClause = searchTerm 
+      ? `
+        /* Orden de prioridad cuando hay búsqueda */
+        ORDER BY 
+          /* 1. Primero las conversaciones privadas 1:1 con usuarios que coincidan exactamente */
+          CASE WHEN 
+            c.is_group = 0 AND 
+            EXISTS (
+              SELECT 1 FROM users u 
+              JOIN conversation_participants cp2 ON u.id = cp2.user_id 
+              WHERE cp2.conversation_id = c.id 
+              AND cp2.user_id != '${session.user.id}' 
+              AND (
+                u.username = '${searchTerm}' OR 
+                u.name = '${searchTerm}'
+              ) 
+            )
+            THEN 0
+          /* 2. Luego las conversaciones privadas 1:1 con usuarios que coincidan parcialmente */
+          WHEN 
+            c.is_group = 0 AND 
+            EXISTS (
+              SELECT 1 FROM users u 
+              JOIN conversation_participants cp2 ON u.id = cp2.user_id 
+              WHERE cp2.conversation_id = c.id 
+              AND cp2.user_id != '${session.user.id}' 
+              AND (
+                u.username LIKE '%${searchTerm}%' OR 
+                u.name LIKE '%${searchTerm}%'
+              )
+            )
+            THEN 1
+          /* 3. Luego los grupos cuyo nombre coincida exactamente con la búsqueda */
+          WHEN c.is_group = 1 AND c.name = '${searchTerm}' THEN 2
+          /* 4. Luego los grupos cuyo nombre contenga la búsqueda */
+          WHEN c.is_group = 1 AND c.name LIKE '%${searchTerm}%' THEN 3
+          /* 5. Por último, otros resultados (que no deberían existir con el nuevo WHERE) */
+          ELSE 4
+          END,
+        /* Secundariamente ordenar por fecha de actualización */
+        c.updated_at DESC
+      `
+      : `ORDER BY c.updated_at DESC`; // Orden predeterminado si no hay búsqueda
+    
+    // MODIFICACIÓN CLAVE: Si hay un término de búsqueda, omitimos la paginación
+    // y devolvemos todas las coincidencias, luego haremos la selección manual
+    const limitOffsetClause = searchTerm 
+      ? `` // Sin límite cuando hay búsqueda, mostrar todos los resultados
+      : `LIMIT ${limitReal} OFFSET ${offsetReal}`; // Paginación normal en modo sin búsqueda
+    
     const userConversations = await prisma.$queryRawUnsafe(`
       SELECT 
         c.id as conversationId,
@@ -137,8 +237,8 @@ export async function GET(request: NextRequest) {
       JOIN conversation_participants cp ON c.id = cp.conversation_id
       LEFT JOIN group_settings gs ON c.id = gs.conversation_id
       ${whereClause}
-      ORDER BY c.updated_at DESC
-      LIMIT ${limit} OFFSET ${offset}
+      ${orderByClause}
+      ${limitOffsetClause}
     `);
 
     // Obtener el total para calcular si hay más páginas
@@ -165,23 +265,28 @@ export async function GET(request: NextRequest) {
         hasMore: false
       });
     }
+    
+    // Si hay un término de búsqueda, aplicamos manualmente la paginación después de obtener todos los resultados
+    let paginatedUserConversations = userConversations;
+    if (searchTerm && Array.isArray(userConversations)) {
+      // Limitamos a los resultados de la página actual
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      paginatedUserConversations = userConversations.slice(startIndex, endIndex);
+      
+      console.log(`Aplicando paginación manual: mostrando ${paginatedUserConversations.length} de ${userConversations.length} coincidencias (página ${page})`);
+    }
 
     // 2. Para cada conversación, obtener al otro participante
     const conversationsWithParticipants = await Promise.all(
-      (userConversations as { 
-        id: string; 
-        isGroup?: boolean; 
+      (paginatedUserConversations as Array<_ConversationResponse & { 
         conversationId?: string;
-        createdAt?: Date;
-        updatedAt?: Date;
-        created_at?: Date;
-        updated_at?: Date;
         isPrivate?: boolean;
         onlyAdminsCanInvite?: boolean;
         onlyAdminsCanMessage?: boolean;
         onlyAdminsCanEdit?: boolean;
         maxParticipants?: number;
-      }[]).map(async (conv) => {
+      }>).map(async (conv) => {
         try {
           // Determinar si es un grupo basado en el ID
           const isGroup = conv.isGroup || (typeof conv.conversationId === 'string' && conv.conversationId.startsWith('group_'));
@@ -356,7 +461,16 @@ export async function GET(request: NextRequest) {
       page,
       limit,
       totalCount,
-      hasMore: offset + sortedConversations.length < totalCount
+      hasMore: searchTerm 
+        ? (userConversations as (_ConversationResponse & { 
+            conversationId?: string;
+            isPrivate?: boolean;
+            onlyAdminsCanInvite?: boolean;
+            onlyAdminsCanMessage?: boolean;
+            onlyAdminsCanEdit?: boolean;
+            maxParticipants?: number;
+          })[]).length > (page * limit) // Para búsqueda, comprobamos contra el total de coincidencias 
+        : (page * limit) < totalCount // Para navegación normal, comprobamos contra el total en la base de datos
     });
 
   } catch (error) {
