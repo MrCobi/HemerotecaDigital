@@ -35,6 +35,9 @@ export function useMessagesState() {
   const [generalSearchTerm, setGeneralSearchTermState] = useState("");
   const [selectedFilterState, setSelectedFilterState] = useState<FilterType>('all');
 
+  // Referencia para almacenar el timeout de debounce de búsqueda
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   // Estado real del filtro, recuperándolo de sessionStorage si existe
   const selectedFilter = useMemo(() => {
     // Ejecutar solo en el cliente
@@ -266,14 +269,19 @@ export function useMessagesState() {
       const activeFilter = explicitFilter || selectedFilter;
       console.log(`Filtro a utilizar en la petición: ${activeFilter} (selectedFilter: ${selectedFilter}, explicitFilter: ${explicitFilter || 'no proporcionado'})`);
       
-      // Construir la URL directamente para mayor control y depuración
-      let url = `/api/messages/conversations?page=${currentPageRef.current}&limit=${CONVERSATIONS_PER_PAGE}&filter=${activeFilter}`;
+      // Construir la URL usando URLSearchParams para garantizar formato correcto
+      const params = new URLSearchParams();
+      params.append('page', currentPageRef.current.toString());
+      params.append('limit', CONVERSATIONS_PER_PAGE.toString());
+      params.append('filter', activeFilter);
       
-      // Añadir término de búsqueda si existe
-      if (generalSearchTerm.trim()) {
-        url += `&search=${encodeURIComponent(generalSearchTerm.trim())}`;
+      // Añadir término de búsqueda SOLO si existe y no está vacío
+      const trimmedSearchTerm = generalSearchTerm.trim();
+      if (trimmedSearchTerm) {
+        params.append('search', encodeURIComponent(trimmedSearchTerm));
       }
       
+      const url = `/api/messages/conversations?${params.toString()}`;
       console.log(`Solicitando conversaciones: ${url} (forceRefresh=${forceRefresh}, resetToPage1=${resetToPage1}, página actual=${currentPageRef.current}, filtro=${activeFilter})`);
       
       // Obtener conversaciones
@@ -323,7 +331,7 @@ export function useMessagesState() {
       setLoading(false);
       isLoadingRef.current = false;
     }
-  }, [status, session?.user?.id, processConvResponse, processMutualResponse, selectedFilter, generalSearchTerm, conversations]);
+  }, [status, session?.user?.id, processConvResponse, processMutualResponse, selectedFilter, generalSearchTerm, CONVERSATIONS_PER_PAGE, conversations]);
 
   // Manejar cambio de filtro
   const _handleFilterChange = useCallback((filter: FilterType) => {
@@ -358,6 +366,9 @@ export function useMessagesState() {
   }, [status, session?.user?.id, fetchConversations]);
 
   // Actualizaciones cuando el filtro o la búsqueda cambian
+  const fetchConversationsRef = useRef(fetchConversations);
+  fetchConversationsRef.current = fetchConversations;
+
   useEffect(() => {
     // Este efecto se disparará cuando cambie el filtro o término de búsqueda
     // Ignoramos este efecto durante la carga inicial
@@ -365,10 +376,11 @@ export function useMessagesState() {
       console.log(`Cambio explícito de filtro/búsqueda: ${selectedFilter}, búsqueda: '${generalSearchTerm}'`);
       // Reiniciar página y cargar desde el inicio cuando cambia el filtro o la búsqueda
       currentPageRef.current = 1;
-      fetchConversations(true);
+      // Usamos el nuevo valor directamente
+      fetchConversationsRef.current(true);
     }
     _isInitialLoadRef.current = false;
-  }, [selectedFilter, generalSearchTerm, fetchConversations]);
+  }, [selectedFilter, generalSearchTerm]);
 
   // Función para cambiar de página de conversaciones
   const changePage = useCallback(async (page: number) => {
@@ -858,15 +870,46 @@ export function useMessagesState() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Wrapper para manejar el cambio de términos de búsqueda
+  // Función para actualizar el término de búsqueda con debounce
   const setGeneralSearchTerm = useCallback((term: string) => {
+    // Limpiar el timeout anterior si existe
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    
+    // Actualizar inmediatamente el estado para la UI
     setGeneralSearchTermState(term);
-    // Al cambiar el término de búsqueda, reiniciar a página 1 y hacer nueva solicitud
-    currentPageRef.current = 1;
-    // Pequeño retraso para evitar múltiples solicitudes al escribir rápidamente
-    setTimeout(() => {
-      fetchConversations(true); // true = forceRefresh
-    }, 300);
+    
+    // Debounce para evitar múltiples peticiones durante la escritura rápida
+    searchDebounceRef.current = setTimeout(() => {
+      console.log(`Término de búsqueda actualizado a: "${term}" (debounce completado)`);
+      
+      // Resetear a la página 1 al buscar o borrar la búsqueda
+      currentPageRef.current = 1;
+      
+      // Bloquear otras actualizaciones automáticas durante esta operación
+      ignoreNextRefreshRef.current = true;
+      
+      // Realizar la búsqueda una sola vez
+      if (!isLoadingRef.current) {
+        fetchConversations(true, true);
+      } else {
+        console.log('Esperando a que termine la petición actual antes de buscar');
+        const checkAndFetch = () => {
+          if (!isLoadingRef.current) {
+            fetchConversations(true, true);
+          } else {
+            setTimeout(checkAndFetch, 100);
+          }
+        };
+        setTimeout(checkAndFetch, 100);
+      }
+      
+      // Restaurar flag después de un tiempo
+      setTimeout(() => {
+        ignoreNextRefreshRef.current = false;
+      }, 500);
+    }, 300); // 300ms de debounce
   }, [fetchConversations]);
 
   // Wrapper para manejar el cambio de filtro
@@ -981,17 +1024,22 @@ export function useMessagesState() {
 
   // Manejar cambio de filtro
   useEffect(() => {
-    // Solo ejecutar este efecto cuando cambie explícitamente el filtro o la búsqueda
+    // Solo ejecutar este efecto cuando cambie explícitamente el filtro
     // y no durante la carga inicial o durante una solicitud de paginación en curso
-    if (!_isInitialLoadRef.current && !paginationRequestInProgressRef.current) {
-      console.log(`Cambio EXPLÍCITO de filtro: ${selectedFilter}, búsqueda: '${generalSearchTerm}'`);
+    if (!_isInitialLoadRef.current && !paginationRequestInProgressRef.current && !ignoreNextRefreshRef.current) {
+      console.log(`Cambio EXPLÍCITO de filtro: ${selectedFilter}`);
       
       // Aquí SÍ debemos resetear a página 1 (es comportamiento esperado con filtros)
       currentPageRef.current = 1;
       // Importante: llamar a fetchConversations con resetToPage1=false para evitar doble reset
       fetchConversations(true, false);
     }
-  }, [selectedFilter, generalSearchTerm, fetchConversations]);
+    
+    // Resetear el flag después de ignorar una actualización
+    if (ignoreNextRefreshRef.current) {
+      ignoreNextRefreshRef.current = false;
+    }
+  }, [selectedFilter, fetchConversations]);
 
   return {
     // Estados
