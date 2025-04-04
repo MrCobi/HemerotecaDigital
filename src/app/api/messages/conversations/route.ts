@@ -494,7 +494,8 @@ export async function POST(request: NextRequest): Promise<NextResponse>  {
     }
 
     const data = await request.json();
-    const { receiverId } = data;
+    // Aceptar tanto receiverId como userId (para compatibilidad)
+    const receiverId = data.receiverId || data.userId;
 
     if (!receiverId) {
       return NextResponse.json(
@@ -502,6 +503,8 @@ export async function POST(request: NextRequest): Promise<NextResponse>  {
         { status: 400 }
       );
     }
+
+    console.log(`[API] Creando conversación con destinatario: ${receiverId}`);
 
     // Verificar que el destinatario exista
     const receiver = await prisma.user.findUnique({

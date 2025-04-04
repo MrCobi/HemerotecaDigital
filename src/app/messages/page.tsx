@@ -163,25 +163,43 @@ export default function MessagesPage() {
       image?: File | null;
     }) => {
       try {
-        const formData = new FormData();
-        formData.append('name', groupData.name);
-        formData.append('description', groupData.description || '');
+        // Si hay una imagen, necesitamos subir la imagen primero
+        let imageUrl = undefined;
         
-        // Añadir participantes
-        if (groupData.participants && groupData.participants.length > 0) {
-          groupData.participants.forEach((participant: string) => {
-            formData.append('participants', participant);
-          });
-        }
-        
-        // Añadir imagen si existe
         if (groupData.image instanceof File) {
-          formData.append('image', groupData.image);
+          const imageFormData = new FormData();
+          imageFormData.append('file', groupData.image);
+          
+          try {
+            const uploadResponse = await fetch('/api/upload', {
+              method: 'POST',
+              body: imageFormData
+            });
+            
+            if (uploadResponse.ok) {
+              const uploadResult = await uploadResponse.json();
+              imageUrl = uploadResult.url;
+              console.log('Imagen subida correctamente:', imageUrl);
+            } else {
+              console.error('Error al subir la imagen');
+            }
+          } catch (error) {
+            console.error('Error al subir la imagen:', error);
+          }
         }
         
-        const response = await fetch('/api/messages/groups', {
+        // Enviar los datos como JSON
+        const response = await fetch('/api/messages/group', {
           method: 'POST',
-          body: formData
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: groupData.name,
+            description: groupData.description || '',
+            participantIds: groupData.participants || [],
+            imageUrl: imageUrl
+          })
         });
         
         if (response.ok) {

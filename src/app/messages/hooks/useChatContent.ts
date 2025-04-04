@@ -15,7 +15,7 @@ export function useChatContent(
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [page, setPage] = useState(1);
   const [newMessageContent, setNewMessageContent] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
@@ -23,6 +23,7 @@ export function useChatContent(
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [participants, setParticipants] = useState<User[]>([]);
+  const [hasMutualFollow, setHasMutualFollow] = useState<boolean | null>(null);
   const firstLoadRef = useRef(true);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const loadingMoreRef = useRef(false);
@@ -335,6 +336,8 @@ export function useChatContent(
     }
   }, [conversation, addNewMessage]);
 
+
+
   // Cargar mensajes
   const fetchMessages = useCallback(async () => {
     if (!conversationId || !session?.user?.id || loadingMoreRef.current) return;
@@ -398,6 +401,8 @@ export function useChatContent(
       loadingMoreRef.current = false;
     }
   }, [conversationId, session?.user?.id, page, scrollToBottom, markConversationAsRead]);
+  
+
 
   // Cargar participantes de la conversación
   const fetchParticipants = useCallback(async () => {
@@ -425,6 +430,90 @@ export function useChatContent(
       console.error('Error al cargar participantes:', error);
     }
   }, [conversationId, session?.user?.id, conversation]);
+
+  // Función para comprobar si existe seguimiento mutuo
+  const checkMutualFollow = useCallback(async () => {
+    console.log(`[useChatContent] Iniciando checkMutualFollow:`, {
+      conversationId,
+      userId: session?.user?.id,
+      isPrivate: conversationId?.startsWith('conv_'),
+      participantsCount: participants?.length || 0
+    });
+    
+    if (!conversationId || !session?.user?.id) {
+      console.log('[useChatContent] No hay conversationId o userId, cancelando checkMutualFollow');
+      return;
+    }
+    
+    // Verificar si es una conversación privada basado en el ID
+    const isPrivateConversation = conversationId?.startsWith('conv_');
+    if (!isPrivateConversation) {
+      // Si no es una conversación privada, no se requiere seguimiento mutuo
+      console.log('[useChatContent] No es conversación privada (ID no comienza con conv_), estableciendo hasMutualFollow=true');
+      setHasMutualFollow(true);
+      return;
+    }
+    
+    try {
+      // Necesitamos cargar directamente desde la base de datos
+      console.log('[useChatContent] Cargando información de los participantes para la conversación:', conversationId);
+      
+      // Llamar directamente a una API para obtener los participantes de la conversación
+      const participantsResponse = await fetch(`/api/messages/conversation-participants?conversationId=${conversationId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store'
+      });
+      
+      if (!participantsResponse.ok) {
+        console.error('[useChatContent] Error al cargar participantes de la conversación:', participantsResponse.statusText);
+        return;
+      }
+      
+      const participantsData = await participantsResponse.json();
+      console.log('[useChatContent] Datos de participantes obtenidos:', participantsData);
+      
+      // Encontrar el participante que no es el usuario actual
+      const currentUserId = session.user?.id;
+      const otherParticipant = participantsData.participants?.find(
+        (p: any) => p.userId !== currentUserId
+      );
+      
+      if (!otherParticipant) {
+        console.error('[useChatContent] No se encontró al otro participante en esta conversación');
+        return;
+      }
+      
+      const otherUserId = otherParticipant.userId;
+      console.log('[useChatContent] ID del otro usuario encontrado:', otherUserId);
+      
+      // Log detallado para depuración
+      console.log(`[useChatContent] Datos para verificación de seguimiento mutuo:`, {
+        currentUserId: session.user?.id,
+        otherUserId
+      });
+      
+      // Llamar al endpoint correcto para verificar el seguimiento mutuo
+      console.log(`[useChatContent] Verificando seguimiento mutuo con usuario: ${otherUserId}`);
+      const response = await fetch(`/api/relationships/check-mutual?userId=${otherUserId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[useChatContent] Resultado verificación seguimiento mutuo:`, data);
+        setHasMutualFollow(data.mutualFollow);
+      } else {
+        console.error('[useChatContent] Error al verificar seguimiento mutuo:', response.status);
+        setHasMutualFollow(false);
+      }
+    } catch (error) {
+      console.error('[useChatContent] Error al verificar seguimiento mutuo:', error);
+      setHasMutualFollow(false);
+    }
+  }, [conversationId, session?.user?.id, conversation?.type, participants, fetchParticipants]);
 
   // Socket para mensajes en tiempo real
   const { 
@@ -552,6 +641,29 @@ export function useChatContent(
         fetchParticipants();
       }
       
+      // Verificar si hay seguimiento mutuo (solo para conversaciones privadas)
+      console.log(`[useChatContent] Verificando tipo de conversación:`, {
+        conversationId,
+        isGroup: conversation?.isGroup,
+        isConvIdPrivate: conversationId?.startsWith('conv_'),
+        isConvIdGroup: conversationId?.startsWith('group_'),
+        participantsCount: participants?.length || 0,
+        userId: session?.user?.id
+      });
+      
+      // Determinar si es una conversación privada basado en el formato del ID
+      const isPrivateConversation = conversationId?.startsWith('conv_');
+      console.log(`[useChatContent] ¿Es conversación privada? ${isPrivateConversation}`);
+      
+      if (isPrivateConversation) {
+        console.log(`[useChatContent] Conversación privada detectada por ID, iniciando verificación de seguimiento mutuo`);
+        checkMutualFollow();
+      } else {
+        // Para conversaciones grupales, siempre permitir mensajes
+        console.log(`[useChatContent] Conversación grupal (ID no comienza con conv_), estableciendo hasMutualFollow=true`);
+        setHasMutualFollow(true);
+      }
+      
       // Limpiar al desmontar
       return () => {
         console.log(`[useChatContent] Saliendo de conversación: ${stableConversationId}`);
@@ -614,6 +726,12 @@ export function useChatContent(
   const sendTextMessage = useCallback(async () => {
     if (!conversationId || !session?.user?.id || !newMessageContent.trim()) return;
     
+    // Verificar si hay seguimiento mutuo para conversaciones privadas
+    if (conversation?.type === 'private' && hasMutualFollow === false) {
+      console.log('[useChatContent] No se puede enviar mensaje: no hay seguimiento mutuo');
+      return;
+    }
+    
     try {
       setSendingMessage(true);
       
@@ -670,6 +788,12 @@ export function useChatContent(
   // Enviar mensaje de imagen
   const sendImageMessage = useCallback(async (file: File) => {
     if (!file || !session?.user?.id) return;
+    
+    // Verificar si hay seguimiento mutuo para conversaciones privadas
+    if (conversation?.type === 'private' && hasMutualFollow === false) {
+      console.log('[useChatContent] No se puede enviar imagen: no hay seguimiento mutuo');
+      return;
+    }
     
     // Generar un ID temporal único para identificar este mensaje
     const tempId = cuid();
@@ -967,6 +1091,7 @@ export function useChatContent(
     imagePreview,
     uploadProgress,
     participants,
+    hasMutualFollow,
     
     setNewMessageContent,
     handleSendMessage,

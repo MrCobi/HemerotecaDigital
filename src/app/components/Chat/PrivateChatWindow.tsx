@@ -289,6 +289,7 @@ const PrivateChatWindow = ({
     hasMoreMessages: _hasMoreMessages,
     newMessageContent,
     sendingMessage,
+    hasMutualFollow,
     imageToSend,
     uploadProgress: _uploadProgressChat,
     
@@ -801,6 +802,13 @@ const PrivateChatWindow = ({
         </div>
       )}
       
+      {/* Mensaje de advertencia cuando no hay seguimiento mutuo */}
+      {hasMutualFollow === false && (
+        <div className="bg-amber-50 text-amber-800 p-3 rounded-lg mb-3 text-sm">
+          <p>No puedes enviar mensajes a este usuario porque no os seguís mutuamente.</p>
+        </div>
+      )}
+
       {/* Formulario para enviar mensajes */}
       <div className="p-3 border-t flex flex-col">
 
@@ -812,7 +820,7 @@ const PrivateChatWindow = ({
             size="icon"
             onClick={openFileSelector}
             className="h-10 w-10 flex-shrink-0"
-            disabled={sendingMessage || showVoiceRecorder}
+            disabled={sendingMessage || showVoiceRecorder || hasMutualFollow === false}
           >
             <ImageIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <input
@@ -831,7 +839,7 @@ const PrivateChatWindow = ({
             size="icon"
             onClick={handleStartVoiceRecording}
             className="h-10 w-10 flex-shrink-0"
-            disabled={sendingMessage || showVoiceRecorder}
+            disabled={sendingMessage || showVoiceRecorder || hasMutualFollow === false}
           >
             <Mic className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </Button>
@@ -840,7 +848,7 @@ const PrivateChatWindow = ({
             <Textarea
               value={newMessageContent}
               onChange={handleTextChange}
-              placeholder="Escribe un mensaje..."
+              placeholder={hasMutualFollow === false ? "No podéis enviaros mensajes si no os seguís mutuamente" : "Escribe un mensaje..."}
               className="resize-none min-h-[40px] max-h-[120px] py-2 pr-10"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -848,7 +856,7 @@ const PrivateChatWindow = ({
                   handleSendMessage();
                 }
               }}
-              disabled={sendingMessage || showVoiceRecorder}
+              disabled={sendingMessage || showVoiceRecorder || hasMutualFollow === false}
             />
             <Button
               type="button"
@@ -856,7 +864,7 @@ const PrivateChatWindow = ({
               size="icon"
               onClick={handleSendMessage}
               className="absolute right-2 bottom-1 h-8 w-8"
-              disabled={(!newMessageContent.trim() && !imageToSend) || sendingMessage || showVoiceRecorder}
+              disabled={(!newMessageContent.trim() && !imageToSend) || sendingMessage || showVoiceRecorder || hasMutualFollow === false}
             >
               {sendingMessage ? (
                 <LoadingSpinner className="h-4 w-4" showText={false} />
