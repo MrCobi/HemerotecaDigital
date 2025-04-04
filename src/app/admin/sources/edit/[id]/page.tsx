@@ -368,11 +368,13 @@ export default function EditSourcePage() {
                         {imagePreview && (
                           <div className="mx-auto max-w-[200px] max-h-[200px] overflow-hidden rounded-md border border-gray-200 shadow-sm">
                             <SafeImage
-                              src={imagePreview || "/placeholder-image.jpg"}
+                              src={imagePreview || "/images/default_periodico.jpg"}
                               alt="Vista previa"
                               width={200}
-                              height={150}
+                              height={200}
                               className="h-auto w-full object-cover"
+                              fallbackSrc="/images/default_periodico.jpg"
+                              priority
                             />
                           </div>
                         )}
