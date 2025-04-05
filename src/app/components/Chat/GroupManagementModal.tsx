@@ -74,6 +74,9 @@ export const GroupManagementModal = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   
+  // NUEVO: Estado local para participantes para actualización inmediata en la interfaz
+  const [localParticipants, setLocalParticipants] = useState<Participant[]>([]);
+  
   // IMPORTANTE: Guardar los valores actuales para que no se pierdan en renderizados
   const savedNameRef = useRef(groupName);
   const savedDescriptionRef = useRef(groupDescription);
@@ -109,11 +112,84 @@ export const GroupManagementModal = ({
         setGroupDescription(conversationData.description || "");
       }
       
+      // Inicializar el estado local de participantes
+      setLocalParticipants(conversationData.participants || []);
+      
       console.log("[DEBUG] Modal abierto: usando valores guardados:", 
         { savedName: savedNameRef.current || conversationData.name, 
-          savedDescription: savedDescriptionRef.current || conversationData.description });
+          savedDescription: savedDescriptionRef.current || conversationData.description,
+          participantsCount: conversationData.participants?.length || 0 });
     }
   }, [isOpen, conversationData]);
+
+  // NUEVO: Escuchar eventos de actualización de grupo para actualizar la interfaz inmediatamente
+  useEffect(() => {
+    // Solo activar si el modal está abierto y tenemos datos de conversación
+    if (!isOpen || !conversationData || !conversationData.id) return;
+    
+    const handleGroupDataUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { conversationId: updatedGroupId, updateType, data } = customEvent.detail;
+      
+      // Solo actualizar si es este grupo
+      if (updatedGroupId !== conversationData.id) return;
+      
+      console.log(`[GroupManagementModal] Detectado evento ${updateType} para este grupo:`, data);
+      
+      // Actualizar según el tipo de evento
+      if (updateType === 'participants_added') {
+        // Verificar el formato de los datos recibidos para participantes añadidos
+        if (Array.isArray(data)) {
+          // Formato: array de IDs de usuario
+          const existingParticipantIds = new Set(localParticipants.map(p => p.userId));
+          
+          // Convertir los IDs a objetos de participante completos
+          const newParticipantsToAdd = data
+            .filter(userId => !existingParticipantIds.has(userId))
+            .map(userId => {
+              // Buscar los datos completos del usuario en los posibles participantes
+              const userData = possibleParticipants.find(p => p.id === userId);
+              
+              return {
+                id: `temp_participant_${userId}`, // ID temporal
+                userId: userId,
+                role: 'member' as const,
+                user: userData || { 
+                  id: userId,
+                  username: "Usuario", // Nombre genérico hasta recibir datos reales
+                  name: null,
+                  image: null
+                }
+              };
+            });
+          
+          if (newParticipantsToAdd.length > 0) {
+            // Actualizar el estado local de participantes
+            setLocalParticipants(prev => [...prev, ...newParticipantsToAdd]);
+            console.log(`[GroupManagementModal] Añadidos ${newParticipantsToAdd.length} participantes en la interfaz`);
+          }
+        }
+      } 
+      else if (updateType === 'participant_removed') {
+        // Actualizar la interfaz al eliminar un participante
+        const participantIdToRemove = data.userId;
+        
+        setLocalParticipants(prev => 
+          prev.filter(p => p.userId !== participantIdToRemove)
+        );
+        
+        console.log(`[GroupManagementModal] Eliminado participante ${participantIdToRemove} de la interfaz`);
+      }
+    };
+
+    // Añadir event listener
+    window.addEventListener('group-data-updated', handleGroupDataUpdate as EventListener);
+    
+    // Limpiar el event listener al desmontar
+    return () => {
+      window.removeEventListener('group-data-updated', handleGroupDataUpdate as EventListener);
+    };
+  }, [isOpen, conversationData, possibleParticipants, localParticipants]);
   
   // Limpiar estado al cerrar
   useEffect(() => {
@@ -212,6 +288,9 @@ export const GroupManagementModal = ({
     if (!conversationData) return;
     
     try {
+      // Obtenemos el ID sin prefijo para las API
+      const groupId = getIdForApi(conversationData.id);
+      
       // SOLUCIÓN: Ahora usamos el nuevo endpoint SSE para notificar actualizaciones de grupo
       await fetch('/api/messages/group/updates/sse', {
         method: 'POST',
@@ -219,7 +298,7 @@ export const GroupManagementModal = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          groupId: conversationData.id,
+          groupId: groupId, // Usamos el ID sin prefijo
           updateType,
           data: updatedData
         })
@@ -232,7 +311,8 @@ export const GroupManagementModal = ({
         // Disparar un evento personalizado para notificar a los componentes locales
         window.dispatchEvent(new CustomEvent('group-data-updated', { 
           detail: { 
-            conversationId: conversationData.id,
+            conversationId: conversationData.id, // Mantenemos el ID original para la UI
+            rawGroupId: groupId, // Añadimos el ID sin prefijo para componentes que lo necesiten
             updateType,
             data: updatedData
           }
@@ -245,14 +325,15 @@ export const GroupManagementModal = ({
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('group-data-updated', { 
           detail: { 
-            conversationId: conversationData.id,
+            conversationId: conversationData.id, // Mantenemos el ID original para la UI
+            rawGroupId: getIdForApi(conversationData.id), // Añadimos el ID sin prefijo para componentes que lo necesiten
             updateType,
             data: updatedData
           }
         }));
       }
     }
-  }, [conversationData]);
+  }, [conversationData, getIdForApi]);
   
   // Función para manejar la subida de imágenes
   const handleImageUpload = useCallback(async (e: Event) => {
@@ -431,6 +512,42 @@ export const GroupManagementModal = ({
       console.log(`[Cliente] Añadiendo participantes al grupo: ${groupId} (original: ${conversationData.id})`);
       console.log(`[Cliente] Participantes seleccionados:`, selectedNewParticipants);
       
+      // ACTUALIZACIÓN OPTIMISTA: Crear versiones temporales de los nuevos participantes
+      const newParticipantsObjects = selectedNewParticipants.map(userId => {
+        // Buscar los datos completos del usuario en los posibles participantes
+        const userData = possibleParticipants.find(p => p.id === userId);
+        
+        // Crear un objeto participante con los datos disponibles
+        return {
+          id: crypto.randomUUID(), // ID temporal
+          userId: userId,
+          role: 'member' as const,
+          user: userData || { 
+            id: userId,
+            username: "Usuario", // Nombre genérico hasta recibir datos reales
+            name: null,
+            image: null
+          }
+        };
+      });
+      
+      // 1. Actualizar UI local primero
+      setLocalParticipants(prev => [...prev, ...newParticipantsObjects]);
+      
+      // 2. Crear versión optimista para otros componentes
+      const optimisticConversationData = {
+        ...conversationData,
+        participants: [...conversationData.participants, ...newParticipantsObjects]
+      };
+      
+      // 3. Actualizar UI con datos optimistas antes de API call
+      onConversationUpdate(optimisticConversationData);
+      
+      // 4. Cerrar modal y limpiar selección inmediatamente para mejor UX
+      setShowAddParticipantsModal(false);
+      setSelectedNewParticipants([]);
+      
+      // Realizar la llamada a la API en segundo plano
       const response = await fetch(
         API_ROUTES.messages.group.addParticipants(groupId),
         {
@@ -442,38 +559,57 @@ export const GroupManagementModal = ({
         }
       );
       
-      // Obtener los datos de error o respuesta
-      const responseText = await response.text();
-      let responseData = {};
-      
-      try {
-        // Intentar parsear como JSON solo si hay contenido
-        if (responseText) {
-          responseData = JSON.parse(responseText);
-        }
-      } catch (parseError) {
-        console.error('Error al parsear respuesta JSON:', parseError);
-      }
-      
+      // Si la respuesta no es exitosa, revertir la actualización optimista
       if (!response.ok) {
-        console.error('Error al añadir participantes:', responseData);
+        console.error('Error al añadir participantes:', await response.text());
+        
+        // Revertir la actualización optimista en todos los componentes
+        onConversationUpdate(conversationData);
+        setLocalParticipants(conversationData.participants || []);
+        
         throw new Error('Error al añadir participantes');
       }
       
+      // Procesar respuesta exitosa
+      const responseData = await response.json();
       console.log('[DEBUG] Respuesta de añadir participantes:', responseData);
       
-      // Cerrar modal y limpiar selección
-      setShowAddParticipantsModal(false);
-      setSelectedNewParticipants([]);
-      
-      // Usar los datos completos de la conversación que devuelve el servidor
-      if (responseData && 'conversation' in responseData) {
-        // Llamar a la función de actualización del componente padre con los datos completos
-        onConversationUpdate(responseData.conversation as ConversationData);
-      }
-      
-      // Notificar a los demás participantes
+      // 5. Notificar a los demás participantes incluso si hubo éxito
+      // pero no intentar refrescar datos del servidor (confiamos en la actualización optimista)
       notifyGroupUpdated('participants_added', selectedNewParticipants);
+      
+      // Solo actualizar con datos del servidor si proporcionó información completa
+      if (responseData && 
+          responseData.conversation && 
+          typeof responseData.conversation === 'object' && 
+          Array.isArray(responseData.conversation.participants)) {
+        
+        // Verificar si hay diferencias sustanciales entre nuestra actualización optimista
+        // y los datos del servidor que requieran actualización
+        const serverParticipantIds = new Set(responseData.conversation.participants.map((p: {userId: string}) => p.userId));
+        const localParticipantIds = new Set(localParticipants.map(p => p.userId));
+        
+        // Si hay discrepancias, actualizar con datos del servidor
+        if (serverParticipantIds.size !== localParticipantIds.size) {
+          console.log('[DEBUG] Actualizando con datos del servidor (diferencia en número de participantes)');
+          
+          const serverData = responseData.conversation;
+          // Mapear los datos del servidor al formato que espera la UI
+          const mappedParticipants = serverData.participants.map((p: {id: string; userId: string; isAdmin?: boolean; user: User}) => ({
+            id: p.id,
+            userId: p.userId,
+            role: p.isAdmin ? 'admin' : 'member',
+            user: p.user
+          }));
+          
+          // Actualizar estado local y global
+          setLocalParticipants(mappedParticipants);
+          onConversationUpdate({
+            ...optimisticConversationData,
+            participants: mappedParticipants
+          });
+        }
+      }
       
       toast({
         title: "Participantes añadidos",
@@ -499,10 +635,35 @@ export const GroupManagementModal = ({
     try {
       setIsUpdatingGroup(true);
       
+      // Crear una copia de los datos originales para revertir en caso de error
+      const originalConversationData = { ...conversationData };
+      const originalParticipants = [...localParticipants];
+      
+      // 1. ACTUALIZACIÓN OPTIMISTA: Eliminar el participante inmediatamente de la UI
+      const updatedLocalParticipants = localParticipants.filter(p => p.userId !== userId);
+      setLocalParticipants(updatedLocalParticipants);
+      
+      // 2. Actualizar otros componentes con la lista filtrada de participantes
+      const updatedParticipants = conversationData.participants.filter(p => p.userId !== userId);
+      const updatedConversationData = {
+        ...conversationData,
+        participants: updatedParticipants
+      };
+      
+      // 3. Notificar al resto de componentes sobre el cambio
+      onConversationUpdate(updatedConversationData);
+      
+      // 4. Notificar a todos los componentes a través del evento personalizado
+      notifyGroupUpdated('participant_removed', {
+        userId,
+        updatedConversation: updatedConversationData
+      });
+      
       // Obtenemos solo el ID sin prefijo para enviarlo a la API
       const groupId = getIdForApi(conversationData.id);
       console.log(`[Cliente] Eliminando participante ${userId} del grupo: ${groupId} (original: ${conversationData.id})`);
       
+      // Realizar la llamada API
       const response = await fetch(
         API_ROUTES.messages.group.removeParticipant(groupId, userId),
         {
@@ -510,56 +671,54 @@ export const GroupManagementModal = ({
         }
       );
       
+      // Si la respuesta no es exitosa, revertir la actualización optimista
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Error al eliminar participante:', errorData);
+        console.error('Error al eliminar participante:', await response.text());
+        
+        // REVERTIR la actualización optimista
+        onConversationUpdate(originalConversationData);
+        setLocalParticipants(originalParticipants);
+        
         throw new Error('Error al eliminar participante');
       }
       
-      // Obtener los datos actualizados de la respuesta
+      // Procesar respuesta exitosa
       const responseData = await response.json();
       console.log('[DEBUG] Respuesta de eliminar participante:', responseData);
       
-      // SOLUCIÓN MEJORADA: Actualización optimista y consistente
-      // Crear una versión actualizada de los participantes eliminando el usuario
-      const updatedParticipants = conversationData.participants.filter(p => p.userId !== userId);
-      
-      // Crear un objeto completo de conversación para asegurar que la UI se actualice correctamente
-      const updatedConversationData = {
-        ...conversationData,
-        participants: updatedParticipants,
-        // Asegurar que mantenemos todas las propiedades importantes
-        id: conversationData.id,
-        name: conversationData.name,
-        description: conversationData.description,
-        imageUrl: conversationData.imageUrl,
-        isGroup: true
-      };
-      
-      // Si tenemos datos completos en la respuesta, usar esos para mayor precisión
-      if (responseData && responseData.conversation && responseData.conversation.participants) {
-        // Crear un nuevo objeto combinando los datos locales con la respuesta del servidor
-        const serverData = responseData.conversation;
-        const fullUpdatedData = {
-          ...updatedConversationData,
-          participants: serverData.participants,
-          name: serverData.name || updatedConversationData.name,
-          description: serverData.description || updatedConversationData.description,
-          imageUrl: serverData.imageUrl || updatedConversationData.imageUrl
-        };
+      // No intentamos actualizar con datos del servidor, confiamos en nuestra actualización optimista
+      // Solo si hay información estructural diferente actualizamos
+      if (responseData && 
+          responseData.conversation && 
+          typeof responseData.conversation === 'object' && 
+          Array.isArray(responseData.conversation.participants)) {
         
-        // Enviar la actualización completa al componente padre
-        onConversationUpdate(fullUpdatedData);
-      } else {
-        // Si no hay datos completos, usar nuestra versión actualizada localmente
-        onConversationUpdate(updatedConversationData);
+        // Verificar si hay diferencias sustanciales entre nuestra actualización optimista
+        // y los datos del servidor que requieran actualización
+        const serverParticipantIds = new Set(responseData.conversation.participants.map((p: {userId: string}) => p.userId));
+        const localParticipantIds = new Set(updatedLocalParticipants.map(p => p.userId));
+        
+        // Si hay discrepancias, actualizar con datos del servidor
+        if (serverParticipantIds.size !== localParticipantIds.size) {
+          console.log('[DEBUG] Actualizando con datos del servidor (diferencia en número de participantes)');
+          
+          const serverData = responseData.conversation;
+          // Mapear los datos del servidor al formato que espera la UI
+          const mappedParticipants = serverData.participants.map((p: {id: string; userId: string; isAdmin?: boolean; user: User}) => ({
+            id: p.id,
+            userId: p.userId,
+            role: p.isAdmin ? 'admin' : 'member',
+            user: p.user
+          }));
+          
+          // Actualizar estado local y global
+          setLocalParticipants(mappedParticipants);
+          onConversationUpdate({
+            ...updatedConversationData,
+            participants: mappedParticipants
+          });
+        }
       }
-      
-      // Notificar a todos los componentes a través del evento personalizado
-      notifyGroupUpdated('participant_removed', {
-        userId,
-        updatedConversation: updatedConversationData
-      });
       
       toast({
         title: "Participante eliminado",
@@ -806,7 +965,7 @@ export const GroupManagementModal = ({
           {/* Participantes */}
           <div>
             <div className="flex justify-between items-center mb-3">
-              <h3 className="text-sm font-medium">Participantes ({conversationData?.participants.length || 0})</h3>
+              <h3 className="text-sm font-medium">Participantes ({localParticipants.length})</h3>
               {initialIsAdmin && (
                 <Button 
                   size="sm" 
@@ -820,7 +979,7 @@ export const GroupManagementModal = ({
               )}
             </div>
             <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
-              {conversationData?.participants?.map((participant) => (
+              {localParticipants.map((participant) => (
                 <div key={participant.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-800 rounded-md">
                   <div className="flex items-center space-x-2">
                     <Avatar className="h-8 w-8">

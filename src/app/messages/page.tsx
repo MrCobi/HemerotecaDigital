@@ -110,13 +110,46 @@ export default function MessagesPage() {
     fetchConversationById: async (conversationId: string | null) => {
       if (!conversationId) return null;
       try {
-        const response = await fetch(`/api/messages/conversations/${conversationId}`);
-        if (response.ok) {
+        // Determinar si es una conversación grupal o privada
+        const isGroup = conversationId.startsWith('group_');
+        console.log(`[Cliente] fetchConversationById: ${conversationId}, isGroup: ${isGroup}`);
+        
+        if (isGroup) {
+          // Para grupos, usar el endpoint específico de grupos
+          const groupId = conversationId.replace('group_', '');
+          console.log(`[Cliente] Obteniendo grupo: ${groupId}`);
+          
+          // Usar el endpoint de grupos existente que sabemos que funciona
+          const response = await fetch(`/api/messages/group/${groupId}`);
+          if (!response.ok) {
+            console.error(`[Cliente] Error al obtener grupo: ${await response.text()}`);
+            return null;
+          }
+          
+          const groupData = await response.json();
+          console.log(`[Cliente] Datos de grupo obtenidos:`, groupData);
+          
+          // Asegurarnos de que el ID tenga el formato correcto
+          if (groupData && !groupData.id.startsWith('group_')) {
+            groupData.id = `group_${groupData.id}`;
+          }
+          
+          return groupData;
+        } else {
+          // Para conversaciones privadas, usar el endpoint de conversaciones privadas
+          console.log(`[Cliente] Obteniendo conversación privada: ${conversationId}`);
+          
+          // Usar el endpoint existente de conversaciones privadas
+          const response = await fetch(`/api/messages/conversations/private/${conversationId}`);
+          if (!response.ok) {
+            console.error(`[Cliente] Error al obtener conversación: ${await response.text()}`);
+            return null;
+          }
+          
           return await response.json();
         }
-        return null;
       } catch (error) {
-        console.error("Error fetching conversation:", error);
+        console.error("[Cliente] Error al obtener conversación:", error);
         return null;
       }
     },
