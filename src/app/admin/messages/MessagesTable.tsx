@@ -268,6 +268,8 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     }
   };
 
+
+
   // Función para renderizar la imagen del usuario
   const renderUserImage = (user: Message['sender'] | Message['receiver'], size: number = 32) => {
     if (!user) return null;
@@ -487,6 +489,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       },
       filterElement: filterElement,
       hideOnMobile: false,
+      className: "w-[8%]", // Ancho fijo para pantallas grandes
     },
     {
       header: "Estado",
@@ -505,6 +508,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
       hideOnMobile: true,
+      className: "w-[8%]", // Ancho fijo para pantallas grandes
     },
     {
       header: "Remitente",
@@ -534,6 +538,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
       hideOnMobile: false,
+      className: "w-[16%]", // Reducido de 18% a 16%
     },
     {
       header: "Destinatario",
@@ -586,18 +591,20 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
       hideOnMobile: false,
+      className: "w-[16%]", // Reducido de 18% a 16%
     },
     {
       header: "Mensaje",
       accessorKey: "content",
       cell: (message: Message) => {
         return (
-          <div className="text-xs sm:text-sm text-foreground max-w-[150px] sm:max-w-xs truncate">
+          <div className="text-xs sm:text-sm text-foreground max-w-[120px] sm:max-w-[170px] truncate overflow-hidden">
             {renderMessageContent(message)}
           </div>
         );
       },
       hideOnMobile: false,
+      className: "w-[15%]", // Reducido de 17% a 15%
     },
     {
       header: "Fecha",
@@ -610,6 +617,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
           </div>
         );
       },
+      className: "w-[15%] text-center", // Aumentado de 14% a 15%
       hideOnMobile: true,
     },
     {
@@ -617,7 +625,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       id: "actions",
       cell: (message: Message) => {
         return (
-          <div className="flex flex-wrap justify-end items-center gap-1.5">
+          <div className="flex flex-wrap justify-end items-center gap-1.5 min-w-[100px]">
             <Link
               href={`/admin/messages/view/${message.id}`}
               className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
@@ -628,7 +636,10 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
             </Link>
             {!message.read && (
               <button
-                onClick={() => handleMarkAsRead(message.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleMarkAsRead(message.id);
+                }}
                 disabled={isMarkingAsRead === message.id}
                 className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors"
                 title="Marcar como leído"
@@ -641,14 +652,12 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
                 <span className="ml-1 text-xs font-medium hidden sm:inline">Marcar leído</span>
               </button>
             )}
-            <DeleteMessageDialog 
-              messageId={message.id} 
-              onDelete={handleDelete}
-            />
+            <DeleteMessageDialog messageId={message.id} onDelete={handleDelete} />
           </div>
         );
       },
       hideOnMobile: false,
+      className: "w-[18%] text-center", // Aumentado de 16% a 18% y centrado
     },
   ], [isMarkingAsRead, filterElement, handleDelete]);
 

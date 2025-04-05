@@ -14,6 +14,7 @@ export type Column<T> = {
   className?: string;
   filterElement?: React.ReactNode;
   hideOnMobile?: boolean;
+  hideOnDesktop?: boolean;
   id?: string;
 };
 
@@ -154,13 +155,15 @@ export default function DataTable<T>({
           
           {isExpanded && visibleColumns.length > 4 && (
             <div className="flex flex-row justify-center space-x-2 mt-3 pt-3 border-t border-border">
-              {visibleColumns[4].cell(item)}
+              {columns.find(col => col.header === "Acciones" || col.accessorKey === "actions")?.cell(item)}
             </div>
           )}
           
           {isExpanded && hiddenColumns.length > 0 && (
             <div className="mt-3 pt-3 border-t border-border">
-              {hiddenColumns.map((column, colIndex) => (
+              {hiddenColumns
+                .filter(col => col.header !== "Acciones" && col.accessorKey !== "actions")
+                .map((column, colIndex) => (
                 <div key={colIndex} className="mt-3 pt-3 border-t border-border">
                   <div className="text-xs font-medium text-muted-foreground uppercase mb-1">
                     {typeof column.header === "string" ? column.header : `Columna ${colIndex + 3}`}
@@ -224,23 +227,25 @@ export default function DataTable<T>({
         </div>
         
         {/* Acciones - solo visible cuando está expandido */}
-        {isExpanded && columns.length > 4 && (
+        {isExpanded && (
           <div className="flex flex-row justify-end space-x-2 mt-2 pt-3 border-t border-border">
-            {columns[4].cell(item)}
+            {columns.find(col => col.header === "Acciones" || col.accessorKey === "actions")?.cell(item)}
           </div>
         )}
         
         {/* Otras columnas - solo visibles cuando está expandido */}
         {isExpanded && columns.length > 5 && (
           <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-3">
-            {columns.slice(5).map((column, colIndex) => (
-              <div key={colIndex} className="flex flex-col">
-                <div className="text-xs font-medium text-muted-foreground uppercase mb-1">
-                  {typeof column.header === "string" ? column.header : `Columna ${colIndex + 5}`}
+            {columns.slice(5)
+              .filter(col => col.header !== "Acciones" && col.accessorKey !== "actions")
+              .map((column, colIndex) => (
+                <div key={colIndex} className="flex flex-col">
+                  <div className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                    {typeof column.header === "string" ? column.header : `Columna ${colIndex + 5}`}
+                  </div>
+                  <div>{column.cell(item)}</div>
                 </div>
-                <div>{column.cell(item)}</div>
-              </div>
-            ))}
+              ))}
           </div>
         )}
       </div>
@@ -280,9 +285,9 @@ export default function DataTable<T>({
       {data.length > 0 ? (
         <>
           {/* Tabla para escritorio (≥1080px) */}
-          <div className="rounded-md border hidden lg:block">
-            <div className="relative w-full">
-              <table className="w-full">
+          <div className="rounded-md border hidden lg:block overflow-hidden">
+            <div className="relative w-full overflow-x-auto">
+              <table className="w-full table-fixed">
                 <thead>
                   <tr className="border-b border-border">
                     {columns.map((column, index) => (
@@ -291,11 +296,13 @@ export default function DataTable<T>({
                         className={cn(
                           "px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide",
                           column.className,
-                          index === 0 ? "w-[35%] lg:w-[30%]" : "", 
-                          index === 1 ? "w-[15%] lg:w-[15%]" : "", 
-                          index === 2 ? "w-[15%] lg:w-[15%]" : "", 
-                          index === 3 ? "w-[15%] lg:w-[15%]" : "", 
-                          index === 4 ? "w-[20%] lg:w-[25%] xl:w-[25%]" : ""  
+                          index === 0 ? "w-[8%] lg:w-[8%]" : "", 
+                          index === 1 ? "w-[8%] lg:w-[8%]" : "", 
+                          index === 2 ? "w-[18%] lg:w-[18%]" : "", 
+                          index === 3 ? "w-[18%] lg:w-[18%]" : "", 
+                          index === 4 ? "w-[15%] lg:w-[15%] pr-3" : "", 
+                          index === 5 ? "w-[15%] lg:w-[15%] px-3" : "", 
+                          index === 6 ? "w-[18%] lg:w-[18%] pl-3" : ""  
                         )}
                       >
                         {column.header}
@@ -316,8 +323,11 @@ export default function DataTable<T>({
                           className={cn(
                             "px-2 py-3",
                             column.className,
-                            // Dar más espacio a la columna de acciones en pantallas entre 1024px y 1122px
-                            colIndex === 4 ? "lg:!min-w-[220px] xl:!min-w-0" : ""
+                            column.hideOnDesktop ? "hidden xl:table-cell" : "",
+                            colIndex === 6 ? "lg:!min-w-[120px]" : "",
+                            colIndex === 4 ? "pr-3" : "", 
+                            colIndex === 5 ? "px-3" : "", 
+                            colIndex === 6 ? "pl-3" : ""  
                           )}
                         >
                           {column.cell(item)}

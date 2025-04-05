@@ -278,7 +278,7 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
         header: "Acciones",
         accessorKey: "actions",
         cell: (source) => (
-          <div className="flex items-center justify-start gap-1.5 flex-wrap">
+          <div className="flex items-center justify-start gap-1.5 flex-wrap min-w-[120px]">
             <Link
               href={`/sources/${source.id}`}
               className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
@@ -304,7 +304,8 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
               consequenceText="Todos los comentarios, valoraciones y favoritos asociados a esta fuente también serán eliminados."
             />
           </div>
-        )
+        ),
+        hideOnMobile: false
       }
     ],
     [categoryFilter, uniqueCategories, handleDeleteSource]

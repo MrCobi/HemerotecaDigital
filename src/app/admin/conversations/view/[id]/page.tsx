@@ -256,15 +256,15 @@ export default function ViewConversationPage({ params }: PageProps) {
       
       <div className="bg-card shadow rounded-xl overflow-hidden">
         {/* Cabecera */}
-        <div className="px-4 sm:px-6 pt-6 pb-4 border-b border-border">
+        <div className="px-3 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-border">
           <div className="flex flex-col sm:flex-row items-center sm:items-center">
             {renderImage()}
             
-            <div className="mt-4 sm:mt-0 sm:ml-6 flex-1">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+            <div className="mt-4 sm:mt-0 sm:ml-6 flex-1 text-center sm:text-left">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <div className="flex flex-wrap items-center mb-1">
-                    <h1 className="text-xl sm:text-2xl font-bold text-foreground mr-2">
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start mb-1">
+                    <h1 className="text-lg sm:text-xl font-bold text-foreground mr-2 break-words">
                       {conversation.isGroup 
                         ? (conversation.name || "Grupo sin nombre") 
                         : "Conversación individual"}
@@ -292,7 +292,7 @@ export default function ViewConversationPage({ params }: PageProps) {
                   </div>
                   
                   {conversation.description && (
-                    <p className="text-muted-foreground text-sm mb-2">{conversation.description}</p>
+                    <p className="text-muted-foreground text-sm mb-2 break-words max-w-full">{conversation.description}</p>
                   )}
                   
                   <div className="text-xs text-muted-foreground">
@@ -300,22 +300,22 @@ export default function ViewConversationPage({ params }: PageProps) {
                   </div>
                 </div>
                 
-                <div className="flex items-center mt-4 sm:mt-0 space-x-2">
+                <div className="flex items-center justify-center sm:justify-end mt-3 sm:mt-0 space-x-2">
                   <Link
                     href={`/admin/conversations/edit/${conversationId}`}
-                    className="inline-flex items-center justify-center py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-md text-sm font-medium transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40"
+                    className="inline-flex items-center justify-center py-1 px-2 sm:py-1.5 sm:px-2.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40"
                   >
-                    <PencilLine className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
-                    <span className="sm:inline">Editar</span>
+                    <PencilLine className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                    <span>Editar</span>
                   </Link>
                   
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <button
-                        className="inline-flex items-center justify-center py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-md text-sm font-medium transition-colors bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40"
+                        className="inline-flex items-center justify-center py-1 px-2 sm:py-1.5 sm:px-2.5 rounded-md text-xs sm:text-sm font-medium transition-colors bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/40"
                       >
-                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
-                        <span className="sm:inline">Eliminar</span>
+                        <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                        <span>Eliminar</span>
                       </button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
@@ -361,21 +361,21 @@ export default function ViewConversationPage({ params }: PageProps) {
         {/* Pestañas de navegación */}
         <div className="border-b border-border">
           <nav className="flex overflow-x-auto scrollbar-none">
-            <div className="border-b-2 border-primary px-4 py-3 text-sm font-medium text-primary">
+            <div className="border-b-2 border-primary px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-primary whitespace-nowrap">
               <span className="flex items-center">
-                <MessageSquare className="h-4 w-4 mr-2" />
+                <MessageSquare className="h-3.5 w-3.5 mr-1 sm:h-4 sm:w-4 sm:mr-2" />
                 Detalles
               </span>
             </div>
             
             <Link 
               href={`/admin/conversations/messages/${conversationId}`} 
-              className="border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-gray-300 transition-colors"
+              className="border-b-2 border-transparent px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground hover:border-gray-300 transition-colors whitespace-nowrap"
             >
               <span className="flex items-center">
-                <MessageSquare className="h-4 w-4 mr-2" />
+                <MessageSquare className="h-3.5 w-3.5 mr-1 sm:h-4 sm:w-4 sm:mr-2" />
                 <span>Mensajes</span>
-                <span className="ml-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs">
+                <span className="ml-1 sm:ml-1.5 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-muted text-[10px] sm:text-xs">
                   {conversation._count?.messages || conversation.messages?.length || 0}
                 </span>
               </span>
@@ -383,12 +383,12 @@ export default function ViewConversationPage({ params }: PageProps) {
             
             <Link 
               href={`/admin/conversations/participants/${conversationId}`} 
-              className="border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-gray-300 transition-colors"
+              className="border-b-2 border-transparent px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground hover:border-gray-300 transition-colors whitespace-nowrap"
             >
               <span className="flex items-center">
-                <Users className="h-4 w-4 mr-2" />
+                <Users className="h-3.5 w-3.5 mr-1 sm:h-4 sm:w-4 sm:mr-2" />
                 <span>Participantes</span>
-                <span className="ml-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs">
+                <span className="ml-1 sm:ml-1.5 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-muted text-[10px] sm:text-xs">
                   {conversation.participants?.length || 0}
                 </span>
               </span>
@@ -397,12 +397,12 @@ export default function ViewConversationPage({ params }: PageProps) {
         </div>
         
         {/* Contenido - Mensajes (Vista previa) */}
-        <div className="p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium">Mensajes recientes</h2>
+        <div className="p-3 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
+            <h2 className="text-base sm:text-lg font-medium">Mensajes recientes</h2>
             <Link 
               href={`/admin/conversations/messages/${conversationId}`}
-              className="text-sm text-primary hover:text-primary/80 transition-colors"
+              className="text-xs sm:text-sm text-primary hover:text-primary/80 transition-colors"
             >
               Ver todos los mensajes
             </Link>
@@ -434,30 +434,30 @@ export default function ViewConversationPage({ params }: PageProps) {
               <div className="text-center">
                 <Link
                   href={`/admin/conversations/messages/${conversationId}`}
-                  className="inline-flex items-center justify-center py-2 px-4 rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="inline-flex items-center justify-center py-1.5 px-3 sm:py-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
                 >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Ver todos los mensajes ({conversation._count?.messages || conversation.messages.length})
+                  <MessageSquare className="h-3.5 w-3.5 mr-1 sm:h-4 sm:w-4 sm:mr-2" />
+                  Ver mensajes ({conversation._count?.messages || conversation.messages.length})
                 </Link>
               </div>
             </div>
           ) : (
-            <div className="py-12 text-center border border-border rounded-lg bg-muted/20">
-              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground opacity-50 mb-3" />
-              <p className="text-muted-foreground">No hay mensajes en esta conversación</p>
+            <div className="py-8 sm:py-12 text-center border border-border rounded-lg bg-muted/20">
+              <MessageSquare className="h-8 w-8 sm:h-12 sm:w-12 mx-auto text-muted-foreground opacity-50 mb-2 sm:mb-3" />
+              <p className="text-xs sm:text-sm text-muted-foreground">No hay mensajes en esta conversación</p>
             </div>
           )}
         </div>
       </div>
       
       {/* Información adicional */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+      <div className="mt-4 sm:mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-card shadow rounded-xl overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-medium">Detalles de la conversación</h2>
+          <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-border">
+            <h2 className="text-base sm:text-lg font-medium">Detalles de la conversación</h2>
           </div>
-          <div className="p-4 sm:p-6">
-            <dl className="grid grid-cols-1 gap-4">
+          <div className="p-3 sm:p-6">
+            <dl className="grid grid-cols-1 gap-3 sm:gap-4">
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">ID</dt>
                 <dd className="mt-1 text-sm text-foreground break-all">{conversation.id}</dd>
@@ -485,10 +485,10 @@ export default function ViewConversationPage({ params }: PageProps) {
         </div>
         
         <div className="bg-card shadow rounded-xl overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-medium">Participantes</h2>
+          <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-border">
+            <h2 className="text-base sm:text-lg font-medium">Participantes</h2>
           </div>
-          <div className="p-4 sm:p-6">
+          <div className="p-3 sm:p-6">
             {conversation.participants && conversation.participants.length > 0 ? (
               <ul className="space-y-3">
                 {conversation.participants.map(participant => (
@@ -535,7 +535,7 @@ export default function ViewConversationPage({ params }: PageProps) {
                 href={`/admin/conversations/participants/${conversationId}`}
                 className="inline-flex items-center justify-center w-full py-2 px-3 rounded-md text-sm font-medium transition-colors bg-card border border-input hover:bg-accent"
               >
-                <Users className="h-4 w-4 mr-2" />
+                <Users className="h-4 w-4 mr-1" />
                 Gestionar participantes
               </Link>
             </div>
