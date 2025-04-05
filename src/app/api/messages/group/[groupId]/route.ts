@@ -187,6 +187,79 @@ export const PATCH = withAuth(async (
   }
 });
 
+// GET - Obtener información de un grupo
+export const GET = withAuth(async (
+  req: Request,
+  auth: AuthParams,
+  { params }: { params: { groupId: string } }
+) => {
+  try {
+    console.log(`[DEBUG] Recibiendo solicitud GET para grupo. Params:`, params);
+    
+    // Asegurar que el ID tiene el formato correcto para la base de datos
+    const resolvedParams = await params;
+    const groupId = ensureIdFormat(resolvedParams.groupId);
+    console.log(`[DEBUG] Obteniendo grupo con ID formateado: ${groupId}, ID original: ${resolvedParams.groupId}`);
+    
+    const userId = auth.user.id;
+    console.log(`[DEBUG] Usuario que realiza la solicitud: ${userId}`);
+    
+    // Verificar que el usuario es participante del grupo
+    const isParticipant = await prisma.conversationParticipant.findFirst({
+      where: {
+        conversationId: groupId,
+        userId: userId
+      }
+    });
+    
+    if (!isParticipant) {
+      console.log(`[ERROR] El usuario ${userId} no es participante del grupo ${groupId}`);
+      return NextResponse.json(
+        { error: "No tienes permisos para ver este grupo" },
+        { status: 403 }
+      );
+    }
+    
+    // Obtener datos del grupo con participantes
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: groupId },
+      include: {
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                image: true
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    if (!conversation) {
+      console.log(`[ERROR] Grupo no encontrado: ${groupId}`);
+      return NextResponse.json(
+        { error: "El grupo no existe" },
+        { status: 404 }
+      );
+    }
+    
+    console.log(`[DEBUG] Grupo encontrado: ${groupId}, Nombre=${conversation.name}`);
+    
+    return NextResponse.json(conversation);
+    
+  } catch (error) {
+    console.error("Error al obtener grupo:", error);
+    return NextResponse.json(
+      { error: "Error al obtener el grupo", details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+});
+
 // DELETE - Eliminar un grupo
 export const DELETE = withAuth(async (
   req: Request,

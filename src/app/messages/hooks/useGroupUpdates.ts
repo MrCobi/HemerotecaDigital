@@ -27,6 +27,9 @@ export function useGroupUpdates(
     // Crear una fuente de eventos para escuchar actualizaciones
     const eventSource = new EventSource(`/api/messages/group/updates/sse?groupId=${apiGroupId}`);
     
+    // Variable para controlar si el usuario ha abandonado/sido eliminado del grupo
+    let userLeftGroup = false;
+    
     // Manejar eventos de conexión
     eventSource.addEventListener('connect', (event) => {
       console.log('[SSE] Conexión establecida para actualizaciones de grupo:', JSON.parse((event as MessageEvent).data));
@@ -50,6 +53,16 @@ export function useGroupUpdates(
     eventSource.addEventListener('participant_removed', (event) => {
       const data = JSON.parse((event as MessageEvent).data);
       console.log('[SSE] Participante eliminado:', data);
+      
+      // Verificar si el usuario actual fue eliminado
+      if (session?.user?.id && data.participantId === session.user.id) {
+        console.log('[SSE] El usuario actual fue eliminado del grupo');
+        userLeftGroup = true;
+        
+        // Cerrar la conexión SSE ya que el usuario ya no es parte del grupo
+        eventSource.close();
+      }
+      
       onUpdate('participant_removed', data);
     });
     
@@ -57,6 +70,16 @@ export function useGroupUpdates(
     eventSource.addEventListener('participant_left', (event) => {
       const data = JSON.parse((event as MessageEvent).data);
       console.log('[SSE] Participante abandonó el grupo:', data);
+      
+      // Verificar si el usuario actual abandonó el grupo
+      if (session?.user?.id && data.participantId === session.user.id) {
+        console.log('[SSE] El usuario actual abandonó el grupo');
+        userLeftGroup = true;
+        
+        // Cerrar la conexión SSE ya que el usuario ya no es parte del grupo
+        eventSource.close();
+      }
+      
       onUpdate('participant_left', data);
     });
     
@@ -64,12 +87,32 @@ export function useGroupUpdates(
     eventSource.addEventListener('group_deleted', (event) => {
       const data = JSON.parse((event as MessageEvent).data);
       console.log('[SSE] Grupo eliminado:', data);
+      
+      // Cerrar la conexión SSE ya que el grupo ya no existe
+      eventSource.close();
+      
       onUpdate('group_deleted', data);
     });
     
     // Manejar errores
     eventSource.onerror = (error) => {
+      // Si recibimos un error 403, es probable que el usuario ya no sea parte del grupo
+      if (userLeftGroup) {
+        console.log('[SSE] Conexión cerrada porque el usuario ya no pertenece al grupo');
+        eventSource.close();
+        return;
+      }
+      
       console.error('[SSE] Error en la conexión de actualizaciones de grupo:', error);
+      
+      // Intentar reconectar solo si el error no es un 403 (Forbidden)
+      // y el usuario no ha dejado el grupo manualmente
+      setTimeout(() => {
+        if (eventSource.readyState === EventSource.CLOSED && !userLeftGroup) {
+          console.log('[SSE] Intentando reconectar...');
+          // En lugar de reconectar aquí, devolveremos null para que useEffect cree una nueva conexión
+        }
+      }, 5000); // Esperar 5 segundos antes de reconectar
     };
     
     return eventSource;
