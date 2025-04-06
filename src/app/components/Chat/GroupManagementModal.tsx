@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSession } from 'next-auth/react';
 import { Button } from '@/src/app/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/src/app/components/ui/dialog';
 import { Input } from '@/src/app/components/ui/input';
@@ -51,10 +50,10 @@ interface GroupManagementModalProps {
 }
 
 interface ParticipantRemovalBlock {
-  userId: string;
-  groupId: string;
-  timestamp: number;
-  expiry: number;
+  [userId: string]: {
+    groupId: string;
+    timestamp: number;
+  }
 }
 
 declare global {
@@ -73,7 +72,6 @@ export const GroupManagementModal = ({
   _onDeleteGroup,
   _onLeaveGroup,
 }: GroupManagementModalProps) => {
-  const { data: _session } = useSession();
   const { toast } = useToast();
   
   // Estados locales simplificados - USANDO REFS para preservar los valores entre renderizados
@@ -527,25 +525,32 @@ export const GroupManagementModal = ({
     const currentParticipantIds = new Set(localParticipants.map(p => p.userId));
     
     // Verificar si hay un bloqueo activo por eliminación reciente
-    const lastRemoval = window.__lastParticipantRemoval;
+    const lastRemoval = window.__lastParticipantRemoval || {};
     const recentlyRemovedIds = new Set<string>();
     
-    // Si hay una eliminación reciente, verificar si todavía está activa
-    if (lastRemoval && lastRemoval.groupId === serverGroupData?.id) {
+    // Verificar todos los usuarios que tienen un bloqueo activo para este grupo
+    if (lastRemoval && serverGroupData?.id) {
       const now = new Date().getTime();
-      // Comprobar si el bloqueo ha expirado (24 horas)
-      const blockHasExpired = lastRemoval.timestamp && (now - lastRemoval.timestamp > 24 * 60 * 60 * 1000);
+      const groupId = serverGroupData.id;
       
-      // Si el bloqueo no ha expirado y NO estamos en el modal de añadir participantes
-      // (si estamos en el modal, significa que el usuario explícitamente quiere añadir)
-      if (!blockHasExpired && !showAddParticipantsModal) {
-        recentlyRemovedIds.add(lastRemoval.userId);
-        console.log(`[GroupManagementModal] Excluyendo usuario recientemente eliminado: ${lastRemoval.userId}`);
-      } else if (blockHasExpired) {
-        console.log(`[GroupManagementModal] Bloqueo de usuario ${lastRemoval.userId} ha expirado`);
-      } else {
-        console.log(`[GroupManagementModal] Permitiendo añadir usuario previamente eliminado: ${lastRemoval.userId}`);
-      }
+      // Recorrer todas las entradas en el objeto lastRemoval
+      Object.keys(lastRemoval).forEach(userId => {
+        const removal = lastRemoval[userId];
+        
+        // Comprobar si este bloqueo es para este grupo y no ha expirado
+        if (removal.groupId === groupId) {
+          // Comprobar si el bloqueo ha expirado (24 horas)
+          const blockHasExpired = (now - removal.timestamp > 24 * 60 * 60 * 1000);
+          
+          // Si el bloqueo no ha expirado y NO estamos en el modal de añadir participantes
+          if (!blockHasExpired && !showAddParticipantsModal) {
+            recentlyRemovedIds.add(userId);
+            console.log(`[GroupManagementModal] Excluyendo usuario recientemente eliminado: ${userId}`);
+          } else if (blockHasExpired) {
+            console.log(`[GroupManagementModal] Bloqueo de usuario ${userId} ha expirado`);
+          }
+        }
+      });
     }
     
     // Filtrar la lista de seguidores mutuos excluyendo a los participantes actuales
@@ -709,7 +714,7 @@ export const GroupManagementModal = ({
       toast({
         title: "Error",
         description: err instanceof Error ? err.message : "Ha ocurrido un error al añadir participantes",
-        variant: "destructive"
+        variant: "destructive",
       });
       console.error("Error al añadir participantes:", err);
     } finally {
@@ -729,7 +734,27 @@ export const GroupManagementModal = ({
     if (!serverGroupData || !initialIsAdmin) return;
     
     try {
-      setIsUpdatingGroup(true);
+      setIsLoading(true);
+      
+      // Añadir función para crear el bloqueo de participante eliminado
+      const createParticipantRemovalBlock = (userId: string, groupId: string) => {
+        // Inicializar o obtener el objeto window.__lastParticipantRemoval
+        const lastRemoval = window.__lastParticipantRemoval || (window.__lastParticipantRemoval = {});
+        
+        // Guardar el bloqueo para este usuario con timestamp actual
+        lastRemoval[userId] = {
+          groupId: groupId,
+          timestamp: new Date().getTime()
+        };
+        
+        console.log(`[GroupManagementModal] Bloqueado usuario ${userId} para grupo ${groupId} durante 24 horas`);
+        return lastRemoval;
+      };
+      
+      // Validación previa
+      if (!conversationData?.id) {
+        throw new Error('No se puede eliminar participante: Información de conversación faltante');
+      }
       
       // MEJORADO: Optimistic update - actualizar la UI antes de la respuesta de la API
       const updatedParticipants = localParticipants.filter(p => p.userId !== userId);
@@ -751,6 +776,9 @@ export const GroupManagementModal = ({
       if (serverGroupData.participants) {
         serverGroupData.participants = updatedParticipants;
       }
+      
+      // Crear bloqueo de participante eliminado
+      createParticipantRemovalBlock(userId, serverGroupData.id);
       
       toast({
         title: "Participante eliminado",
@@ -781,7 +809,7 @@ export const GroupManagementModal = ({
         variant: "destructive",
       });
     } finally {
-      setIsUpdatingGroup(false);
+      setIsLoading(false);
     }
   };
 

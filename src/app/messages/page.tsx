@@ -4,16 +4,15 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/src/app/components/ui/button";
-import { MessageSquarePlus, Users, MessageCircle, Plus } from "lucide-react";
-import Image from "next/image";
+import { MessageSquarePlus, Users, MessageCircle } from "lucide-react";
 import { useMessagesState } from "./hooks/useMessagesState";
 import MessageContainer from "../components/Chat/MessageContainer";
 import GroupManagementModal from '../components/Chat/GroupManagementModal';
 import NewMessageModal from '../components/Chat/NewMessageModal';
 import ConversationList from '../components/Chat/ConversationList';
-import { User, Participant } from "./types";
+import CreateGroupModal from '../components/Chat/CreateGroupModal';
+import { User, GroupCreationState } from "./types";
 import { useToast } from "@/src/app/components/ui/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/app/components/ui/dialog";
 import { useConversationUpdates } from "./hooks/useConversationUpdates";
 import { useGroupUpdates } from "./hooks/useGroupUpdates";
 
@@ -63,14 +62,7 @@ export default function MessagesPage() {
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
-  const [createGroupState, setCreateGroupState] = useState<{
-    name: string;
-    description: string;
-    participants: Participant[];
-    isCreating: boolean;
-    image: File | null;
-    imagePreview: string | null;
-  }>({
+  const [createGroupState, setCreateGroupState] = useState<GroupCreationState>({
     name: "",
     description: "",
     participants: [],
@@ -340,6 +332,84 @@ export default function MessagesPage() {
     }
   });
 
+  // Listener para eventos de conversación eliminada o acceso denegado
+  useEffect(() => {
+    const handleConversationDeleted = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { conversationId, reason } = customEvent.detail;
+      
+      console.log(`[MessagesPage] Detectada conversación eliminada: ${conversationId}, razón: ${reason}`);
+      
+      if (conversationId === selectedConversation) {
+        // Mostrar notificación al usuario
+        toast({
+          title: "Conversación no disponible",
+          description: reason === 'not_found' 
+            ? "Esta conversación ya no existe."
+            : "No tienes acceso a esta conversación.",
+          variant: "destructive",
+        });
+        
+        // Actualizar la lista de conversaciones para reflejar el cambio
+        fetchConversations()
+          .then(() => {
+            // Limpiar la selección actual
+            selectConversation(null);
+            
+            // Redirigir al usuario a la página principal de mensajes
+            router.replace('/messages', { scroll: false });
+          })
+          .catch(error => {
+            console.error("Error actualizando conversaciones tras eliminación:", error);
+          });
+        
+        // También eliminar la conversación del historial de navegación si existe
+        try {
+          // Usar localStorage para recordar que esta conversación debe ser evitada
+          const invalidCache = JSON.parse(localStorage.getItem('invalidConversationsCache') || '{}');
+          invalidCache[conversationId] = { reason, timestamp: Date.now() };
+          localStorage.setItem('invalidConversationsCache', JSON.stringify(invalidCache));
+          
+          console.log(`[MessagesPage] Conversación ${conversationId} marcada como inválida en localStorage`);
+        } catch (e) {
+          console.error("Error guardando cache de conversaciones inválidas:", e);
+        }
+      } else {
+        // Incluso si no es la conversación activa, actualizar la lista para quitar la conversación eliminada
+        fetchConversations();
+      }
+    };
+    
+    // Escuchar a ambos tipos de eventos
+    window.addEventListener('conversation-deleted', handleConversationDeleted);
+    window.addEventListener('conversation-access-denied', handleConversationDeleted);
+    
+    return () => {
+      window.removeEventListener('conversation-deleted', handleConversationDeleted);
+      window.removeEventListener('conversation-access-denied', handleConversationDeleted);
+    };
+  }, [toast, selectedConversation, fetchConversations, selectConversation, router]);
+
+  // Inicializar la cache de conversaciones inválidas desde localStorage al cargar
+  useEffect(() => {
+    try {
+      // Intentar cargar desde localStorage al inicio
+      const savedInvalidCache = localStorage.getItem('invalidConversationsCache');
+      if (savedInvalidCache) {
+        window.__invalidConversationsCache = Object.keys(JSON.parse(savedInvalidCache))
+          .reduce((acc, key) => {
+            acc[key] = true;
+            return acc;
+          }, {} as Record<string, boolean>);
+        
+        console.log('[MessagesPage] Cache de conversaciones inválidas cargada:', 
+          Object.keys(window.__invalidConversationsCache).length);
+      }
+    } catch (e) {
+      console.error("Error cargando cache de conversaciones inválidas:", e);
+    }
+  }, []);
+
   // Deselectionar conversación (usado en la vista móvil)
   const deselectConversation = useCallback(() => {
     selectConversation(null);
@@ -526,84 +596,7 @@ export default function MessagesPage() {
     }
   }, [createGroupState, toast, fetchConversations, MessageService]);
 
-  // Función para manejar la selección de imagen de grupo
-  const handleGroupImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      
-      const reader = new FileReader();
-      reader.onload = (evt: ProgressEvent<FileReader>) => {
-        const target = evt.target;
-        if (target && target.result) {
-          setCreateGroupState(prev => ({
-            ...prev,
-            image: file,
-            imagePreview: typeof target.result === 'string' ? target.result : null
-          }));
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  }, []);
 
-  // Función para manejar la selección de participantes
-  const handleParticipantSelection = useCallback((participant: User) => {
-    setCreateGroupState(prev => {
-      const existingParticipant = prev.participants.find(p => p.userId === participant.id);
-      
-      if (existingParticipant) {
-        // Si el participante ya existe, no hacemos nada
-        return prev;
-      } else {
-        // Si no existe, lo añadimos
-        const newParticipant: Participant = {
-          id: `temp-${participant.id}`,
-          userId: participant.id,
-          role: 'member' as 'admin' | 'member' | 'moderator' | 'owner',
-          user: participant
-        };
-        
-        return {
-          ...prev,
-          participants: [...prev.participants, newParticipant]
-        };
-      }
-    });
-  }, []);
-
-  // Función para añadir participantes al grupo existente
-  const _handleAddParticipantsToGroup = useCallback(async (participantIds: string[]) => {
-    if (!selectedConversationData || participantIds.length === 0) return;
-    
-    try {
-      // Usar el MessageService para añadir participantes
-      await MessageService.addGroupParticipants(
-        selectedConversationData.id,
-        participantIds
-      );
-      
-      // Actualizar datos
-      fetchConversations();
-      if (selectedConversation) {
-        selectConversation(selectedConversation);
-      }
-      
-      // Cerrar modal
-      setShowCreateGroupModal(false);
-      
-      toast({
-        title: "Participantes añadidos",
-        description: "Los participantes se han añadido correctamente al grupo",
-      });
-    } catch (error) {
-      console.error('Error al añadir participantes:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron añadir los participantes al grupo",
-        variant: "destructive",
-      });
-    }
-  }, [selectedConversationData, selectedConversation, toast, fetchConversations, selectConversation, MessageService]);
 
   // Función para abrir el modal de crear grupo
   const handleCreateGroupClick = useCallback(async () => {
@@ -808,199 +801,14 @@ export default function MessagesPage() {
       />
       
       {/* Modal para crear grupo */}
-      <Dialog open={showCreateGroupModal} onOpenChange={setShowCreateGroupModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Crear nuevo grupo</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {/* Imagen del grupo */}
-            <div className="mx-auto max-w-xs">
-              <div 
-                className="relative mx-auto h-24 w-24 cursor-pointer overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700" 
-                onClick={() => document.getElementById('group-image-input')?.click()}
-              >
-                {createGroupState.imagePreview ? (
-                  <Image
-                    src={createGroupState.imagePreview}
-                    alt="Previsualización"
-                    width={96}
-                    height={96}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <Plus className="h-8 w-8 text-gray-400" />
-                  </div>
-                )}
-              </div>
-              <input
-                id="group-image-input"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleGroupImageChange}
-              />
-              <p className="mt-2 text-center text-sm text-gray-500 dark:text-gray-400">
-                Haz clic para subir una imagen de grupo
-              </p>
-            </div>
-            
-            {/* Nombre y descripción del grupo */}
-            <div>
-              <label className="mb-1 block text-sm font-medium">
-                Nombre del grupo
-              </label>
-              <input
-                type="text"
-                placeholder="Nombre del grupo"
-                className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                value={createGroupState.name}
-                onChange={(e) => setCreateGroupState(prev => ({ ...prev, name: e.target.value }))}
-              />
-            </div>
-            
-            <div>
-              <label className="mb-1 block text-sm font-medium">
-                Descripción (opcional)
-              </label>
-              <textarea
-                placeholder="Descripción del grupo"
-                className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                value={createGroupState.description}
-                onChange={(e) => setCreateGroupState(prev => ({ ...prev, description: e.target.value }))}
-              />
-            </div>
-            
-            {/* Participantes */}
-            <div>
-              <label className="mb-1 block text-sm font-medium">
-                Añadir participantes
-              </label>
-              <input
-                type="text"
-                placeholder="Buscar usuarios..."
-                className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-              />
-            </div>
-            
-            {/* Lista de participantes seleccionados */}
-            {createGroupState.participants.length > 0 && (
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Participantes seleccionados ({createGroupState.participants.length})
-                </label>
-                <div className="max-h-32 overflow-y-auto space-y-1">
-                  {createGroupState.participants.map((participant) => (
-                    <div
-                      key={participant.userId}
-                      className="flex items-center justify-between rounded-md bg-gray-100 p-2 dark:bg-gray-800"
-                    >
-                      <div className="flex items-center">
-                        <div className="h-6 w-6 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                          {participant.user.image ? (
-                            <Image
-                              src={participant.user.image}
-                              alt={participant.user.username || 'Usuario'}
-                              width={24}
-                              height={24}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-primary-100 text-primary-800">
-                              {participant.user.username?.charAt(0).toUpperCase() || 'U'}
-                            </div>
-                          )}
-                        </div>
-                        <div className="ml-2 text-sm">
-                          {participant.user.name || participant.user.username || 'Usuario sin nombre'}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleParticipantSelection(participant.user)}
-                      >
-                        Quitar
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Lista de usuarios para seleccionar */}
-            <div className="max-h-64 overflow-y-auto">
-              {mutualFollowersForGroups.length > 0 ? (
-                <div className="space-y-2">
-                  {mutualFollowersForGroups.map((user) => {
-                    const isSelected = createGroupState.participants.some(p => p.userId === user.id);
-                    return (
-                      <div
-                        key={user.id}
-                        className={`flex cursor-pointer items-center justify-between rounded-md p-2 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                          isSelected ? 'bg-gray-100 dark:bg-gray-800' : ''
-                        }`}
-                        onClick={() => handleParticipantSelection(user)}
-                      >
-                        <div className="flex items-center">
-                          <div className="h-8 w-8 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                            {user.image ? (
-                              <Image
-                                src={user.image}
-                                alt={user.username || 'Usuario'}
-                                width={32}
-                                height={32}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-primary-100 text-primary-800">
-                                {user.username?.charAt(0).toUpperCase() || 'U'}
-                              </div>
-                            )}
-                          </div>
-                          <div className="ml-2">
-                            <div className="text-sm font-medium">
-                              {user.name || user.username || 'Usuario sin nombre'}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-xs text-blue-500">
-                          {isSelected ? 'Seleccionado' : 'Añadir'}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="py-4 text-center text-gray-500 dark:text-gray-400">
-                  No hay seguidores mutuos disponibles para añadir al grupo.
-                </div>
-              )}
-            </div>
-            
-            {/* Botón de creación */}
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowCreateGroupModal(false)}
-                disabled={createGroupState.isCreating}
-                className={`border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800`}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleCreateGroup}
-                disabled={!createGroupState.name || createGroupState.participants.length === 0 || createGroupState.isCreating}
-                className={`bg-blue-500 hover:bg-blue-600 text-white dark:bg-blue-600 dark:hover:bg-blue-700`}
-              >
-                {createGroupState.isCreating ? 'Creando...' : 'Crear grupo'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CreateGroupModal
+        isOpen={showCreateGroupModal}
+        onClose={() => setShowCreateGroupModal(false)}
+        onCreateGroup={handleCreateGroup}
+        mutualFollowers={mutualFollowersForGroups}
+        createGroupState={createGroupState}
+        setCreateGroupState={setCreateGroupState}
+      />
       
       {/* Modal de gestión de grupo */}
       {selectedConversation && selectedConversationData && (

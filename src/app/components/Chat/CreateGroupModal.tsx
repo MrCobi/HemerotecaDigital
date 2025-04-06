@@ -17,30 +17,93 @@ interface CreateGroupModalProps {
   isOpen: boolean;
   onClose: () => void;
   mutualFollowers: User[];
-  groupState: GroupCreationState;
-  onGroupNameChange: (name: string) => void;
-  onGroupDescriptionChange: (desc: string) => void;
-  onParticipantToggle: (user: User) => void;
-  onGroupImageChange: (file: File | null) => void;
+  createGroupState: GroupCreationState;
+  setCreateGroupState: React.Dispatch<React.SetStateAction<GroupCreationState>>;
   onCreateGroup: () => void;
-  _currentUserId: string;
+  onParticipantSelect?: (user: User) => void;
+  onImageChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 const CreateGroupModal = React.memo(({
   isOpen,
   onClose,
   mutualFollowers,
-  groupState,
-  onGroupNameChange,
-  onGroupDescriptionChange,
-  onParticipantToggle,
-  onGroupImageChange,
+  createGroupState,
+  setCreateGroupState,
   onCreateGroup,
-  _currentUserId
+  onParticipantSelect,
+  onImageChange
 }: CreateGroupModalProps) => {
   // Estados locales
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Manejadores de eventos internos que funcionan con el estado global proporcionado
+  const handleGroupNameChange = (name: string) => {
+    setCreateGroupState(prev => ({ ...prev, name }));
+  };
+  
+  const handleGroupDescriptionChange = (description: string) => {
+    setCreateGroupState(prev => ({ ...prev, description }));
+  };
+  
+  const handleParticipantToggle = (user: User) => {
+    if (onParticipantSelect) {
+      onParticipantSelect(user);
+    } else {
+      // Implementación por defecto si no se proporciona la función
+      setCreateGroupState(prev => {
+        const isAlreadySelected = prev.participants.some(p => p.userId === user.id);
+        
+        if (isAlreadySelected) {
+          // Eliminar participante
+          return {
+            ...prev,
+            participants: prev.participants.filter(p => p.userId !== user.id)
+          };
+        } else {
+          // Añadir participante con estructura completa según la interfaz Participant
+          return {
+            ...prev,
+            participants: [...prev.participants, {
+              id: `temp_${user.id}`, // ID temporal para cumplir con la interfaz
+              userId: user.id,
+              role: 'member', // Rol predeterminado
+              user: user
+            }]
+          };
+        }
+      });
+    }
+  };
+  
+  // Manejar subida de imagen
+  const handleGroupImageChange = (file: File | null) => {
+    // Actualizar estado con la imagen seleccionada
+    if (file) {
+      // Crear URL para previsualización
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          const previewUrl = e.target.result as string;
+          setCreateGroupState(prev => ({
+            ...prev,
+            image: file,
+            imagePreview: previewUrl
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setCreateGroupState(prev => ({
+        ...prev,
+        image: null,
+        imagePreview: null
+      }));
+    }
+  };
+  
+
+
   // Búsqueda memoizada de usuarios
   const filteredUsers = React.useMemo(() => {
     // Verificar que tenemos datos válidos
@@ -82,36 +145,11 @@ const CreateGroupModal = React.memo(({
 
   // Comprobar si un usuario está seleccionado
   const isUserSelected = useCallback((userId: string) => {
-    return groupState.participants.some(p => p.userId === userId);
-  }, [groupState.participants]);
-
-  // Manejar subida de imagen
-  const handleImageUpload = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e) => {
-      const target = e.target as HTMLInputElement;
-      if (target.files && target.files[0]) {
-        const file = target.files[0];
-        
-        // Crear URL para previsualización
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (e.target?.result) {
-            const _previewUrl = e.target.result as string;
-            // Actualizar imagen y previsualización
-            onGroupImageChange(file);
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-    input.click();
-  }, [onGroupImageChange]);
+    return createGroupState.participants.some(p => p.userId === userId);
+  }, [createGroupState.participants]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => !groupState.isCreating && onClose()}>
+    <Dialog open={isOpen} onOpenChange={() => !createGroupState.isCreating && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Crear grupo</DialogTitle>
@@ -120,10 +158,32 @@ const CreateGroupModal = React.memo(({
         <div className="space-y-4">
           {/* Imagen del grupo */}
           <div className="flex justify-center">
-            <div className="relative h-24 w-24 cursor-pointer" onClick={handleImageUpload}>
-              {groupState.imagePreview ? (
+            <div className="relative h-24 w-24 cursor-pointer" onClick={() => {
+              const fileInput = document.createElement('input');
+              fileInput.type = 'file';
+              fileInput.accept = 'image/*';
+              fileInput.addEventListener('change', (e) => {
+                const target = e.target as HTMLInputElement;
+                if (target.files && target.files[0]) {
+                  if (onImageChange) {
+                    // Crear un evento sintético
+                    const syntheticEvent = {
+                      target: target,
+                      currentTarget: target,
+                      preventDefault: () => {},
+                      stopPropagation: () => {}
+                    } as React.ChangeEvent<HTMLInputElement>;
+                    onImageChange(syntheticEvent);
+                  } else {
+                    handleGroupImageChange(target.files[0]);
+                  }
+                }
+              });
+              fileInput.click();
+            }}>
+              {createGroupState.imagePreview ? (
                 <CldImage 
-                  src={groupState.imagePreview} 
+                  src={createGroupState.imagePreview} 
                   alt="Previsualización"
                   width={96}
                   height={96}
@@ -152,9 +212,9 @@ const CreateGroupModal = React.memo(({
             <Input
               id="group-name"
               placeholder="Nombre del grupo"
-              value={groupState.name}
-              onChange={(e) => onGroupNameChange(e.target.value)}
-              disabled={groupState.isCreating}
+              value={createGroupState.name}
+              onChange={(e) => handleGroupNameChange(e.target.value)}
+              disabled={createGroupState.isCreating}
               className="w-full"
             />
           </div>
@@ -167,9 +227,9 @@ const CreateGroupModal = React.memo(({
             <Textarea
               id="group-description"
               placeholder="Describe el propósito del grupo"
-              value={groupState.description}
-              onChange={(e) => onGroupDescriptionChange(e.target.value)}
-              disabled={groupState.isCreating}
+              value={createGroupState.description}
+              onChange={(e) => handleGroupDescriptionChange(e.target.value)}
+              disabled={createGroupState.isCreating}
               className="w-full resize-none"
               rows={3}
             />
@@ -185,14 +245,14 @@ const CreateGroupModal = React.memo(({
               placeholder="Buscar usuarios..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={groupState.isCreating}
+              disabled={createGroupState.isCreating}
               className="w-full"
             />
           </div>
           
           {/* Lista de participantes */}
           <div className="max-h-64 overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700 border rounded-md">
-            {groupState.isCreating ? (
+            {createGroupState.isCreating ? (
               <div className="py-10 flex justify-center items-center">
                 <LoadingSpinner className="w-8 h-8 mr-2" />
                 <span>Creando grupo...</span>
@@ -204,7 +264,7 @@ const CreateGroupModal = React.memo(({
                   className={`p-2 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer ${
                     isUserSelected(user.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                   }`}
-                  onClick={() => onParticipantToggle(user)}
+                  onClick={() => handleParticipantToggle(user)}
                 >
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-8 w-8">
@@ -265,13 +325,13 @@ const CreateGroupModal = React.memo(({
           </div>
           
           {/* Participantes seleccionados */}
-          {groupState.participants.length > 0 && (
+          {createGroupState.participants.length > 0 && (
             <div>
-              <p className="text-sm font-medium mb-2">Participantes seleccionados ({groupState.participants.length})</p>
+              <p className="text-sm font-medium mb-2">Participantes seleccionados ({createGroupState.participants.length})</p>
               <div className="flex flex-wrap gap-2">
-                {groupState.participants.map(participant => (
+                {createGroupState.participants.map(participant => (
                   <div 
-                    key={participant.userId}
+                    key={participant.id}
                     className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs rounded-full px-3 py-1 flex items-center"
                   >
                     <span>{participant.user.username || participant.user.name || 'Usuario'}</span>
@@ -280,7 +340,7 @@ const CreateGroupModal = React.memo(({
                       className="ml-1 cursor-pointer" 
                       onClick={(e) => {
                         e.stopPropagation();
-                        onParticipantToggle(participant.user);
+                        handleParticipantToggle(participant.user);
                       }}
                     />
                   </div>
@@ -290,14 +350,14 @@ const CreateGroupModal = React.memo(({
           )}
           
           {/* Acciones */}
-          {!groupState.isCreating && (
+          {!createGroupState.isCreating && (
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
               <Button 
                 onClick={onCreateGroup}
-                disabled={!groupState.name.trim() || groupState.participants.length === 0}
+                disabled={!createGroupState.name.trim() || createGroupState.participants.length === 0}
               >
                 Crear grupo
               </Button>

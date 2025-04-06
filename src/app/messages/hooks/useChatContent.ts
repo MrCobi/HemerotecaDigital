@@ -24,6 +24,24 @@ interface ImageMessagePayload {
   tempId: string;
 }
 
+// Extender el tipo Window para incluir nuestras propiedades personalizadas
+declare global {
+  interface Window {
+    __invalidConversationsCache?: Record<string, boolean>;
+    // Para ParticipantRemovalBlock, definido en GroupManagementModal
+    __lastParticipantRemoval?: {
+      [userId: string]: {
+        groupId: string;
+        timestamp: number;
+      }
+    };
+  }
+}
+
+/**
+ * Hook personalizado para gestionar el contenido de chat
+ * Encapsula la lógica de mensajes, socket, y estado de la conversación
+ */
 export function useChatContent(
   conversation: ConversationData | null,
   conversationId: string | null,
@@ -103,8 +121,8 @@ export function useChatContent(
         
         // También guardar en localStorage para que otros componentes puedan detectarlo
         try {
-          const errorData = await response.json();
-          const errorMessage = errorData.error || "No tienes permisos para acceder a esta conversación";
+          const _errorData = await response.json();
+          const errorMessage = _errorData.error || "No tienes permisos para acceder a esta conversación";
           localStorage.setItem(`chat_access_error_${conversationIdToMark}`, errorMessage);
         } catch  {
           localStorage.setItem(`chat_access_error_${conversationIdToMark}`, "No tienes permisos para acceder a esta conversación");
@@ -159,8 +177,8 @@ export function useChatContent(
         // También guardar en localStorage para que otros componentes puedan detectarlo
         if (conversationId) {
           try {
-            const errorData = await response.json();
-            const errorMessage = errorData.error || "No tienes permisos para acceder a esta conversación";
+            const _errorData = await response.json();
+            const errorMessage = _errorData.error || "No tienes permisos para acceder a esta conversación";
             localStorage.setItem(`chat_access_error_${conversationId}`, errorMessage);
           } catch {
             localStorage.setItem(`chat_access_error_${conversationId}`, "No tienes permisos para acceder a esta conversación");
@@ -263,7 +281,7 @@ export function useChatContent(
       
       // Verificar si existe un mensaje temporal que corresponda a este mensaje
       const tempIndex = prevMessages.findIndex(msg => 
-        msg.tempId && newMessage.tempId && msg.tempId === newMessage.tempId
+        msg.id === newMessage.tempId || (msg.tempId && msg.tempId === newMessage.tempId)
       );
       
       console.log('[useChatContent] Actualización de estado - existingIndex:', existingIndex, 'tempIndex:', tempIndex);
@@ -349,14 +367,15 @@ export function useChatContent(
     
     if (!currentConvId || !messageConvId) return;
     
-    // Normalizar IDs para comparación consistente, igual que en onNewMessage
-    const normalizedCurrentId = (currentConvId || '').replace(/^(group_|conv_)/, '');
-    const normalizedMessageId = (messageConvId || '').replace(/^(group_|conv_)/, '');
+    // Normalizar IDs para compararlos correctamente - MEJORADO
+    // Eliminar cualquier prefijo (group_, conv_) y asegurar que ambos son strings
+    const normalizedConversationId = (conversationId || '').replace(/^(group_|conv_)/, '');
+    const normalizedMessageConversationId = (messageConvId || '').replace(/^(group_|conv_)/, '');
     
-    console.log('[useChatContent] IDs normalizados - Actual:', normalizedCurrentId, 'Mensaje:', normalizedMessageId);
+    console.log('[useChatContent] IDs normalizados - Actual:', normalizedConversationId, 'Mensaje:', normalizedMessageConversationId);
     
     // Verificar coincidencia exacta tras normalización
-    const belongsToCurrentConversation = normalizedCurrentId === normalizedMessageId;
+    const belongsToCurrentConversation = normalizedConversationId === normalizedMessageConversationId;
     
     console.log('[useChatContent] ¿Coinciden?', belongsToCurrentConversation);
     
@@ -366,7 +385,7 @@ export function useChatContent(
     } else {
       console.log('[useChatContent] El mensaje NO pertenece a esta conversación, ignorando');
     }
-  }, [conversation, addNewMessage]);
+  }, [conversation, addNewMessage, conversationId]);
 
 
 
@@ -392,6 +411,53 @@ export function useChatContent(
       });
       
       if (!response.ok) {
+        const _errorData = await response.json().catch(() => ({}));
+        
+        // Manejar errores específicos según el código de estado
+        if (response.status === 404) {
+          console.log(`[useChatContent] Conversación no encontrada: ${conversationId}. Puede que haya sido eliminada.`);
+          
+          // Añadir a la lista negra para evitar futuros intentos
+          if (window.__invalidConversationsCache && conversationId) {
+            window.__invalidConversationsCache[conversationId] = true;
+            console.log(`[useChatContent] Añadida conversación a lista negra: ${conversationId}`);
+          }
+          
+          // Emitir un evento para notificar que esta conversación ya no existe
+          // Esto permitirá que otros componentes (como page.tsx) reaccionen a la eliminación
+          const deleteEvent = new CustomEvent('conversation-deleted', {
+            detail: {
+              conversationId,
+              reason: 'not_found'
+            }
+          });
+          window.dispatchEvent(deleteEvent);
+          
+          // Establecer un error más explicativo
+          setError('Esta conversación ya no está disponible.');
+          throw new Error('Conversación no encontrada');
+        } else if (response.status === 403) {
+          console.log(`[useChatContent] Sin acceso a la conversación: ${conversationId}`);
+          
+          // También añadir a lista negra - sin acceso es permanente
+          if (window.__invalidConversationsCache && conversationId) {
+            window.__invalidConversationsCache[conversationId] = true;
+            console.log(`[useChatContent] Añadida conversación sin acceso a lista negra: ${conversationId}`);
+          }
+          
+          // También emitir un evento similar para conversaciones sin acceso
+          const accessEvent = new CustomEvent('conversation-access-denied', {
+            detail: {
+              conversationId,
+              reason: 'forbidden'
+            }
+          });
+          window.dispatchEvent(accessEvent);
+          
+          setError('No tienes permiso para acceder a esta conversación.');
+          throw new Error('Acceso denegado a la conversación');
+        }
+        
         throw new Error('Error al cargar mensajes');
       }
       
@@ -655,6 +721,28 @@ export function useChatContent(
 
   // Efecto para unirse/salir de la conversación
   useEffect(() => {
+    // Lista negra de conversaciones inválidas/eliminadas para evitar
+    // intentos repetidos de cargar conversaciones que sabemos que ya no existen
+    const invalidConversationsCache = window.__invalidConversationsCache || (window.__invalidConversationsCache = {});
+    
+    // Si la conversación está en la lista negra, no intentar cargarla
+    if (conversationId && invalidConversationsCache[conversationId]) {
+      console.log(`[useChatContent] Evitando intentar cargar conversación inválida conocida: ${conversationId}`);
+      setError('Esta conversación ya no está disponible o ha sido eliminada.');
+      
+      // Emitir el evento para que la UI pueda responder adecuadamente
+      const deleteEvent = new CustomEvent('conversation-deleted', {
+        detail: {
+          conversationId,
+          reason: 'blacklisted'
+        }
+      });
+      window.dispatchEvent(deleteEvent);
+      
+      // No continuar con la lógica de unirse/cargar
+      return;
+    }
+    
     if (conversationId && connected && session?.user?.id) {
       console.log(`[useChatContent] Uniendo a conversación: ${conversationId}`);
       // Usar un ID estable para evitar reconexiones innecesarias
@@ -1017,8 +1105,8 @@ export function useChatContent(
           });
           
           if (!uploadResponse || !uploadResponse.ok) {
-            const errorData = await uploadResponse?.json().catch(() => ({}));
-            console.error('Error en respuesta de API:', errorData);
+            const _errorData = await uploadResponse?.json().catch(() => ({}));
+            console.error('Error en respuesta de API:', _errorData);
             const errorMessage = uploadResponse ? `Error al subir archivo de audio: ${uploadResponse.statusText}` : 'Error al conectar con el servidor';
             uploadResponse = null; // Para que siga reintentando
             throw new Error(errorMessage);
@@ -1067,9 +1155,9 @@ export function useChatContent(
         const response = await fetch(`/api/messages/conversations/${conversationId}/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             content: '',
-            mediaUrl: cloudinaryUrl, 
+            mediaUrl: cloudinaryUrl,
             messageType: 'voice',
             tempId
           })
@@ -1080,7 +1168,6 @@ export function useChatContent(
         }
         
         const savedMessage = await response.json();
-        console.log('Respuesta del servidor (fallback HTTP):', savedMessage);
         
         // Actualizar el mensaje temporal con los datos del mensaje guardado
         setMessages(prev => prev.map(msg => 
@@ -1093,6 +1180,8 @@ export function useChatContent(
               } 
             : msg
         ));
+        
+        console.log('Respuesta del servidor (fallback HTTP):', savedMessage);
       }
       
       // Desplazar al final después de enviar

@@ -97,6 +97,7 @@ export function useGroupUpdates(
     // Manejar errores
     eventSource.onerror = (error) => {
       // Si recibimos un error 403, es probable que el usuario ya no sea parte del grupo
+      // o que el grupo haya sido eliminado
       if (userLeftGroup) {
         console.log('[SSE] Conexión cerrada porque el usuario ya no pertenece al grupo');
         eventSource.close();
@@ -105,7 +106,23 @@ export function useGroupUpdates(
       
       console.error('[SSE] Error en la conexión de actualizaciones de grupo:', error);
       
-      // Intentar reconectar solo si el error no es un 403 (Forbidden)
+      // Si recibimos un error 403 o 404, es probable que el grupo ya no exista
+      // o que el usuario haya sido expulsado, enviamos un evento de tipo "group_deleted"
+      // para que la aplicación maneje correctamente este caso
+      if (error instanceof Event && eventSource.readyState === EventSource.CLOSED) {
+        console.log('[SSE] Detectada posible eliminación de grupo - notificando al sistema');
+        // Notificar a la aplicación como si fuera un evento de grupo eliminado
+        onUpdate('group_deleted', { 
+          groupId: apiGroupId,
+          reason: 'connection_error_detected'
+        });
+        
+        // Cerrar la conexión permanentemente
+        eventSource.close();
+        return;
+      }
+      
+      // Intentar reconectar solo si el error no parece ser de permisos
       // y el usuario no ha dejado el grupo manualmente
       setTimeout(() => {
         if (eventSource.readyState === EventSource.CLOSED && !userLeftGroup) {
