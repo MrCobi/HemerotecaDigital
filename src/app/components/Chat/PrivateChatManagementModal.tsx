@@ -40,9 +40,15 @@ export type ConversationData = {
   imageUrl?: string | null;
   isGroup: boolean;
   participants: Participant[];
+  otherUser?: {
+    id: string;
+    username?: string | null;
+    name?: string | null;
+    image?: string | null;
+  };
   createdAt?: string | Date;
   // Usando Record con union types para propiedades adicionales
-  [key: string]: string | null | boolean | Participant[] | undefined | Date;
+  [key: string]: string | null | boolean | Participant[] | undefined | Date | Record<string, unknown>;
 };
 
 interface PrivateChatManagementModalProps {
@@ -68,13 +74,23 @@ const PrivateChatManagementModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
-  // Obtener el otro participante de la conversación
+  // Obtener el otro participante de la conversación - usando otherUser directamente
   const otherParticipant = React.useMemo(() => {
-    if (!conversationData?.participants || conversationData.participants.length < 2) return null;
+    // Para conversaciones privadas, usamos el campo otherUser que ya viene en los datos
+    if (conversationData?.otherUser) {
+      console.log("[PrivateChatManagementModal] Usando otherUser:", conversationData.otherUser);
+      return conversationData.otherUser;
+    }
     
-    return conversationData.participants.find(
-      p => p.userId !== currentUserId
-    )?.user || null;
+    // Fallback al método anterior por si acaso
+    if (conversationData && conversationData.participants && conversationData.participants.length >= 2) {
+      console.log("[PrivateChatManagementModal] Participantes:", JSON.stringify(conversationData.participants, null, 2));
+      const participant = conversationData.participants.find(p => p.userId !== currentUserId);
+      if (participant?.user) return participant.user;
+    }
+    
+    console.log("[PrivateChatManagementModal] No se pudo obtener información del otro usuario");
+    return null;
   }, [conversationData, currentUserId]);
 
   // Función para borrar la conversación
@@ -142,6 +158,10 @@ const PrivateChatManagementModal = ({
   const formattedDate = conversationData.createdAt 
     ? format(new Date(conversationData.createdAt), 'dd/MM/yyyy HH:mm')
     : 'Fecha desconocida';
+    
+  // Depurar la información que tenemos
+  console.log("[PrivateChatManagementModal] Datos completos de conversación:", JSON.stringify(conversationData, null, 2));
+  console.log("[PrivateChatManagementModal] Otro participante:", otherParticipant);
 
   // Renderizar componente
   return (
@@ -151,7 +171,7 @@ const PrivateChatManagementModal = ({
           <DialogHeader>
             <DialogTitle>Información de conversación</DialogTitle>
             <DialogDescription>
-              Conversación con {otherParticipant?.username || 'el usuario'}
+              Conversación con {otherParticipant?.username || otherParticipant?.name || 'el usuario'}
             </DialogDescription>
           </DialogHeader>
 
@@ -161,10 +181,10 @@ const PrivateChatManagementModal = ({
               <div className="flex items-center space-x-4">
                 <Avatar className="h-16 w-16">
                   {otherParticipant.image ? (
-                    <AvatarImage src={otherParticipant.image} alt={otherParticipant.username || 'Usuario'} />
+                    <AvatarImage src={otherParticipant.image} alt={otherParticipant.username || otherParticipant.name || 'Usuario'} />
                   ) : (
                     <AvatarFallback>
-                      {otherParticipant.username?.[0]?.toUpperCase() || 'U'}
+                      {(otherParticipant.username || otherParticipant.name)?.[0]?.toUpperCase() || 'U'}
                     </AvatarFallback>
                   )}
                 </Avatar>
@@ -195,7 +215,7 @@ const PrivateChatManagementModal = ({
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => window.open(`/profile/${otherParticipant.username || otherParticipant.id}`, '_blank')}
+                  onClick={() => window.open(`/users/${otherParticipant.username || otherParticipant.id}`, '_blank')}
                 >
                   Ver perfil completo
                 </Button>
