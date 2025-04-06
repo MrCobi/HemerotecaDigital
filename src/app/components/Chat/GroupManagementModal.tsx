@@ -757,56 +757,59 @@ export const GroupManagementModal = ({
   };
 
   // Función para eliminar el grupo
+  const [isDeleteGroupDialogOpen, setIsDeleteGroupDialogOpen] = useState(false);
+
+  const handleDeleteGroupClick = () => {
+    setIsDeleteGroupDialogOpen(true);
+  };
+
   const handleDeleteGroup = async () => {
     if (!serverGroupData || !initialIsAdmin) return;
     
-    const confirmDelete = window.confirm('¿Estás seguro de eliminar este grupo? Esta acción no se puede deshacer.');
-    
-    if (confirmDelete) {
-      try {
-        setIsUpdatingGroup(true);
-        
-        // Obtenemos solo el ID sin prefijo para enviarlo a la API
-        const groupId = getIdForApi(serverGroupData.id);
-        console.log(`[Cliente] Eliminando grupo: ${groupId} (original: ${serverGroupData.id})`);
-        
-        const response = await fetch(
-          API_ROUTES.messages.group.delete(groupId),
-          {
-            method: 'DELETE'
-          }
-        );
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Error al eliminar grupo:', errorData);
-          throw new Error('Error al eliminar el grupo');
+    try {
+      setIsUpdatingGroup(true);
+      
+      // Obtenemos solo el ID sin prefijo para enviarlo a la API
+      const groupId = getIdForApi(serverGroupData.id);
+      console.log(`[Cliente] Eliminando grupo: ${groupId} (original: ${serverGroupData.id})`);
+      
+      const response = await fetch(
+        API_ROUTES.messages.group.delete(groupId),
+        {
+          method: 'DELETE'
         }
-        
-        // Notificar a los demás participantes
-        onConversationUpdate({
-          ...serverGroupData,
-          participants: []
-        });
-        
-        toast({
-          title: "Grupo eliminado",
-          description: "El grupo ha sido eliminado correctamente"
-        });
-        
-        // Cerrar modal y notificar para refrescar la lista de conversaciones
-        onClose();
-        
-      } catch (err) {
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Ha ocurrido un error al eliminar el grupo",
-          variant: "destructive"
-        });
-        console.error("Error al eliminar grupo:", err);
-      } finally {
-        setIsUpdatingGroup(false);
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error al eliminar grupo:', errorData);
+        throw new Error('Error al eliminar el grupo');
       }
+      
+      // Notificar a los demás participantes
+      onConversationUpdate({
+        ...serverGroupData,
+        participants: []
+      });
+      
+      toast({
+        title: "Grupo eliminado",
+        description: "El grupo ha sido eliminado correctamente"
+      });
+      
+      // Cerrar modal y notificar para refrescar la lista de conversaciones
+      onClose();
+      
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Ha ocurrido un error al eliminar el grupo",
+        variant: "destructive"
+      });
+      console.error("Error al eliminar grupo:", err);
+    } finally {
+      setIsUpdatingGroup(false);
+      setIsDeleteGroupDialogOpen(false);
     }
   };
 
@@ -1071,12 +1074,21 @@ export const GroupManagementModal = ({
               {initialIsAdmin ? (
                 <Button 
                   variant="destructive" 
-                  onClick={handleDeleteGroup}
+                  onClick={handleDeleteGroupClick}
                   disabled={isUpdatingGroup}
                   className="w-full"
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar grupo
+                  {isUpdatingGroup ? (
+                    <>
+                      <span className="mr-2">Eliminando...</span>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Eliminar Grupo
+                    </>
+                  )}
                 </Button>
               ) : (
                 <Button 
@@ -1190,10 +1202,9 @@ export const GroupManagementModal = ({
     <Dialog open={isLeaveGroupDialogOpen} onOpenChange={setIsLeaveGroupDialogOpen}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>¿Abandonar grupo?</DialogTitle>
+          <DialogTitle>Abandonar grupo</DialogTitle>
           <DialogDescription>
-            Si abandonas el grupo, tendrás que ser invitado de nuevo para volver a unirte.
-            Esta acción no puede deshacerse.
+            ¿Estás seguro de que quieres abandonar este grupo? No podrás volver a unirte a menos que te inviten nuevamente.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -1208,6 +1219,42 @@ export const GroupManagementModal = ({
             onClick={confirmLeaveGroup}
           >
             Abandonar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Diálogo de confirmación para eliminar grupo */}
+    <Dialog open={isDeleteGroupDialogOpen} onOpenChange={setIsDeleteGroupDialogOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-red-600 dark:text-red-400">Eliminar grupo</DialogTitle>
+          <DialogDescription>
+            ¿Estás seguro de que quieres eliminar este grupo permanentemente? Esta acción no se puede deshacer y se eliminarán todos los mensajes y datos asociados.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex justify-between">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsDeleteGroupDialogOpen(false)}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            variant="destructive" 
+            onClick={handleDeleteGroup}
+          >
+            {isUpdatingGroup ? (
+              <>
+                <span className="mr-2">Eliminando...</span>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              </>
+            ) : (
+              <>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar Grupo
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
