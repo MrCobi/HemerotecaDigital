@@ -688,10 +688,11 @@ export default function MessagesPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                // Recargar completamente las conversaciones en lugar de solo los contadores
-                fetchConversations();
-                refreshUnreadCounts();
+              onClick={async () => {
+                console.log("[MessagesPage] Botón de recarga presionado, forzando actualización completa");
+                // Forzar actualización completa con forceRefresh=true y resetPage=true
+                await fetchConversations(true, true, _selectedFilter);
+                console.log("[MessagesPage] Actualización completa finalizada");
               }}
               title="Actualizar conversaciones"
               className={`border-blue-500 text-blue-500 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800`}
@@ -721,7 +722,12 @@ export default function MessagesPage() {
               onUserSelect={handleUserSelection}
               onNewMessage={() => setShowNewMessageModal(true)}
               onNewGroup={() => setShowCreateGroupModal(true)}
-              onRefresh={() => fetchConversations(true)}
+              onRefresh={async () => {
+                console.log("[MessagesPage] Botón de recarga presionado, forzando actualización completa");
+                // Forzar actualización completa con forceRefresh=true y resetPage=true
+                await fetchConversations(true, true, _selectedFilter);
+                console.log("[MessagesPage] Actualización completa finalizada");
+              }}
               onFilterChange={(filter) => {
                 console.log(`MessagesPage: Cambiando filtro a ${filter} (filtro actual: ${_selectedFilter})`);
                 _setSelectedFilter(filter);

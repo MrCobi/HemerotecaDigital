@@ -279,25 +279,22 @@ const ConversationList = React.memo(({
   useEffect(() => {
     // Función que maneja el evento de actualización de conversación
     const handleConversationUpdate = (event: CustomEvent) => {
-      console.log("[ConversationList] Detectado evento conversation-updated:", event.detail);
+      console.log("[ConversationList] Evento conversation-updated recibido", event.detail);
       
-      // Cuando se actualiza una conversación, forzamos un refresco
-      if (onRefresh && typeof onRefresh === 'function') {
-        // Pequeño retraso para asegurar que el backend tenga tiempo de procesar
-        setTimeout(() => {
-          console.log("[ConversationList] Refrescando lista de conversaciones tras actualización");
-          onRefresh();
-        }, 100);
+      // Si la conversación está en nuestra lista, actualizarla
+      if (event.detail?.conversationId && combinedList.some(item => 
+        item.isConversation && item.id === event.detail.conversationId
+      )) {
+        console.log("[ConversationList] Refrescando lista tras cambio en conversación");
+        onRefresh();
       }
     };
 
     // Función que maneja el evento de actualización de grupo (participantes, etc.)
     const handleGroupDataUpdate = (event: CustomEvent) => {
-      console.log("[ConversationList] Detectado evento group-data-updated:", event.detail);
+      console.log("[ConversationList] Evento group-data-updated recibido", event.detail);
       
-      // Actualizar inmediatamente al recibir eventos de grupo (participantes, etc.)
-      if (onRefresh && typeof onRefresh === 'function') {
-        // Ejecutar inmediatamente para cambios de participantes para mayor responsividad
+      if (event.detail) {
         console.log("[ConversationList] Refrescando lista de conversaciones tras cambio en grupo");
         onRefresh();
       }
@@ -312,7 +309,7 @@ const ConversationList = React.memo(({
       window.removeEventListener('conversation-updated', handleConversationUpdate as EventListener);
       window.removeEventListener('group-data-updated', handleGroupDataUpdate as EventListener);
     };
-  }, [onRefresh]);
+  }, [onRefresh, combinedList]);
 
   return (
     <div className="flex flex-col h-full w-full bg-white dark:bg-gray-800">
