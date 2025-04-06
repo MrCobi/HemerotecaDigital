@@ -142,7 +142,8 @@ const NewMessageModal = React.memo(({
   const handleUserSelect = useCallback((user: User) => {
     // Verificar si ya existe una conversación 1:1 con este usuario
     const existingConversation = conversations.find(conv => 
-      // Verificar si es una conversación 1:1 (solo 2 participantes)
+      // Verificar si es una conversación 1:1 (solo 2 participantes Y NO es un grupo)
+      !conv.isGroup && 
       conv.participants?.length === 2 && 
       // Verificar si el usuario seleccionado es uno de los participantes
       conv.participants?.some((p: {userId: string}) => p.userId === user.id)

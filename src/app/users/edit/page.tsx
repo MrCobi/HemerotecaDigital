@@ -400,7 +400,7 @@ export default function EditProfilePage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => router.push("/profile")}
+                    onClick={() => router.push("/api/auth/dashboard")}
                     className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
