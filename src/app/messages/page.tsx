@@ -772,6 +772,7 @@ export default function MessagesPage() {
               _loading={false}
               _isMobileView={mobileView}
               _currentUserId={session?.user?.id}
+              fetchConversations={fetchConversations}
             />
           ) : (
             <EmptyState

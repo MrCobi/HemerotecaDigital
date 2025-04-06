@@ -299,6 +299,9 @@ const ConversationList = React.memo(({
         onRefresh();
       }
     };
+    
+    // Ya no necesitamos un listener para conversation-deleted porque la actualización
+    // se maneja directamente a través de fetchConversations
 
     // Añadir event listeners
     window.addEventListener('conversation-updated', handleConversationUpdate as EventListener);

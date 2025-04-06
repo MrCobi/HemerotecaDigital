@@ -177,3 +177,128 @@ export async function GET(
     return NextResponse.json({ error: "Error del servidor" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ conversationId: string }> }
+) {
+  try {
+    // Verificar autenticación
+    const session = await auth();
+    const currentUserId = session?.user?.id;
+
+    if (!currentUserId) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    // Obtener ID de la conversación
+    const { conversationId } = await params;
+    const originalId = conversationId; // Guardamos el ID original para los logs
+    
+    console.log(`[API] Recibida solicitud para eliminar conversación: ${conversationId}`);
+
+    // Verificar que la conversación exista
+    const conversation = await prisma.conversation.findUnique({
+      where: {
+        id: conversationId
+      },
+      include: {
+        participants: {
+          select: {
+            userId: true,
+            isAdmin: true
+          }
+        }
+      }
+    });
+
+    if (!conversation) {
+      console.log(`[API] Conversación no encontrada con ID: ${conversationId}`);
+      return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
+    }
+
+    // Verificar que el usuario actual sea participante
+    const userParticipant = conversation.participants.find(p => p.userId === currentUserId);
+    if (!userParticipant) {
+      console.log(`[API] Usuario ${currentUserId} no es participante de la conversación ${conversationId}`);
+      return NextResponse.json({ error: "No autorizado para eliminar esta conversación" }, { status: 403 });
+    }
+
+    // Verificar permisos (solo el creador/admin puede eliminar grupos, cualquiera puede eliminar privadas)
+    if (conversation.isGroup && !userParticipant.isAdmin) {
+      return NextResponse.json({ 
+        error: "Solo los administradores pueden eliminar grupos" 
+      }, { status: 403 });
+    }
+
+    // Eliminamos la conversación y todo su contenido (mensajes, participantes) en una transacción
+    await prisma.$transaction(async (tx) => {
+      // 1. Eliminar mensajes
+      await tx.directMessage.deleteMany({
+        where: {
+          conversationId: conversationId
+        }
+      });
+
+      // 2. Eliminar registros de lecturas
+      await tx.messageRead.deleteMany({
+        where: {
+          messageId: {
+            in: await tx.directMessage.findMany({
+              where: { conversationId },
+              select: { id: true }
+            }).then(msgs => msgs.map(m => m.id))
+          }
+        }
+      });
+
+      // 3. Eliminar participantes
+      await tx.conversationParticipant.deleteMany({
+        where: {
+          conversationId: conversationId
+        }
+      });
+
+      // 4. Si es grupo, eliminar invitaciones y configuración
+      if (conversation.isGroup) {
+        // Eliminar invitaciones pendientes
+        await tx.groupInvitation.deleteMany({
+          where: {
+            conversationId: conversationId
+          }
+        });
+
+        // Eliminar configuración del grupo
+        await tx.groupSettings.deleteMany({
+          where: {
+            conversationId: conversationId
+          }
+        });
+      }
+
+      // 5. Finalmente eliminar la conversación
+      await tx.conversation.delete({
+        where: {
+          id: conversationId
+        }
+      });
+    });
+
+    console.log(`[API] Conversación ${conversationId} eliminada correctamente`);
+
+    // Enviar evento personalizado para notificar a la interfaz (opciones adicionales)
+    // (Esta parte sería manejada por el frontend)
+
+    return NextResponse.json({ 
+      success: true, 
+      message: "Conversación eliminada correctamente",
+      id: originalId
+    });
+  } catch (error) {
+    console.error("[API] Error al eliminar conversación:", error);
+    return NextResponse.json(
+      { error: "Error al procesar la solicitud", details: (error as Error).message },
+      { status: 500 }
+    );
+  }
+}

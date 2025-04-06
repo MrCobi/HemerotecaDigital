@@ -8,7 +8,7 @@ import LoadingSpinner from "@/src/app/components/ui/LoadingSpinner";
 import OptimizedChatWindow from "./OptimizedChatWindow";
 import PrivateChatWindow from "./PrivateChatWindow"; // Añadimos el nuevo componente
 
-import { ConversationData, User } from '@/src/app/messages/types';
+import { ConversationData, User, FilterType } from '@/src/app/messages/types';
 
 interface MessageContainerProps {
   _selectedConversation?: string | null;
@@ -20,6 +20,7 @@ interface MessageContainerProps {
   _loading?: boolean;
   _isMobileView?: boolean;
   _currentUserId?: string;
+  fetchConversations?: (forceRefresh?: boolean, resetToPage1?: boolean, explicitFilter?: FilterType) => Promise<void>;
 }
 
 const MessageContainer = React.memo(({
@@ -31,7 +32,8 @@ const MessageContainer = React.memo(({
   _onUserProfileClick,
   _loading = false,
   _isMobileView = false,
-  _currentUserId
+  _currentUserId,
+  fetchConversations
 }: MessageContainerProps) => {
   const { data: _session } = useSession();
   // Estado para seguimiento de errores de permisos
@@ -181,6 +183,7 @@ const MessageContainer = React.memo(({
           onBackClick={_onBackClick}
           onSettingsClick={_onSettingsClick}
           className="h-full"
+          fetchConversations={fetchConversations}
         />
       )}
     </div>

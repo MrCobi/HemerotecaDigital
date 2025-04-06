@@ -15,10 +15,11 @@ import { ArrowLeft, ArrowUp, ImageIcon, Settings, X, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
 import { useToast } from '@/src/app/components/ui/use-toast';
-import { Message, User, ConversationData } from '@/src/app/messages/types';
+import { Message, User, ConversationData, FilterType } from '@/src/app/messages/types';
 import NextImage from 'next/image';
 import useAudioRecorder from '@/src/hooks/useAudioRecorder';
 import AudioPlayer from './AudioPlayer';
+import PrivateChatManagementModal from './PrivateChatManagementModal';
 
 // Importar el hook personalizado
 import { useChatContent } from '@/src/app/messages/hooks/useChatContent';
@@ -47,6 +48,7 @@ type PrivateChatWindowProps = {
   onBackClick?: () => void;
   onSettingsClick?: () => void;
   _onPlayAudio?: (url: string) => void;
+  fetchConversations?: (forceRefresh?: boolean, resetToPage1?: boolean, explicitFilter?: FilterType) => Promise<void>;
 };
 
 // Componente para mostrar separadores de fecha entre mensajes
@@ -276,8 +278,8 @@ const PrivateChatWindow = ({
   _isOpen,
   _onUserProfileClick,
   onBackClick,
-  onSettingsClick,
   _onPlayAudio,
+  fetchConversations,
 }: PrivateChatWindowProps) => {
   const { data: session } = useSession();
   const { toast: _toast } = useToast();
@@ -328,6 +330,9 @@ const PrivateChatWindow = ({
 
   // Estado para controlar la carga de mensajes más antiguos
   const [loadingOlderMessages, setLoadingOlderMessages] = React.useState(false);
+
+  // Estado para controlar la visibilidad del modal de gestión de chat privado
+  const [isManagementModalOpen, setIsManagementModalOpen] = React.useState(false);
 
   // Función para cargar mensajes más antiguos
   const handleLoadMoreMessages = React.useCallback(async () => {
@@ -673,19 +678,27 @@ const PrivateChatWindow = ({
         </div>
         
         {/* Botón de configuración */}
-        {onSettingsClick && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onSettingsClick}
-            className="ml-auto"
-            aria-label="Configuración"
-          >
-            <Settings className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          </Button>
-        )}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => setIsManagementModalOpen(true)}
+          className="ml-auto"
+          aria-label="Configuración"
+        >
+          <Settings className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+        </Button>
       </div>
 
+      {/* Modal de gestión de chat privado */}
+      <PrivateChatManagementModal 
+        isOpen={isManagementModalOpen}
+        onClose={() => setIsManagementModalOpen(false)}
+        conversationData={conversation}
+        currentUserId={currentUserId || session?.user?.id || ''}
+        onConversationDeleted={onBackClick}
+        fetchConversations={fetchConversations}
+      />
+      
       {/* Contenedor de mensajes */}
       <div
         ref={messagesContainerRef}
