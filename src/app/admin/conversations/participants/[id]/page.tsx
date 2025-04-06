@@ -97,6 +97,7 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
     setLoading(true);
     
     try {
+      console.log("Cargando datos de conversación...");
       const sessionRes = await fetch('/api/auth/session');
       const sessionData = await sessionRes.json();
       
@@ -105,13 +106,17 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
         return;
       }
       
-      const response = await fetch(`/api/admin/conversations/${conversationId}`);
+      // Añadimos un parámetro de caché para evitar datos en caché
+      const response = await fetch(`/api/admin/conversations/${conversationId}?t=${Date.now()}`);
       
       if (!response.ok) {
         throw new Error(`Error al cargar la conversación: ${response.status}`);
       }
       
       const data: Conversation = await response.json();
+      console.log("Datos de conversación actualizados:", data);
+      console.log("Número de participantes:", data.participants?.length || 0);
+      
       setConversation(data);
       setLoading(false);
     } catch (err) {
@@ -188,7 +193,12 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
   const addParticipant = async (userId: string, role: string) => {
     if (!conversationId) return;
     
+    setAddingParticipant(true);
+    
     try {
+      console.log(`Iniciando proceso de añadir participante: ${userId} con rol: ${role}`);
+      
+      // Añadir el participante
       const response = await fetch(`/api/admin/conversations/${conversationId}/participants`, {
         method: 'POST',
         headers: {
@@ -197,25 +207,41 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
         body: JSON.stringify({ userId, role }),
       });
       
+      const responseData = await response.json();
+      console.log("Respuesta al añadir participante:", responseData);
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al añadir participante");
+        throw new Error(responseData.error || "Error al añadir participante");
       }
       
-      const newParticipant: Participant = await response.json();
+      // Cerrar el diálogo y limpiar la búsqueda antes de recargar datos
+      setAddingParticipant(false);
+      setSearchTerm("");
+      setSearchResults([]);
       
-      // Actualizar el estado local con la conversación actualizada
-      if (newParticipant.conversationId) {
-        loadConversation();
-        setSearchTerm("");
-        toast.success("Participante añadido con éxito");
-      } else {
-        toast.error("Error al añadir participante");
+      // Recargar los datos de la conversación directamente desde la API
+      // usando un nuevo fetch con timestamp para evitar caché
+      try {
+        const refreshResponse = await fetch(`/api/admin/conversations/${conversationId}?refresh=${Date.now()}`);
+        
+        if (refreshResponse.ok) {
+          const freshData = await refreshResponse.json();
+          console.log("Datos actualizados recibidos:", freshData);
+          
+          // Actualizar el estado con los datos frescos
+          setConversation(freshData);
+          
+          toast.success("Participante añadido con éxito");
+        } else {
+          throw new Error("Error al actualizar los datos");
+        }
+      } catch (refreshError) {
+        console.error("Error al actualizar datos después de añadir participante:", refreshError);
+        toast.error("Participante añadido, pero hubo un error al actualizar la vista");
       }
-    } catch (err: Error | unknown) {
+    } catch (err: unknown) {
       console.error("Error añadiendo participante:", err);
       toast.error(err instanceof Error ? err.message : "No se pudo añadir el participante");
-    } finally {
       setAddingParticipant(false);
     }
   };
@@ -264,7 +290,7 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
       } else {
         toast.warning("Participante eliminado, pero no se pudo actualizar la interfaz");
       }
-    } catch (err: Error | unknown) {
+    } catch (err: unknown) {
       console.error("Error eliminando participante:", err);
       toast.error(err instanceof Error ? err.message : "No se pudo eliminar el participante");
     } finally {
@@ -307,9 +333,9 @@ export default function ConversationParticipantsPage({ params }: PageProps) {
       }
       
       toast.success(`Usuario ${isAdmin ? 'promovido a administrador' : 'cambiado a miembro normal'}`);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error cambiando rol:", err);
-      toast.error("No se pudo cambiar el rol del participante");
+      toast.error(err instanceof Error ? err.message : "No se pudo cambiar el rol del participante");
     } finally {
       setChangingRole(null);
     }
