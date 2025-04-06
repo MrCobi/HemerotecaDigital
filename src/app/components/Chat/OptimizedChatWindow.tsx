@@ -326,19 +326,6 @@ const MessageItem = React.memo(({
 
 MessageItem.displayName = 'MessageItem';
 
-// Eliminar la función extractCloudinaryId ya que no se está utilizando
-// const extractCloudinaryId = (url: string): string => {
-//   // Ejemplo: https://res.cloudinary.com/dlg8j3g5k/image/upload/v1/path/to/image.jpg
-//   const regex = /\/image\/upload\/(?:v\d+\/)?(.+)$/;
-//   const match = url.match(regex);
-//   if (match && match[1]) {
-//     return match[1];
-//   }
-//   // Fallback: devolver la última parte de la URL
-//   const parts = url.split('/');
-//   return parts[parts.length - 1];
-// };
-
 // Componente principal de la ventana de chat
 const OptimizedChatWindow = ({
   conversation,
@@ -400,6 +387,9 @@ const OptimizedChatWindow = ({
   
   // Estado local para la información de la conversación actual
   const [localConversationData, setLocalConversationData] = React.useState<ConversationData | null>(conversation);
+  
+  // Estado para forzar actualizaciones específicas en la UI
+  const [_forceUpdate, setForceUpdate] = React.useState(0);
   
   // Efecto para mantener sincronizada la información de la conversación actual
   React.useEffect(() => {
@@ -480,85 +470,124 @@ const OptimizedChatWindow = ({
       // Solo actualizar si es este grupo
       if (updatedGroupId !== conversationId) return;
       
-      console.log(`[OptimizedChatWindow] Actualizando local desde evento: ${updateType}`, data);
+      console.log(`[OptimizedChatWindow] Recibido evento de grupo: ${updateType}`, data);
       
-      // Actualizar los datos locales de la conversación
-      setLocalConversationData(prevData => {
-        if (!prevData) return prevData;
+      // Para cambios importantes, forzar una actualización completa desde el servidor
+      if (updateType === 'group_updated' || updateType === 'participants_added' || 
+          updateType === 'participant_removed' || updateType === 'participant_left') {
         
-        // Siempre crear un nuevo objeto para forzar la re-renderización
-        const updatedData = {...prevData};
-        
-        // Actualizar según el tipo de evento
-        if (updateType === 'group_updated') {
-          if (data.name) updatedData.name = data.name;
-          if (data.description) updatedData.description = data.description;
-          // Forzar una actualización inmediata
-          console.log('[OptimizedChatWindow] Nombre/descripción actualizados:', updatedData.name);
-        } 
-        else if (updateType === 'participants_added') {
-          // Recibimos un array de IDs de usuario en lugar de objetos de participante
-          console.log('[OptimizedChatWindow] Usuarios añadidos:', data);
+        // Primero actualizamos el estado local para una respuesta inmediata
+        setLocalConversationData(prevData => {
+          if (!prevData) return prevData;
           
-          // Verificar el formato de los datos recibidos
-          if (Array.isArray(data)) {
-            // Formato: array de IDs de usuario
-            const existingParticipantIds = new Set(updatedData.participants.map(p => p.userId));
-            
-            // Convertir los IDs a objetos de participante completos
-            const newParticipantsToAdd = data
-              .filter(userId => !existingParticipantIds.has(userId))
-              .map(userId => ({
-                id: `temp_participant_${userId}`, // Añadir id requerido por la interfaz Participant
-                userId,
-                user: { 
-                  id: userId,
-                  name: 'Usuario Añadido', // Nombre temporal hasta que se obtenga el real
-                  email: '',
-                  emailVerified: null,
-                  image: null
-                },
-                role: 'member' as const // Forzar como valor literal de tipo role
-              }));
-            
-            if (newParticipantsToAdd.length > 0) {
-              updatedData.participants = [...updatedData.participants, ...newParticipantsToAdd];
-              // Forzar actualización del UI para la lista de participantes
-              console.log(`[OptimizedChatWindow] ${newParticipantsToAdd.length} participantes añadidos, total: ${updatedData.participants.length}`);
+          // Crear copia para modificar
+          const updatedData = {...prevData};
+          
+          // Actualizar según el tipo de evento
+          if (updateType === 'group_updated') {
+            // Actualizar propiedades básicas del grupo
+            if (data.name) updatedData.name = data.name;
+            if (data.description) updatedData.description = data.description;
+            if (data.imageUrl) updatedData.imageUrl = data.imageUrl;
+            console.log('[OptimizedChatWindow] Grupo actualizado localmente:', {
+              nombre: updatedData.name,
+              descripcion: updatedData.description?.substring(0, 20) + '...',
+              imagen: updatedData.imageUrl ? 'Presente' : 'No disponible'
+            });
+          } 
+          else if (updateType === 'participants_added') {
+            // Procesamiento existente para añadir participantes...
+            if (Array.isArray(data)) {
+              const existingParticipantIds = new Set(updatedData.participants.map(p => p.userId));
+              
+              const newParticipantsToAdd = data
+                .filter(userId => !existingParticipantIds.has(userId))
+                .map(userId => ({
+                  id: `temp_participant_${userId}`,
+                  userId,
+                  user: { 
+                    id: userId,
+                    name: 'Usuario Añadido',
+                    email: '',
+                    emailVerified: null,
+                    image: null
+                  },
+                  role: 'member' as const
+                }));
+              
+              if (newParticipantsToAdd.length > 0) {
+                updatedData.participants = [...updatedData.participants, ...newParticipantsToAdd];
+                console.log(`[OptimizedChatWindow] ${newParticipantsToAdd.length} participantes añadidos localmente, total: ${updatedData.participants.length}`);
+              }
+            } 
+            else if (data.participants && Array.isArray(data.participants)) {
+              const existingParticipantIds = new Set(updatedData.participants.map(p => p.userId));
+              const newParticipants = data.participants.filter((p: { userId: string }) => 
+                !existingParticipantIds.has(p.userId)
+              );
+              
+              if (newParticipants.length > 0) {
+                updatedData.participants = [...updatedData.participants, ...newParticipants];
+              }
             }
           } 
-          else if (data.participants && Array.isArray(data.participants)) {
-            // Formato anterior: objeto con array de participantes
-            const existingParticipantIds = new Set(updatedData.participants.map(p => p.userId));
-            const newParticipants = data.participants.filter((p: { userId: string }) => 
-              !existingParticipantIds.has(p.userId)
-            );
+          else if (updateType === 'participant_removed' || updateType === 'participant_left') {
+            const participantIdToRemove = data.userId;
             
-            if (newParticipants.length > 0) {
-              updatedData.participants = [...updatedData.participants, ...newParticipants];
+            const participantExists = updatedData.participants.some(p => p.userId === participantIdToRemove);
+            
+            if (participantExists) {
+              updatedData.participants = updatedData.participants.filter(
+                p => p.userId !== participantIdToRemove
+              );
+              console.log(`[OptimizedChatWindow] Participante eliminado localmente, total: ${updatedData.participants.length}`);
             }
           }
-        } 
-        else if (updateType === 'participant_removed' || updateType === 'participant_left') {
-          // Eliminar participante
-          const participantIdToRemove = data.userId;
           
-          // Verificar que el participante existe antes de intentar eliminarlo
-          const participantExists = updatedData.participants.some(p => p.userId === participantIdToRemove);
-          
-          if (participantExists) {
-            updatedData.participants = updatedData.participants.filter(
-              p => p.userId !== participantIdToRemove
-            );
-            // Forzar actualización del UI para la lista de participantes
-            console.log(`[OptimizedChatWindow] Participante eliminado/salió, total: ${updatedData.participants.length}`);
-          } else {
-            console.log(`[OptimizedChatWindow] Participante no encontrado: ${participantIdToRemove}`);
-          }
-        }
+          return updatedData;
+        });
         
-        return updatedData;
-      });
+        // Después de la actualización local, forzar una actualización desde el servidor
+        if (conversationId.startsWith('group_')) {
+          const groupId = conversationId.replace('group_', '');
+          console.log(`[OptimizedChatWindow] Forzando actualización desde servidor para grupo: ${groupId}`);
+          
+          // Actualizar directamente desde la API para obtener datos completos y actualizados
+          fetch(`/api/messages/group/${groupId}`)
+            .then(response => {
+              if (response.ok) return response.json();
+              throw new Error('Error fetching updated group data');
+            })
+            .then(updatedGroupData => {
+              // Asegurar que tiene el prefijo correcto
+              if (updatedGroupData && !updatedGroupData.id.startsWith('group_')) {
+                updatedGroupData.id = `group_${updatedGroupData.id}`;
+              }
+              
+              console.log('[OptimizedChatWindow] Datos actualizados recibidos del servidor:', {
+                nombre: updatedGroupData.name,
+                descripcion: updatedGroupData.description?.substring(0, 20) + '...',
+                participantes: updatedGroupData.participants?.length || 0
+              });
+              
+              // IMPORTANTE: Usar un setTimeout para asegurar que esta actualización tenga prioridad
+              // sobre cualquier otra actualización pendiente
+              setTimeout(() => {
+                // Forzar actualización de la UI con los datos del servidor
+                setLocalConversationData(updatedGroupData);
+                // Forzar renderizado (clave React)
+                setForceUpdate(prev => prev + 1);
+              }, 50);
+            })
+            .catch(error => {
+              console.error('[OptimizedChatWindow] Error al actualizar desde servidor:', error);
+            });
+        }
+      }
+      else if (updateType === 'group_deleted') {
+        console.log('[OptimizedChatWindow] El grupo ha sido eliminado');
+        // Opcional: redireccionar al usuario
+      }
     };
     
     // Escuchar el evento personalizado

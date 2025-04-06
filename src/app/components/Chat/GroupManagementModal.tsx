@@ -261,7 +261,25 @@ export const GroupManagementModal = ({
     }
   }, [isOpen]);
 
-  // Función para actualizar la información del grupo
+  // NUEVO: Función para emitir eventos de actualización de forma estandarizada
+  const dispatchGroupUpdateEvent = useCallback((updateType: string, data: Record<string, unknown>) => {
+    if (!serverGroupData?.id) return;
+    
+    console.log(`[GroupManagementModal] Emitiendo evento ${updateType}:`, data);
+    
+    // Disparar evento personalizado para que otros componentes puedan actualizarse
+    const event = new CustomEvent('group-data-updated', {
+      detail: {
+        conversationId: serverGroupData.id,
+        updateType,
+        data
+      }
+    });
+    
+    window.dispatchEvent(event);
+  }, [serverGroupData?.id]);
+
+  // Función para guardar cambios generales del grupo
   const handleSaveChanges = async () => {
     if (!serverGroupData || !initialIsAdmin) return false;
     
@@ -316,6 +334,13 @@ export const GroupManagementModal = ({
       };
       
       console.log("[DEBUG] Enviando datos actualizados al OptimizedChatWindow:", updatedConversationData);
+      
+      // Notificar a través de evento para actualizar otros componentes
+      dispatchGroupUpdateEvent('group_updated', {
+        name: groupName,
+        description: groupDescription,
+        imageUrl: serverGroupData.imageUrl
+      });
       
       // Notificar al padre (page.tsx) sobre la actualización para que actualice
       // todos los componentes que usan estos datos (incluyendo OptimizedChatWindow)
@@ -601,7 +626,10 @@ export const GroupManagementModal = ({
       // 3. Actualizar UI con datos optimistas antes de API call
       onConversationUpdate(optimisticConversationData);
       
-      // 4. Cerrar modal y limpiar selección inmediatamente para mejor UX
+      // 4. Notificar a través de evento para actualizar otros componentes
+      dispatchGroupUpdateEvent('participants_added', { participants: selectedNewParticipants });
+      
+      // 5. Cerrar modal y limpiar selección inmediatamente para mejor UX
       setShowAddParticipantsModal(false);
       setSelectedNewParticipants([]);
       
@@ -632,7 +660,7 @@ export const GroupManagementModal = ({
       const responseData = await response.json();
       console.log('[DEBUG] Respuesta de añadir participantes:', responseData);
       
-      // 5. Notificar a los demás participantes incluso si hubo éxito
+      // 6. Notificar a los demás participantes incluso si hubo éxito
       // pero no intentar refrescar datos del servidor (confiamos en la actualización optimista)
       onConversationUpdate({
         ...serverGroupData,
@@ -707,7 +735,8 @@ export const GroupManagementModal = ({
       const updatedParticipants = localParticipants.filter(p => p.userId !== userId);
       setLocalParticipants(updatedParticipants);
       
-      // MEJORADO: Crear bloqueo usando la función centralizada
+      // Notificar a través de evento para actualizar otros componentes
+      dispatchGroupUpdateEvent('participant_removed', { userId });
       
       const response = await fetch(`/api/messages/group/${getIdForApi(serverGroupData.id)}/participants/${userId}`, {
         method: 'DELETE',
@@ -786,6 +815,9 @@ export const GroupManagementModal = ({
         throw new Error('Error al eliminar el grupo');
       }
       
+      // Notificar a través de evento para actualizar otros componentes
+      dispatchGroupUpdateEvent('group_deleted', {});
+      
       // Notificar a los demás participantes
       onConversationUpdate({
         ...serverGroupData,
@@ -842,6 +874,9 @@ export const GroupManagementModal = ({
         console.error('Error al abandonar grupo:', errorData);
         throw new Error('Error al abandonar el grupo');
       }
+      
+      // Notificar a través de evento para actualizar otros componentes
+      dispatchGroupUpdateEvent('participant_left', { userId: currentUserId });
       
       // Notificar a los demás participantes
       onConversationUpdate({

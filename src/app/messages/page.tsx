@@ -9,6 +9,7 @@ import Image from "next/image";
 import { useMessagesState } from "./hooks/useMessagesState";
 import MessageContainer from "../components/Chat/MessageContainer";
 import GroupManagementModal from '../components/Chat/GroupManagementModal';
+import NewMessageModal from '../components/Chat/NewMessageModal';
 import ConversationList from '../components/Chat/ConversationList';
 import { User, Participant } from "./types";
 import { useToast } from "@/src/app/components/ui/use-toast";
@@ -61,6 +62,7 @@ export default function MessagesPage() {
   // Estados para modales
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [createGroupState, setCreateGroupState] = useState<{
     name: string;
     description: string;
@@ -77,6 +79,9 @@ export default function MessagesPage() {
     imagePreview: null
   });
 
+  // Estados para usuarios mutuos
+  const [_localMutualFollowers, setLocalMutualFollowers] = useState<User[]>([]);
+
   // Usar el hook personalizado para el estado principal de mensajes
   const {
     loading,
@@ -87,7 +92,6 @@ export default function MessagesPage() {
     selectedConversationData,
     isGroupAdmin,
     mobileView,
-    mutualFollowers,
     mutualFollowersForGroups,
     showGroupManagementModal,
     toggleGroupManagementModal,
@@ -361,35 +365,44 @@ export default function MessagesPage() {
 
   // Manejar click en nuevo mensaje
   const handleNewMessageClick = useCallback(() => {
-    // Actualizar la lista de seguidores mutuos antes de abrir el modal
-    try {
-      fetch('/api/relationships/mutual')
-        .then(response => response.json())
-        .then(data => {
-          console.log("Seguidores mutuos cargados:", data);
-          if (Array.isArray(data)) {
-          }
-        })
-        .catch(error => {
-          console.error("Error cargando seguidores mutuos:", error);
-        });
-    } catch (error) {
-      console.error("Error en solicitud de seguidores mutuos:", error);
-    }
+    // Limpiar la lista local antes de mostrar el modal
+    setLocalMutualFollowers([]);
     
-    // Abrir el modal
+    // Primero mostrar el modal con estado de carga
     setShowNewMessageModal(true);
+    
+    // Consultar los seguidores mutuos sin conversación
+    fetch('/api/relationships/mutual-without-conversation')
+      .then(response => response.json())
+      .then(data => {
+        console.log("Seguidores mutuos sin conversación cargados:", data);
+        
+        if (Array.isArray(data)) {
+          // Usar el estado local para almacenar los usuarios mutuos
+          setLocalMutualFollowers(data);
+          console.log("Lista actualizada a través del estado local:", data.length, "usuarios");
+        }
+      })
+      .catch(error => {
+        console.error("Error cargando seguidores mutuos:", error);
+      });
   }, []);
 
   // Función para seleccionar un usuario para iniciar una conversación
   const handleUserSelection = useCallback(async (user: User) => {
     try {
+      // Marcar que estamos creando una conversación
+      setIsCreatingConversation(true);
+      
       // Crear la conversación y obtener los datos
       const conversationData = await MessageService.createConversation(user.id);
       
       if (conversationData && conversationData.id) {
         // Solo actualizar la lista de conversaciones para incluir la nueva
         await fetchConversations();
+        
+        // Opcionalmente seleccionar la conversación recién creada
+        selectConversation(conversationData.id);
         
         // Mostrar notificación de éxito opcional
         toast({
@@ -408,8 +421,11 @@ export default function MessagesPage() {
         description: "No se pudo crear la conversación",
         variant: "destructive",
       });
+    } finally {
+      // Siempre marcar que terminamos de crear la conversación
+      setIsCreatingConversation(false);
     }
-  }, [fetchConversations, toast, setShowNewMessageModal, MessageService]);
+  }, [fetchConversations, toast, setShowNewMessageModal, MessageService, selectConversation]);
 
   // Procesar el ID de conversación de la URL al cargar
   useEffect(() => {
@@ -775,72 +791,15 @@ export default function MessagesPage() {
       </div>
       
       {/* Modal para nuevo mensaje */}
-      <Dialog open={showNewMessageModal} onOpenChange={setShowNewMessageModal}>
-        <DialogContent className="sm:max-w-md dark:bg-gray-800">
-          <DialogHeader>
-            <DialogTitle className="dark:text-gray-100">Nuevo mensaje</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Buscar usuarios..."
-                className="w-full rounded-md border border-gray-300 p-2 pr-10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-              />
-            </div>
-            
-            <div className="max-h-96 overflow-y-auto">
-              {mutualFollowers.length > 0 ? (
-                <div className="space-y-2">
-                  {mutualFollowers.map((user) => (
-                    <div
-                      key={user.id}
-                      className="flex cursor-pointer items-center justify-between rounded-md p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
-                      onClick={() => {
-                        handleUserSelection(user);
-                        setShowNewMessageModal(false);
-                      }}
-                    >
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                          {user.image ? (
-                            <Image
-                              src={user.image}
-                              alt={user.username || 'Usuario'}
-                              width={40}
-                              height={40}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-primary-100 text-primary-800">
-                              {user.username?.charAt(0).toUpperCase() || 'U'}
-                            </div>
-                          )}
-                        </div>
-                        <div className="ml-3">
-                          <div className="font-medium">
-                            {user.name || user.username || 'Usuario sin nombre'}
-                          </div>
-                          {user.username && user.name && (
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              @{user.username}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-4 text-center text-gray-500 dark:text-gray-400">
-                  No hay seguidores mutuos disponibles para iniciar un chat.
-                </div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <NewMessageModal
+        isOpen={showNewMessageModal}
+        onClose={() => setShowNewMessageModal(false)}
+        onUserSelect={handleUserSelection}
+        _currentUserId={session?.user?.id || ''}
+        isCreatingConversation={isCreatingConversation}
+        conversations={conversations}
+        selectConversation={selectConversation}
+      />
       
       {/* Modal para crear grupo */}
       <Dialog open={showCreateGroupModal} onOpenChange={setShowCreateGroupModal}>
