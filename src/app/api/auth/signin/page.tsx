@@ -1,9 +1,10 @@
 // src/app/api/auth/signin/page.tsx
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import SigninForm from "./_components/signin-form";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 // Configuración clave para resolver el error
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,15 @@ export const dynamic = 'force-dynamic';
 function SignInContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
+  const router = useRouter();
+  const { data: session } = useSession();
+
+  // Redirección si el usuario ya ha iniciado sesión
+  useEffect(() => {
+    if (session) {
+      router.push("/home");
+    }
+  }, [session, router]);
 
   return (
     <div>

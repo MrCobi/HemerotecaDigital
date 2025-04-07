@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useSession } from "next-auth/react";
+import { redirect } from "next/navigation";
 import { motion } from 'framer-motion';
 
 // Utilizamos dynamic import para evitar el error durante el prerender
@@ -43,6 +45,9 @@ const pageVariants = {
 };
 
 export default function AppearancePage() {
+  const { data: session, status } = useSession();
+  const [loading, setLoading] = useState(true);
+  
   // Efecto para añadir transiciones suaves entre cambios de tema
   // Optimizado para afectar menos elementos
   useEffect(() => {
@@ -52,6 +57,31 @@ export default function AppearancePage() {
       document.documentElement.classList.remove('theme-transition');
     };
   }, []);
+  
+  useEffect(() => {
+    if (status === "authenticated" || status === "unauthenticated") {
+      setLoading(false);
+    }
+  }, [status]);
+
+  // Redireccionar si no está autenticado
+  if (status === "unauthenticated") {
+    redirect("/api/auth/signin");
+  }
+  
+  // Mostrar estado de carga mientras se verifica la autenticación
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-blue-950 dark:to-purple-950 py-12 px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm p-8 rounded-xl shadow-lg">
+            <h1 className="text-2xl font-bold mb-6 text-gray-800 dark:text-blue-100">Personalización</h1>
+            <LoadingSkeleton />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-blue-950 dark:to-purple-950 py-12 px-4 sm:px-6 transition-colors duration-300 relative">
