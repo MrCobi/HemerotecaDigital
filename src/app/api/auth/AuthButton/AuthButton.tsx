@@ -73,26 +73,37 @@ const AuthButton = () => {
               (!session.user.image.startsWith('/') && !session.user.image.startsWith('http'))) ? (
                 <CldImage
                   src={(() => {
-                    // Extraer el public_id limpio, manejando diferentes formatos
-                    let publicId = session.user.image;
-
-                    // Si es una URL completa de Cloudinary
-                    if (session.user.image.includes('cloudinary.com')) {
-                      // Extraer el public_id eliminando la parte de la URL
-                      // Buscamos 'hemeroteca_digital' como punto de referencia seguro
-                      const match = session.user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
-                      if (match && match[1]) {
-                        publicId = `hemeroteca_digital/${match[1]}`;
+                    let publicId = "";
+                    
+                    // Si la imagen es una URL de Cloudinary
+                    if (session.user.image && session.user.image.includes('cloudinary.com')) {
+                      // Verificar si la URL ya tiene el formato completo de Cloudinary
+                      if (session.user.image.includes('res.cloudinary.com/dlg8j3g5k/image/upload/')) {
+                        // Usar la URL completa directamente, no intentar construirla de nuevo
+                        return session.user.image;
                       } else {
-                        // Si no encontramos el patrón específico, intentamos una extracción más general
-                        publicId = session.user.image.replace(/.*\/v\d+\//, '').split('?')[0];
+                        // Extraer el public_id eliminando la parte de la URL
+                        // Buscamos 'hemeroteca_digital' como punto de referencia seguro
+                        const match = session.user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                        if (match && match[1]) {
+                          publicId = `hemeroteca_digital/${match[1]}`;
+                        } else {
+                          // Si no encontramos el patrón específico, intentamos una extracción más general
+                          publicId = session.user.image.replace(/.*\/v\d+\//, '').split('?')[0];
+                        }
                       }
                     }
 
                     // Verificar que el ID no esté duplicado o anidado
-                    if (publicId.includes('https://')) {
+                    if (publicId.includes('https://') || publicId.includes('cloudinary.com')) {
                       console.warn('ID público contiene URL completa en AuthButton:', publicId);
                       publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                    }
+
+                    // Si después de todo el procesamiento, el publicId sigue teniendo la URL completa
+                    if (publicId.includes('https://')) {
+                      console.error('No se pudo extraer correctamente el publicId:', publicId);
+                      return session.user.image; // Usar la URL original en este caso
                     }
 
                     console.log('Public ID extraído en AuthButton:', publicId);

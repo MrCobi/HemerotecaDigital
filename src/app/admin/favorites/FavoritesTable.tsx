@@ -2,37 +2,18 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { CldImage } from "next-cloudinary";
 import { format } from "date-fns";
 import { useState, useMemo, useCallback } from "react";
 import DataTable, { Column } from "../components/DataTable/DataTable";
 import { ExternalLink, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/src/app/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { Favorite } from "./types"; // Importar el tipo desde el archivo compartido
 
-type Favorite = {
-  id: string;
-  createdAt: Date;
-  updatedAt: Date;
-  userId: string;
-  sourceId: string;
-  user: {
-    id: string;
-    name: string | null;
-    email: string | null;
-    image: string | null;
-  };
-  source: {
-    id: string;
-    name: string;
-    url: string;
-    imageUrl: string | null;
-    category: string;
-  };
-};
-
-type FavoritesTableProps = {
+interface FavoritesTableProps {
   favorites: Favorite[];
-};
+}
 
 // Componente para el diálogo de confirmación de eliminación
 interface DeleteFavoriteDialogProps {
@@ -147,7 +128,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
         const userNameMatch = favorite.user.name?.toLowerCase().includes(lowercasedFilter) || false;
         const userEmailMatch = favorite.user.email?.toLowerCase().includes(lowercasedFilter) || false;
         const sourceNameMatch = favorite.source.name.toLowerCase().includes(lowercasedFilter);
-        const sourceUrlMatch = favorite.source.url.toLowerCase().includes(lowercasedFilter);
+        const sourceUrlMatch = favorite.source.url?.toLowerCase().includes(lowercasedFilter) || false;
         
         return userNameMatch || userEmailMatch || sourceNameMatch || sourceUrlMatch;
       }
@@ -204,17 +185,55 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
         return (
           <div className="flex items-center">
             <div className="flex-shrink-0 h-8 w-8 mr-2">
-              <Image
-                src={user?.image || "/images/AvatarPredeterminado.webp"}
-                alt={user?.name || "Avatar"}
-                width={32}
-                height={32}
-                className="h-8 w-8 rounded-full object-cover"
-                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = "/images/AvatarPredeterminado.webp";
-                }}
-              />
+              {user?.image ? (
+                user.image.includes('cloudinary') ? (
+                  <CldImage
+                    src={(() => {
+                      let publicId = user.image;
+                      if (user.image.includes('cloudinary.com')) {
+                        const match = user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                        if (match && match[1]) {
+                          publicId = `hemeroteca_digital/${match[1]}`;
+                        } else {
+                          publicId = user.image.replace(/.*\/v\d+\//, '').split('?')[0];
+                        }
+                      }
+                      if (publicId.includes('https://')) {
+                        publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                      }
+                      return publicId;
+                    })()}
+                    alt={user?.name || "Avatar"}
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 rounded-full object-cover"
+                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/images/AvatarPredeterminado.webp";
+                    }}
+                  />
+                ) : (
+                  <Image
+                    src={user.image}
+                    alt={user?.name || "Avatar"}
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 rounded-full object-cover"
+                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/images/AvatarPredeterminado.webp";
+                    }}
+                  />
+                )
+              ) : (
+                <Image
+                  src="/images/AvatarPredeterminado.webp"
+                  alt="Avatar predeterminado"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 rounded-full object-cover"
+                />
+              )}
             </div>
             <div>
               <div className="text-sm font-medium text-foreground truncate max-w-[150px]">
@@ -236,20 +255,48 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
           <div className="flex items-center">
             <div className="flex-shrink-0 h-10 w-10 mr-3">
               {source.imageUrl ? (
-                <Image
-                  src={source.imageUrl}
-                  alt={source.name}
-                  width={40}
-                  height={40}
-                  className="h-10 w-10 rounded-md object-cover"
-                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/images/default_periodico.jpg";
-                  }}
-                />
+                source.imageUrl.includes('cloudinary') ? (
+                  <CldImage
+                    src={(() => {
+                      let publicId = source.imageUrl;
+                      if (source.imageUrl.includes('cloudinary.com')) {
+                        const match = source.imageUrl.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                        if (match && match[1]) {
+                          publicId = `hemeroteca_digital/${match[1]}`;
+                        } else {
+                          publicId = source.imageUrl.replace(/.*\/v\d+\//, '').split('?')[0];
+                        }
+                      }
+                      if (publicId.includes('https://')) {
+                        publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                      }
+                      return publicId;
+                    })()}
+                    alt={source.name}
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 rounded-md object-cover"
+                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/images/default_periodico.jpg";
+                    }}
+                  />
+                ) : (
+                  <Image
+                    src={source.imageUrl}
+                    alt={source.name}
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 rounded-md object-cover"
+                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/images/default_periodico.jpg";
+                    }}
+                  />
+                )
               ) : (
                 <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold">
-                  {source.name.substring(0, 2).toUpperCase()}
+                  {source.name.charAt(0).toUpperCase()}
                 </div>
               )}
             </div>
@@ -262,12 +309,12 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
               </Link>
               <div className="text-xs text-muted-foreground mt-1 truncate max-w-xs">
                 <a 
-                  href={source.url} 
+                  href={source.url || "#"} 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   className="hover:underline flex items-center"
                 >
-                  <span className="truncate">{source.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}</span>
+                  <span className="truncate">{source.url ? source.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] : 'URL no disponible'}</span>
                   <ExternalLink className="h-3 w-3 ml-1 inline-flex" />
                 </a>
               </div>
