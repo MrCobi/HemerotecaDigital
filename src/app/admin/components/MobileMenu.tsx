@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import SafeImage from "@/src/components/ui/SafeImage";
 
@@ -12,6 +12,8 @@ export default function MobileMenu({
   userImage: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -21,9 +23,27 @@ export default function MobileMenu({
     setIsOpen(false);
   };
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isOpen && 
+          menuRef.current && 
+          !menuRef.current.contains(event.target as Node) &&
+          buttonRef.current && 
+          !buttonRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
   return (
     <div className="md:hidden">
       <button
+        ref={buttonRef}
         type="button"
         className="text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/50 bg-card rounded-md p-2"
         onClick={toggleMenu}
@@ -35,7 +55,7 @@ export default function MobileMenu({
       </button>
 
       {isOpen && (
-        <div className="absolute top-0 mt-12 left-0 right-0 bg-card shadow-lg border-t border-border z-50">
+        <div ref={menuRef} className="absolute top-0 mt-12 left-0 right-0 bg-card shadow-lg border-t border-border z-50">
           <div className="p-4 border-b border-border flex items-center justify-between">
             <div className="flex items-center">
               <div className="flex-shrink-0 h-10 w-10">

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import AuthButton from "@/src/app/api/auth/AuthButton/AuthButton";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Suspense } from "react";
 import { MessageBadge } from "@/src/app/components/MessageBadge";
 import { UnreadMessagesProvider } from "@/src/app/contexts/UnreadMessagesContext";
@@ -51,6 +51,8 @@ function Navbar() {
   const { data: session } = useSession();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -60,6 +62,23 @@ function Navbar() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isMenuOpen && 
+          menuRef.current && 
+          !menuRef.current.contains(event.target as Node) &&
+          menuButtonRef.current && 
+          !menuButtonRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMenuOpen]);
 
   return (
     <header
@@ -127,6 +146,7 @@ function Navbar() {
             {/* Mobile menu button (authenticated users only) */}
             {session && (
               <button
+                ref={menuButtonRef}
                 type="button"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="sm:hidden inline-flex items-center justify-center p-1.5 rounded-md text-blue-100 hover:text-white hover:bg-blue-800/50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white transition-colors"
@@ -163,6 +183,7 @@ function Navbar() {
       {/* Mobile menu */}
       {session && (
         <div
+          ref={menuRef}
           className={`sm:hidden transition-all duration-300 ease-in-out ${isMenuOpen
             ? "max-h-[18rem] opacity-100 shadow-lg border-t border-blue-500/30"
             : "max-h-0 opacity-0 overflow-hidden"
