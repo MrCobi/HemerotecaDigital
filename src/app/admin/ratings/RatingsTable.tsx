@@ -341,7 +341,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
     {
       header: "Fuente",
       accessorKey: "source",
-      className: "w-[30%]",
+      className: "w-[15%]",
       cell: (rating: Rating) => {
         return (
           <div className="min-w-0 truncate">
@@ -358,7 +358,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
     {
       header: "Valoración",
       accessorKey: "value",
-      className: "w-[20%]",
+      className: "w-[25%]",
       cell: (rating: Rating) => renderStars(rating.value),
       filterElement: ratingFilterElement,
     },
@@ -382,7 +382,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
     {
       header: "Acciones",
       id: "actions",
-      className: "w-[10%]",
+      className: "w-[20%]",
       cell: (rating: Rating) => {
         return (
           <div className="flex items-center justify-start gap-1">

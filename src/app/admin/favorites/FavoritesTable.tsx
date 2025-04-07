@@ -229,7 +229,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
     {
       header: "Fuente",
       accessorKey: "source",
-      className: "w-[30%]",
+      className: "w-[15%]",
       cell: (favorite: Favorite) => {
         const { source } = favorite;
         return (
@@ -279,7 +279,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
     {
       header: "Categoría",
       accessorKey: "category",
-      className: "w-[15%]",
+      className: "w-[20%]",
       cell: (favorite: Favorite) => {
         return (
           <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300">
@@ -318,7 +318,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
     {
       header: "Acciones",
       id: "actions",
-      className: "w-[15%]",
+      className: "w-[25%]",
       cell: (favorite: Favorite) => {
         return (
           <div className="flex items-center space-x-2">

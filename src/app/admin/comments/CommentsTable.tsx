@@ -178,7 +178,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
         header: "Fuente",
         accessorKey: "source",
         hideOnMobile: true,
-        className: "w-[25%]",
+        className: "w-[20%]",
         cell: (comment: Comment) => {
           const { source } = comment;
           return (
@@ -269,7 +269,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
       {
         header: "Acciones",
         id: "actions",
-        className: "w-[10%]",
+        className: "w-[15%]",
         cell: (comment: Comment) => {
           return (
             <div className="flex items-center justify-start gap-1.5">

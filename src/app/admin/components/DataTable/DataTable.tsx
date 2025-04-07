@@ -16,7 +16,6 @@ export type Column<T> = {
   hideOnMobile?: boolean;
   hideOnDesktop?: boolean;
   id?: string;
-  priority?: number;
 };
 
 export type DataTableProps<T> = {
@@ -75,17 +74,6 @@ export default function DataTable<T>({
   const _isTabletView = windowWidth >= 768 && windowWidth < 1080;
   const _isSmallDesktopView = windowWidth >= 1080 && windowWidth < 1280;
 
-  const shouldShowActionButton = (priority: number = 1) => {
-    if (_isMobileView) {
-      return priority <= 1;
-    } else if (_isTabletView) {
-      return priority <= 2;
-    } else if (_isSmallDesktopView) {
-      return priority <= 3;
-    }
-    return true;
-  };
-
   const getTabletVisibleColumns = () => {
     if (windowWidth < 850) return 3; 
     if (windowWidth < 950) return 4; 
@@ -93,39 +81,6 @@ export default function DataTable<T>({
   };
 
   const _tabletVisibleColumns = getTabletVisibleColumns();
-
-  const renderCellContent = (column: Column<T>, item: T) => {
-    if (column.header === "Acciones" || column.accessorKey === "actions" || column.id === "actions") {
-      const originalContent = column.cell(item);
-      
-      if (!React.isValidElement(originalContent)) {
-        return originalContent;
-      }
-      
-      if (React.isValidElement(originalContent) && originalContent.type === 'div' && (originalContent.props as { children?: React.ReactNode }).children) {
-        if (typeof originalContent.props === 'object' && originalContent.props !== null && Array.isArray(originalContent.props.children)) {
-          const filteredButtons = React.Children.map((originalContent.props as { children?: React.ReactNode }).children, (child, index) => {
-            const buttonPriority = child.props.priority || index + 1;
-            
-            if (shouldShowActionButton(buttonPriority)) {
-              return child;
-            }
-            return null;
-          });
-          
-          return React.cloneElement(
-            originalContent,
-            originalContent.props,
-            filteredButtons
-          );
-        }
-      }
-      
-      return originalContent;
-    }
-    
-    return column.cell(item);
-  };
 
   const renderMobileRow = (item: T, index: number) => {
     const isExpanded = expandedRows[index] || false;
@@ -200,10 +155,7 @@ export default function DataTable<T>({
           
           {isExpanded && visibleColumns.length > 4 && (
             <div className="flex flex-row justify-center space-x-2 mt-3 pt-3 border-t border-border">
-              {renderCellContent(
-                columns.find(col => col.header === "Acciones" || col.accessorKey === "actions") || visibleColumns[4],
-                item
-              )}
+              {columns.find(col => col.header === "Acciones" || col.accessorKey === "actions")?.cell(item) || visibleColumns[4].cell(item)}
             </div>
           )}
           
@@ -275,10 +227,7 @@ export default function DataTable<T>({
         
         {isExpanded && (
           <div className="flex flex-row justify-end space-x-2 mt-2 pt-3 border-t border-border">
-            {renderCellContent(
-              columns.find(col => col.header === "Acciones" || col.accessorKey === "actions") || columns[columns.length - 1],
-              item
-            )}
+            {columns.find(col => col.header === "Acciones" || col.accessorKey === "actions")?.cell(item) || columns[columns.length - 1].cell(item)}
           </div>
         )}
         
@@ -381,10 +330,7 @@ export default function DataTable<T>({
                           )}
                         >
                           <div className="overflow-hidden text-ellipsis">
-                            {column.header === "Acciones" || column.accessorKey === "actions" || column.id === "actions"
-                              ? renderCellContent(column, item)
-                              : column.cell(item)
-                            }
+                            {column.cell(item)}
                           </div>
                         </td>
                       ))}
