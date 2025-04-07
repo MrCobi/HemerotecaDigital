@@ -7,7 +7,10 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "socket": "node socket-server.js",
+    "dev:all": "concurrently \"npm run dev\" \"npm run socket\"",
+    "start:all": "concurrently \"npm run start\" \"npm run socket\""
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
@@ -102,6 +105,7 @@
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.2",
     "eslint": "^9",
     "eslint-config-next": "15.1.6",
     "lighthouse": "^12.4.0",
