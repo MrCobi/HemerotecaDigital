@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button, buttonVariants } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
@@ -8,11 +8,11 @@ import { Label } from "@/src/app/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/src/app/components/ui/select";
 import { Loader2, ArrowLeft, Save } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/app/components/ui/alert";
-import { CldUploadWidget } from "next-cloudinary";
 import Image from "next/image";
 import { SignUpSchema } from "@/lib/zod";
 import { z } from "zod";
 import { CldImage } from "next-cloudinary";
+import { toast } from "sonner";
 
 // Esquema extendido para incluir el rol para administradores
 const AdminUserSchema = SignUpSchema.extend({
@@ -40,6 +40,9 @@ export default function CreateUserPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -56,6 +59,58 @@ export default function CreateUserPage() {
       setForm({ ...form, role: value as "user" | "admin" });
     }
   };
+
+  // Manejador de cambio de archivo
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      // Verificar que sea un archivo de imagen
+      if (!selectedFile.type.startsWith('image/')) {
+        setUploadError('Solo se permiten archivos de imagen');
+        toast.error('Solo se permiten archivos de imagen');
+        return;
+      }
+      setFile(selectedFile);
+      const reader = new FileReader();
+      reader.onload = () => setImageUrl(reader.result as string);
+      reader.readAsDataURL(selectedFile);
+      setUploadError(null);
+      toast.info('Imagen seleccionada. Guarde para aplicar los cambios.');
+    }
+  }, []);
+
+  // Función para subir archivo
+  const uploadFile = useCallback((file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append("file", file);
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percent);
+        }
+      });
+
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
+            // Construir la URL completa a partir del public_id
+            const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'demo';
+            const fullUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${response.url}`;
+            resolve(fullUrl);
+          } else {
+            reject(new Error(xhr.statusText || "Error al subir el archivo"));
+          }
+        }
+      };
+
+      xhr.open("POST", "/api/upload");
+      xhr.send(formData);
+    });
+  }, []);
 
   const validateForm = () => {
     try {
@@ -94,13 +149,25 @@ export default function CreateUserPage() {
     setIsLoading(true);
     
     try {
+      let finalImageUrl = imageUrl;
+
+      // Si hay un archivo nuevo, subirlo
+      if (file) {
+        try {
+          finalImageUrl = await uploadFile(file);
+        } catch (uploadError) {
+          console.error("Error al subir imagen:", uploadError);
+          toast.error("Error al subir la imagen. Intentando guardar sin imagen.");
+        }
+      }
+
       // Preparar los datos del usuario
       const userData = {
         name: form.name,
         username: form.username,
         email: form.email,
         password: form.password, 
-        image: imageUrl || "",
+        image: finalImageUrl || "",
         bio: form.bio || null,
         role: form.role
       };
@@ -243,26 +310,32 @@ export default function CreateUserPage() {
                   )}
                 </div>
                 <div className="mb-6">
-                  <CldUploadWidget
-                    uploadPreset="hemeroteca_users"
-                    onSuccess={(result) => {
-                      if (result.info && typeof result.info === 'object' && 'secure_url' in result.info) {
-                        setImageUrl(result.info.secure_url as string);
-                      }
-                    }}
-                  >
-                    {({ open }: { open: () => void }) => (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => open()}
-                        className="w-full"
-                      >
-                        Subir Imagen
-                      </Button>
-                    )}
-                  </CldUploadWidget>
+                  <div className="w-full max-w-[300px] mx-auto">
+                    <label 
+                      htmlFor="imageUpload" 
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                    >
+                      Imagen de perfil
+                    </label>
+                    <input
+                      id="imageUpload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="block w-full text-sm text-muted-foreground truncate file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                    />
+                  </div>
+                  
+                  {uploadProgress > 0 && (
+                    <div className="bg-primary/10 text-primary p-2 rounded-md mt-2 w-full max-w-[300px]">
+                      Subiendo imagen... {uploadProgress}%
+                    </div>
+                  )}
+                  {uploadError && (
+                    <div className="bg-destructive/10 text-destructive p-2 rounded-md mt-2 w-full max-w-[300px]">
+                      {uploadError}
+                    </div>
+                  )}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   <p>La imagen de perfil es opcional.</p>

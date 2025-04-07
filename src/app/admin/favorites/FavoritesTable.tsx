@@ -318,10 +318,9 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
         return (
           <div className="flex items-center space-x-2">
             <Link
-              href={favorite.source.url}
-              target="_blank"
+              href={`/sources/${favorite.source.id}`}
               className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
-              title="Visitar fuente"
+              title="Ver detalle de la fuente"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               <span className="ml-1 text-xs truncate">Visitar</span>
