@@ -21,7 +21,6 @@ interface SourcesTableProps {
   }>;
 }
 
-// Función para determinar la clase del badge de categoría
 const getCategoryBadgeClass = (category: string) => {
   switch (category.toLowerCase()) {
     case "general":
@@ -52,7 +51,6 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
-  // Obtener categorías únicas para el filtro
   const uniqueCategories = useMemo(() => {
     const categories = sources.map(source => source.category);
     return [...new Set(categories)].sort();
@@ -65,18 +63,15 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
   };
 
   const filteredSources = useMemo(() => {
-    // Si no hay filtros activos, devolver todas las fuentes
     if (!filterValue && categoryFilter === null) return sources;
 
     return sources.filter((source) => {
-      // Filtro de texto (nombre, descripción, URL)
       const matchesFilter =
         !filterValue ||
         source.name.toLowerCase().includes(filterValue.toLowerCase()) ||
         source.description.toLowerCase().includes(filterValue.toLowerCase()) ||
         source.url.toLowerCase().includes(filterValue.toLowerCase());
 
-      // Filtro de categoría
       const matchesCategory =
         categoryFilter === null || // Explícitamente verificar si es null para "Todas las categorías"
         source.category === categoryFilter;
@@ -85,19 +80,17 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
     });
   }, [sources, filterValue, categoryFilter]);
 
-  // Paginación
   const totalPages = Math.ceil(filteredSources.length / rowsPerPage);
   const paginatedSources = filteredSources.slice(
     (currentPage - 1) * rowsPerPage,
     currentPage * rowsPerPage
   );
 
-  // Función para manejar la eliminación de una fuente
   const handleDeleteSource = useCallback(async (sourceId: string): Promise<void> => {
-    if (isDeleting) return; // Prevenir múltiples clicks
-    
+    if (isDeleting) return;
+
     setIsDeleting(true);
-    
+
     try {
       const response = await fetch(`/api/admin/sources/${sourceId}`, {
         method: 'DELETE',
@@ -112,12 +105,10 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
         throw new Error(data.error || 'Error al eliminar la fuente');
       }
 
-      // Actualizar el estado local para reflejar la eliminación inmediatamente
       setSources(prevSources => prevSources.filter(source => source.id !== sourceId));
       
       toast.success('Fuente eliminada correctamente');
       
-      // Aún hacemos un refresh para actualizar todos los datos del servidor
       router.refresh();
     } catch (error) {
       console.error('Error al eliminar la fuente:', error);
@@ -132,12 +123,13 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
       {
         header: "Fuente",
         accessorKey: "source",
+        className: "w-[30%]",
         cell: (source) => (
           <div className="flex items-center">
-            <div className="h-10 w-10 flex-shrink-0 rounded-md bg-muted flex items-center justify-center mr-3">
+            <div className="h-10 w-10 flex-shrink-0 rounded-md bg-muted flex items-center justify-center mr-2">
               {source.imageUrl ? (
                 <SafeImage
-                  src={source.imageUrl.replace('http:', 'https:')} // Agregar protocolo HTTPS
+                  src={source.imageUrl.replace('http:', 'https:')}
                   alt={source.name}
                   width={40}
                   height={40}
@@ -151,11 +143,11 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
                 </div>
               )}
             </div>
-            <div>
-              <div className="font-medium text-foreground">{source.name}</div>
-              <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground flex items-center hover:text-primary">
-                <ExternalLink className="h-3 w-3 mr-1" />
-                {source.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
+            <div className="min-w-0 flex-1">
+              <div className="font-medium text-foreground text-sm truncate">{source.name}</div>
+              <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground flex items-center hover:text-primary truncate">
+                <ExternalLink className="h-3 w-3 mr-1 flex-shrink-0" />
+                <span className="truncate">{source.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}</span>
               </a>
             </div>
           </div>
@@ -164,6 +156,7 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
       {
         header: "Categoría",
         accessorKey: "category",
+        className: "w-[15%]",
         cell: (source) => (
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryBadgeClass(source.category)}`}>
             {source.category}
@@ -187,11 +180,12 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
       {
         header: "Estadísticas",
         id: "stats",
+        className: "w-[20%]",
         cell: (source) => (
           <div className="space-y-1">
             <div className="flex items-center text-amber-500">
               <Star className="h-4 w-4 mr-1" />
-              <span>
+              <span className="text-sm">
                 {source.avgRating !== undefined 
                   ? `${source.avgRating.toFixed(1)} (${source.ratingCount || source._count?.ratings || 0})` 
                   : "Sin valoraciones"}
@@ -209,8 +203,8 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
       {
         header: "Ubicación",
         accessorKey: "location",
+        className: "w-[15%]",
         cell: (source) => {
-          // Mapeo de códigos de país a nombres completos
           const countryNames: {[key: string]: string} = {
             'us': 'USA',
             'uk': 'Reino Unido',
@@ -230,7 +224,6 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
             'sa': 'Arabia Saudí'
           };
           
-          // Mapeo de códigos de idioma a nombres completos
           const languageNames: {[key: string]: string} = {
             'en': 'Inglés',
             'es': 'Español',
@@ -263,9 +256,10 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
       {
         header: "Creado",
         accessorKey: "createdAt",
+        className: "w-[10%]",
         cell: (source) => {
           return (
-            <div className="text-sm">
+            <div className="text-sm whitespace-nowrap">
               {format(new Date(source.createdAt), 'dd/MM/yyyy')}
               <div className="text-xs text-muted-foreground">
                 {format(new Date(source.createdAt), 'HH:mm')}
@@ -277,8 +271,9 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
       {
         header: "Acciones",
         accessorKey: "actions",
+        className: "w-[10%]",
         cell: (source) => (
-          <div className="flex items-center justify-start gap-1.5 flex-wrap min-w-[120px]">
+          <div className="flex items-center gap-1 flex-wrap min-w-0">
             <Link
               href={`/sources/${source.id}`}
               className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
@@ -286,7 +281,7 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
               title="Ver fuente"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              <span className="ml-1 text-xs truncate">Ver</span>
+              <span className="ml-1 text-xs truncate hidden sm:inline">Ver</span>
             </Link>
             <Link
               href={`/admin/sources/edit/${source.id}`}
@@ -294,7 +289,7 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
               title="Editar fuente"
             >
               <Edit className="h-3.5 w-3.5" />
-              <span className="ml-1 text-xs truncate">Editar</span>
+              <span className="ml-1 text-xs truncate hidden sm:inline">Editar</span>
             </Link>
             <DeleteDialog
               entityId={source.id}
@@ -308,7 +303,7 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
         hideOnMobile: false
       }
     ],
-    [categoryFilter, uniqueCategories, handleDeleteSource]
+    [handleDeleteSource]
   );
 
   return (

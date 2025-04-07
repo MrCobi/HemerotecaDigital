@@ -51,11 +51,9 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const router = useRouter();
 
-  // Filtro para comentarios
   const filteredComments = useMemo(() => {
     let filtered = comments;
 
-    // Filtro por texto
     if (filterValue) {
       filtered = filtered.filter((comment) =>
         comment.content.toLowerCase().includes(filterValue.toLowerCase()) ||
@@ -65,7 +63,6 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
       );
     }
 
-    // Filtro por tipo (todos, respuestas, eliminados)
     if (activeFilter === "replies") {
       filtered = filtered.filter((comment) => comment.parentId !== null);
     } else if (activeFilter === "deleted") {
@@ -75,7 +72,6 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
     return filtered;
   }, [comments, filterValue, activeFilter]);
 
-  // Paginación
   const totalComments = filteredComments.length;
   const totalPages = Math.ceil(totalComments / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
@@ -88,7 +84,6 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
     setCurrentPage(page);
   };
 
-  // Función para manejar la eliminación de un comentario
   const handleDeleteComment = useCallback(async (commentId: string): Promise<void> => {
     if (isDeleting) return;
     
@@ -108,8 +103,6 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
         throw new Error(data.error || 'Error al eliminar el comentario');
       }
 
-      // Si el servidor devuelve los IDs de los comentarios eliminados (incluyendo respuestas),
-      // actualizamos todos ellos en el estado local
       if (data.deletedIds && Array.isArray(data.deletedIds)) {
         setComments(prevComments => 
           prevComments.map(comment => 
@@ -119,14 +112,12 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
           )
         );
         
-        // Si hay respuestas eliminadas, mostrar mensaje más específico
         if (data.deletedIds.length > 1) {
           toast.success(`Comentario eliminado junto con ${data.deletedIds.length - 1} respuestas`);
         } else {
           toast.success('Comentario eliminado correctamente');
         }
       } else {
-        // Comportamiento anterior como fallback
         setComments(prevComments => 
           prevComments.map(comment => 
             comment.id === commentId 
@@ -138,7 +129,6 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
         toast.success('Comentario eliminado correctamente');
       }
       
-      // También hacemos un refresh para actualizar los datos del servidor
       router.refresh();
     } catch (error) {
       console.error('Error al eliminar el comentario:', error);
@@ -154,6 +144,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
       {
         header: "Comentario",
         accessorKey: "content",
+        className: "w-[30%]",
         cell: (comment: Comment) => {
           return (
             <div className="max-w-[180px] sm:max-w-md">
@@ -187,6 +178,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
         header: "Fuente",
         accessorKey: "source",
         hideOnMobile: true,
+        className: "w-[25%]",
         cell: (comment: Comment) => {
           const { source } = comment;
           return (
@@ -216,6 +208,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
         header: "Usuario",
         accessorKey: "user",
         hideOnMobile: true,
+        className: "w-[20%]",
         cell: (comment: Comment) => {
           const { user } = comment;
           if (!user) return <span className="text-sm text-muted-foreground">Usuario eliminado</span>;
@@ -256,6 +249,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
         header: "Fecha",
         accessorKey: "createdAt",
         hideOnMobile: true,
+        className: "w-[15%]",
         cell: (comment: Comment) => {
           const { createdAt, updatedAt } = comment;
           return (
@@ -275,6 +269,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
       {
         header: "Acciones",
         id: "actions",
+        className: "w-[10%]",
         cell: (comment: Comment) => {
           return (
             <div className="flex items-center justify-start gap-1.5">
@@ -282,6 +277,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
                 href={`/admin/comments/view/${comment.id}`}
                 className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
                 title="Ver comentario"
+                priority={1}
               >
                 <Eye className="h-3.5 w-3.5 sm:mr-0 md:mr-1" />
                 <span className="hidden md:inline ml-1 text-xs truncate">Ver</span>
@@ -293,6 +289,7 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
                   entityType="el comentario"
                   onDelete={() => handleDeleteComment(comment.id)}
                   consequenceText="Esta acción no eliminará físicamente el comentario, sino que lo marcará como eliminado."
+                  priority={2}
                 />
               )}
             </div>

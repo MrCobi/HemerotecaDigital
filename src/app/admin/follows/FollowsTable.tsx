@@ -194,13 +194,14 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
     {
       header: "Seguidor",
       accessorKey: "follower",
+      className: "w-[35%]",
       cell: (follow: Follow) => {
         const { follower } = follow;
         if (!follower) return <div className="text-muted-foreground text-xs">Usuario no disponible</div>;
         
         return (
           <div className="flex items-center">
-            <div className="flex-shrink-0 mr-2 sm:mr-3">
+            <div className="flex-shrink-0 mr-2">
               {renderUserImage(follower)}
             </div>
             <div className="min-w-0">
@@ -222,13 +223,14 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
     {
       header: "Sigue a",
       accessorKey: "following",
+      className: "w-[35%]",
       cell: (follow: Follow) => {
         const { following } = follow;
         if (!following) return <div className="text-muted-foreground text-xs">Usuario no disponible</div>;
         
         return (
           <div className="flex items-center">
-            <div className="flex-shrink-0 mr-2 sm:mr-3">
+            <div className="flex-shrink-0 mr-2">
               {renderUserImage(following)}
             </div>
             <div className="min-w-0">
@@ -250,6 +252,7 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
     {
       header: "Fecha",
       accessorKey: "createdAt",
+      className: "w-[10%]",
       cell: (follow: Follow) => {
         const date = new Date(follow.createdAt);
         return (
@@ -263,6 +266,7 @@ export default function FollowsTable({ follows, onDeleteFollow }: FollowsTablePr
     {
       header: "Acciones",
       id: "actions",
+      className: "w-[20%]",
       cell: (follow: Follow) => {
         return (
           <div className="flex flex-wrap items-center justify-start gap-1.5">

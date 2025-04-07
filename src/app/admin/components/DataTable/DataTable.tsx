@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import TableFilter from "../TableFilter";
 import RowsPerPageSelector from "../RowsPerPageSelector";
@@ -16,6 +16,7 @@ export type Column<T> = {
   hideOnMobile?: boolean;
   hideOnDesktop?: boolean;
   id?: string;
+  priority?: number;
 };
 
 export type DataTableProps<T> = {
@@ -72,6 +73,18 @@ export default function DataTable<T>({
 
   const _isMobileView = windowWidth < 768;
   const _isTabletView = windowWidth >= 768 && windowWidth < 1080;
+  const _isSmallDesktopView = windowWidth >= 1080 && windowWidth < 1280;
+
+  const shouldShowActionButton = (priority: number = 1) => {
+    if (_isMobileView) {
+      return priority <= 1;
+    } else if (_isTabletView) {
+      return priority <= 2;
+    } else if (_isSmallDesktopView) {
+      return priority <= 3;
+    }
+    return true;
+  };
 
   const getTabletVisibleColumns = () => {
     if (windowWidth < 850) return 3; 
@@ -80,6 +93,39 @@ export default function DataTable<T>({
   };
 
   const _tabletVisibleColumns = getTabletVisibleColumns();
+
+  const renderCellContent = (column: Column<T>, item: T) => {
+    if (column.header === "Acciones" || column.accessorKey === "actions" || column.id === "actions") {
+      const originalContent = column.cell(item);
+      
+      if (!React.isValidElement(originalContent)) {
+        return originalContent;
+      }
+      
+      if (React.isValidElement(originalContent) && originalContent.type === 'div' && (originalContent.props as { children?: React.ReactNode }).children) {
+        if (typeof originalContent.props === 'object' && originalContent.props !== null && Array.isArray(originalContent.props.children)) {
+          const filteredButtons = React.Children.map((originalContent.props as { children?: React.ReactNode }).children, (child, index) => {
+            const buttonPriority = child.props.priority || index + 1;
+            
+            if (shouldShowActionButton(buttonPriority)) {
+              return child;
+            }
+            return null;
+          });
+          
+          return React.cloneElement(
+            originalContent,
+            originalContent.props,
+            filteredButtons
+          );
+        }
+      }
+      
+      return originalContent;
+    }
+    
+    return column.cell(item);
+  };
 
   const renderMobileRow = (item: T, index: number) => {
     const isExpanded = expandedRows[index] || false;
@@ -95,7 +141,6 @@ export default function DataTable<T>({
             onRowClick && "cursor-pointer"
           )}
           onClick={onRowClick ? (e) => {
-            // No ejecutar onRowClick si se hizo clic en el botón de expandir
             if (e.defaultPrevented) return;
             onRowClick(item);
           } : undefined}
@@ -155,7 +200,10 @@ export default function DataTable<T>({
           
           {isExpanded && visibleColumns.length > 4 && (
             <div className="flex flex-row justify-center space-x-2 mt-3 pt-3 border-t border-border">
-              {columns.find(col => col.header === "Acciones" || col.accessorKey === "actions")?.cell(item)}
+              {renderCellContent(
+                columns.find(col => col.header === "Acciones" || col.accessorKey === "actions") || visibleColumns[4],
+                item
+              )}
             </div>
           )}
           
@@ -214,7 +262,6 @@ export default function DataTable<T>({
           </button>
         </div>
         
-        {/* Información visible siempre */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-2">
           {columns.slice(1, 4).map((column, idx) => (
             <div key={idx} className="flex flex-col">
@@ -226,14 +273,15 @@ export default function DataTable<T>({
           ))}
         </div>
         
-        {/* Acciones - solo visible cuando está expandido */}
         {isExpanded && (
           <div className="flex flex-row justify-end space-x-2 mt-2 pt-3 border-t border-border">
-            {columns.find(col => col.header === "Acciones" || col.accessorKey === "actions")?.cell(item)}
+            {renderCellContent(
+              columns.find(col => col.header === "Acciones" || col.accessorKey === "actions") || columns[columns.length - 1],
+              item
+            )}
           </div>
         )}
         
-        {/* Otras columnas - solo visibles cuando está expandido */}
         {isExpanded && columns.length > 5 && (
           <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-3">
             {columns.slice(5)
@@ -284,26 +332,24 @@ export default function DataTable<T>({
       
       {data.length > 0 ? (
         <>
-          {/* Tabla para escritorio (≥1080px) */}
           <div className="rounded-md border hidden lg:block overflow-hidden">
             <div className="relative w-full overflow-x-auto">
-              <table className="w-full table-fixed">
+              <table className="w-full table-fixed border-collapse">
                 <thead>
                   <tr className="border-b border-border">
                     {columns.map((column, index) => (
                       <th
                         key={index}
                         className={cn(
-                          "px-2 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide",
-                          column.className,
-                          index === 0 ? "w-[8%] lg:w-[8%]" : "", 
-                          index === 1 ? "w-[8%] lg:w-[8%]" : "", 
-                          index === 2 ? "w-[18%] lg:w-[18%]" : "", 
-                          index === 3 ? "w-[18%] lg:w-[18%]" : "", 
-                          index === 4 ? "w-[15%] lg:w-[15%] pr-3" : "", 
-                          index === 5 ? "w-[15%] lg:w-[15%] px-3" : "", 
-                          index === 6 ? "w-[18%] lg:w-[18%] pl-3" : ""  
+                          "px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide",
+                          "whitespace-nowrap overflow-hidden text-ellipsis",
+                          column.className
                         )}
+                        style={{
+                          minWidth: column.header === "Tipo" ? "80px" : 
+                                   column.header === "Acciones" ? "120px" : 
+                                   "100px"
+                        }}
                       >
                         {column.header}
                       </th>
@@ -321,16 +367,25 @@ export default function DataTable<T>({
                         <td
                           key={colIndex}
                           className={cn(
-                            "px-2 py-3",
+                            "px-3 py-3",
+                            "overflow-hidden",
                             column.className,
                             column.hideOnDesktop ? "hidden xl:table-cell" : "",
-                            colIndex === 6 ? "lg:!min-w-[120px]" : "",
-                            colIndex === 4 ? "pr-3" : "", 
-                            colIndex === 5 ? "px-3" : "", 
-                            colIndex === 6 ? "pl-3" : ""  
+                            column.header === "Tipo" && "w-[8%] min-w-[80px]",
+                            column.header === "Nombre/Participantes" && "w-[25%] min-w-[200px]",
+                            column.header === "Fuente" && "w-[20%] min-w-[150px]",
+                            column.header === "Creador" && "w-[20%] min-w-[150px]",
+                            column.header === "Mensajes" && "w-[12%] min-w-[100px]",
+                            column.header === "Creado" && "w-[15%] min-w-[120px]",
+                            column.header === "Acciones" && "w-[12%] min-w-[120px]"
                           )}
                         >
-                          {column.cell(item)}
+                          <div className="overflow-hidden text-ellipsis">
+                            {column.header === "Acciones" || column.accessorKey === "actions" || column.id === "actions"
+                              ? renderCellContent(column, item)
+                              : column.cell(item)
+                            }
+                          </div>
                         </td>
                       ))}
                     </tr>
@@ -340,7 +395,6 @@ export default function DataTable<T>({
             </div>
           </div>
           
-          {/* Vista para tablets (768px-1079px) */}
           <div className="hidden md:block lg:hidden">
             {data.map((item, index) => (
               <div key={index}>
@@ -349,7 +403,6 @@ export default function DataTable<T>({
             ))}
           </div>
           
-          {/* Vista para móviles (<768px) */}
           <div className="block md:hidden">
             {data.map((item, index) => renderMobileRow(item, index))}
           </div>

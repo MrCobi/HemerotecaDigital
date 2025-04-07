@@ -317,21 +317,22 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
     {
       header: "Usuario",
       accessorKey: "user",
+      className: "w-[25%]",
       cell: (rating: Rating) => {
         const { user } = rating;
         return (
           <div className="flex items-center">
-            <div className="h-8 w-8 flex-shrink-0 mr-3">
+            <div className="h-8 w-8 flex-shrink-0 mr-2">
               {renderUserImage(user)}
             </div>
-            <div>
+            <div className="min-w-0">
               <Link
                 href={`/admin/users/view/${user.id}`}
-                className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
+                className="text-primary hover:text-primary/80 transition-colors text-sm font-medium truncate block"
               >
                 {user.name || "Usuario sin nombre"}
               </Link>
-              <div className="text-xs text-muted-foreground">{user.email}</div>
+              <div className="text-xs text-muted-foreground truncate">{user.email}</div>
             </div>
           </div>
         );
@@ -340,12 +341,13 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
     {
       header: "Fuente",
       accessorKey: "source",
+      className: "w-[30%]",
       cell: (rating: Rating) => {
         return (
-          <div>
+          <div className="min-w-0 truncate">
             <Link
               href={`/sources/${rating.sourceId}`}
-              className="text-primary hover:text-primary/80 transition-colors text-sm font-medium"
+              className="text-primary hover:text-primary/80 transition-colors text-sm font-medium truncate block"
             >
               {rating.source?.title || rating.source?.name || rating.sourceId}
             </Link>
@@ -356,12 +358,14 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
     {
       header: "Valoración",
       accessorKey: "value",
+      className: "w-[20%]",
       cell: (rating: Rating) => renderStars(rating.value),
       filterElement: ratingFilterElement,
     },
     {
       header: "Fecha",
       accessorKey: "createdAt",
+      className: "w-[15%]",
       cell: (rating: Rating) => {
         // Asegurarse de que createdAt sea una fecha válida
         const date = typeof rating.createdAt === 'string' 
@@ -369,7 +373,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
           : rating.createdAt;
         
         return (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground whitespace-nowrap">
             {formatDistanceToNow(date, { locale: es, addSuffix: true })}
           </div>
         );
@@ -378,20 +382,23 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
     {
       header: "Acciones",
       id: "actions",
+      className: "w-[10%]",
       cell: (rating: Rating) => {
         return (
-          <div className="flex items-center justify-start gap-1.5">
+          <div className="flex items-center justify-start gap-1">
             <Link
               href={`/sources/${rating.sourceId}`}
               className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
               title="Ver fuente"
+              priority={1} // Prioridad alta - siempre visible
             >
               <Book className="h-3.5 w-3.5" />
-              <span className="ml-1 text-xs truncate">Ver</span>
+              <span className="ml-1 text-xs truncate hidden sm:inline">Ver</span>
             </Link>
             <DeleteRatingDialog 
               ratingId={rating.id} 
               onDelete={handleDelete}
+              priority={2} // Prioridad media - se oculta en móvil
             />
           </div>
         );

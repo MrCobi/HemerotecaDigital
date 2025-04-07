@@ -196,13 +196,14 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
     {
       header: "Usuario",
       accessorKey: "user",
+      className: "w-[25%]",
       cell: (favorite: Favorite) => {
         const { user } = favorite;
         if (!user) return <span className="text-sm text-muted-foreground">Usuario eliminado</span>;
         
         return (
           <div className="flex items-center">
-            <div className="flex-shrink-0 h-8 w-8">
+            <div className="flex-shrink-0 h-8 w-8 mr-2">
               <Image
                 src={user?.image || "/images/AvatarPredeterminado.webp"}
                 alt={user?.name || "Avatar"}
@@ -215,11 +216,11 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
                 }}
               />
             </div>
-            <div className="ml-3">
-              <div className="text-sm font-medium text-foreground">
+            <div>
+              <div className="text-sm font-medium text-foreground truncate max-w-[150px]">
                 {user.name || "Usuario sin nombre"}
               </div>
-              <div className="text-xs text-muted-foreground">{user.email}</div>
+              <div className="text-xs text-muted-foreground truncate max-w-[150px]">{user.email}</div>
             </div>
           </div>
         );
@@ -228,6 +229,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
     {
       header: "Fuente",
       accessorKey: "source",
+      className: "w-[30%]",
       cell: (favorite: Favorite) => {
         const { source } = favorite;
         return (
@@ -277,6 +279,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
     {
       header: "Categoría",
       accessorKey: "category",
+      className: "w-[15%]",
       cell: (favorite: Favorite) => {
         return (
           <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300">
@@ -302,6 +305,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
     {
       header: "Fecha",
       accessorKey: "createdAt",
+      className: "w-[15%]",
       cell: (favorite: Favorite) => {
         const date = new Date(favorite.createdAt);
         return (
@@ -314,6 +318,7 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
     {
       header: "Acciones",
       id: "actions",
+      className: "w-[15%]",
       cell: (favorite: Favorite) => {
         return (
           <div className="flex items-center space-x-2">

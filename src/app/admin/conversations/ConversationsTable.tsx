@@ -330,6 +330,7 @@ export default function ConversationsTable({ conversations }: ConversationsTable
       },
       filterElement: filterElement,
       hideOnMobile: false,
+      className: "w-[8%]", // Ancho ajustado
     },
     {
       header: "Nombre/Participantes",
@@ -403,6 +404,7 @@ export default function ConversationsTable({ conversations }: ConversationsTable
         );
       },
       hideOnMobile: false,
+      className: "w-[30%]", // Ancho ajustado
     },
     {
       header: "Creador",
@@ -493,6 +495,7 @@ export default function ConversationsTable({ conversations }: ConversationsTable
         return <span className="text-xs sm:text-sm text-muted-foreground">No disponible</span>;
       },
       hideOnMobile: true,
+      className: "w-[20%]", // Ancho ajustado
     },
     {
       header: "Mensajes",
@@ -509,6 +512,7 @@ export default function ConversationsTable({ conversations }: ConversationsTable
         );
       },
       hideOnMobile: true,
+      className: "w-[10%]", // Ancho ajustado
     },
     {
       header: "Creado",
@@ -522,6 +526,7 @@ export default function ConversationsTable({ conversations }: ConversationsTable
         );
       },
       hideOnMobile: true,
+      className: "w-[12%]", // Ancho ajustado
     },
     {
       header: "Acciones",
@@ -555,6 +560,7 @@ export default function ConversationsTable({ conversations }: ConversationsTable
         );
       },
       hideOnMobile: false,
+      className: "w-[20%]", // Ancho ajustado
     },
   ], [filterElement, handleDelete]);
 

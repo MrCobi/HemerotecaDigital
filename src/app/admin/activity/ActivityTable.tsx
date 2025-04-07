@@ -52,17 +52,16 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
     });
   }, [activities, filterValue, typeFilter]);
 
-  // Paginación
   const totalPages = Math.ceil(filteredActivities.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
   const currentActivities = filteredActivities.slice(startIndex, endIndex);
 
-  // Columnas de la tabla
   const columns: Column<ActivityItem>[] = useMemo(() => [
     {
       accessorKey: "type",
       header: "Tipo",
+      className: "w-[15%]",
       cell: (activity: ActivityItem) => {
         let type = "";
         let className = "";
@@ -158,6 +157,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
     {
       accessorKey: "user",
       header: "Usuario",
+      className: "w-[25%]",
       cell: (activity: ActivityItem) => {
         const user = activity.user;
 
@@ -169,23 +169,17 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
                   user.image.includes('cloudinary.com') ? (
                     <CldImage 
                       src={(() => {
-                        // Extraer el public_id limpio, manejando diferentes formatos
                         let publicId = user.image || '';
                         
-                        // Si es una URL completa de Cloudinary
                         if (user.image.includes('cloudinary.com')) {
-                          // Extraer el public_id eliminando la parte de la URL
-                          // Buscamos 'hemeroteca_digital' como punto de referencia seguro
                           const match = user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
                           if (match && match[1]) {
                             publicId = `hemeroteca_digital/${match[1]}`;
                           } else {
-                            // Si no encontramos el patrón específico, intentamos una extracción más general
                             publicId = user.image.replace(/.*\/v\d+\//, '').split('?')[0];
                           }
                         }
                         
-                        // Verificar que el ID no esté duplicado o anidado
                         if (publicId.includes('https://')) {
                           console.warn('ID público contiene URL completa en activity:', publicId);
                           publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
@@ -256,8 +250,8 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
     {
       accessorKey: "source",
       header: "Fuente",
+      className: "w-[35%]",
       cell: (activity: ActivityItem) => {
-        // Para actividades de follow/unfollow, mostrar el usuario seguido/dejado de seguir
         if ((activity.type === 'follow' || activity.type === 'unfollow') && activity.targetName && activity.targetType === 'user') {
           return (
             <div className="flex items-center flex-col sm:flex-row">
@@ -271,9 +265,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
           );
         }
         
-        // Primero intentamos usar sourceName si está disponible
         if (activity.sourceName) {
-          // Si tenemos sourceId (contenido en targetId cuando es de tipo source)
           if (activity.targetType === 'source' && activity.targetId) {
             return (
               <a
@@ -293,7 +285,6 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
           );
         }
 
-        // Si no hay sourceName, intentamos usar targetId y targetName como fallback
         let sourceId = "";
         let sourceName = "";
 
@@ -320,6 +311,7 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
     {
       accessorKey: "date",
       header: "Fecha",
+      className: "w-[15%]",
       cell: (activity: ActivityItem) => {
         const date = new Date(activity.createdAt);
         return (

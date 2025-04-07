@@ -268,8 +268,6 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
     }
   };
 
-
-
   // Función para renderizar la imagen del usuario
   const renderUserImage = (user: Message['sender'] | Message['receiver'], size: number = 32) => {
     if (!user) return null;
@@ -489,7 +487,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       },
       filterElement: filterElement,
       hideOnMobile: false,
-      className: "w-[8%]", // Ancho fijo para pantallas grandes
+      className: "w-[8%]", // Ancho ajustado
     },
     {
       header: "Estado",
@@ -508,7 +506,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
       hideOnMobile: true,
-      className: "w-[8%]", // Ancho fijo para pantallas grandes
+      className: "w-[8%]", // Ancho ajustado
     },
     {
       header: "Remitente",
@@ -538,7 +536,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
       hideOnMobile: false,
-      className: "w-[16%]", // Reducido de 18% a 16%
+      className: "w-[20%]", // Ancho ajustado (aumentado de 16% a 20%)
     },
     {
       header: "Destinatario",
@@ -591,7 +589,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
       hideOnMobile: false,
-      className: "w-[16%]", // Reducido de 18% a 16%
+      className: "w-[20%]", // Ancho ajustado (aumentado de 16% a 20%)
     },
     {
       header: "Mensaje",
@@ -604,7 +602,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
       hideOnMobile: false,
-      className: "w-[15%]", // Reducido de 17% a 15%
+      className: "w-[20%]", // Ancho ajustado (aumentado de 15% a 20%)
     },
     {
       header: "Fecha",
@@ -617,7 +615,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
           </div>
         );
       },
-      className: "w-[15%] text-center", // Aumentado de 14% a 15%
+      className: "w-[10%]", // Ancho ajustado (reducido de 15% a 10%)
       hideOnMobile: true,
     },
     {
@@ -657,7 +655,7 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
         );
       },
       hideOnMobile: false,
-      className: "w-[18%] text-center", // Aumentado de 16% a 18% y centrado
+      className: "w-[14%]", // Ancho ajustado (reducido de 18% a 14%)
     },
   ], [isMarkingAsRead, filterElement, handleDelete]);
 

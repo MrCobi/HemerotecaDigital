@@ -20,7 +20,6 @@ import {
 import { toast } from "sonner";
 import Image from "next/image";
 
-// Componente para el diálogo de confirmación de eliminación
 interface DeleteUserDialogProps {
   userId: string;
   userName: string | null;
@@ -93,10 +92,8 @@ function DeleteUserDialog({ userId, userName, onDelete }: DeleteUserDialogProps)
   );
 }
 
-// Definimos el tipo Role explícitamente
 export type Role = "ADMIN" | "EDITOR" | "USER";
 
-// Definimos el tipo User manualmente ya que tenemos problemas con la importación de Prisma
 export interface User {
   id: string;
   name: string | null;
@@ -105,7 +102,7 @@ export interface User {
   role: Role;
   createdAt: Date;
   emailVerified: Date | null;
-  username?: string; // Añadimos username para poder redirigir al perfil del usuario
+  username?: string;
 }
 
 type UsersTableProps = {
@@ -119,7 +116,6 @@ export default function UsersTable({ users }: UsersTableProps) {
   const [roleFilter, setRoleFilter] = useState<Role | null>(null);
   const [localUsers, setLocalUsers] = useState<User[]>(users);
 
-  // Actualizar localUsers cuando cambia users (por ejemplo, al montar el componente)
   useMemo(() => {
     setLocalUsers(users);
   }, [users]);
@@ -147,14 +143,12 @@ export default function UsersTable({ users }: UsersTableProps) {
     });
   }, [localUsers, filterValue, roleFilter]);
 
-  // Paginación
   const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
   const paginatedUsers = filteredUsers.slice(
     (currentPage - 1) * rowsPerPage,
     currentPage * rowsPerPage
   );
 
-  // Función para manejar la eliminación de un usuario
   const handleDeleteUser = async (userId: string) => {
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
@@ -166,13 +160,10 @@ export default function UsersTable({ users }: UsersTableProps) {
         throw new Error(data.error || 'Error desconocido');
       }
       
-      // Actualizar la lista de usuarios localmente en lugar de recargar la página
       setLocalUsers(prev => prev.filter(user => user.id !== userId));
       
-      // Mostrar notificación de éxito
       toast.success("Usuario eliminado correctamente");
       
-      // Si estamos en la última página y ya no hay elementos, retrocedemos una página
       if (paginatedUsers.length === 1 && currentPage > 1) {
         setCurrentPage(prev => prev - 1);
       }
@@ -186,15 +177,16 @@ export default function UsersTable({ users }: UsersTableProps) {
     {
       accessorKey: "user",
       header: "Usuario",
+      className: "w-[25%]",
       cell: (user: User) => (
-        <div className="flex items-center">
-          <div className="flex-shrink-0 mr-3">
+        <div className="flex items-center space-x-2 max-w-full overflow-hidden">
+          <div className="flex-shrink-0">
             {user.image ? (
               <Image
                 src={user.image}
                 alt={user.name || "Avatar"}
-                width={36}
-                height={36}
+                width={32}
+                height={32}
                 className="rounded-full object-cover"
                 priority
                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
@@ -206,16 +198,16 @@ export default function UsersTable({ users }: UsersTableProps) {
               <Image
                 src="/images/AvatarPredeterminado.webp"
                 alt={user.name || "Avatar"}
-                width={36}
-                height={36}
+                width={32}
+                height={32}
                 className="rounded-full object-cover"
                 priority
               />
             )}
           </div>
-          <div>
-            <div className="font-medium text-foreground">{user.name}</div>
-            <div className="text-xs text-muted-foreground">{user.email}</div>
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-foreground text-sm truncate">{user.name}</div>
+            <div className="text-xs text-muted-foreground truncate">{user.email}</div>
           </div>
         </div>
       )
@@ -223,6 +215,7 @@ export default function UsersTable({ users }: UsersTableProps) {
     {
       accessorKey: "role",
       header: "Rol",
+      className: "w-[15%]",
       cell: (user: User) => {
         let roleLabel, className;
 
@@ -263,6 +256,7 @@ export default function UsersTable({ users }: UsersTableProps) {
     {
       accessorKey: "emailVerified",
       header: "Estado",
+      className: "w-[15%]",
       cell: (user: User) => (
         <div className="flex items-center">
           <div
@@ -280,10 +274,11 @@ export default function UsersTable({ users }: UsersTableProps) {
     {
       accessorKey: "createdAt",
       header: "Registro",
+      className: "w-[20%]",
       cell: (user: User) => {
         const date = new Date(user.createdAt);
         return (
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground whitespace-nowrap">
             {format(date, "dd MMM yyyy")}
           </div>
         );
@@ -292,11 +287,12 @@ export default function UsersTable({ users }: UsersTableProps) {
     {
       accessorKey: "actions",
       header: "Acciones",
+      className: "w-[25%]",
       cell: (user: User) => (
-        <div className="flex items-center justify-start gap-1.5">
+        <div className="flex items-center justify-start gap-2">
           <Link 
             href={`/admin/users/view/${user.id}`}
-            className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
+            className="inline-flex items-center justify-center h-7 py-0.5 px-2 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
             title="Ver perfil"
           >
             <User className="h-3.5 w-3.5" />
@@ -304,7 +300,7 @@ export default function UsersTable({ users }: UsersTableProps) {
           </Link>
           <Link 
             href={`/admin/users/edit/${user.id}`}
-            className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800/40 transition-colors"
+            className="inline-flex items-center justify-center h-7 py-0.5 px-2 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800/40 transition-colors"
             title="Editar usuario"
           >
             <Edit className="h-3.5 w-3.5" />
@@ -321,18 +317,21 @@ export default function UsersTable({ users }: UsersTableProps) {
   ];
 
   return (
-    <DataTable
-      data={paginatedUsers}
-      columns={columns}
-      currentPage={currentPage}
-      totalPages={totalPages}
-      onPageChange={setCurrentPage}
-      onFilterChange={setFilterValue}
-      filterValue={filterValue}
-      filterPlaceholder="Buscar por nombre o email..."
-      rowsPerPage={rowsPerPage}
-      onRowsPerPageChange={setRowsPerPage}
-      emptyMessage="No se encontraron usuarios"
-    />
+    <div className="overflow-hidden">
+      <DataTable
+        data={paginatedUsers}
+        columns={columns}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        onFilterChange={setFilterValue}
+        filterValue={filterValue}
+        filterPlaceholder="Buscar por nombre o email..."
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={setRowsPerPage}
+        emptyMessage="No se encontraron usuarios"
+        className="w-full"
+      />
+    </div>
   );
 }
