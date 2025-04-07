@@ -600,6 +600,17 @@ export const GroupManagementModal = ({
       console.log(`[Cliente] Añadiendo participantes al grupo: ${groupId} (original: ${serverGroupData.id})`);
       console.log(`[Cliente] Participantes seleccionados:`, selectedNewParticipants);
       
+      // Función auxiliar para generar UUIDs compatible con todos los navegadores
+      const generateUUID = (): string => {
+        // Implementación universalmente compatible para generar UUIDs
+        let d = new Date().getTime();
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = (d + Math.random() * 16) % 16 | 0;
+          d = Math.floor(d / 16);
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+      };
+
       // ACTUALIZACIÓN OPTIMISTA: Crear versiones temporales de los nuevos participantes
       const newParticipantsObjects = selectedNewParticipants.map(userId => {
         // Buscar los datos completos del usuario en los posibles participantes
@@ -607,7 +618,7 @@ export const GroupManagementModal = ({
         
         // Crear un objeto participante con los datos disponibles
         return {
-          id: crypto.randomUUID(), // ID temporal
+          id: generateUUID(), // ID temporal generado con función compatible
           userId: userId,
           role: 'member' as const,
           user: userData || { 

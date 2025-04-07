@@ -252,15 +252,19 @@ export function useChatContent(
   }, [_markMessageAsRead, session?.user?.id]);
 
   // Función auxiliar para determinar si se debe actualizar el estado del mensaje
+  // Eliminar el estado 'read' para evitar duplicaciones
   const shouldUpdateStatus = useCallback((currentStatus?: string, newStatus?: string) => {
     if (!newStatus) return false;
     if (!currentStatus) return true;
+    
+    // Ignorar actualizaciones a estado 'read' para evitar duplicaciones
+    if (newStatus === 'read') return false;
     
     const statusPriority: Record<string, number> = {
       'sending': 1,
       'sent': 2,
       'delivered': 3,
-      'read': 4,
+      // 'read': 4, -- Eliminado para evitar duplicaciones
       'failed': 0
     };
     
@@ -292,14 +296,21 @@ export function useChatContent(
         const updatedMessages = [...prevMessages];
         
         // Solo actualizamos el estado si el nuevo tiene un estado más "avanzado"
+        // Evitamos actualizar a estado 'read' para prevenir duplicaciones
         const currentStatus = prevMessages[existingIndex].status;
         const newStatus = newMessage.status;
+        
+        // Ignorar completamente las actualizaciones a estado 'read'
+        if (newStatus === 'read') {
+          console.log('[useChatContent] Ignorando actualización a estado "read" para evitar duplicación');
+          return updatedMessages;
+        }
         
         if (shouldUpdateStatus(currentStatus, newStatus)) {
           updatedMessages[existingIndex] = {
             ...updatedMessages[existingIndex],
             status: newStatus,
-            read: newMessage.read || updatedMessages[existingIndex].read
+            // Ya no actualizamos la propiedad 'read'
           };
           console.log('[useChatContent] Actualizado estado de mensaje:', updatedMessages[existingIndex]);
         }
