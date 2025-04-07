@@ -917,7 +917,7 @@ export function useMessagesState() {
     let searchId;
     try {
       searchId = crypto.randomUUID();
-    } catch (e) {
+    } catch  {
       // Fallback si randomUUID no está disponible
       const d = new Date().getTime();
       searchId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
