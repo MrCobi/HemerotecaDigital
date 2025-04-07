@@ -303,7 +303,7 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
         hideOnMobile: false
       }
     ],
-    [handleDeleteSource]
+    [handleDeleteSource, categoryFilter, uniqueCategories]
   );
 
   return (

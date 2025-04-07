@@ -390,7 +390,6 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
               href={`/sources/${rating.sourceId}`}
               className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
               title="Ver fuente"
-              priority={1} // Prioridad alta - siempre visible
             >
               <Book className="h-3.5 w-3.5" />
               <span className="ml-1 text-xs truncate hidden sm:inline">Ver</span>
@@ -398,7 +397,6 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
             <DeleteRatingDialog 
               ratingId={rating.id} 
               onDelete={handleDelete}
-              priority={2} // Prioridad media - se oculta en móvil
             />
           </div>
         );

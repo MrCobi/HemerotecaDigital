@@ -277,7 +277,6 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
                 href={`/admin/comments/view/${comment.id}`}
                 className="inline-flex items-center justify-center h-7 py-0.5 px-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
                 title="Ver comentario"
-                priority={1}
               >
                 <Eye className="h-3.5 w-3.5 sm:mr-0 md:mr-1" />
                 <span className="hidden md:inline ml-1 text-xs truncate">Ver</span>
@@ -289,7 +288,6 @@ export default function CommentsTable({ comments: initialComments }: CommentsTab
                   entityType="el comentario"
                   onDelete={() => handleDeleteComment(comment.id)}
                   consequenceText="Esta acción no eliminará físicamente el comentario, sino que lo marcará como eliminado."
-                  priority={2}
                 />
               )}
             </div>
