@@ -97,10 +97,16 @@ export default function CreateUserPage() {
         if (xhr.readyState === 4) {
           if (xhr.status === 200) {
             const response = JSON.parse(xhr.responseText);
-            // Construir la URL completa a partir del public_id
-            const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'demo';
-            const fullUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${response.url}`;
-            resolve(fullUrl);
+            // Usar la URL segura proporcionada directamente por la API
+            // Esta URL ya incluye el dominio de Cloudinary y la ruta completa
+            if (response.secure_url) {
+              resolve(response.secure_url);
+            } else if (response.url) {
+              resolve(response.url);
+            } else {
+              console.error('Respuesta inesperada de la API de carga:', response);
+              reject(new Error('URL de imagen no encontrada en la respuesta'));
+            }
           } else {
             reject(new Error(xhr.statusText || "Error al subir el archivo"));
           }
