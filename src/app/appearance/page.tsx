@@ -45,7 +45,7 @@ const pageVariants = {
 };
 
 export default function AppearancePage() {
-  const { data: session, status } = useSession();
+  const { data: _session, status } = useSession();
   const [loading, setLoading] = useState(true);
   
   // Efecto para añadir transiciones suaves entre cambios de tema

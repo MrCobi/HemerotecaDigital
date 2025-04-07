@@ -6,8 +6,6 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-// Nota: No podemos exportar metadata desde un componente de cliente
-// La metadata se maneja automáticamente o debe estar en un archivo layout.tsx
 
 export default function SignUpPage() {
   const router = useRouter();
