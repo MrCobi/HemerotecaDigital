@@ -206,6 +206,11 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
                     alt={user?.name || "Avatar"}
                     width={32}
                     height={32}
+                    crop="fill"
+                    gravity="face"
+                    quality="auto"
+                    format="auto"
+                    effects={[{ improve: true }, { sharpen: "100" }]}
                     className="h-8 w-8 rounded-full object-cover"
                     onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                       const target = e.target as HTMLImageElement;
@@ -275,6 +280,11 @@ export default function FavoritesTable({ favorites }: FavoritesTableProps) {
                     alt={source.name}
                     width={40}
                     height={40}
+                    crop="fill"
+                    gravity="auto"
+                    quality="auto"
+                    format="auto"
+                    effects={[{ improve: true }, { sharpen: "100" }]}
                     className="h-10 w-10 rounded-md object-cover"
                     onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                       const target = e.target as HTMLImageElement;
