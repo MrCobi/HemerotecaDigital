@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image, { ImageProps } from "next/image";
+import { CldImage } from "next-cloudinary";
 
 /**
  * SafeImage es un componente que maneja de forma segura diferentes formatos de URLs de imágenes,
@@ -17,6 +18,22 @@ export const SafeImage = ({
   fallbackSrc?: string;
 }) => {
   const [error, setError] = useState(false);
+
+  // Extrae el publicId de una URL de Cloudinary
+  const extractCloudinaryPublicId = (url: string): string => {
+    if (url.includes('cloudinary.com')) {
+      const match = url.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+      if (match && match[1]) {
+        return `hemeroteca_digital/${match[1]}`;
+      } else {
+        return url.replace(/.*\/v\d+\//, '').split('?')[0];
+      }
+    }
+    if (url.includes('https://')) {
+      return url.replace(/.*\/v\d+\//, '').split('?')[0];
+    }
+    return url;
+  };
 
   // Función para normalizar las URLs de imágenes
   const getSafeImageUrl = (url?: string | null): string => {
@@ -61,8 +78,41 @@ export const SafeImage = ({
     return url;
   };
 
-  const safeUrl = error ? fallbackSrc : getSafeImageUrl(src);
+  // Si la imagen es de error o no hay URL, mostrar la imagen de fallback
+  if (error || !src) {
+    return (
+      <Image
+        src={fallbackSrc}
+        alt={alt}
+        priority={true}
+        quality={90}
+        {...props}
+      />
+    );
+  }
 
+  // Si es una imagen de Cloudinary, usar CldImage para mejor calidad
+  if (src.includes('cloudinary')) {
+    const publicId = extractCloudinaryPublicId(src);
+    return (
+      <CldImage
+        src={publicId}
+        alt={alt}
+        width={props.width as number}
+        height={props.height as number}
+        crop="fill"
+        gravity="auto"
+        quality="auto"
+        format="auto"
+        effects={[{ improve: true }, { sharpen: "100" }]}
+        onError={() => setError(true)}
+        {...props}
+      />
+    );
+  }
+
+  // Para otras imágenes, usar el componente Image normal
+  const safeUrl = getSafeImageUrl(src);
   return (
     <Image
       src={safeUrl}

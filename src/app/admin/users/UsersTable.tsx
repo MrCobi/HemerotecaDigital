@@ -19,6 +19,7 @@ import {
 } from "@/src/app/components/ui/alert-dialog";
 import { toast } from "sonner";
 import Image from "next/image";
+import { CldImage } from "next-cloudinary";
 
 interface DeleteUserDialogProps {
   userId: string;
@@ -182,18 +183,52 @@ export default function UsersTable({ users }: UsersTableProps) {
         <div className="flex items-center space-x-2 max-w-full overflow-hidden">
           <div className="flex-shrink-0">
             {user.image ? (
-              <Image
-                src={user.image}
-                alt={user.name || "Avatar"}
-                width={32}
-                height={32}
-                className="rounded-full object-cover"
-                priority
-                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = "/images/AvatarPredeterminado.webp";
-                }}
-              />
+              user.image.includes('cloudinary') ? (
+                <CldImage
+                  src={(() => {
+                    let publicId = user.image;
+                    if (user.image.includes('cloudinary.com')) {
+                      const match = user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                      if (match && match[1]) {
+                        publicId = `hemeroteca_digital/${match[1]}`;
+                      } else {
+                        publicId = user.image.replace(/.*\/v\d+\//, '').split('?')[0];
+                      }
+                    }
+                    if (publicId.includes('https://')) {
+                      publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                    }
+                    return publicId;
+                  })()}
+                  alt={user.name || "Avatar"}
+                  width={32}
+                  height={32}
+                  crop="fill"
+                  gravity="face"
+                  quality="auto"
+                  format="auto"
+                  effects={[{ improve: true }, { sharpen: "100" }]}
+                  className="rounded-full object-cover"
+                  priority
+                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/AvatarPredeterminado.webp";
+                  }}
+                />
+              ) : (
+                <Image
+                  src={user.image}
+                  alt={user.name || "Avatar"}
+                  width={32}
+                  height={32}
+                  className="rounded-full object-cover"
+                  priority
+                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/AvatarPredeterminado.webp";
+                  }}
+                />
+              )
             ) : (
               <Image
                 src="/images/AvatarPredeterminado.webp"

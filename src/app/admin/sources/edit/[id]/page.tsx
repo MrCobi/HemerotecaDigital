@@ -80,6 +80,7 @@ const COUNTRIES = [
   { code: "cn", name: "China" },
   { code: "jp", name: "Japón" },
   { code: "in", name: "India" },
+  { code: "au", name: "Australia" },
 ];
 
 // Esquema de validación para el formulario

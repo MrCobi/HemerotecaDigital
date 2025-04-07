@@ -196,64 +196,87 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
     }
   }, [currentPage, onRatingDeleted, paginatedRatings.length]);
 
-  // Función para renderizar la imagen del usuario
-  const renderUserImage = (user: Rating['user'], size: number = 32) => {
+  // Renderizar avatar de usuario
+  const UserAvatar = ({ user, size = 32 }: { user: Rating['user']; size?: number }) => {
     if (!user) return null;
 
-    // Si el usuario tiene una imagen válida de Cloudinary
-    if (user.image && user.image.includes('cloudinary.com')) {
-      // Extraer el public_id limpio, manejando diferentes formatos
-      let publicId = user.image;
-
-      // Si es una URL completa de Cloudinary
+    // Si el usuario tiene una imagen
+    if (user.image) {
+      // Si es una imagen de Cloudinary
       if (user.image.includes('cloudinary.com')) {
-        // Extraer el public_id eliminando la parte de la URL
-        // Buscamos 'hemeroteca_digital' como punto de referencia seguro
-        const match = user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
-        if (match && match[1]) {
-          publicId = `hemeroteca_digital/${match[1]}`;
-        } else {
-          // Si no encontramos el patrón específico, intentamos una extracción más general
-          publicId = user.image.replace(/.*\/v\d+\//, '').split('?')[0];
+        // Extraer el public_id limpio, manejando diferentes formatos
+        let publicId = user.image;
+
+        // Si es una URL completa de Cloudinary
+        if (user.image.includes('cloudinary.com')) {
+          // Extraer el public_id eliminando la parte de la URL
+          // Buscamos 'hemeroteca_digital' como punto de referencia seguro
+          const match = user.image.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+          if (match && match[1]) {
+            publicId = `hemeroteca_digital/${match[1]}`;
+          } else {
+            // Si no encontramos el patrón específico, intentamos una extracción más general
+            publicId = user.image.replace(/.*\/v\d+\//, '').split('?')[0];
+          }
         }
-      }
 
-      // Verificar que el ID no esté duplicado o anidado
-      if (publicId.includes('https://')) {
-        console.warn('ID público contiene URL completa:', publicId);
-        publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
-      }
+        // Verificar que el ID no esté duplicado o anidado
+        if (publicId.includes('https://')) {
+          console.warn('ID público contiene URL completa:', publicId);
+          publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+        }
 
-      try {
-        return (
-          <CldImage
-            src={publicId}
-            alt={user?.name || "Avatar"}
-            width={size}
-            height={size}
-            crop="fill"
-            gravity="face"
-            className="h-8 w-8 rounded-full object-cover"
-            onError={() => {
-              throw new Error('Falló carga de imagen Cloudinary');
-            }}
-          />
-        );
-      } catch {
-        // Si hay algún error con Cloudinary, usamos la imagen predeterminada
+        try {
+          return (
+            <CldImage
+              src={publicId}
+              alt={user?.name || "Avatar"}
+              width={size}
+              height={size}
+              crop="fill"
+              gravity="face"
+              quality="auto"
+              format="auto"
+              effects={[{ improve: true }, { sharpen: "100" }]}
+              className="h-8 w-8 rounded-full object-cover"
+              onError={() => {
+                throw new Error('Falló carga de imagen Cloudinary');
+              }}
+            />
+          );
+        } catch {
+          // Si hay algún error con Cloudinary, usamos la imagen predeterminada
+          return (
+            <Image
+              src="/images/AvatarPredeterminado.webp"
+              alt={user?.name || "Avatar"}
+              width={size}
+              height={size}
+              className="h-8 w-8 rounded-full object-cover"
+            />
+          );
+        }
+      } else {
+        // Para otras fuentes de imágenes (Google, etc.)
         return (
           <Image
-            src="/images/AvatarPredeterminado.webp"
+            src={user.image}
             alt={user?.name || "Avatar"}
             width={size}
             height={size}
             className="h-8 w-8 rounded-full object-cover"
+            priority
+            quality={90}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = "/images/AvatarPredeterminado.webp";
+            }}
           />
         );
       }
     }
 
-    // Usar imagen predeterminada para usuarios sin imagen de Cloudinary
+    // Usar imagen predeterminada para usuarios sin imagen
     return (
       <Image
         src="/images/AvatarPredeterminado.webp"
@@ -323,7 +346,7 @@ export default function RatingsTable({ ratings, onRatingDeleted }: RatingsTableP
         return (
           <div className="flex items-center">
             <div className="h-8 w-8 flex-shrink-0 mr-2">
-              {renderUserImage(user)}
+              <UserAvatar user={user} />
             </div>
             <div className="min-w-0">
               <Link

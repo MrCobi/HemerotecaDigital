@@ -114,6 +114,9 @@ const AuthButton = () => {
                   height={48}
                   crop="fill"
                   gravity="face"
+                  quality="auto"
+                  format="auto"
+                  effects={[{ improve: true }, { sharpen: "100" }]}
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     console.error('Error cargando imagen en AuthButton:', session.user.image);
@@ -127,7 +130,9 @@ const AuthButton = () => {
                   alt={session.user?.name || "Usuario"}
                   width={48}
                   height={48}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover rounded-full"
+                  priority={true}
+                  quality={90}
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.src = "/images/AvatarPredeterminado.webp";

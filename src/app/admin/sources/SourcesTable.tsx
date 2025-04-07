@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import DeleteDialog from "@/src/components/ui/DeleteDialog";
 import SafeImage from "@/src/components/ui/SafeImage";
+import { CldImage } from "next-cloudinary";
 
 interface SourcesTableProps {
   sources: Array<Source & {
@@ -128,15 +129,47 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
           <div className="flex items-center">
             <div className="h-10 w-10 flex-shrink-0 rounded-md bg-muted flex items-center justify-center mr-2">
               {source.imageUrl ? (
-                <SafeImage
-                  src={source.imageUrl.replace('http:', 'https:')}
-                  alt={source.name}
-                  width={40}
-                  height={40}
-                  className="h-10 w-10 rounded-md object-cover"
-                  priority
-                  fallbackSrc="/images/placeholder.webp"
-                />
+                source.imageUrl.includes('cloudinary') ? (
+                  <CldImage
+                    src={(() => {
+                      let publicId = source.imageUrl.replace('http:', 'https:');
+                      if (publicId.includes('cloudinary.com')) {
+                        const match = publicId.match(/hemeroteca_digital\/(.*?)(?:\?|$)/);
+                        if (match && match[1]) {
+                          publicId = `hemeroteca_digital/${match[1]}`;
+                        } else {
+                          publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                        }
+                      }
+                      if (publicId.includes('https://')) {
+                        publicId = publicId.replace(/.*\/v\d+\//, '').split('?')[0];
+                      }
+                      return publicId;
+                    })()}
+                    alt={source.name}
+                    width={40}
+                    height={40}
+                    crop="fill"
+                    gravity="auto"
+                    quality="auto:best"
+                    format="auto"
+                    effects={[{ improve: true }, { sharpen: "100" }]}
+                    className="h-10 w-10 rounded-md object-cover"
+                    onError={() => {
+                      console.error('Error cargando imagen de fuente:', source.imageUrl);
+                    }}
+                  />
+                ) : (
+                  <SafeImage
+                    src={source.imageUrl.replace('http:', 'https:')}
+                    alt={source.name}
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 rounded-md object-cover"
+                    priority
+                    fallbackSrc="/images/placeholder.webp"
+                  />
+                )
               ) : (
                 <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold">
                   {source.name.substring(0, 2).toUpperCase()}
