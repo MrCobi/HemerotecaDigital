@@ -913,7 +913,18 @@ export function useMessagesState() {
     }
     
     // Generar un ID único para esta solicitud de búsqueda
-    const searchId = crypto.randomUUID();
+    // Usamos una alternativa segura compatible con todos los navegadores y entornos
+    let searchId;
+    try {
+      searchId = crypto.randomUUID();
+    } catch (e) {
+      // Fallback si randomUUID no está disponible
+      const d = new Date().getTime();
+      searchId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = (d + Math.random() * 16) % 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+    }
     lastSearchIdRef.current = searchId;
     
     // Actualizar inmediatamente el estado para la UI
