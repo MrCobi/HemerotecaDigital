@@ -188,7 +188,7 @@ export default function useSocket(options: UseSocketOptions) {
   const recentlyProcessedMessages = useRef<Set<string>>(new Set());
   const activeConversations = useRef<Set<string>>(new Set());
   
-  // Función para evitar procesamiento de mensajes duplicados
+  // Función para evitar procesamiento de mensajes duplicados - MEJORADO
   const shouldProcessMessageOnce = useCallback((messageId: string) => {
     if (!messageId) return true; // Si no hay ID, procesarlo (mensajes temporales)
     
@@ -202,10 +202,10 @@ export default function useSocket(options: UseSocketOptions) {
     recentlyProcessedMessages.current.add(messageId);
     
     // Limitar el tamaño del conjunto para evitar crecimiento indefinido
-    if (recentlyProcessedMessages.current.size > 100) {
-      // Eliminar el mensaje más antiguo (el primero añadido)
-      const oldestMessage = Array.from(recentlyProcessedMessages.current)[0];
-      recentlyProcessedMessages.current.delete(oldestMessage);
+    if (recentlyProcessedMessages.current.size > 200) { // Aumentado de 100 a 200 para mayor seguridad
+      // Eliminar los mensajes más antiguos (primeros añadidos)
+      const oldMessages = Array.from(recentlyProcessedMessages.current).slice(0, 50);
+      oldMessages.forEach(msgId => recentlyProcessedMessages.current.delete(msgId));
     }
     
     return true;
@@ -411,6 +411,9 @@ export default function useSocket(options: UseSocketOptions) {
         message.id = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       }
       
+      // Almacenar el ID del mensaje para evitar procesar duplicados
+      const messageId = message.id;
+      
       // Verificar si el mensaje pertenece a una conversación activa
       const shouldProcessMessage = 
         message.receiverId === userId || 
@@ -418,15 +421,18 @@ export default function useSocket(options: UseSocketOptions) {
         // También procesar mensajes de salas a las que pertenecemos aunque no los tengamos en activeConversations
         (message.conversationId && (message.conversationId.startsWith('conv_') || message.conversationId.startsWith('group_')));
       
-      // Verificar si es un mensaje duplicado
-      const isDuplicate = !shouldProcessMessageOnce(message.id);
+      // Verificar si es un mensaje duplicado - SOLUCIÓN MEJORADA
+      const isDuplicate = !shouldProcessMessageOnce(messageId);
       
       if (shouldProcessMessage && !isDuplicate && callbacksRef.current.onNewMessage) {
-        console.log(`[Socket] Procesando nuevo mensaje para UI:`, message.id);
+        console.log(`[Socket] Procesando nuevo mensaje para UI:`, messageId);
+        
+        // Añadir protección adicional contra duplicados
+        // Por si el shouldProcessMessageOnce no fue efectivo
         callbacksRef.current.onNewMessage(message);
       } else {
         if (isDuplicate) {
-          console.log(`[Socket] Mensaje duplicado ignorado:`, message.id);
+          console.log(`[Socket] Mensaje duplicado ignorado (ID: ${messageId})`);
         } else if (!shouldProcessMessage) {
           console.log(`[Socket] Mensaje no pertenece a una conversación activa:`, message.conversationId);
         } else {

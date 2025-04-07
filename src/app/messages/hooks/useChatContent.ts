@@ -648,7 +648,7 @@ export function useChatContent(
     onMessageStatus: (status: { messageId: string; status: string; tempId?: string }) => {
       console.log('[useChatContent] Recibido status update:', status);
       if (status.tempId) {
-        // Actualizar el estado de un mensaje temporal cuando llega su confirmación
+        // SOLUCIÓN MEJORADA: Actualizar el estado de un mensaje temporal cuando llega su confirmación
         setMessages(prevMessages => {
           // Primero verificar si el mensaje ya existe con el messageId (puede haber duplicados)
           const existingMessageIndex = prevMessages.findIndex(m => m.id === status.messageId);
@@ -660,16 +660,29 @@ export function useChatContent(
           
           // Si ya existe un mensaje con el ID final y también tenemos un mensaje temporal
           if (existingMessageIndex !== -1 && tempMessageIndex !== -1 && existingMessageIndex !== tempMessageIndex) {
-            // Eliminar el mensaje temporal y mantener solo el confirmado
-            console.log(`[useChatContent] Eliminando mensaje temporal duplicado`);
+            // MEJORA: Si ambos existen, SIEMPRE eliminar el mensaje con ID temporal
+            // y mantener solo el permanente (evita duplicados en la UI)
+            console.log(`[useChatContent] Eliminando mensaje temporal duplicado y conservando el permanente`);
             const updatedMessages = [...prevMessages];
+            
+            // Conservar cualquier atributo importante del mensaje temporal que pudiera faltar en el permanente
+            const tempMessage = updatedMessages[tempMessageIndex];
+            const permanentMessage = updatedMessages[existingMessageIndex];
+            
+            // Crear un mensaje actualizado combinando ambos
+            const mergedMessage = {
+              ...tempMessage,
+              ...permanentMessage,
+              id: status.messageId, // Asegurar ID permanente
+              status: status.status as Message['status'], // Actualizar estado
+              tempId: undefined // Eliminar referencia temporal
+            };
+            
+            // Eliminar mensaje temporal
             updatedMessages.splice(tempMessageIndex, 1);
             
-            // También actualizar el mensaje confirmado con el estado más reciente
-            updatedMessages[existingMessageIndex] = {
-              ...updatedMessages[existingMessageIndex],
-              status: status.status as Message['status']
-            };
+            // Actualizar mensaje permanente con la versión combinada
+            updatedMessages[existingMessageIndex < tempMessageIndex ? existingMessageIndex : existingMessageIndex - 1] = mergedMessage;
             
             return updatedMessages;
           }
@@ -682,7 +695,7 @@ export function useChatContent(
               ...updatedMessages[tempMessageIndex],
               id: status.messageId,
               status: status.status as Message['status'],
-              tempId: undefined
+              tempId: undefined // Eliminar completamente el tempId para evitar problemas futuros
             };
             return updatedMessages;
           }
