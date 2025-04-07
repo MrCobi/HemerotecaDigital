@@ -236,6 +236,7 @@ export function useChatContent(
     if (conversationId && messages.length > 0 && !loading) {
       // Pequeño retraso para asegurar que la UI se haya renderizado
       const timer = setTimeout(() => {
+        // Marcar mensajes como leídos en el servidor, pero sin actualizar la UI con duplicados
         markAllMessagesAsRead();
       }, 1000);
       
@@ -272,8 +273,22 @@ export function useChatContent(
     return (statusPriority[newStatus] || 0) > (statusPriority[currentStatus] || 0);
   }, []);
 
+  // Registro de mensajes procesados para evitar duplicaciones
+  const processedMessagesRef = useRef<Set<string>>(new Set());
+  
   // Función para añadir un nuevo mensaje a la lista
   const addNewMessage = useCallback((newMessage: Message) => {
+    // Verificación de duplicados usando una referencia persistente
+    if (newMessage.id && processedMessagesRef.current.has(newMessage.id)) {
+      console.log(`[useChatContent] Ignorando mensaje duplicado con ID: ${newMessage.id}`);
+      return; // No procesar el mismo mensaje dos veces
+    }
+    
+    if (newMessage.id) {
+      // Registrar este ID para evitar duplicaciones
+      processedMessagesRef.current.add(newMessage.id);
+    }
+    
     console.log('[useChatContent] Añadiendo mensaje:', newMessage);
     console.log('[useChatContent] Tipo de mensaje:', newMessage.messageType);
     console.log('[useChatContent] ConversationId del mensaje:', newMessage.conversationId);
@@ -290,6 +305,20 @@ export function useChatContent(
       
       console.log('[useChatContent] Actualización de estado - existingIndex:', existingIndex, 'tempIndex:', tempIndex);
       
+      // Verificación adicional para evitar duplicados - si hay un mensaje con el mismo contenido y timestamp similar
+      if (existingIndex === -1 && newMessage.content) {
+        const potentialDuplicate = prevMessages.find(msg => 
+          msg.content === newMessage.content && 
+          msg.senderId === newMessage.senderId &&
+          msg.id !== newMessage.id
+        );
+        
+        if (potentialDuplicate) {
+          console.log('[useChatContent] Detectado potencial duplicado basado en contenido:', newMessage.content);
+          return prevMessages; // No añadir mensajes con mismo contenido/remitente
+        }
+      }
+      
       // Si ya existe un mensaje con este ID, no lo añadimos de nuevo
       if (existingIndex !== -1) {
         // Solo actualizamos algunos campos específicos si es necesario
@@ -300,9 +329,14 @@ export function useChatContent(
         const currentStatus = prevMessages[existingIndex].status;
         const newStatus = newMessage.status;
         
-        // Ignorar completamente las actualizaciones a estado 'read'
+        // Ignorar actualizaciones a estado 'read' en la UI, para evitar duplicaciones
+        // En lugar de ignorar completamente, actualizamos el estado del mensaje existente sin crear uno nuevo
         if (newStatus === 'read') {
-          console.log('[useChatContent] Ignorando actualización a estado "read" para evitar duplicación');
+          console.log('[useChatContent] Actualizando estado a "read" sin crear duplicado');
+          updatedMessages[existingIndex] = {
+            ...updatedMessages[existingIndex],
+            read: true  // Marcar como leído pero mantener el mismo objeto de mensaje
+          };
           return updatedMessages;
         }
         
@@ -365,8 +399,22 @@ export function useChatContent(
     }
   }, [conversation?.id, session?.user?.id, scrollToBottom, shouldUpdateStatus]);
 
+  // Registro de mensajes recibidos para evitar procesarlos dos veces
+  const receivedMessageIdsRef = useRef<Set<string>>(new Set());
+  
   // Manejar nuevo mensaje recibido
   const handleNewMessage = useCallback((message: Message) => {
+    // Verificación para evitar procesar el mismo mensaje dos veces
+    if (message.id && receivedMessageIdsRef.current.has(message.id)) {
+      console.log(`[useChatContent] Ignorando mensaje ya recibido: ${message.id}`);
+      return;
+    }
+    
+    // Registrar este mensaje como procesado
+    if (message.id) {
+      receivedMessageIdsRef.current.add(message.id);
+    }
+    
     console.log('[useChatContent] Recibido nuevo mensaje:', message);
     
     // Verificar si el mensaje pertenece a la conversación actual
