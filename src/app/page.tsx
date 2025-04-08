@@ -244,7 +244,7 @@ export default function HomePage() {
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-6 lg:gap-8">
-            {[{ value: 1500, label: "Artículos" }, { value: 7, label: "Categorías" }, { value: 45, label: "Fuentes" }, { value: 100, label: "Usuarios" }].map((stat, i) => (
+            {[{ value: 10000, label: "Artículos" }, { value: 7, label: "Categorías" }, { value: 100, label: "Fuentes" }, { value: 100, label: "Usuarios" }].map((stat, i) => (
               <StatItem key={i} value={stat.value} label={stat.label} isVisible={isVisible.stats} />
             ))}
           </div>
