@@ -33,6 +33,9 @@ interface GroupUpdateData {
   name?: string;
   description?: string;
   imageUrl?: string;
+  updateType?: string;
+  participantId?: string;
+  role?: string;
   [key: string]: unknown;
 }
 
@@ -92,8 +95,136 @@ export const PATCH = withAuth(async (
       );
     }
     
-    // Validar que al menos un campo está siendo actualizado
-    if (!name && !description && !imageUrl) {
+    // Manejar actualización de rol de participante
+    if (updateData.updateType === 'participantRole' && updateData.participantId && updateData.role) {
+      console.log(`[DEBUG] Actualizando rol de participante ${updateData.participantId} a ${updateData.role}`);
+      
+      // Verificar si el participante existe en el grupo
+      const targetParticipant = await prisma.conversationParticipant.findFirst({
+        where: {
+          conversationId: groupId,
+          userId: updateData.participantId
+        }
+      });
+      
+      if (!targetParticipant) {
+        console.log(`[ERROR] Participante ${updateData.participantId} no encontrado en el grupo ${groupId}`);
+        return NextResponse.json(
+          { error: "El participante no existe en este grupo" },
+          { status: 404 }
+        );
+      }
+      
+      // Verificar si el rol solicitado es válido
+      const validRoles = ['admin', 'member', 'moderator'];
+      if (!validRoles.includes(updateData.role)) {
+        console.log(`[ERROR] Rol inválido: ${updateData.role}`);
+        return NextResponse.json(
+          { error: "Rol inválido" },
+          { status: 400 }
+        );
+      }
+      
+      // Verificar si el usuario objetivo es el creador (owner) del grupo
+      if (targetParticipant.role === 'owner') {
+        console.log(`[ERROR] No se puede cambiar el rol del creador del grupo`);
+        return NextResponse.json(
+          { error: "No se puede cambiar el rol del creador del grupo" },
+          { status: 403 }
+        );
+      }
+      
+      // Verificar si el usuario actual es el creador del grupo si está intentando cambiar un admin
+      const currentUserRole = await prisma.conversationParticipant.findFirst({
+        where: {
+          conversationId: groupId,
+          userId: userId
+        },
+        select: {
+          role: true
+        }
+      });
+      
+      if (targetParticipant.role === 'admin' && currentUserRole?.role !== 'owner') {
+        console.log(`[ERROR] Solo el creador puede cambiar el rol de un administrador`);
+        return NextResponse.json(
+          { error: "Solo el creador puede cambiar el rol de un administrador" },
+          { status: 403 }
+        );
+      }
+      
+      // Actualizar el rol del participante
+      try {
+        await prisma.conversationParticipant.update({
+          where: {
+            id: targetParticipant.id
+          },
+          data: {
+            role: updateData.role as 'admin' | 'member' | 'moderator'
+          }
+        });
+        
+        // Obtener la conversación actualizada con todos los participantes
+        const updatedConversation = await prisma.conversation.findUnique({
+          where: { id: groupId },
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    username: true,
+                    image: true
+                  }
+                }
+              }
+            },
+            settings: true
+          }
+        });
+        
+        // Emitir evento de actualización para informar al chat
+        try {
+          const payload = {
+            conversationId: groupId,
+            updateType: 'participant_role_changed',
+            data: {
+              participantId: updateData.participantId,
+              newRole: updateData.role
+            }
+          };
+          
+          // Crear URL para emitir evento SSE
+          const domain = process.env.NODE_ENV === 'development' 
+            ? 'http://localhost:3000' 
+            : process.env.NEXT_PUBLIC_SITE_URL || 'https://hemerotecadigital.io';
+          
+          const sseEndpoint = `${domain}/api/messages/group/updates/sse`;
+          
+          await fetch(sseEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+          
+          console.log(`[DEBUG] Evento de cambio de rol emitido correctamente`);
+        } catch (sseError) {
+          console.error(`[ERROR] Error al emitir evento SSE:`, sseError);
+          // No fallamos la operación completa si falla la notificación SSE
+        }
+        
+        return NextResponse.json(updatedConversation);
+      } catch (error) {
+        console.error(`[ERROR] Error al actualizar rol del participante:`, error);
+        return NextResponse.json(
+          { error: "Error al actualizar rol del participante", details: error instanceof Error ? error.message : 'Unknown error' },
+          { status: 500 }
+        );
+      }
+    } else if (!name && !description && !imageUrl) {
       console.log(`[ERROR] No se proporcionaron datos para actualizar`);
       return NextResponse.json(
         { error: "No se proporcionaron datos para actualizar" },
@@ -271,11 +402,28 @@ export const DELETE = withAuth(async (
     const groupId = ensureIdFormat(resolvedParams.groupId);
     const userId = auth.user.id;
     
-    // Verificar si el usuario es administrador
-    const isAdmin = await isGroupAdmin(groupId, userId);
-    if (!isAdmin) {
+    // Verificar si el usuario es el creador del grupo (owner)
+    const participant = await prisma.conversationParticipant.findFirst({
+      where: {
+        conversationId: groupId,
+        userId: userId
+      },
+      select: {
+        role: true
+      }
+    });
+    
+    if (!participant) {
       return NextResponse.json(
-        { error: "No tienes permisos para eliminar este grupo" },
+        { error: "No eres participante de este grupo" },
+        { status: 403 }
+      );
+    }
+    
+    if (participant.role !== 'owner') {
+      console.log(`[ERROR] Usuario no creador intenta eliminar grupo: ${userId} en grupo: ${groupId}`);
+      return NextResponse.json(
+        { error: "Solo el creador del grupo puede eliminarlo" },
         { status: 403 }
       );
     }

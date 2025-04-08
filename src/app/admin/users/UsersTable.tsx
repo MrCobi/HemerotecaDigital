@@ -283,7 +283,6 @@ export default function UsersTable({ users }: UsersTableProps) {
         >
           <option value="all">Todos</option>
           <option value="USER">Usuarios</option>
-          <option value="EDITOR">Editores</option>
           <option value="ADMIN">Administradores</option>
         </select>
       )

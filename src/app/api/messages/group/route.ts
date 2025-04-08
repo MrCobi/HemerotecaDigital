@@ -87,11 +87,11 @@ export const POST = withAuth(async (req: Request, auth: AuthParams) => {
         creatorId: userId, // Añadir el ID del creador
         participants: {
           create: [
-            // Añadir al creador como admin
+            // Añadir al creador como owner
             {
               userId: userId,
               isAdmin: true,
-              role: 'admin' as const
+              role: 'owner' as const
             },
             // Añadir al resto de participantes como miembros
             ...validParticipants.map((participantId: string) => ({

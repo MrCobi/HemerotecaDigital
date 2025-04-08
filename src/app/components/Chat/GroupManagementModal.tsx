@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/src/app/components/ui/input';
 import { Textarea } from '@/src/app/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/src/app/components/ui/avatar';
-import { X, Users, Pencil, UploadCloud, Trash2, LogOut } from 'lucide-react';
+import { X, Users, Pencil, UploadCloud, Trash2, LogOut, ShieldCheck, ShieldX } from 'lucide-react';
 import { CldImage } from 'next-cloudinary';
 import Image from 'next/image';
 import { API_ROUTES } from '@/src/config/api-routes';
@@ -93,6 +93,13 @@ export const GroupManagementModal = ({
   // NUEVO: Estados para manejar carga independiente de datos
   const [_isLoading, setIsLoading] = useState(false);
   const [serverGroupData, setServerGroupData] = useState<ConversationData | null>(null);
+  
+  // Estados para diálogos de confirmación
+  const [isDeleteGroupDialogOpen, setIsDeleteGroupDialogOpen] = useState(false);
+  const [isLeaveGroupDialogOpen, setIsLeaveGroupDialogOpen] = useState(false);
+  const [isChangeRoleDialogOpen, setIsChangeRoleDialogOpen] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
+  const [isPromotingToAdmin, setIsPromotingToAdmin] = useState(false);
   
   // IMPORTANTE: Guardar los valores actuales para que no se pierdan en renderizados
   const savedNameRef = useRef(groupName);
@@ -505,7 +512,7 @@ export const GroupManagementModal = ({
       toast({
         title: "Error",
         description: "No se pudieron cargar los posibles participantes",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   }, [serverGroupData, toast]);
@@ -825,8 +832,6 @@ export const GroupManagementModal = ({
   };
 
   // Función para eliminar el grupo
-  const [isDeleteGroupDialogOpen, setIsDeleteGroupDialogOpen] = useState(false);
-
   const handleDeleteGroupClick = () => {
     setIsDeleteGroupDialogOpen(true);
   };
@@ -885,8 +890,6 @@ export const GroupManagementModal = ({
   };
 
   // Función para abandonar el grupo
-  const [isLeaveGroupDialogOpen, setIsLeaveGroupDialogOpen] = useState(false);
-
   const handleLeaveGroupClick = () => {
     setIsLeaveGroupDialogOpen(true);
   };
@@ -950,6 +953,108 @@ export const GroupManagementModal = ({
     } finally {
       setIsUpdatingGroup(false);
       setIsLeaveGroupDialogOpen(false);
+    }
+  };
+
+  // Función para cambiar el rol de un participante (hacer admin o quitar admin)
+  const handleRoleChangeClick = (participant: Participant, promote: boolean) => {
+    // No permitir cambios en el rol del dueño del grupo
+    if (participant.role === 'owner') {
+      toast({
+        title: "Acción no permitida",
+        description: "No puedes cambiar el rol del creador del grupo",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // No permitir que un admin que no es dueño cambie el rol de otro admin
+    const currentUserParticipant = localParticipants.find(p => p.userId === currentUserId);
+    if (participant.role === 'admin' && currentUserParticipant?.role !== 'owner') {
+      toast({
+        title: "Acción no permitida",
+        description: "Solo el creador del grupo puede modificar el rol de otros administradores",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSelectedParticipant(participant);
+    setIsPromotingToAdmin(promote);
+    setIsChangeRoleDialogOpen(true);
+  };
+
+  const confirmRoleChange = async () => {
+    if (!serverGroupData || !selectedParticipant) return;
+    
+    try {
+      setIsUpdatingGroup(true);
+      
+      const groupId = getIdForApi(serverGroupData.id);
+      const newRole = isPromotingToAdmin ? 'admin' : 'member';
+      
+      console.log(`[Cliente] Cambiando rol de usuario ${selectedParticipant.userId} a ${newRole}`);
+      
+      // Utilizamos la ruta de actualización del grupo para enviar actualización de rol
+      const response = await fetch(
+        `${API_ROUTES.messages.group.update(groupId)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            updateType: 'participantRole',
+            participantId: selectedParticipant.userId,
+            role: newRole
+          })
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Error al cambiar el rol del participante: ${response.status}`);
+      }
+      
+      // Actualización local optimista
+      setLocalParticipants(prev => 
+        prev.map(p => 
+          p.userId === selectedParticipant.userId 
+            ? {...p, role: newRole as 'admin' | 'member' | 'moderator' | 'owner'} 
+            : p
+        )
+      );
+      
+      // Actualizar en el padre para propagar cambios
+      const updatedConversation: Partial<ConversationData> = {
+        ...serverGroupData,
+        participants: localParticipants.map(p => 
+          p.userId === selectedParticipant.userId 
+            ? {...p, role: newRole as 'admin' | 'member' | 'moderator' | 'owner'} 
+            : p
+        )
+      };
+      
+      onConversationUpdate(updatedConversation);
+      
+      toast({
+        title: isPromotingToAdmin ? "Administrador añadido" : "Administrador eliminado",
+        description: isPromotingToAdmin 
+          ? `${selectedParticipant.user.username || selectedParticipant.user.name || 'Usuario'} ahora es administrador`
+          : `${selectedParticipant.user.username || selectedParticipant.user.name || 'Usuario'} ya no es administrador`
+      });
+      
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Ha ocurrido un error al cambiar el rol del participante",
+        variant: "destructive",
+      });
+      console.error("Error al cambiar rol de participante:", err);
+    } finally {
+      setIsUpdatingGroup(false);
+      setIsChangeRoleDialogOpen(false);
+      setSelectedParticipant(null);
     }
   };
 
@@ -1096,46 +1201,79 @@ export const GroupManagementModal = ({
               {localParticipants.map((participant) => (
                 <div key={participant.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-800 rounded-md">
                   <div className="flex items-center space-x-2">
-                    <Avatar className="h-8 w-8">
-                      {participant.user?.image && participant.user.image.includes('cloudinary') ? (
-                        <CldImage 
+                    <Avatar className="h-8 w-8 border">
+                      {participant.user.image ? (
+                        <Image 
                           src={participant.user.image}
-                          alt={participant.user.username || participant.user.name || "Usuario"}
-                          width={32}
-                          height={32}
-                          crop="fill"
-                          gravity="face"
-                          className="object-cover"
-                        />
-                      ) : participant.user?.image ? (
-                        <Image
-                          src={participant.user.image}
-                          alt={participant.user.username || participant.user.name || "Usuario"}
+                          alt={participant.user.username || "Usuario"}
                           width={32}
                           height={32}
                           className="object-cover"
                         />
                       ) : (
-                        <AvatarFallback>{(participant.user.username || participant.user.name || "?")[0]}</AvatarFallback>
+                        <AvatarFallback>
+                          {participant.user.username?.[0] || participant.user.name?.[0] || "U"}
+                        </AvatarFallback>
                       )}
                     </Avatar>
                     <div>
-                      <p className="text-sm font-medium">{participant.user.username || participant.user.name || "Usuario"}</p>
-                      {participant.role === 'admin' && (
-                        <p className="text-xs text-blue-500">Admin</p>
-                      )}
+                      <p className="font-medium">{participant.user.username || participant.user.name || "Usuario sin nombre"}</p>
+                      <div className="text-sm text-muted-foreground flex items-center">
+                        {participant.userId === currentUserId ? (
+                          <span className="text-blue-500">Tú</span>
+                        ) : (
+                          <span>
+                            {participant.role === 'owner' && (
+                              <span className="text-amber-500 flex items-center">
+                                <ShieldCheck className="h-3 w-3 mr-1" /> Creador
+                              </span>
+                            )}
+                            {participant.role === 'admin' && (
+                              <span className="text-green-500 flex items-center">
+                                <ShieldCheck className="h-3 w-3 mr-1" /> Admin
+                              </span>
+                            )}
+                            {participant.role === 'member' && (
+                              <span className="text-gray-500">Miembro</span>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {initialIsAdmin && participant.userId !== currentUserId && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleRemoveParticipant(participant.userId)}
-                      disabled={isUpdatingGroup}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-8"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleRemoveParticipant(participant.userId)}
+                        disabled={isUpdatingGroup}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-8"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                      {participant.role === 'admin' ? (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleRoleChangeClick(participant, false)}
+                          disabled={isUpdatingGroup}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-8"
+                        >
+                          <ShieldX className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleRoleChangeClick(participant, true)}
+                          disabled={isUpdatingGroup}
+                          className="text-green-500 hover:text-green-700 hover:bg-green-50 p-1 h-8"
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -1327,6 +1465,42 @@ export const GroupManagementModal = ({
               <>
                 <Trash2 className="h-4 w-4 mr-2" />
                 Eliminar Grupo
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Diálogo de confirmación para cambiar rol */}
+    <Dialog open={isChangeRoleDialogOpen} onOpenChange={setIsChangeRoleDialogOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Cambiar rol de {selectedParticipant?.user.username || selectedParticipant?.user.name || "Usuario"}</DialogTitle>
+          <DialogDescription>
+            ¿Estás seguro de que quieres {isPromotingToAdmin ? "promover" : "degradar"} a {selectedParticipant?.user.username || selectedParticipant?.user.name || "Usuario"}?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex justify-between">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsChangeRoleDialogOpen(false)}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            variant="default" 
+            onClick={confirmRoleChange}
+          >
+            {isUpdatingGroup ? (
+              <>
+                <span className="mr-2">Actualizando...</span>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="h-4 w-4 mr-2" />
+                {isPromotingToAdmin ? "Promover" : "Degradar"}
               </>
             )}
           </Button>

@@ -70,6 +70,37 @@ export const DELETE = withAuth(async (
       );
     }
     
+    // SEGURIDAD: Verificar si el participante a eliminar es 'owner' y no es auto-eliminación
+    if (participant.role === 'owner' && !isSelfRemoval) {
+      console.log(`[ERROR] Intento de eliminar al creador del grupo: ${participantId} en grupo: ${groupId}`);
+      return NextResponse.json(
+        { error: "No se puede eliminar al creador del grupo" },
+        { status: 403 }
+      );
+    }
+    
+    // Obtener rol del usuario actual si no es auto-eliminación
+    if (!isSelfRemoval) {
+      const currentUserParticipant = await prisma.conversationParticipant.findFirst({
+        where: {
+          conversationId: groupId,
+          userId: currentUserId
+        },
+        select: {
+          role: true
+        }
+      });
+      
+      // SEGURIDAD: Administradores normales no pueden eliminar a otros administradores
+      if (participant.role === 'admin' && currentUserParticipant?.role !== 'owner') {
+        console.log(`[ERROR] Admin intenta eliminar a otro admin: ${participantId} en grupo: ${groupId}`);
+        return NextResponse.json(
+          { error: "Solo el creador del grupo puede eliminar a otros administradores" },
+          { status: 403 }
+        );
+      }
+    }
+    
     // Si el usuario a eliminar es 'owner' y se está auto-eliminando,
     // comprobar si hay otro administrador para transferirle la propiedad
     if (participant.role === 'owner' && isSelfRemoval) {
