@@ -3,7 +3,7 @@
 import { Button } from "@/src/app/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 
 // Pre-calculated positions for decorative elements
@@ -75,6 +75,20 @@ export default function HomePage() {
   });
   const { data: session } = useSession();
 
+  // Estado para el carrusel
+  const [activeSlide, setActiveSlide] = useState(0);
+  const totalSlides = 3;
+
+  // Función para avanzar al siguiente slide
+  const nextSlide = useCallback(() => {
+    setActiveSlide((prev) => (prev + 1) % totalSlides);
+  }, [totalSlides]);
+
+  // Función para ir a un slide específico
+  const goToSlide = useCallback((index: number) => {
+    setActiveSlide(index);
+  }, []);
+
   // Redirección si el usuario ya ha iniciado sesión
   useEffect(() => {
     if (session) {
@@ -108,6 +122,34 @@ export default function HomePage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Configurar el intervalo para el carrusel automático
+  useEffect(() => {
+    const interval = setInterval(() => {
+      nextSlide();
+    }, 3000); // Cambiar slide cada 3 segundos
+
+    return () => clearInterval(interval);
+  }, [nextSlide]);
+
+  // Contenido de cada slide
+  const slideContent = [
+    {
+      title: "Descubre el Mundo de las Noticias Actuales",
+      description:
+        "Explora nuestra colección de artículos, reportajes y documentos informativos que cubren los acontecimientos más relevantes de nuestro tiempo.",
+    },
+    {
+      title: "Navega por Temas de Interés Contemporáneo",
+      description:
+        "Accede a contenidos organizados por categorías, descubriendo las noticias y tendencias que definen nuestra actualidad.",
+    },
+    {
+      title: "Comparte y Conecta con la Comunidad",
+      description:
+        "Únete a otros lectores interesados, comparte descubrimientos y participa en discusiones sobre temas de actualidad.",
+    },
+  ];
+
   return (
     <main className="min-h-screen dark:bg-blue-950">
       {/* Hero Section */}
@@ -124,7 +166,7 @@ export default function HomePage() {
                 width: element.width,
                 height: element.height,
                 backgroundColor: "rgba(255, 255, 255, 0.15)",
-                borderRadius: "50%"
+                borderRadius: "50%",
               }}
             />
           ))}
@@ -141,19 +183,29 @@ export default function HomePage() {
             }`}
           >
             <p className="text-blue-300 dark:text-blue-200 font-medium mb-3 sm:mb-3 tracking-wider uppercase text-sm sm:text-base">
-              Archivo histórico digital
+              Hemeroteca Digital
             </p>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 sm:mb-6 leading-tight">
-              Descubre el Mundo{" "}
-              <span className="block mt-1 sm:mt-2">
-                de las Noticias Históricas
-              </span>
-            </h1>
-            <p className="text-sm sm:text-base text-gray-200 dark:text-blue-200 mb-6 sm:mb-8 max-w-2xl">
-              Explora nuestra vasta colección de artículos, periódicos y documentos
-              históricos digitalizados que abarcan más de cinco décadas de
-              historia.
-            </p>
+
+            {/* Contenido del carousel */}
+            <div className="relative w-full overflow-hidden">
+              <div
+                className="flex w-full transition-transform duration-500 ease-in-out"
+                style={{ transform: `translateX(-${activeSlide * 100}%)` }}
+              >
+                {slideContent.map((slide, index) => (
+                  <div key={index} className="w-full min-w-full flex-shrink-0 flex flex-col">
+                    <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-white mb-3 sm:mb-6 leading-tight">
+                      <span className="block sm:inline">{slide.title.split(" ").slice(0, 3).join(" ")}</span>{" "}
+                      <span className="block mt-0 sm:mt-2">{slide.title.split(" ").slice(3).join(" ")}</span>
+                    </h1>
+                    <p className="text-sm sm:text-base text-gray-200 dark:text-blue-200 mb-5 sm:mb-8 max-w-2xl">
+                      {slide.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Button
                 size="lg"
@@ -174,18 +226,26 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Scroll indicators */}
-        <div className="absolute bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2 animate-bounce">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className={`h-1 sm:h-2 rounded-full transition-all duration-300 ${
-                i === 0
-                  ? "w-4 sm:w-8 bg-blue-400"
-                  : "w-1 sm:w-2 bg-white/60 dark:bg-blue-800/60"
-              }`}
-            />
-          ))}
+        {/* Carrusel de puntos interactivo - con flexbox para adaptación automática */}
+        <div className="absolute bottom-4 sm:bottom-8 left-0 right-0 w-full flex justify-center items-center">
+          <div className="flex space-x-2 sm:space-x-3">
+            {[0, 1, 2].map((i) => (
+              <button
+                key={i}
+                onClick={() => goToSlide(i)}
+                className="focus:outline-none transition-all duration-300 py-2 px-1 flex items-center justify-center"
+                aria-label={`Ir a slide ${i + 1}`}
+              >
+                <div
+                  className={`h-1.5 sm:h-3 rounded-full transition-all duration-500 ${
+                    i === activeSlide
+                      ? "w-5 sm:w-10 bg-blue-400 animate-pulse"
+                      : "w-1.5 sm:w-3 bg-white/60 dark:bg-blue-800/60 hover:bg-white/80 dark:hover:bg-blue-700/70"
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -204,10 +264,10 @@ export default function HomePage() {
           {/* Stats grid - Responsive layout */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-6 lg:gap-8">
             {[
-              { value: 2500, label: "Artículos" },
-              { value: 20, label: "Años de historia" },
-              { value: 120, label: "Fuentes" },
-              { value: 800, label: "Usuarios" },
+              { value: 1500, label: "Artículos" },
+              { value: 7, label: "Categorías" },
+              { value: 45, label: "Fuentes" },
+              { value: 100, label: "Usuarios" },
             ].map((stat, i) => (
               <StatItem
                 key={i}
@@ -228,8 +288,7 @@ export default function HomePage() {
               Cómo Funciona Nuestra Hemeroteca
             </h2>
             <p className="text-base text-gray-600 dark:text-blue-200 max-w-3xl mx-auto">
-              Descubre el proceso que seguimos para preservar y hacer accesible la
-              historia a través de nuestros documentos.
+              Descubre el proceso que seguimos para organizar y hacer accesible la información a través de nuestro sistema digital.
             </p>
           </div>
 
@@ -239,25 +298,25 @@ export default function HomePage() {
                 number: "01",
                 title: "Recopilación",
                 description:
-                  "Seleccionamos cuidadosamente fuentes históricas relevantes.",
+                  "Seleccionamos cuidadosamente fuentes de noticias relevantes y actuales.",
               },
               {
                 number: "02",
-                title: "Digitalización",
+                title: "Procesamiento",
                 description:
-                  "Utilizamos tecnología avanzada para digitalizar los documentos.",
+                  "Utilizamos tecnología avanzada para analizar y clasificar los contenidos.",
               },
               {
                 number: "03",
-                title: "Catalogación",
+                title: "Categorización",
                 description:
-                  "Expertos clasifican y etiquetan cada documento.",
+                  "Organizamos los artículos por temas, relevancia y tendencias actuales.",
               },
               {
                 number: "04",
                 title: "Acceso",
                 description:
-                  "Ponemos a tu disposición todo el archivo para consulta.",
+                  "Ponemos a tu disposición todo el contenido para consulta inmediata.",
               },
             ].map((step, i) => (
               <div
@@ -282,38 +341,38 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">
-              Explora Nuestra Línea del Tiempo
+              Explora Nuestras Categorías
             </h2>
             <p className="text-base text-gray-600 dark:text-blue-200 max-w-3xl mx-auto">
-              Navega por nuestros documentos organizados cronológicamente.
+              Navega por nuestros artículos organizados por temas de interés.
             </p>
           </div>
 
           <div className="space-y-12">
             {[
               {
-                year: "2021",
-                title: "Inicio del Proyecto",
+                year: "Tecnología",
+                title: "Avances Tecnológicos",
                 description:
-                  "Comenzamos el desarrollo de la hemeroteca digital como proyecto académico.",
+                  "Descubre las últimas tendencias en tecnología, IA, gadgets y transformación digital.",
               },
               {
-                year: "2022",
-                title: "500 Artículos",
+                year: "Deportes",
+                title: "Actualidad Deportiva",
                 description:
-                  "Alcanzamos nuestro primer hito de quinientos artículos digitalizados.",
+                  "Mantente al día con las noticias deportivas más relevantes sobre fútbol, baloncesto y otros deportes.",
               },
               {
-                year: "2023",
-                title: "Integración de búsqueda avanzada",
+                year: "Cultura",
+                title: "Expresiones Culturales",
                 description:
-                  "Implementamos capacidades avanzadas de búsqueda y clasificación automática.",
+                  "Explora artículos sobre cine, música, literatura y otras manifestaciones culturales contemporáneas.",
               },
               {
-                year: "2024",
-                title: "Expansión de contenidos",
+                year: "Sociedad",
+                title: "Temas Sociales",
                 description:
-                  "Ampliamos nuestro archivo con nuevas fuentes nacionales y colaboraciones.",
+                  "Análisis y reportajes sobre temas que afectan a nuestra sociedad actual y sus desafíos.",
               },
             ].map((event, i) => (
               <div
@@ -350,11 +409,10 @@ export default function HomePage() {
       <section className="py-16 bg-gradient-to-br from-blue-600 to-indigo-900 dark:from-blue-900 dark:to-indigo-950">
         <div className="max-w-3xl mx-auto px-4 text-center text-white">
           <h2 className="text-4xl font-bold mb-6">
-            Comienza a Explorar la Historia Hoy
+            Comienza a Explorar las Noticias Hoy
           </h2>
           <p className="text-base mb-8 text-gray-200 dark:text-blue-200">
-            Únete a miles de investigadores, historiadores y mentes curiosas para
-            descubrir el pasado a través de nuestro archivo.
+            Únete a miles de lectores interesados para descubrir contenidos relevantes sobre temas de actualidad.
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <Button
@@ -370,7 +428,7 @@ export default function HomePage() {
               className="text-blue-800 dark:text-blue-200 border-white dark:border-blue-200 hover:bg-white/10 dark:hover:bg-blue-800/30"
               onClick={() => router.push("/api/auth/signup")}
             >
-              Registarse <ArrowRight className="ml-2" size={16} />
+              Registrarse <ArrowRight className="ml-2" size={16} />
             </Button>
           </div>
         </div>
