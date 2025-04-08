@@ -204,10 +204,10 @@ export default function HomePage() {
           {/* Stats grid - Responsive layout */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-6 lg:gap-8">
             {[
-              { value: 10000, label: "Artículos" },
-              { value: 50, label: "Años de historia" },
-              { value: 200, label: "Fuentes" },
-              { value: 5000, label: "Usuarios" },
+              { value: 2500, label: "Artículos" },
+              { value: 20, label: "Años de historia" },
+              { value: 120, label: "Fuentes" },
+              { value: 800, label: "Usuarios" },
             ].map((stat, i) => (
               <StatItem
                 key={i}
@@ -292,28 +292,28 @@ export default function HomePage() {
           <div className="space-y-12">
             {[
               {
-                year: "2020",
-                title: "Lanzamiento del Proyecto",
-                description:
-                  "Comenzamos con la visión de hacer que los periódicos históricos sean accesibles para todos.",
-              },
-              {
                 year: "2021",
-                title: "1M de Artículos",
+                title: "Inicio del Proyecto",
                 description:
-                  "Alcanzamos nuestro primer hito de un millón de artículos digitalizados.",
+                  "Comenzamos el desarrollo de la hemeroteca digital como proyecto académico.",
               },
               {
                 year: "2022",
-                title: "Integración de IA",
+                title: "500 Artículos",
                 description:
-                  "Implementamos capacidades avanzadas de búsqueda y OCR.",
+                  "Alcanzamos nuestro primer hito de quinientos artículos digitalizados.",
               },
               {
                 year: "2023",
-                title: "Expansión Global",
+                title: "Integración de búsqueda avanzada",
                 description:
-                  "Ampliamos nuestro archivo para incluir publicaciones internacionales.",
+                  "Implementamos capacidades avanzadas de búsqueda y clasificación automática.",
+              },
+              {
+                year: "2024",
+                title: "Expansión de contenidos",
+                description:
+                  "Ampliamos nuestro archivo con nuevas fuentes nacionales y colaboraciones.",
               },
             ].map((event, i) => (
               <div
