@@ -327,7 +327,7 @@ export default function SourcesPage({
                       className="absolute inset-0 object-cover transition-transform duration-300 group-hover:scale-105"
                       fill
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      fallbackSrc="/images/placeholder.webp"
+                      fallbackSrc="/images/default-source-image.svg"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     <div className="absolute top-4 right-4 bg-white/90 dark:bg-gray-800/90 px-3 py-1 rounded-full text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center shadow-lg">

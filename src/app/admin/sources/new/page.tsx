@@ -196,6 +196,9 @@ export default function NewSourcePage() {
       // Actualizar el imageUrl en los datos del formulario
       if (imageUrl) {
         data.imageUrl = imageUrl;
+      } else {
+        // Usar la imagen predeterminada para fuentes sin imagen
+        data.imageUrl = "/images/default-source-image.svg";
       }
 
       // Enviar datos de la fuente al API
@@ -206,8 +209,8 @@ export default function NewSourcePage() {
         },
         body: JSON.stringify({
           ...data,
-          // Si imageUrl está vacío, enviarlo como null para que la base de datos lo maneje correctamente
-          imageUrl: data.imageUrl || null,
+          // Ya no necesitamos la verificación para null porque siempre tendremos una URL
+          imageUrl: data.imageUrl,
         }),
       });
 
@@ -303,21 +306,19 @@ export default function NewSourcePage() {
                       <FormLabel>Imagen (opcional)</FormLabel>
                       <div className="space-y-4">
                         {/* Vista previa de la imagen */}
-                        {imagePreview && (
-                          <div className="mx-auto max-w-[200px] max-h-[200px] overflow-hidden rounded-md border border-gray-200 shadow-sm">
-                            <Image
-                              src={imagePreview || "/placeholder-image.jpg"}
-                              alt="Vista previa"
-                              width={200}
-                              height={150}
-                              className="h-auto w-full object-cover"
-                              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = "/placeholder-image.jpg";
-                              }}
-                            />
-                          </div>
-                        )}
+                        <div className="mx-auto max-w-[200px] max-h-[200px] overflow-hidden rounded-md border border-gray-200 shadow-sm">
+                          <Image
+                            src={imagePreview || "/images/default-source-image.svg"}
+                            alt="Vista previa"
+                            width={200}
+                            height={150}
+                            className="h-auto w-full object-contain"
+                            onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = "/images/default-source-image.svg";
+                            }}
+                          />
+                        </div>
                         
                         <FormControl>
                           <Input

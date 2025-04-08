@@ -171,8 +171,15 @@ export default function SourcesTable({ sources: initialSources }: SourcesTablePr
                   />
                 )
               ) : (
-                <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold">
-                  {source.name.substring(0, 2).toUpperCase()}
+                <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center">
+                  <SafeImage
+                    src="/images/default-source-image.svg"
+                    alt={source.name}
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 rounded-md object-cover"
+                    priority
+                  />
                 </div>
               )}
             </div>

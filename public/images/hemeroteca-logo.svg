@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo del logo -->
+  <rect width="512" height="512" rx="64" fill="#4F46E5" />
+  
+  <!-- Libro abierto/periódico (base) -->
+  <path d="M100 160 L412 160 L412 372 L100 372 Z" fill="#F3F4F6" />
+  
+  <!-- Páginas del libro/periódico -->
+  <path d="M256 160 L412 160 L412 372 L256 372 C256 372, 360 350, 360 270 C360 190, 256 160, 256 160 Z" fill="#E5E7EB" />
+  <path d="M100 160 L256 160 L256 372 L100 372 C100 372, 152 350, 152 270 C152 190, 100 160, 100 160 Z" fill="#FFFFFF" />
+  
+  <!-- Líneas representando texto -->
+  <rect x="120" y="200" width="100" height="10" rx="2" fill="#6366F1" />
+  <rect x="120" y="220" width="80" height="8" rx="2" fill="#6366F1" opacity="0.8" />
+  <rect x="120" y="240" width="110" height="6" rx="2" fill="#6366F1" opacity="0.6" />
+  <rect x="120" y="260" width="90" height="8" rx="2" fill="#6366F1" opacity="0.8" />
+  <rect x="120" y="280" width="100" height="6" rx="2" fill="#6366F1" opacity="0.7" />
+  <rect x="120" y="300" width="70" height="8" rx="2" fill="#6366F1" opacity="0.9" />
+  <rect x="120" y="320" width="110" height="6" rx="2" fill="#6366F1" opacity="0.6" />
+
+  <!-- Líneas representando texto en la página derecha -->
+  <rect x="280" y="200" width="110" height="10" rx="2" fill="#4F46E5" />
+  <rect x="280" y="220" width="90" height="8" rx="2" fill="#4F46E5" opacity="0.8" />
+  <rect x="280" y="240" width="100" height="6" rx="2" fill="#4F46E5" opacity="0.6" />
+  <rect x="280" y="260" width="110" height="8" rx="2" fill="#4F46E5" opacity="0.8" />
+  <rect x="280" y="280" width="80" height="6" rx="2" fill="#4F46E5" opacity="0.7" />
+  <rect x="280" y="300" width="110" height="8" rx="2" fill="#4F46E5" opacity="0.9" />
+  <rect x="280" y="320" width="90" height="6" rx="2" fill="#4F46E5" opacity="0.6" />
+  
+  <!-- Lupa para representar búsqueda/investigación (elemento visual clave) -->
+  <circle cx="400" cy="140" r="35" fill="none" stroke="#FFFFFF" stroke-width="12" />
+  <path d="M425 165 L450 190" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" />
+  
+  <!-- H para Hemeroteca -->
+  <path d="M180 110 L180 60 L180 85 L210 85 L210 60 L210 110" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+</svg>

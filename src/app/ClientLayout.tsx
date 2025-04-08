@@ -99,13 +99,14 @@ function Navbar() {
               >
                 <div className="relative w-8 h-8 sm:w-8 sm:h-8 md:w-10 md:h-10 overflow-hidden rounded-lg transform transition-transform group-hover:scale-105">
                   <Image
-                    src="/images/default_periodico.jpg"
-                    alt="Logo"
+                    src="/images/hemeroteca-logo.svg"
+                    alt="Hemeroteca Digital"
                     fill
-                    className="object-cover"
+                    className="object-contain"
+                    priority
                   />
                 </div>
-                <span className="ml-2 sm:ml-2 md:ml-3 text-white font-semibold text-sm sm:text-base md:text-lg hidden xs:block transform transition-all group-hover:scale-105">
+                <span className="ml-2 text-white font-semibold text-sm sm:text-base md:text-lg whitespace-nowrap">
                   Hemeroteca Digital
                 </span>
               </Link>

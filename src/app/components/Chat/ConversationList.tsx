@@ -135,14 +135,14 @@ const ConversationItem = ({ item, isSelected, onSelect, _currentUserId }: Conver
             />
           ) : (
             <Image 
-              src={conversation?.imageUrl || "/images/AvatarPredeterminado.webp"}
+              src={conversation?.imageUrl || (isGroup ? "/images/group-chat.svg" : "/images/AvatarPredeterminado.webp")}
               width={48}
               height={48}
               alt={conversation?.name || "Grupo"}
               className="h-full w-full object-cover"
               onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                 const target = e.target as HTMLImageElement;
-                target.src = "/images/AvatarPredeterminado.webp";
+                target.src = isGroup ? "/images/group-chat.svg" : "/images/AvatarPredeterminado.webp";
               }}
             />
           )

@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/src/app/components/ui/ava
 import { Button } from '@/src/app/components/ui/button';
 import { Textarea } from '@/src/app/components/ui/textarea';
 // Importar los iconos directamente desde Lucide React para mejor compatibilidad
-import { ArrowLeft, ArrowUp, Image as ImageIcon, Settings, X, Mic, Users } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Image as ImageIcon, Settings, X, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import LoadingSpinner from '@/src/app/components/ui/LoadingSpinner';
@@ -984,9 +984,7 @@ const OptimizedChatWindow = ({
               localConversationData?.imageUrl ? (
                 <AvatarImage src={localConversationData.imageUrl} alt={localConversationData.name || 'Grupo'} />
               ) : (
-                <AvatarFallback>
-                  <Users className="h-5 w-5" />
-                </AvatarFallback>
+                <AvatarImage src="/images/group-chat.svg" alt={localConversationData.name || 'Grupo'} />
               )
             ) : otherUser?.image ? (
               <AvatarImage src={otherUser.image} alt={otherUser.username || 'Usuario'} />

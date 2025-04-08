@@ -385,16 +385,16 @@ export default function DashboardPage() {
           <Link href="/home" className="flex items-center space-x-2">
             <div className="relative w-10 h-10">
               <Image
-                src="/images/default_periodico.jpg"
-                alt="Logo"
+                src="/images/hemeroteca-logo.svg"
+                alt="Logo de Hemeroteca Digital"
                 width={40}
                 height={40}
-                className="rounded-lg object-cover"
+                className="rounded-lg object-contain"
                 priority
               />
             </div>
             <span className="text-xl font-semibold text-blue-900 dark:text-white">
-              Hemeroteca
+              Hemeroteca Digital
             </span>
           </Link>
           <Button
@@ -539,17 +539,17 @@ export default function DashboardPage() {
               >
                 <div className="relative w-10 h-10">
                   <Image
-                    src="/images/default_periodico.jpg"
-                    alt="Logo"
+                    src="/images/hemeroteca-logo.svg"
+                    alt="Logo de Hemeroteca Digital"
                     width={40}
                     height={40}
-                    className="rounded-lg object-cover"
+                    className="rounded-lg object-contain"
                     priority
                   />
                 </div>
                 {isOpen && (
                   <span className="ml-3 text-xl font-semibold text-blue-900 dark:text-white">
-                    Hemeroteca
+                    Hemeroteca Digital
                   </span>
                 )}
               </Link>
