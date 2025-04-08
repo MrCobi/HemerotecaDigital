@@ -251,7 +251,7 @@ const useCounter = (end: number, duration: number = 2000) => {
   return count;
 };
 
-const TrendsSection = lazy(() => import('./TrendsSection'));
+const TrendsSection = lazy(() => import('../components/home/TrendsSection'));
 
 const HomePage = () => {
   const { data: session } = useSession();
