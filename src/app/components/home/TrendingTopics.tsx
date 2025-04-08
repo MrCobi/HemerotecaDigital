@@ -45,9 +45,10 @@ export function TrendingTopics() {
         {trendingTopics.map((topic, index) => (
           <motion.div
             key={topic.name}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1, duration: 0.3 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.1 }}
             className="space-y-2 group cursor-pointer"
           >
             <div className="flex items-center justify-between">
@@ -66,9 +67,10 @@ export function TrendingTopics() {
             <div className="h-1 w-full bg-muted/50 rounded-full overflow-hidden">
               <motion.div 
                 className="h-full bg-primary/70 rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, parseInt(topic.trend))}%` }}
-                transition={{ delay: 0.5 + index * 0.1, duration: 0.8 }}
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: `${Math.min(100, parseInt(topic.trend))}%`, opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ delay: 0.3 + index * 0.1, duration: 0.5 }}
               />
             </div>
           </motion.div>
