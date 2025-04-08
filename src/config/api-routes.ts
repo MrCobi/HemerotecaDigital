@@ -22,7 +22,8 @@ export const API_ROUTES = {
     },
     stats: "/api/users/stats",
     byUsername: (username: string) => `/api/users/by-username/${username}`,
-    suggestions: (query: string) => `/api/users/suggestions?query=${encodeURIComponent(query)}`,
+    suggestions: (query: string, page: number = 1, limit: number = 10, sortBy: string = "followers", order: string = "desc") => 
+      `/api/users/suggestions?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}&sortBy=${sortBy}&order=${order}`,
     followStatus: (ids: string[]) => `/api/users/follow-status?ids=${ids.join(",")}`,
     privacy: "/api/user/privacy"
   },

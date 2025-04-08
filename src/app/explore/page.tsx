@@ -11,6 +11,7 @@ import { API_ROUTES } from "@/src/config/api-routes";
 import { useRouter } from "next/navigation";
 import { useAnimationSettings, useConditionalAnimation, useConditionalTransition } from "../hooks/useAnimationSettings";
 import { UserCard } from "@/src/app/components/UserCard";
+import { UserIcon } from "lucide-react";
 
 type Stats = {
   followers?: number;
@@ -34,12 +35,15 @@ export default function ExplorePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 6;
   const [followingStatus, setFollowingStatus] = useState<
     Record<string, boolean>
   >({});
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [windowWidth, setWindowWidth] = useState(0);
+  const [sortBy, setSortBy] = useState("followers");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   // Obtener el estado de las animaciones
   const animationsEnabled = useAnimationSettings();
@@ -94,7 +98,7 @@ export default function ExplorePage() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedQuery(searchQuery);
-      setCurrentPage(1);
+      setCurrentPage(1); // Resetear a página 1 cuando cambia la búsqueda
     }, 300);
 
     return () => clearTimeout(handler);
@@ -106,7 +110,7 @@ export default function ExplorePage() {
       setError(null);
 
       const response = await fetch(
-        API_ROUTES.users.suggestions(debouncedQuery),
+        API_ROUTES.users.suggestions(debouncedQuery, currentPage, itemsPerPage, sortBy, sortOrder),
         {
           headers: { Authorization: `Bearer ${session?.user?.id}` },
         }
@@ -114,12 +118,15 @@ export default function ExplorePage() {
 
       if (!response.ok) throw new Error("Error loading suggestions");
 
-      const { data } = await response.json();
-      setUsers(data);
-
+      const data = await response.json();
+      setUsers(data.data);
+      
+      // Actualizar datos de paginación desde el backend
+      setTotalPages(data.pagination.totalPages);
+      
       // Check follow status for all users in one request
-      if (data.length > 0) {
-        const ids = data.map((user: User) => user.id);
+      if (data.data.length > 0) {
+        const ids = data.data.map((user: User) => user.id);
         const statusResponse = await fetch(API_ROUTES.users.followStatus(ids), {
           headers: { Authorization: `Bearer ${session?.user?.id}` },
         });
@@ -137,7 +144,7 @@ export default function ExplorePage() {
     } finally {
       setLoading(false);
     }
-  }, [session?.user?.id, toast, debouncedQuery]);
+  }, [session?.user?.id, toast, debouncedQuery, currentPage, itemsPerPage, sortBy, sortOrder]);
 
   useEffect(() => {
     if (session) loadSuggestions();
@@ -183,11 +190,25 @@ export default function ExplorePage() {
     setSearchQuery(e.target.value);
   };
 
-  const paginatedUsers = users.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-  const totalPages = Math.ceil(users.length / itemsPerPage);
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // No necesitamos recalcular los usuarios paginados aquí, 
+    // ya que loadSuggestions se disparará con el nuevo currentPage
+    window.scrollTo(0, 0);
+  };
+
+  const handleSortChange = (newSortBy: string) => {
+    if (sortBy === newSortBy) {
+      // Si ya está ordenado por este campo, cambiar la dirección de ordenación
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      // Si es un nuevo campo, establecerlo y restablecer la dirección a desc
+      setSortBy(newSortBy);
+      setSortOrder("desc");
+    }
+    // Volver a la primera página cuando cambia la ordenación
+    setCurrentPage(1);
+  };
 
   // Mostrar pantalla de carga mientras se verifica la sesión
   if (status === "loading") {
@@ -234,17 +255,71 @@ export default function ExplorePage() {
               </h1>
             </div>
 
-            <div className="w-full md:w-96 relative">
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none z-10">
-                <Search className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+            <div className="flex flex-col md:flex-row gap-4 mb-8">
+              <div className="relative flex-grow">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500 dark:text-gray-400">
+                  <Search className="h-5 w-5" />
+                </span>
+                <Input
+                  placeholder="Buscar por nombre, nombre de usuario o bio..."
+                  value={searchQuery}
+                  onChange={handleSearch}
+                  className="pl-10 pr-4 py-2 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
+                />
               </div>
-              <Input
-                type="text"
-                placeholder="Buscar por nombre, nombre de usuario o bio..."
-                value={searchQuery}
-                onChange={handleSearch}
-                className="pl-10 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-gray-200 dark:border-gray-700 focus-visible:ring-blue-500 dark:focus-visible:ring-blue-600 focus-visible:ring-offset-0 focus-visible:border-blue-300 dark:focus-visible:border-blue-700 transition-all"
-              />
+              
+              {/* Opciones de ordenación */}
+              <div className="flex flex-row gap-2">
+                <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg flex overflow-hidden">
+                  <button
+                    onClick={() => handleSortChange("followers")}
+                    className={`px-3 py-2 text-sm transition-colors flex items-center gap-1 ${
+                      sortBy === "followers"
+                        ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    <Users size={16} />
+                    Seguidores
+                    {sortBy === "followers" && (
+                      <span className="ml-1">
+                        {sortOrder === "desc" ? "↓" : "↑"}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleSortChange("name")}
+                    className={`px-3 py-2 text-sm transition-colors flex items-center gap-1 ${
+                      sortBy === "name"
+                        ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    <UserIcon size={16} />
+                    Nombre
+                    {sortBy === "name" && (
+                      <span className="ml-1">
+                        {sortOrder === "desc" ? "↓" : "↑"}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleSortChange("createdAt")}
+                    className={`px-3 py-2 text-sm transition-colors flex items-center gap-1 ${
+                      sortBy === "createdAt"
+                        ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    Más recientes
+                    {sortBy === "createdAt" && (
+                      <span className="ml-1">
+                        {sortOrder === "desc" ? "↓" : "↑"}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -276,12 +351,15 @@ export default function ExplorePage() {
                 transition={animationTransition}
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
               >
-                {paginatedUsers.map((user, _index) => (
+                {users.map((user) => (
                   <motion.div
                     key={user.id}
                     initial={animationVariants.hidden}
                     animate={animationVariants.visible}
-                    transition={animationTransition}
+                    transition={{
+                      ...animationTransition,
+                    }}
+                    className="w-full"
                   >
                     <UserCard
                       user={user}
@@ -299,6 +377,7 @@ export default function ExplorePage() {
                 ))}
               </motion.div>
 
+              {/* Solo mostrar paginación si hay más de una página */}
               {totalPages > 1 && (
                 <motion.div 
                   className="flex justify-center items-center gap-1 mt-8"
@@ -311,7 +390,7 @@ export default function ExplorePage() {
                     whileHover={animationsEnabled ? { scale: 1.05 } : {}}
                     whileTap={animationsEnabled ? { scale: 0.95 } : {}}
                     className="h-8 w-8 sm:h-9 sm:w-9 hidden sm:flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 relative z-10"
-                    onClick={() => setCurrentPage(1)}
+                    onClick={() => handlePageChange(1)}
                     disabled={currentPage === 1}
                   >
                     <span className="text-xs sm:text-sm font-bold">&lt;&lt;</span>
@@ -322,7 +401,7 @@ export default function ExplorePage() {
                     whileHover={animationsEnabled ? { scale: 1.05 } : {}}
                     whileTap={animationsEnabled ? { scale: 0.95 } : {}}
                     className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 relative z-10"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    onClick={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage === 1}
                   >
                     <span className="text-xs sm:text-sm font-bold">&lt;</span>
@@ -352,7 +431,7 @@ export default function ExplorePage() {
                       return (
                         <motion.button
                           key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
+                          onClick={() => handlePageChange(pageNum)}
                           whileHover={animationsEnabled ? { scale: 1.05 } : {}}
                           whileTap={animationsEnabled ? { scale: 0.95 } : {}}
                           className={`h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-md transition-all duration-200 ${
@@ -372,7 +451,7 @@ export default function ExplorePage() {
                     whileHover={animationsEnabled ? { scale: 1.05 } : {}}
                     whileTap={animationsEnabled ? { scale: 0.95 } : {}}
                     className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 relative z-10"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
                   >
                     <span className="text-xs sm:text-sm font-bold">&gt;</span>
@@ -383,7 +462,7 @@ export default function ExplorePage() {
                     whileHover={animationsEnabled ? { scale: 1.05 } : {}}
                     whileTap={animationsEnabled ? { scale: 0.95 } : {}}
                     className="h-8 w-8 sm:h-9 sm:w-9 hidden sm:flex items-center justify-center rounded-md bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 relative z-10"
-                    onClick={() => setCurrentPage(totalPages)}
+                    onClick={() => handlePageChange(totalPages)}
                     disabled={currentPage === totalPages}
                   >
                     <span className="text-xs sm:text-sm font-bold">&gt;&gt;</span>
