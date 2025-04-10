@@ -121,6 +121,6 @@ export const API_ROUTES = {
     popular: "/api/trends/popular"
   },
   external: {
-    news: "https://newsapi.org/v2/top-headlines?country=us&apiKey=da3db1fa448a49d9a84fbdd13e4d6098"
+    news: `https://newsapi.org/v2/top-headlines?country=us&apiKey=${process.env.NEXT_PUBLIC_NEWS_API_KEY || ''}`
   }
 };

@@ -281,6 +281,7 @@ const HomePage = () => {
   const [featuredArticles, setFeaturedArticles] = useState<Article[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [windowWidth, setWindowWidth] = useState(0);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
   
   // Obtener configuración de animaciones para aplicar a los componentes de framer-motion
   const _animationsEnabled = useAnimationSettings();
@@ -423,27 +424,39 @@ const HomePage = () => {
   useEffect(() => {
     const loadFollowingActivity = async () => {
       if (session?.user?.id) {
-        setIsLoadingFollowingActivity(true);
+        // Solo mostramos el indicador de carga en la primera carga
+        if (isFirstLoad) {
+          setIsLoadingFollowingActivity(true);
+        }
         try {
+          // Verificamos que la página no exceda el límite máximo
+          const maxPage = 10;
+          const safeCurrentPage = Math.min(currentPage, maxPage);
+          
           const response = await fetch(
-            API_ROUTES.activities.following(currentPage, itemsPerPage)
+            API_ROUTES.activities.following(safeCurrentPage, itemsPerPage)
           );
           if (response.ok) {
             const data = await response.json();
             if (Array.isArray(data.data)) {
               setFollowingActivity(data.data);
-              setTotalActivities(data.total);
+              // Limitamos el total de actividades a un máximo de 50 (10 páginas x 5 items)
+              const maxActivities = maxPage * itemsPerPage;
+              setTotalActivities(Math.min(data.total, maxActivities));
             }
           }
         } catch (error) {
           console.error("Error loading following activity:", error);
         } finally {
-          setIsLoadingFollowingActivity(false);
+          if (isFirstLoad) {
+            setIsLoadingFollowingActivity(false);
+            setIsFirstLoad(false);
+          }
         }
       }
     };
     loadFollowingActivity();
-  }, [session, currentPage]);
+  }, [session, currentPage, isFirstLoad]);
 
   useEffect(() => {
     setMounted(true);
@@ -525,7 +538,7 @@ const HomePage = () => {
   const PaginationControls = () => {
     // Limitar a un máximo de 10 páginas
     const maxPages = 10;
-    const calculatedTotalPages = Math.ceil(totalActivities / itemsPerPage) || 1;
+    const calculatedTotalPages = Math.ceil(Math.min(totalActivities, maxPages * itemsPerPage) / itemsPerPage) || 1;
     const totalPages = Math.min(calculatedTotalPages, maxPages);
 
     return (
@@ -544,14 +557,7 @@ const HomePage = () => {
           </button>
           
           <div className="flex justify-center items-center py-2 px-3 flex-1 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-center font-medium text-gray-700 dark:text-gray-300">
-            {isLoadingFollowingActivity ? (
-              <span className="flex items-center">
-                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin mr-1.5" />
-                Cargando...
-              </span>
-            ) : (
-              <span>Página {currentPage} de {totalPages}</span>
-            )}
+            <span>Página {currentPage} de {totalPages}</span>
           </div>
           
           <button
