@@ -48,30 +48,61 @@ export default function Pagination({
 
   return (
     <div className={cn("flex items-center justify-between px-4 py-3 sm:px-6", className)}>
-      <div className="flex flex-1 justify-between sm:hidden">
+      <div className="flex flex-1 items-center justify-center gap-1 sm:hidden">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
           className={cn(
-            "relative inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium",
+            "relative inline-flex items-center rounded-l-md border px-2 py-2 text-sm font-medium",
             currentPage === 1
               ? "border-border bg-muted text-muted-foreground cursor-not-allowed"
               : "border-border bg-background text-foreground hover:bg-muted/50 transition-colors"
           )}
+          aria-label="Anterior"
         >
-          Anterior
+          <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path
+              fillRule="evenodd"
+              d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+              clipRule="evenodd"
+            />
+          </svg>
         </button>
+        
+        {getPageNumbers().map((page) => (
+          <button
+            key={page}
+            onClick={() => onPageChange(page)}
+            aria-current={currentPage === page ? "page" : undefined}
+            className={cn(
+              "relative inline-flex items-center px-3 py-2 text-sm font-medium transition-colors",
+              currentPage === page
+                ? "z-10 bg-primary text-primary-foreground focus:z-20"
+                : "bg-background text-foreground hover:bg-muted/50 focus:z-20"
+            )}
+          >
+            {page}
+          </button>
+        ))}
+        
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
           className={cn(
-            "relative ml-3 inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium",
+            "relative inline-flex items-center rounded-r-md border px-2 py-2 text-sm font-medium",
             currentPage === totalPages
               ? "border-border bg-muted text-muted-foreground cursor-not-allowed"
               : "border-border bg-background text-foreground hover:bg-muted/50 transition-colors"
           )}
+          aria-label="Siguiente"
         >
-          Siguiente
+          <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path
+              fillRule="evenodd"
+              d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+              clipRule="evenodd"
+            />
+          </svg>
         </button>
       </div>
       <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
