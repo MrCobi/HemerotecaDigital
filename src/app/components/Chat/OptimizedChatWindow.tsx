@@ -366,7 +366,6 @@ const OptimizedChatWindow = ({
     sendingMessage,
     imageToSend,
     imagePreview,
-    uploadProgress,
     
     setNewMessageContent,
     handleSendMessage: originalHandleSendMessage,
@@ -1170,47 +1169,37 @@ const OptimizedChatWindow = ({
       <div className="p-3 border-t flex flex-col">
         {/* Vista previa de imagen seleccionada */}
         {imagePreview && (
-          <div className="mb-2 relative">
-            <div
-              className="relative w-24 h-24 overflow-hidden rounded-md border border-gray-300 dark:border-gray-700"
-            >
-              {imagePreview.startsWith('data:') || imagePreview.startsWith('blob:') ? (
-                <CldImage
-                  src={imagePreview}
-                  alt="Preview"
-                  className="w-full h-full object-cover"
+          <div className="p-2 border-t dark:border-gray-700">
+            <div className="relative inline-block">
+              {imagePreview.includes('cloudinary.com') ? (
+                <CldImage 
+                  src={extractCloudinaryId(imagePreview)}
+                  alt="Vista previa" 
                   width={150}
                   height={150}
+                  quality={80}
+                  className="max-h-40 rounded-md"
                 />
               ) : (
-                <NextImage
-                  src={imagePreview ?? ''}
-                  alt="Preview"
-                  fill
-                  style={{ objectFit: 'cover' }}
-                  
+                <NextImage 
+                  src={imagePreview} 
+                  alt="Vista previa" 
+                  className="max-h-40 max-w-full rounded-md"
+                  width={150}
+                  height={150}
                 />
               )}
               <Button
                 variant="destructive"
                 size="icon"
-                className="absolute top-0 right-0 h-6 w-6 rounded-full"
+                className="absolute top-0 right-0 h-7 w-7 rounded-full bg-red-500 hover:bg-red-600 p-1 text-white shadow-md transform transition-transform duration-200 hover:scale-110 border-2 border-white"
                 onClick={() => handleImageChange(null)}
+                aria-label="Eliminar imagen"
+                title="Eliminar imagen"
               >
-                <X className="h-3 w-3" />
+                <X className="h-4 w-4" strokeWidth={2.5} />
               </Button>
             </div>
-            {uploadProgress > 0 && uploadProgress < 100 && (
-              <div className="mt-1 w-24">
-                <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-                <span className="text-xs text-gray-500">{uploadProgress}%</span>
-              </div>
-            )}
           </div>
         )}
         
@@ -1282,5 +1271,21 @@ const OptimizedChatWindow = ({
 };
 
 OptimizedChatWindow.displayName = 'OptimizedChatWindow';
+
+// Función para extraer el ID de Cloudinary de una URL completa
+function extractCloudinaryId(url: string): string {
+  if (!url) return '';
+  
+  if (url.includes('cloudinary.com')) {
+    // Intentar extraer el ID basado en el formato de URL de Cloudinary
+    const match = url.match(/\/v\d+\/([^/]+)\.\w+$/);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  // Si no se puede extraer, devolver la URL original
+  return url;
+}
 
 export default OptimizedChatWindow;

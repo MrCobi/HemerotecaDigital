@@ -9,6 +9,7 @@ import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { es as _es } from 'date-fns/locale';
 import { default as _Image } from 'next/image';
 import { CldImage } from 'next-cloudinary';
+import Image from 'next/image';
 import { useRef as _useRef, useState, useEffect as _useEffect, useCallback as _useCallback } from 'react';
 // Importar los iconos necesarios
 import { ArrowLeft, ArrowUp, ImageIcon, Settings, X, Mic } from 'lucide-react';
@@ -301,9 +302,9 @@ const PrivateChatWindow = ({
 
   // Estado para manejar la imagen seleccionada
   const [_image, _setImage] = useState<File | null>(null);
-  const [imagePreview, _setImagePreview] = useState<string | null>(null);
+  const [_imagePreview, _setImagePreview] = useState<string | null>(null);
   const [_uploadProgress, _setUploadProgress] = useState(0);
-  const [previewUseCloudinary, setPreviewUseCloudinary] = useState(true);
+  const [_previewUseCloudinary, _setPreviewUseCloudinary] = useState(true);
 
   // Usar el hook personalizado para manejar la lógica del chat
   const {
@@ -313,13 +314,13 @@ const PrivateChatWindow = ({
     newMessageContent,
     sendingMessage,
     imageToSend,
-    imagePreview: _imagePreview,
+    imagePreview: chatImagePreview, // Renombramos para evitar confusión
     uploadProgress: _uploadProgressChat,
     hasMutualFollow,
     
     setNewMessageContent,
     handleSendMessage,
-    handleImageChange,
+    handleImageChange, // Esta es la función que necesitamos usar
     loadMoreMessages,
     handleScroll,
     
@@ -338,49 +339,6 @@ const PrivateChatWindow = ({
   const isInitialLoadRef = React.useRef(true);
   // Referencia para almacenar el último ID de conversación procesado
   const lastProcessedConversationRef = React.useRef<string | null>(null);
-
-  // Función para cargar mensajes más antiguos
-  const handleLoadMoreMessages = React.useCallback(async () => {
-    setLoadingOlderMessages(true);
-    try {
-      // Guardar la posición de scroll actual para mantenerla después de cargar nuevos mensajes
-      const scrollContainer = messagesContainerRef.current;
-      const scrollHeight = scrollContainer?.scrollHeight || 0;
-      const scrollTop = scrollContainer?.scrollTop || 0;
-      
-      // Llamar a la función de cargar más mensajes del hook
-      await loadMoreMessages();
-      
-      // Restaurar la posición de scroll (con un pequeño retraso para permitir el renderizado)
-      setTimeout(() => {
-        if (scrollContainer) {
-          const newScrollHeight = scrollContainer.scrollHeight;
-          const heightDifference = newScrollHeight - scrollHeight;
-          scrollContainer.scrollTop = scrollTop + heightDifference;
-        }
-      }, 100);
-    } catch (error) {
-      console.error('Error al cargar mensajes más antiguos:', error);
-    } finally {
-      setLoadingOlderMessages(false);
-    }
-  }, [loadMoreMessages, messagesContainerRef]);
-
-  // Manejar cambio de texto en el input
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setNewMessageContent(e.target.value);
-  };
-
-  // Manejar selección de archivo
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    handleImageChange(file);
-  };
-
-  // Abrir selector de archivos
-  const openFileSelector = () => {
-    imageInputRef.current?.click();
-  };
 
   // Obtener el otro usuario de la conversación (para chats privados)
   const otherUser = React.useMemo(() => {
@@ -428,12 +386,6 @@ const PrivateChatWindow = ({
     // Si llegamos hasta aquí, no pudimos encontrar al otro usuario
     return null;
   }, [conversation, currentUserId]);
-
-  // Iniciar grabación de voz
-  const handleStartVoiceRecording = React.useCallback(() => {
-    setShowVoiceRecorder(true);
-    startRecording();
-  }, [startRecording]);
 
   // Función para enviar mensajes de voz
   const sendVoiceMessage = React.useCallback(async (blob: Blob) => {
@@ -653,6 +605,64 @@ const PrivateChatWindow = ({
     }
   }, [conversationId, fetchConversations]);
 
+  // Función para cargar mensajes más antiguos
+  const handleLoadMoreMessages = React.useCallback(async () => {
+    setLoadingOlderMessages(true);
+    try {
+      // Guardar la posición de scroll actual para mantenerla después de cargar nuevos mensajes
+      const scrollContainer = messagesContainerRef.current;
+      const scrollHeight = scrollContainer?.scrollHeight || 0;
+      const scrollTop = scrollContainer?.scrollTop || 0;
+      
+      // Llamar a la función de cargar más mensajes del hook
+      await loadMoreMessages();
+      
+      // Restaurar la posición de scroll (con un pequeño retraso para permitir el renderizado)
+      setTimeout(() => {
+        if (scrollContainer) {
+          const newScrollHeight = scrollContainer.scrollHeight;
+          const heightDifference = newScrollHeight - scrollHeight;
+          scrollContainer.scrollTop = scrollTop + heightDifference;
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Error al cargar mensajes más antiguos:', error);
+    } finally {
+      setLoadingOlderMessages(false);
+    }
+  }, [loadMoreMessages, messagesContainerRef]);
+
+  // Manejar cambio de texto en el input
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNewMessageContent(e.target.value);
+  };
+
+  // Función para abrir el selector de archivos
+  const openFileSelector = React.useCallback(() => {
+    if (imageInputRef.current) {
+      imageInputRef.current.click();
+    }
+  }, []);
+  
+  // Función para manejar la selección de archivos
+  const handleFileSelect = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImageChange(file); // Usamos la función del hook useChatContent
+    }
+    
+    // Resetear input para permitir seleccionar el mismo archivo nuevamente
+    if (e.target) {
+      e.target.value = '';
+    }
+  }, [handleImageChange]);
+
+  // Iniciar grabación de voz
+  const handleStartVoiceRecording = React.useCallback(() => {
+    setShowVoiceRecorder(true);
+    startRecording();
+  }, [startRecording]);
+
   // Mostrar un mensaje si no hay conversación seleccionada
   if (!conversationId || !conversation) {
     return (
@@ -817,56 +827,40 @@ const PrivateChatWindow = ({
       </div>
 
       {/* Previsualización de imagen */}
-      {imagePreview && (
+      {chatImagePreview && (
         <div className="p-2 border-t dark:border-gray-700">
           <div className="relative inline-block">
-            {imagePreview && imagePreview.includes('cloudinary.com') && previewUseCloudinary ? (
+            {chatImagePreview && chatImagePreview.includes('cloudinary.com') ? (
               <CldImage 
-                src={extractCloudinaryId(imagePreview)}
+                src={extractCloudinaryId(chatImagePreview)}
                 alt="Vista previa" 
                 className="max-h-40 max-w-full rounded-lg"
                 width={150}
                 height={150}
                 quality={100}
-                onError={() => {
-                  console.log("Error cargando imagen de Cloudinary, usando fallback");
-                  setPreviewUseCloudinary(false);
-                }}
-              />
-            ) : imagePreview && (imagePreview.startsWith('data:') || imagePreview.startsWith('blob:')) ? (
-              <CldImage 
-                src={extractCloudinaryId(imagePreview)}
-                alt="Vista previa" 
-                className="max-h-40 max-w-full rounded-lg"
-                width={150}
-                height={150}
-                quality={100}
-                onError={() => {
-                  console.log("Error cargando imagen de Cloudinary, usando fallback");
-                  setPreviewUseCloudinary(false);
-                }}
               />
             ) : (
-              <NextImage 
-                src={imagePreview} 
+              <Image 
+                src={chatImagePreview} 
+                unoptimized={true}
                 alt="Vista previa" 
                 className="max-h-40 max-w-full rounded-lg"
                 width={150}
                 height={150}
-                quality={100}
-                unoptimized={true}
               />
             )}
             <button
               onClick={() => handleImageChange(null)}
-              className="absolute top-1 right-1 bg-gray-800 bg-opacity-70 rounded-full p-1 text-white"
+              className="absolute top-0 right-0 bg-red-500 hover:bg-red-600 rounded-full p-1.5 text-white shadow-md transform transition-transform duration-200 hover:scale-110 border-2 border-white"
+              aria-label="Eliminar imagen"
+              title="Eliminar imagen"
             >
-              <X size={16} className="text-white" />
+              <X size={18} className="text-white" strokeWidth={2.5} />
             </button>
           </div>
         </div>
       )}
-
+      
       {/* Reproductor de audio oculto */}
       <audio ref={audioRef} className="hidden" />
       
