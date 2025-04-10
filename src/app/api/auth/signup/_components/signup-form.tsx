@@ -180,8 +180,8 @@ export default function SignupForm() {
   ), [passwordStrength]);
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900">
-      <div className="w-full max-w-7xl mx-auto lg:flex lg:flex-row justify-between items-start p-6 sm:p-12 dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900">
+    <div className="min-h-screen overflow-x-hidden dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900">
+      <div className="max-w-7xl mx-auto lg:flex lg:flex-row justify-between items-start p-6 sm:p-12 dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900">
         {/* Formulario de registro */}
         <div className="w-full lg:w-1/2 flex flex-col justify-center items-center">
           <div className="w-full max-w-md">
@@ -417,13 +417,13 @@ export default function SignupForm() {
                             </div>
                           )}
                         </div>
-                        <label className="bg-white dark:bg-gray-800 py-2 px-3 border border-gray-300 dark:border-gray-700 dark:text-blue-200 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-blue-200 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                        <label className="bg-white dark:bg-gray-800 py-2 px-3 border border-gray-300 dark:border-gray-700 dark:text-blue-200 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-blue-200 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer max-w-full whitespace-normal text-center">
                           Seleccionar imagen
                           <Input
                             type="file"
                             accept="image/*"
                             onChange={handleFileChange}
-                            className="sr-only"
+                            className="hidden"
                           />
                         </label>
                       </div>

@@ -19,7 +19,7 @@ export default function SignUpPage() {
   }, [session, router]);
 
   return (
-    <main className="overflow-x-hidden">
+    <main className="overflow-x-hidden max-w-full">
       <SignUpForm />
     </main>
   );
