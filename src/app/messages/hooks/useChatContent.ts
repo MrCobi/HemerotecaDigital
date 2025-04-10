@@ -234,13 +234,7 @@ export function useChatContent(
   // Auto-marcar mensajes como leídos cuando la conversación cambia o se carga
   useEffect(() => {
     if (conversationId && messages.length > 0 && !loading) {
-      // Pequeño retraso para asegurar que la UI se haya renderizado
-      const timer = setTimeout(() => {
-        // Marcar mensajes como leídos en el servidor, pero sin actualizar la UI con duplicados
-        markAllMessagesAsRead();
-      }, 1000);
-      
-      return () => clearTimeout(timer);
+      markAllMessagesAsRead();
     }
   }, [conversationId, messages.length, loading, markAllMessagesAsRead]);
 
@@ -273,20 +267,28 @@ export function useChatContent(
     return (statusPriority[newStatus] || 0) > (statusPriority[currentStatus] || 0);
   }, []);
 
-  // Registro de mensajes procesados para evitar duplicaciones
-  const processedMessagesRef = useRef<Set<string>>(new Set());
+  // Registro de mensajes procesados para evitar duplicaciones - Cambiamos a un Map para guardar también timestamp
+  const processedMessagesRef = useRef<Map<string, number>>(new Map());
   
   // Función para añadir un nuevo mensaje a la lista
   const addNewMessage = useCallback((newMessage: Message) => {
-    // Verificación de duplicados usando una referencia persistente
+    // Verificación mejorada de duplicados
     if (newMessage.id && processedMessagesRef.current.has(newMessage.id)) {
       console.log(`[useChatContent] Ignorando mensaje duplicado con ID: ${newMessage.id}`);
       return; // No procesar el mismo mensaje dos veces
     }
     
     if (newMessage.id) {
-      // Registrar este ID para evitar duplicaciones
-      processedMessagesRef.current.add(newMessage.id);
+      // Registrar este ID con timestamp para mejor manejo de duplicados
+      processedMessagesRef.current.set(newMessage.id, Date.now());
+      
+      // Limpieza de mensajes procesados más antiguos que 5 minutos para evitar crecimiento excesivo
+      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+      processedMessagesRef.current.forEach((timestamp, msgId) => {
+        if (timestamp < fiveMinutesAgo) {
+          processedMessagesRef.current.delete(msgId);
+        }
+      });
     }
     
     console.log('[useChatContent] Añadiendo mensaje:', newMessage);
@@ -823,8 +825,8 @@ export function useChatContent(
       // Unirse a la conversación
       joinConversation(stableConversationId);
       
-      // Cargar mensajes iniciales
-      fetchMessages();
+      // Ya no cargamos los mensajes aquí para evitar duplicados
+      // fetchMessages se llamará desde el segundo useEffect
       
       // Obtener participantes si es necesario
       if (!participants || participants.length === 0) {
@@ -864,12 +866,24 @@ export function useChatContent(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, connected, session?.user?.id]);
 
+  // Control de carga único por conversación para prevenir cargas dobles
+  const loadedConversationsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!conversationId || !session?.user?.id) return;
     
-    // Prevenir cargas duplicadas o innecesarias
-    const currentConvId = conversationId;
-    firstLoadRef.current = true;
+    // Prevenir cargas duplicadas verificando si ya se cargó esta conversación
+    const isAlreadyLoaded = loadedConversationsRef.current.has(conversationId);
+    console.log(`[useChatContent] Verificando carga de conversación ${conversationId} - Ya cargada: ${isAlreadyLoaded}, Mensajes actuales: ${messages.length}`);
+
+    // Reiniciar el estado cuando cambia la conversación
+    if (!isAlreadyLoaded) {
+      // Limpiar mensajes anteriores al cambiar de conversación
+      setMessages([]);
+      setLoading(true);
+      firstLoadRef.current = true;
+      console.log(`[useChatContent] Nueva conversación ${conversationId} - Iniciando carga inicial`);
+    }
     
     // Evitar múltiples cargas
     const controller = new AbortController();
@@ -877,19 +891,28 @@ export function useChatContent(
       try {
         if (!readStatusRef.current) readStatusRef.current = {};
         
-        // Solo cargar si no hemos cargado ya para esta conversación
-        if (messages.length === 0 || messages[0]?.conversationId !== currentConvId) {
+        // Solo cargar mensajes si:
+        // 1. No hemos cargado antes esta conversación O
+        // 2. La conversación cambió y necesitamos nuevos mensajes
+        if (!isAlreadyLoaded || messages.length === 0) {
+          console.log(`[useChatContent] Cargando mensajes para conversación ${conversationId}`);
           await fetchMessages();
+          // Marcar esta conversación como cargada después de completar fetchMessages
+          loadedConversationsRef.current.add(conversationId);
+        } else {
+          console.log(`[useChatContent] Omitiendo carga de mensajes para conversación ${conversationId} - Ya cargada`);
         }
         
         // Solo cargar participantes si es necesario
-        if (!readStatusRef.current[currentConvId]) {
+        if (!readStatusRef.current[conversationId]) {
           await fetchParticipants();
         }
       } catch (error) {
         if (!(error instanceof DOMException && error.name === 'AbortError')) {
           console.error('Error cargando datos:', error);
         }
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -1337,6 +1360,24 @@ export function useChatContent(
     }
   }, [messages, scrollToBottom]);
 
+  // Hook useEffect para limpiar el Set de mensajes procesados cuando cambia la conversación
+  useEffect(() => {
+    // Limpiar la caché de mensajes procesados cuando cambiamos de conversación
+    // pero preservar los del grupo o conversación actual
+    if (conversationId) {
+      const currentConversationMessages = new Map<string, number>();
+      
+      // Solo preservar mensajes de la conversación actual
+      messages.forEach(msg => {
+        if (msg.id) {
+          currentConversationMessages.set(msg.id, Date.now());
+        }
+      });
+      
+      processedMessagesRef.current = currentConversationMessages;
+    }
+  }, [conversationId, messages]);
+
   return {
     messages,
     loading,
@@ -1360,6 +1401,7 @@ export function useChatContent(
     messagesEndRef,
     messagesContainerRef,
     sendVoiceMessage,
-    markNewMessageAsRead
+    markNewMessageAsRead,
+    markAllMessagesAsRead, // Exportando la función para que esté disponible en los componentes
   };
 }

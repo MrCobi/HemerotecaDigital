@@ -376,7 +376,7 @@ const OptimizedChatWindow = ({
     
     messagesEndRef,
     messagesContainerRef,
-    markNewMessageAsRead,
+    markAllMessagesAsRead,
   } = useChatContent(conversation, conversationId);
 
   // Extraer el otherUser del conversation
@@ -390,6 +390,9 @@ const OptimizedChatWindow = ({
   
   // Estado para forzar actualizaciones específicas en la UI
   const [_forceUpdate, setForceUpdate] = React.useState(0);
+  
+  // Referencia para almacenar el último ID de conversación procesado
+  const lastProcessedConversationRef = React.useRef<string | null>(null);
   
   // Efecto para mantener sincronizada la información de la conversación actual
   React.useEffect(() => {
@@ -669,23 +672,65 @@ const OptimizedChatWindow = ({
     isFirstLoadRef.current = true;
   }, [conversationId]);
 
-  // Efecto para marcar mensajes como leídos cuando llegan nuevos
+  // Efecto para marcar mensajes como leídos inmediatamente al montar el componente
   React.useEffect(() => {
-    // Solo marcar mensajes si hay mensajes y no están en carga
-    if (messages.length > 0 && !loading) {
-      // Marcar todos los mensajes que no son del usuario actual
-      const unreadMessages = messages.filter(
-        msg => !msg.read && msg.senderId !== currentUserId && msg.id
-      );
+    // Solo ejecutar si hay un ID de conversación, no estamos cargando y hay mensajes
+    if (conversationId && !loading && messages.length > 0) {
+      // Verificar si ya procesamos esta conversación
+      const isSameConversation = lastProcessedConversationRef.current === conversationId;
       
-      // Marcar cada mensaje no leído
-      unreadMessages.forEach(msg => {
-        if (msg.id) {
-          markNewMessageAsRead(msg.id, msg.senderId);
-        }
-      });
+      // Solo continuar si es la carga inicial o una nueva conversación
+      if (isFirstLoadRef.current || !isSameConversation) {
+        console.log(`[OptimizedChatWindow] Procesando nueva conversación: ${conversationId}, isInitial=${isFirstLoadRef.current}`);
+        
+        // Actualizar el estado de inicialización y la última conversación procesada
+        isFirstLoadRef.current = false;
+        lastProcessedConversationRef.current = conversationId;
+        
+        // Usar markAllMessagesAsRead en lugar de procesar cada mensaje individualmente
+        // Esto evita la sobrecarga de peticiones HTTP que causa el error "net::ERR_INSUFFICIENT_RESOURCES"
+        markAllMessagesAsRead();
+        
+        // Notificar a través de un evento que se ha leído la conversación
+        const event = new CustomEvent('conversation-read', {
+          detail: { conversationId }
+        });
+        window.dispatchEvent(event);
+        
+        console.log(`[OptimizedChatWindow] Primera carga completada para conversación: ${conversationId}`);
+      } else {
+        console.log(`[OptimizedChatWindow] Evitando procesamiento duplicado para conversación: ${conversationId}`);
+      }
     }
-  }, [messages, loading, currentUserId, markNewMessageAsRead]);
+    
+    // Limpieza del efecto - solo reiniciar cuando cambia realmente la conversación
+    return () => {
+      if (conversationId && conversationId !== lastProcessedConversationRef.current) {
+        console.log(`[OptimizedChatWindow] Limpiando efecto para nueva conversación: ${conversationId} (anterior: ${lastProcessedConversationRef.current})`);
+        isFirstLoadRef.current = true;
+      }
+    };
+  }, [conversationId, loading, messages, markAllMessagesAsRead]);
+  
+  // Efecto adicional para manejar actualizaciones de unreadCount
+  React.useEffect(() => {
+    // Función para actualizar la lista de conversaciones cuando se marca como leída
+    const handleConversationRead = (event: CustomEvent) => {
+      const { conversationId: readConversationId } = event.detail;
+      if (readConversationId === conversationId) {
+        // Podemos disparar un evento para recargar la lista de conversaciones si es necesario
+        // O implementar alguna lógica específica del componente
+        console.log('[OptimizedChatWindow] Conversación marcada como leída:', readConversationId);
+      }
+    };
+
+    // Registrar listener para el evento conversation-read
+    window.addEventListener('conversation-read', handleConversationRead as EventListener);
+    
+    return () => {
+      window.removeEventListener('conversation-read', handleConversationRead as EventListener);
+    };
+  }, [conversationId]);
 
   // Iniciar grabación de voz
   const handleStartVoiceRecording = React.useCallback(() => {

@@ -310,22 +310,22 @@ const PrivateChatWindow = ({
     messages,
     loading,
     error,
-    hasMoreMessages: _hasMoreMessages,
     newMessageContent,
     sendingMessage,
-    hasMutualFollow,
     imageToSend,
+    imagePreview: _imagePreview,
     uploadProgress: _uploadProgressChat,
+    hasMutualFollow,
     
     setNewMessageContent,
     handleSendMessage,
     handleImageChange,
-    loadMoreMessages: _loadMoreMessages,
+    loadMoreMessages,
     handleScroll,
     
     messagesEndRef,
     messagesContainerRef,
-    markNewMessageAsRead,
+    markAllMessagesAsRead,
   } = useChatContent(conversation, conversationId);
 
   // Estado para controlar la carga de mensajes más antiguos
@@ -333,6 +333,11 @@ const PrivateChatWindow = ({
 
   // Estado para controlar la visibilidad del modal de gestión de chat privado
   const [isManagementModalOpen, setIsManagementModalOpen] = React.useState(false);
+
+  // Referencia para controlar si es la primera carga
+  const isInitialLoadRef = React.useRef(true);
+  // Referencia para almacenar el último ID de conversación procesado
+  const lastProcessedConversationRef = React.useRef<string | null>(null);
 
   // Función para cargar mensajes más antiguos
   const handleLoadMoreMessages = React.useCallback(async () => {
@@ -344,7 +349,7 @@ const PrivateChatWindow = ({
       const scrollTop = scrollContainer?.scrollTop || 0;
       
       // Llamar a la función de cargar más mensajes del hook
-      await _loadMoreMessages();
+      await loadMoreMessages();
       
       // Restaurar la posición de scroll (con un pequeño retraso para permitir el renderizado)
       setTimeout(() => {
@@ -359,7 +364,7 @@ const PrivateChatWindow = ({
     } finally {
       setLoadingOlderMessages(false);
     }
-  }, [_loadMoreMessages, messagesContainerRef]);
+  }, [loadMoreMessages, messagesContainerRef]);
 
   // Manejar cambio de texto en el input
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -586,23 +591,67 @@ const PrivateChatWindow = ({
     setRecordingTime(hookRecordingTime);
   }, [hookRecordingTime]);
 
-  // Efecto para marcar mensajes como leídos cuando se abren o llegan nuevos
+  // Efecto para marcar mensajes como leídos al entrar en la conversación
   React.useEffect(() => {
-    // Solo marcar mensajes si hay mensajes y no están en carga
-    if (messages.length > 0 && !loading) {
-      // Marcar todos los mensajes que no son del usuario actual
-      const unreadMessages = messages.filter(
-        msg => !msg.read && msg.senderId !== session?.user?.id && msg.id
-      );
+    // Solo ejecutar si hay un ID de conversación, no estamos cargando y hay mensajes
+    if (conversationId && !loading && messages.length > 0) {
+      // Verificar si ya procesamos esta conversación
+      const isSameConversation = lastProcessedConversationRef.current === conversationId;
       
-      // Marcar cada mensaje no leído
-      unreadMessages.forEach(msg => {
-        if (msg.id) {
-          markNewMessageAsRead(msg.id, msg.senderId);
-        }
-      });
+      // Solo continuar si es la carga inicial o una nueva conversación
+      if (isInitialLoadRef.current || !isSameConversation) {
+        console.log(`[PrivateChatWindow] Procesando nueva conversación: ${conversationId}, isInitial=${isInitialLoadRef.current}`);
+        
+        // Actualizar el estado de inicialización y la última conversación procesada
+        isInitialLoadRef.current = false;
+        lastProcessedConversationRef.current = conversationId;
+        
+        // Usar markAllMessagesAsRead en lugar de hacerlo individualmente para evitar
+        // sobrecarga de peticiones y el error "net::ERR_INSUFFICIENT_RESOURCES"
+        markAllMessagesAsRead();
+        
+        // Y también notificar a través de un evento que se ha leído la conversación
+        // para actualizar la lista de conversaciones en tiempo real
+        const event = new CustomEvent('conversation-read', {
+          detail: { conversationId }
+        });
+        window.dispatchEvent(event);
+        
+        console.log(`[PrivateChatWindow] Primera carga completada para conversación: ${conversationId}`);
+      } else {
+        console.log(`[PrivateChatWindow] Evitando procesamiento duplicado para conversación: ${conversationId}`);
+      }
     }
-  }, [messages, loading, session?.user?.id, markNewMessageAsRead]);
+    
+    // Limpieza del efecto - solo reiniciar cuando cambia realmente la conversación
+    return () => {
+      if (conversationId && conversationId !== lastProcessedConversationRef.current) {
+        console.log(`[PrivateChatWindow] Limpiando efecto para nueva conversación: ${conversationId} (anterior: ${lastProcessedConversationRef.current})`);
+        isInitialLoadRef.current = true;
+      }
+    };
+  }, [conversationId, loading, messages, markAllMessagesAsRead]);
+
+  // Efecto adicional para manejar actualizaciones de unreadCount
+  React.useEffect(() => {
+    if (conversationId && fetchConversations) {
+      // Función para actualizar la lista de conversaciones cuando se marca como leída
+      const handleConversationRead = (event: CustomEvent) => {
+        const { conversationId: readConversationId } = event.detail;
+        if (readConversationId === conversationId) {
+          // Refrescar la lista de conversaciones para actualizar contadores
+          fetchConversations(true, false);
+        }
+      };
+
+      // Registrar listener para el evento conversation-read
+      window.addEventListener('conversation-read', handleConversationRead as EventListener);
+      
+      return () => {
+        window.removeEventListener('conversation-read', handleConversationRead as EventListener);
+      };
+    }
+  }, [conversationId, fetchConversations]);
 
   // Mostrar un mensaje si no hay conversación seleccionada
   if (!conversationId || !conversation) {

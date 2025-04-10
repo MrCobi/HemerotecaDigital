@@ -260,14 +260,39 @@ const ConversationList = React.memo(({
   showHeader = true,
   showFilters = true,
   showSearchInput = true,
-  currentPage,
-  totalPages,
-  totalConversations,
+  currentPage = 1,
+  totalPages = 1,
+  totalConversations = 0,
   onPageChange,
-  itemsPerPage,
-  loadingPage
+  itemsPerPage = 20,
+  loadingPage = false,
 }: ConversationListProps) => {
   
+  // Referencia para mantener la lista previa de conversaciones
+  const prevConversationsRef = React.useRef<CombinedItem[]>([]);
+  // Estado para controlar si es la primera carga
+  const [isInitialLoad, setIsInitialLoad] = React.useState(true);
+  
+  // Efecto para controlar el estado de carga inicial vs actualizaciones
+  React.useEffect(() => {
+    if (loading) {
+      // Si la lista está vacía, es una carga inicial
+      if (combinedList.length === 0 && prevConversationsRef.current.length === 0) {
+        setIsInitialLoad(true);
+      } else {
+        // Si ya tenemos datos, es una actualización
+        setIsInitialLoad(false);
+      }
+    } else {
+      // Cuando termina la carga, actualizamos la referencia
+      prevConversationsRef.current = combinedList;
+      // Y si era carga inicial, la marcamos como completada
+      if (isInitialLoad && combinedList.length > 0) {
+        setIsInitialLoad(false);
+      }
+    }
+  }, [loading, combinedList, isInitialLoad]);
+
   // Filtrar las conversaciones según los criterios seleccionados
   const filteredConversations = useMemo(() => {
     // Ya no filtramos nada localmente, usamos directamente lo que viene del backend
@@ -420,7 +445,7 @@ const ConversationList = React.memo(({
 
       {/* Lista de conversaciones */}
       <div className="flex-1 overflow-y-auto">
-        {loading ? (
+        {loading && isInitialLoad ? (
           <div className="h-full flex items-center justify-center">
             <LoadingSpinner size="medium" />
           </div>

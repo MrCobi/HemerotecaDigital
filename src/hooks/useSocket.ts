@@ -171,6 +171,7 @@ export default function useSocket(options: UseSocketOptions) {
   // Use a properly typed ref for the socket that points to the global instance
   const socketRef = useRef<Socket | null>(null);
   const instanceId = useRef<number>(++socketInitCount);
+  const hasInitSocket = useRef<boolean>(false); // Nueva ref para controlar la inicialización una sola vez
   
   // Refs para callbacks y estado interno
   const callbacksRef = useRef({
@@ -615,52 +616,159 @@ export default function useSocket(options: UseSocketOptions) {
     console.log(`[Socket] Fuera de la conversación: ${conversationId}, Restantes: ${activeConversations.current.size}`);
   }, [userId]);
 
-  // Configurar y limpiar el socket
+  // Efecto principal para inicializar y limpiar el socket
   useEffect(() => {
-    console.log(`[Socket] Inicializando hook useSocket para usuario: ${userId || 'no autenticado'}`);
-    
-    // Capturar el valor de instanceId al principio del efecto
+    // Capturamos el valor actual de instanceId al inicio del efecto para usarlo en la limpieza
     const currentInstanceId = instanceId.current;
+
+    // Si ya inicializamos el socket en esta instancia, no lo hacemos de nuevo
+    if (hasInitSocket.current) {
+      console.log(`[Socket ${currentInstanceId}] Socket ya inicializado en esta instancia, omitiendo nueva inicialización`);
+      return;
+    }
+
+    // Verificar si tenemos lo necesario para inicializar la conexión
+    if (!userId) {
+      console.log(`[Socket ${currentInstanceId}] No se puede inicializar sin userId`);
+      return;
+    }
+
+    console.log(`[Socket ${currentInstanceId}] Inicializando socket para userId: ${userId}`);
+    hasInitSocket.current = true;
     
-    // Conectar socket
+    // Función para limpieza global
+    const cleanupSocket = () => {
+      // Limpieza más robusta al desmontar el componente
+      if (socketRef.current) {
+        console.log(`[Socket ${currentInstanceId}] Limpiando recursos del socket...`);
+        
+        // Limpieza de timeouts
+        if (inactivityTimeout.current) {
+          clearTimeout(inactivityTimeout.current);
+          inactivityTimeout.current = null;
+        }
+        
+        if (reconnectTimeout.current) {
+          clearTimeout(reconnectTimeout.current);
+          reconnectTimeout.current = null;
+        }
+        
+        // Limpieza de reintentos de mensajes
+        Object.keys(messageRetryTimeouts.current).forEach(msgId => {
+          clearTimeout(messageRetryTimeouts.current[msgId]);
+          delete messageRetryTimeouts.current[msgId];
+        });
+        
+        // Desconectar el socket actual
+        stopHeartbeat();
+        if (socketRef.current !== globalSocket) {
+          // Solo desconectamos si no es el socket global
+          socketRef.current.disconnect();
+        }
+        
+        socketRef.current = null;
+        setConnected(false);
+      }
+    };
+
+    // Inicializar el socket (ahora fuera del setTimeout para mejorar respuesta inicial)
     initSocket();
     
-    // Configurar eventos 
-    setupEventHandlers();
+    // Limpiar cuando el componente se desmonte
+    return () => {
+      console.log(`[Socket ${currentInstanceId}] Desmontando componente, limpiando recursos`);
+      cleanupSocket();
+    };
+  }, [userId, initSocket]); // Solo dependemos de userId y la función initSocket
+
+  // Efecto secundario para gestionar eventos de página y actividad del usuario
+  useEffect(() => {
+    if (!hasInitSocket.current || !socketRef.current) return;
     
-    // Escuchar eventos de actividad para reiniciar timer sin provocar rerenderizados
-    const handleActivity = () => {
-      // No usamos setState aquí, solo reiniciamos el timer si es necesario
-      if (userId && socketRef.current && socketRef.current.connected) {
+    // Capturamos el ID de instancia actual para usarlo en las funciones dentro del efecto
+    const currentInstanceId = instanceId.current;
+    
+    // Para evitar fugas de memoria, inicializamos los listeners solo una vez
+    // y nos aseguramos de limpiarlos después
+    const handleVisibilityChange = () => {
+      const isPageVisible = document.visibilityState === 'visible';
+      console.log(`[Socket ${currentInstanceId}] Cambio de visibilidad: ${isPageVisible ? 'visible' : 'oculto'}`);
+      
+      if (isPageVisible && socketRef.current) {
+        // Reconectar solo si estamos desconectados
+        if (!socketRef.current.connected && userId) {
+          console.log(`[Socket ${currentInstanceId}] Página visible - intentando reconectar`);
+          socketRef.current.connect();
+        }
+        
+        // Reiniciar timer de inactividad
         resetInactivityTimer();
       }
     };
     
-    window.addEventListener('mousemove', handleActivity);
-    window.addEventListener('keydown', handleActivity);
-    window.addEventListener('click', handleActivity);
+    // Handlers de interacción del usuario para rastrear actividad
+    const userActivityHandler = () => {
+      resetInactivityTimer();
+    };
     
-    // Establecer temporizador de inactividad
+    // Agregar event listeners para estado de página y actividad
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('mousemove', userActivityHandler, { passive: true });
+    document.addEventListener('keydown', userActivityHandler, { passive: true });
+    document.addEventListener('click', userActivityHandler, { passive: true });
+    document.addEventListener('touchstart', userActivityHandler, { passive: true });
+    
+    // Iniciar el timer de inactividad
     resetInactivityTimer();
     
+    // Limpiar event listeners
     return () => {
-      console.log(`[Socket] Limpiando hook de socket`);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('mousemove', userActivityHandler);
+      document.removeEventListener('keydown', userActivityHandler);
+      document.removeEventListener('click', userActivityHandler);
+      document.removeEventListener('touchstart', userActivityHandler);
       
-      // Eliminar listeners de actividad
-      window.removeEventListener('mousemove', handleActivity);
-      window.removeEventListener('keydown', handleActivity);
-      window.removeEventListener('click', handleActivity);
-      
-      // Limpiar timers
       if (inactivityTimeout.current) {
         clearTimeout(inactivityTimeout.current);
         inactivityTimeout.current = null;
       }
-      
-      // No desconectamos el socket global para mantener la conexión
-      console.log(`[Socket ${currentInstanceId}] Componente desmontado, manteniendo conexión global`);
     };
-  }, [userId, setupEventHandlers, resetInactivityTimer, initSocket]);
+  }, [resetInactivityTimer, userId]);
+
+  // Inicializar automáticamente cuando el componente se monta
+  useEffect(() => {
+    if (!userId) return;
+    
+    // Capturamos el ID de instancia al inicio del efecto
+    const currentInstanceId = instanceId.current;
+    
+    console.log(`[Socket ${currentInstanceId}] Inicialización automática`);
+    initSocket();
+  }, [initSocket, userId]); // Removido instanceId de las dependencias ya que ahora capturamos su valor
+
+  // Verificar conexión y mostrar mensajes pendientes cada vez que cambian las dependencias
+  useEffect(() => {
+    if (connected && userId) {
+      processPendingMessages();
+    }
+  }, [connected, processPendingMessages, userId]);
+
+  // Reconectar cuando el navegador vuelve a estar online
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[Socket] Navegador online, intentando reconectar...');
+      if (socketRef.current && !socketRef.current.connected) {
+        initSocket();
+      }
+    };
+    
+    window.addEventListener('online', handleOnline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [initSocket, userId]);
 
   // Prefixed with underscore since it's currently unused
   const _handleSocketError = useCallback((errorData: Error | unknown) => {
@@ -802,37 +910,6 @@ export default function useSocket(options: UseSocketOptions) {
     }
     stopHeartbeat();
   }, []);
-
-  // Inicializar automáticamente cuando el componente se monta
-  useEffect(() => {
-    if (!userId) return;
-    
-    console.log(`[Socket ${instanceId.current}] Inicialización automática`);
-    initSocket();
-  }, [initSocket, instanceId, userId]);
-
-  // Verificar conexión y mostrar mensajes pendientes cada vez que cambian las dependencias
-  useEffect(() => {
-    if (connected && userId) {
-      processPendingMessages();
-    }
-  }, [connected, processPendingMessages, userId]);
-
-  // Reconectar cuando el navegador vuelve a estar online
-  useEffect(() => {
-    const handleOnline = () => {
-      console.log('[Socket] Navegador online, intentando reconectar...');
-      if (socketRef.current && !socketRef.current.connected) {
-        initSocket();
-      }
-    };
-    
-    window.addEventListener('online', handleOnline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-    };
-  }, [initSocket, userId]);
 
   // Return the interface
   return {
