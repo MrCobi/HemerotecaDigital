@@ -44,14 +44,14 @@
     --transition-timing: ease;
   }
 
-  /* Transiciones suaves para cambios de tema */
-  .theme-transition,
-  .theme-transition *,
-  html.theme-transition,
-  html.theme-transition * {
-    transition-property: background-color, color, border-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
-    transition-duration: var(--transition-duration);
-    transition-timing-function: var(--transition-timing);
+  /* Transiciones optimizadas para cambios de tema - solo elementos clave */
+  .theme-transition {
+    transition: background-color 200ms ease;
+  }
+  
+  /* Limitar transiciones solo a elementos importantes para mejorar rendimiento */
+  .theme-transition .themed-element {
+    transition: background-color 200ms ease, color 200ms ease;
   }
 
   /* Evitar transiciones en elementos que no deberían tenerlas */

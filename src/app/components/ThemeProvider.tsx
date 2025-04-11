@@ -36,51 +36,54 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Función para aplicar un tema específico
+  // Función optimizada para aplicar un tema específico
   const applyTheme = useCallback((newTheme: Theme) => {
     if (typeof window === "undefined") return;
 
-    // Añadir clase de transición antes de cambiar el tema
-    document.documentElement.classList.add("theme-transition");
+    // Implementación de cambio de tema optimizada para rendimiento
+    // Evita transiciones innecesarias mediante requestAnimationFrame
+    requestAnimationFrame(() => {
+      // Añadir clase de transición solo a documentElement para reducir repaints
+      document.documentElement.classList.add("theme-transition");
 
-    if (newTheme === "system") {
-      applySystemTheme();
-      
-      // Agregar listener para cambios en la preferencia del sistema
-      const matchMedia = window.matchMedia("(prefers-color-scheme: dark)");
-      const handleChange = () => {
-        // Añadir clase de transición antes del cambio automático
-        document.documentElement.classList.add("theme-transition");
+      if (newTheme === "system") {
         applySystemTheme();
-        // Eliminar la clase después de la transición
-        setTimeout(() => {
-          document.documentElement.classList.remove("theme-transition");
-        }, 500); // Tiempo igual a la duración de la transición
-      };
-      
-      // Eliminar listener anterior si existe
-      matchMedia.removeEventListener("change", handleChange);
-      // Agregar nuevo listener
-      matchMedia.addEventListener("change", handleChange);
-      
-      // Guardar el listener para limpieza
-      return () => matchMedia.removeEventListener("change", handleChange);
-    } else {
-      // Eliminar listener si existe
-      const matchMedia = window.matchMedia("(prefers-color-scheme: dark)");
-      matchMedia.removeEventListener("change", () => applySystemTheme());
-      
-      // Aplicar tema claro u oscuro
-      const isDark = newTheme === "dark";
-      document.documentElement.classList.toggle("dark", isDark);
-      document.documentElement.setAttribute("data-theme", newTheme);
-      document.documentElement.style.colorScheme = isDark ? "dark" : "light";
-    }
+        
+        // Gestor de eventos optimizado para cambios de preferencia del sistema
+        const matchMedia = window.matchMedia("(prefers-color-scheme: dark)");
+        const handleChange = () => {
+          requestAnimationFrame(() => {
+            document.documentElement.classList.add("theme-transition");
+            applySystemTheme();
+            // Eliminar la clase después de una transición más corta
+            setTimeout(() => {
+              document.documentElement.classList.remove("theme-transition");
+            }, 200); // Transición reducida a 200ms para mejor rendimiento
+          });
+        };
+        
+        // Manejo optimizado de listeners
+        matchMedia.removeEventListener("change", handleChange);
+        matchMedia.addEventListener("change", handleChange);
+        
+        return () => matchMedia.removeEventListener("change", handleChange);
+      } else {
+        // Limpieza de listeners
+        const matchMedia = window.matchMedia("(prefers-color-scheme: dark)");
+        matchMedia.removeEventListener("change", () => applySystemTheme());
+        
+        // Aplicar tema con rendimiento optimizado
+        const isDark = newTheme === "dark";
+        document.documentElement.classList.toggle("dark", isDark);
+        document.documentElement.setAttribute("data-theme", newTheme);
+        document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+      }
 
-    // Quitar la clase de transición después de que se haya completado
-    setTimeout(() => {
-      document.documentElement.classList.remove("theme-transition");
-    }, 500); // Duración en ms igual a la variable CSS de transición
+      // Quitar la clase de transición más rápidamente
+      setTimeout(() => {
+        document.documentElement.classList.remove("theme-transition");
+      }, 200); // Duración reducida para mejor rendimiento
+    });
   }, [applySystemTheme]);
 
   // Cambiar el tema y guardarlo
