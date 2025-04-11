@@ -512,28 +512,78 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
       header: "Remitente",
       accessorKey: "sender",
       cell: (message: Message) => {
-        if (!message.sender) {
-          return <span className="text-xs sm:text-sm text-muted-foreground">Usuario eliminado</span>;
+        // Primero intentamos usar el campo 'sender' directamente
+        if (message.sender) {
+          return (
+            <div className="flex items-center">
+              <div className="flex-shrink-0 mr-2 sm:mr-3">
+                {renderUserImage(message.sender)}
+              </div>
+              <div className="min-w-0">
+                <Link
+                  href={`/admin/users/view/${message.sender.id}`}
+                  className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
+                >
+                  {message.sender.name || "Usuario sin nombre"}
+                </Link>
+                {message.sender.email && (
+                  <div className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-full">{message.sender.email}</div>
+                )}
+              </div>
+            </div>
+          );
         }
         
-        return (
-          <div className="flex items-center">
-            <div className="flex-shrink-0 mr-2 sm:mr-3">
-              {renderUserImage(message.sender)}
-            </div>
-            <div className="min-w-0">
-              <Link
-                href={`/admin/users/view/${message.sender.id}`}
-                className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
-              >
-                {message.sender.name || "Usuario sin nombre"}
-              </Link>
-              {message.sender.email && (
-                <div className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-full">{message.sender.email}</div>
-              )}
-            </div>
-          </div>
-        );
+        // Si no tenemos sender, buscamos en los participantes
+        if (message.conversation.participants) {
+          // Buscar el participante cuyo ID coincide con el senderId
+          const senderParticipant = message.conversation.participants.find(
+            participant => participant.user.id === message.senderId
+          );
+          
+          if (senderParticipant && senderParticipant.user) {
+            return (
+              <div className="flex items-center">
+                <div className="flex-shrink-0 mr-2 sm:mr-3">
+                  <div className="h-7 w-7 sm:h-8 sm:w-8 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
+                    {senderParticipant.user.image ? (
+                      <Image
+                        src={senderParticipant.user.image}
+                        alt={senderParticipant.user.name || "Avatar"}
+                        width={32}
+                        height={32}
+                        className="h-full w-full object-cover rounded-full"
+                        onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
+                      />
+                    ) : (
+                      <Image
+                        src="/images/AvatarPredeterminado.webp"
+                        alt="Avatar predeterminado"
+                        width={32}
+                        height={32}
+                        className="h-full w-full object-cover rounded-full"
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <Link
+                    href={`/admin/users/view/${senderParticipant.user.id}`}
+                    className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
+                  >
+                    {senderParticipant.user.name || "Usuario sin nombre"}
+                  </Link>
+                </div>
+              </div>
+            );
+          }
+        }
+        
+        // Si no encontramos la info del remitente
+        return <span className="text-xs sm:text-sm text-muted-foreground">Usuario eliminado</span>;
       },
       hideOnMobile: false,
       className: "w-[20%]", // Ancho ajustado (aumentado de 16% a 20%)
@@ -565,28 +615,79 @@ export default function MessagesTable({ messages }: MessagesTableProps) {
           );
         }
         
-        if (!message.receiver) {
-          return <span className="text-xs sm:text-sm text-muted-foreground">Usuario eliminado</span>;
+        // Para conversaciones individuales, buscamos al otro participante
+        if (!message.conversation.isGroup && message.conversation.participants) {
+          // Encontrar al otro participante que no sea el remitente
+          const otherParticipant = message.conversation.participants.find(
+            participant => participant.user.id !== message.senderId
+          );
+          
+          if (otherParticipant && otherParticipant.user) {
+            return (
+              <div className="flex items-center">
+                <div className="flex-shrink-0 mr-2 sm:mr-3">
+                  <div className="h-7 w-7 sm:h-8 sm:w-8 overflow-hidden rounded-full flex items-center justify-center bg-gray-100">
+                    {otherParticipant.user.image ? (
+                      <Image
+                        src={otherParticipant.user.image}
+                        alt={otherParticipant.user.name || "Avatar"}
+                        width={32}
+                        height={32}
+                        className="h-full w-full object-cover rounded-full"
+                        onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/images/AvatarPredeterminado.webp";
+                        }}
+                      />
+                    ) : (
+                      <Image
+                        src="/images/AvatarPredeterminado.webp"
+                        alt="Avatar predeterminado"
+                        width={32}
+                        height={32}
+                        className="h-full w-full object-cover rounded-full"
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <Link
+                    href={`/admin/users/view/${otherParticipant.user.id}`}
+                    className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
+                  >
+                    {otherParticipant.user.name || "Usuario sin nombre"}
+                  </Link>
+                </div>
+              </div>
+            );
+          }
         }
         
-        return (
-          <div className="flex items-center">
-            <div className="flex-shrink-0 mr-2 sm:mr-3">
-              {renderUserImage(message.receiver)}
+        // Si no podemos encontrar al otro participante en la conversación individual,
+        // intentamos usar el campo receiver como fallback
+        if (!message.conversation.isGroup && message.receiver) {
+          return (
+            <div className="flex items-center">
+              <div className="flex-shrink-0 mr-2 sm:mr-3">
+                {renderUserImage(message.receiver)}
+              </div>
+              <div className="min-w-0">
+                <Link
+                  href={`/admin/users/view/${message.receiver.id}`}
+                  className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
+                >
+                  {message.receiver.name || "Usuario sin nombre"}
+                </Link>
+                {message.receiver.email && (
+                  <div className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-full">{message.receiver.email}</div>
+                )}
+              </div>
             </div>
-            <div className="min-w-0">
-              <Link
-                href={`/admin/users/view/${message.receiver.id}`}
-                className="text-primary hover:text-primary/80 transition-colors text-xs sm:text-sm font-medium truncate block max-w-[120px] sm:max-w-full"
-              >
-                {message.receiver.name || "Usuario sin nombre"}
-              </Link>
-              {message.receiver.email && (
-                <div className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-full">{message.receiver.email}</div>
-              )}
-            </div>
-          </div>
-        );
+          );
+        }
+        
+        // Si no tenemos información del destinatario por ninguna vía
+        return <span className="text-xs sm:text-sm text-muted-foreground">Usuario eliminado</span>;
       },
       hideOnMobile: false,
       className: "w-[20%]", // Ancho ajustado (aumentado de 16% a 20%)
