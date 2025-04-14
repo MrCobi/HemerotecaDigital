@@ -263,6 +263,9 @@ const HomePage = () => {
     collections: false,
     recent: false,
   });
+  
+  // Referencias para los elementos que queremos observar
+  const statsRef = useRef<HTMLElement>(null);
   const [userStats, setUserStats] = useState({
     favoriteCount: 0,
     activityCount: 0,
@@ -594,6 +597,43 @@ const HomePage = () => {
       darkModeMediaQuery.removeEventListener('change', handleChange);
     };
   }, []);
+  
+  // Crear un observer para detectar cuando la sección de estadísticas está visible
+  useEffect(() => {
+    // Solo ejecutar en el cliente una vez que está montado
+    if (!mounted) return;
+    
+    const observerOptions = {
+      root: null, // viewport
+      rootMargin: '0px', // sin margen
+      threshold: 0.1 // 10% visible es suficiente para activar
+    };
+    
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach(entry => {
+        if (entry.target === statsRef.current && entry.isIntersecting) {
+          setIsVisible(prev => ({ ...prev, stats: true }));
+        }
+      });
+    };
+    
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+    
+    // Guardamos la referencia en una variable local para usarla en la función de limpieza
+    const currentStatsRef = statsRef.current;
+    
+    if (currentStatsRef) {
+      observer.observe(currentStatsRef);
+    }
+    
+    return () => {
+      // Usamos la variable local en lugar de statsRef.current
+      if (currentStatsRef) {
+        observer.unobserve(currentStatsRef);
+      }
+      observer.disconnect();
+    };
+  }, [mounted]);
 
   if (!mounted || session === null) {
     return (
@@ -716,7 +756,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      <section id="stats-section" className="py-8 sm:py-12 lg:py-16 relative z-10">
+      <section ref={statsRef} id="stats-section" className="py-8 sm:py-12 lg:py-16 relative z-10">
         <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8">
           <motion.div
             initial={animationVariants.hidden}
