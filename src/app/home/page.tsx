@@ -230,8 +230,16 @@ const StatItem = ({
 
 const useCounter = (end: number, duration: number = 2000) => {
   const [count, setCount] = useState(0);
+  // Usar el hook de configuración de animaciones
+  const animationsEnabled = useAnimationSettings();
 
   useEffect(() => {
+    // Si las animaciones están desactivadas, mostrar directamente el valor final
+    if (!animationsEnabled) {
+      setCount(end);
+      return;
+    }
+    
     let startTime: number | null = null;
     let animationFrame: number;
 
@@ -246,7 +254,7 @@ const useCounter = (end: number, duration: number = 2000) => {
 
     animationFrame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationFrame);
-  }, [end, duration]);
+  }, [end, duration, animationsEnabled]);
 
   return count;
 };
