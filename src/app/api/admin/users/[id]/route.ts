@@ -96,6 +96,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const { id: userId } = await params;
 
+    // Obtener el usuario con los conteos básicos
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -105,7 +106,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             ratings: true,
             favoriteSources: true,
             sentMessages: true,
-            receivedMessages: true,
+            receivedMessages: true, // Esto solo contará mensajes directos (con receiverId)
             accounts: true
           }
         }
@@ -116,7 +117,42 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
-    return NextResponse.json(user);
+    // Obtener las conversaciones donde el usuario es participante
+    const userConversations = await prisma.conversationParticipant.findMany({
+      where: {
+        userId: userId
+      },
+      select: {
+        conversationId: true
+      }
+    });
+
+    const conversationIds = userConversations.map(conv => conv.conversationId);
+
+    // Contar mensajes recibidos en conversaciones donde el usuario es participante
+    // pero no es el remitente
+    const messagesInConversations = await prisma.directMessage.count({
+      where: {
+        conversationId: {
+          in: conversationIds
+        },
+        senderId: {
+          not: userId
+        }
+      }
+    });
+
+    // Combinar los resultados para un conteo correcto
+    const updatedUser = {
+      ...user,
+      _count: {
+        ...user._count,
+        // Sumar los mensajes directos (receiverId) y los de conversaciones
+        receivedMessages: user._count.receivedMessages + messagesInConversations
+      }
+    };
+
+    return NextResponse.json(updatedUser);
   } catch (error) {
     console.error("Error al obtener usuario:", error);
     return NextResponse.json(
