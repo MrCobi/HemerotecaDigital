@@ -11,8 +11,6 @@ const mapPrismaRoleToComponentRole = (prismaRole: string): Role => {
   switch (prismaRole) {
     case "admin":
       return "ADMIN";
-    case "moderator":
-      return "EDITOR";
     default:
       return "USER";
   }

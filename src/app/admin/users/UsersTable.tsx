@@ -93,7 +93,7 @@ function DeleteUserDialog({ userId, userName, onDelete }: DeleteUserDialogProps)
   );
 }
 
-export type Role = "ADMIN" | "EDITOR" | "USER";
+export type Role = "ADMIN"  | "USER";
 
 export interface User {
   id: string;
@@ -258,10 +258,6 @@ export default function UsersTable({ users }: UsersTableProps) {
           case "ADMIN":
             roleLabel = "Administrador";
             className = "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
-            break;
-          case "EDITOR":
-            roleLabel = "Editor";
-            className = "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
             break;
           case "USER":
           default:

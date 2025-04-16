@@ -50,7 +50,6 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
   const [uploadError, setUploadError] = useState<string | null>(null);
   const roles = [
     { value: "user", label: "Usuario" },
-    { value: "editor", label: "Editor" },
     { value: "admin", label: "Administrador" },
   ];
   const [error, setError] = useState("");

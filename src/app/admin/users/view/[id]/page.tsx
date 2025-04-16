@@ -66,7 +66,6 @@ type UserData = {
 
 const roleBadgeStyles = {
   admin: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  editor: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   user: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
 };
 
@@ -335,8 +334,7 @@ export default function UserViewPage({ params }: PageProps) {
                   <Badge className={`${
                     roleBadgeStyles[user.role as keyof typeof roleBadgeStyles] || roleBadgeStyles.user
                   }`}>
-                    {user.role === "admin" ? "Admin" : 
-                     user.role === "editor" ? "Editor" : "Usuario"}
+                    {user.role === "admin" ? "Admin" : "Usuario"}
                   </Badge>
                 </div>
                 
