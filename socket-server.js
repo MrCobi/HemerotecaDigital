@@ -49,6 +49,7 @@ const activeConversations = new Map();
 
 // Webhook endpoint para recibir notificaciones de nuevos mensajes desde la API
 app.post('/webhook/new-message', (req, res) => {
+  console.log('Authorization header recibido:', req.headers.authorization);
   const authHeader = req.headers.authorization;
   if (authHeader !== 'Socket-Internal-Auth-00123') {
     console.error('Acceso no autorizado al webhook');
