@@ -307,19 +307,7 @@ export function useChatContent(
       
       console.log('[useChatContent] Actualización de estado - existingIndex:', existingIndex, 'tempIndex:', tempIndex);
       
-      // Verificación adicional para evitar duplicados - si hay un mensaje con el mismo contenido y timestamp similar
-      if (existingIndex === -1 && newMessage.content) {
-        const potentialDuplicate = prevMessages.find(msg => 
-          msg.content === newMessage.content && 
-          msg.senderId === newMessage.senderId &&
-          msg.id !== newMessage.id
-        );
-        
-        if (potentialDuplicate) {
-          console.log('[useChatContent] Detectado potencial duplicado basado en contenido:', newMessage.content);
-          return prevMessages; // No añadir mensajes con mismo contenido/remitente
-        }
-      }
+
       
       // Si ya existe un mensaje con este ID, no lo añadimos de nuevo
       if (existingIndex !== -1) {
