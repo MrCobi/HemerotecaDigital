@@ -371,8 +371,15 @@ export function useChatContent(
       
       console.log('[useChatContent] Nuevo mensaje creado:', processedMessage);
       
-      // Devolver una nueva lista con el mensaje añadido
-      return [...prevMessages, processedMessage];
+      // Eliminar cualquier mensaje temporal con el mismo tempId antes de añadir el real
+      let filteredMessages = prevMessages;
+      if (processedMessage.id && processedMessage.tempId) {
+        filteredMessages = prevMessages.filter(
+          msg => !(msg.tempId && msg.tempId === processedMessage.tempId && !msg.id)
+        );
+      }
+      // Devolver una nueva lista con el mensaje añadido (sin duplicados tempId)
+      return [...filteredMessages, processedMessage];
     });
     
     // Reproducir el sonido de notificación si es un mensaje entrante
