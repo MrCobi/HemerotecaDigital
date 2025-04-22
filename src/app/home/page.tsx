@@ -18,7 +18,7 @@ import {
   Heart,
   MessageSquare,
   User2,
-  
+
 } from "lucide-react";
 import { Button } from "@/src/app/components/ui/button";
 import { Input } from "@/src/app/components/ui/input";
@@ -42,16 +42,16 @@ import { OptimizedImage } from "../components/OptimizedImage";
 interface Activity {
   id: string;
   type:
-    | "favorite_added"
-    | "favorite_removed"
-    | "comment"
-    | "rating_added"
-    | "rating_removed"
-    | "follow"
-    | "unfollow"
-    | "comment_reply"
-    | "comment_deleted"
-    | "favorite";
+  | "favorite_added"
+  | "favorite_removed"
+  | "comment"
+  | "rating_added"
+  | "rating_removed"
+  | "follow"
+  | "unfollow"
+  | "comment_reply"
+  | "comment_deleted"
+  | "favorite";
   sourceName: string | null;
   targetName: string | null;
   targetId: string | null;
@@ -193,7 +193,7 @@ const getCategoryImage = (englishCategory: string, _isDarkMode: boolean): string
   if (!mapping) {
     return `https://source.unsplash.com/random/300x200?${encodeURIComponent(englishCategory)}`;
   }
-  
+
   // Usar siempre las imágenes fallback hasta que tengamos las imágenes locales
   return mapping.fallbackImage || `https://source.unsplash.com/random/300x200?${encodeURIComponent(englishCategory)}`;
 };
@@ -239,7 +239,7 @@ const useCounter = (end: number, duration: number = 2000) => {
       setCount(end);
       return;
     }
-    
+
     let startTime: number | null = null;
     let animationFrame: number;
 
@@ -271,7 +271,7 @@ const HomePage = () => {
     collections: false,
     recent: false,
   });
-  
+
   // Referencias para los elementos que queremos observar
   const statsRef = useRef<HTMLElement>(null);
   const [userStats, setUserStats] = useState({
@@ -285,7 +285,7 @@ const HomePage = () => {
     useState(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalActivities, setTotalActivities] = useState<number>(0);
-  
+
   // Variables que se necesitan mantener
   const itemsPerPage = 5;
   const [categories, setCategories] = useState<string[]>([]);
@@ -293,21 +293,21 @@ const HomePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [windowWidth, setWindowWidth] = useState(0);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
-  
+
   // Obtener configuración de animaciones para aplicar a los componentes de framer-motion
   const _animationsEnabled = useAnimationSettings();
-  
+
   // Variantes para animaciones condicionales
   const fadeInVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 }
   };
-  
+
   const noAnimationVariants = {
     hidden: { opacity: 1, y: 0 },
     visible: { opacity: 1, y: 0 }
   };
-  
+
   const animationVariants = useConditionalAnimation(fadeInVariants, noAnimationVariants);
   const animationTransition = useConditionalTransition(0.5);
 
@@ -342,22 +342,22 @@ const HomePage = () => {
   const animateScroll = (from: number, to: number) => {
     const duration = 400; // duración en milisegundos
     const start = performance.now();
-    
+
     const animate = (time: number) => {
       const elapsed = time - start;
       const progress = Math.min(elapsed / duration, 1);
       const easeProgress = easeInOutCubic(progress);
       const currentPosition = from + (to - from) * easeProgress;
-      
+
       if (horizontalScroll.current) {
         horizontalScroll.current.scrollLeft = currentPosition;
       }
-      
+
       if (progress < 1) {
         requestAnimationFrame(animate);
       }
     };
-    
+
     requestAnimationFrame(animate);
   };
 
@@ -381,7 +381,7 @@ const HomePage = () => {
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    
+
     if (horizontalScroll.current) {
       const x = e.pageX - horizontalScroll.current.offsetLeft;
       const walk = (x - startX) * 1.5; // Velocidad de desplazamiento
@@ -443,7 +443,7 @@ const HomePage = () => {
           // Verificamos que la página no exceda el límite máximo
           const maxPage = 10;
           const safeCurrentPage = Math.min(currentPage, maxPage);
-          
+
           const response = await fetch(
             API_ROUTES.activities.following(safeCurrentPage, itemsPerPage)
           );
@@ -512,7 +512,7 @@ const HomePage = () => {
       try {
         const response = await fetch(API_ROUTES.categories.list);
         const data = await response.json();
-  
+
         if (Array.isArray(data)) {
           setCategories(data);
         } else {
@@ -532,15 +532,15 @@ const HomePage = () => {
     if (typeof window !== 'undefined') {
       // Establecer el ancho inicial
       setWindowWidth(window.innerWidth);
-      
+
       // Función para actualizar el ancho cuando cambia
       const handleResize = () => {
         setWindowWidth(window.innerWidth);
       };
-      
+
       // Agregar listener
       window.addEventListener('resize', handleResize);
-      
+
       // Limpiar listener
       return () => window.removeEventListener('resize', handleResize);
     }
@@ -558,27 +558,25 @@ const HomePage = () => {
           <button
             onClick={() => !isLoadingFollowingActivity && setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage === 1 || isLoadingFollowingActivity}
-            className={`flex justify-center items-center py-2 px-3 w-1/4 ${
-              currentPage === 1 || isLoadingFollowingActivity
+            className={`flex justify-center items-center py-2 px-3 w-1/4 ${currentPage === 1 || isLoadingFollowingActivity
                 ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
                 : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
-            } transition-colors`}
+              } transition-colors`}
           >
             <span className="text-lg font-bold">&lt;</span>
           </button>
-          
+
           <div className="flex justify-center items-center py-2 px-3 flex-1 bg-gray-50 dark:bg-gray-800 text-xs sm:text-sm text-center font-medium text-gray-700 dark:text-gray-300">
             <span>Página {currentPage} de {totalPages}</span>
           </div>
-          
+
           <button
             onClick={() => !isLoadingFollowingActivity && setCurrentPage((p) => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages || isLoadingFollowingActivity}
-            className={`flex justify-center items-center py-2 px-3 w-1/4 ${
-              currentPage === totalPages || isLoadingFollowingActivity
+            className={`flex justify-center items-center py-2 px-3 w-1/4 ${currentPage === totalPages || isLoadingFollowingActivity
                 ? "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
                 : "bg-blue-600 dark:bg-blue-700 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
-            } transition-colors`}
+              } transition-colors`}
           >
             <span className="text-lg font-bold">&gt;</span>
           </button>
@@ -593,30 +591,30 @@ const HomePage = () => {
     setMounted(true);
     // Detecta el modo oscuro
     setIsDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches);
-    
+
     // Escucha cambios en el modo de color
     const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       setIsDarkMode(e.matches);
     };
-    
+
     darkModeMediaQuery.addEventListener('change', handleChange);
     return () => {
       darkModeMediaQuery.removeEventListener('change', handleChange);
     };
   }, []);
-  
+
   // Crear un observer para detectar cuando la sección de estadísticas está visible
   useEffect(() => {
     // Solo ejecutar en el cliente una vez que está montado
     if (!mounted) return;
-    
+
     const observerOptions = {
       root: null, // viewport
       rootMargin: '0px', // sin margen
       threshold: 0.1 // 10% visible es suficiente para activar
     };
-    
+
     const observerCallback = (entries: IntersectionObserverEntry[]) => {
       entries.forEach(entry => {
         if (entry.target === statsRef.current && entry.isIntersecting) {
@@ -624,16 +622,16 @@ const HomePage = () => {
         }
       });
     };
-    
+
     const observer = new IntersectionObserver(observerCallback, observerOptions);
-    
+
     // Guardamos la referencia en una variable local para usarla en la función de limpieza
     const currentStatsRef = statsRef.current;
-    
+
     if (currentStatsRef) {
       observer.observe(currentStatsRef);
     }
-    
+
     return () => {
       // Usamos la variable local en lugar de statsRef.current
       if (currentStatsRef) {
@@ -713,7 +711,7 @@ const HomePage = () => {
                 <Input
                   type="text"
                   placeholder={windowWidth < 640 ? "Buscar..." : "Buscar artículos..."}
-                  className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white dark:text-white placeholder:text-blue-200 dark:placeholder:text-gray-300 focus-visible:ring-white/30 focus-visible:border-white/30 pr-12 py-4 sm:py-5 text-sm sm:text-base" 
+                  className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white dark:text-white placeholder:text-blue-200 dark:placeholder:text-gray-300 focus-visible:ring-white/30 focus-visible:border-white/30 pr-12 py-4 sm:py-5 text-sm sm:text-base"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -722,7 +720,7 @@ const HomePage = () => {
                     }
                   }}
                 />
-                <Button 
+                <Button
                   className="ml-2 bg-white dark:bg-gray-200 text-blue-600 dark:text-blue-800 hover:bg-blue-50 dark:hover:bg-gray-300 absolute right-1 top-1/2 -translate-y-1/2 z-20"
                   onClick={() => {
                     if (searchQuery.trim()) {
@@ -849,8 +847,8 @@ const HomePage = () => {
                   {article.urlToImage ? (
                     <div className="relative w-full h-full">
                       <OptimizedImage
-                        src={isExternalImageValid(article.urlToImage) 
-                          ? article.urlToImage 
+                        src={isExternalImageValid(article.urlToImage)
+                          ? article.urlToImage
                           : '/images/article_placeholder.jpg'}
                         alt={article.title || 'Article image'}
                         fill={true}
@@ -977,41 +975,42 @@ const HomePage = () => {
                   const spanishCategory = getSpanishCategory(englishCategory);
                   const gradientClass = getCategoryGradient(englishCategory);
                   const resolvedBgImage = getCategoryImage(englishCategory, isDarkMode);
-                  
+
                   return (
-                  <motion.div
-                    key={i}
-                    initial={animationVariants.hidden}
-                    animate={animationVariants.visible}
-                    transition={animationTransition}
-                    className="snap-start flex-shrink-0 relative"
-                    style={{ width: "280px", minWidth: "180px" }}
-                  >
-                    <div className="group relative rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-32 xs:h-36 sm:h-40 w-full">
-                      <div
-                        className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-110"
-                        style={{
-                          backgroundImage: `url(${resolvedBgImage})`,
-                        }}
-                      />
-                      <div className={`absolute inset-0 bg-gradient-to-t ${gradientClass} opacity-70`} />
-                      <div className="absolute bottom-0 left-0 right-0 p-3 xs:p-4 sm:p-5 select-none">
-                        <h3 className="text-base xs:text-lg sm:text-xl font-bold text-white">
-                          {spanishCategory}
-                        </h3>
-                        <div className="flex items-center mt-1 xs:mt-2 text-xs sm:text-sm text-blue-50">
-                          <Link
-                            href={`/categories/${encodeURIComponent(englishCategory)}`}
-                            className="flex items-center text-blue-100 hover:text-white transition-colors"
-                          >
-                            Explorar{" "}
-                            <ArrowRight className="ml-1 w-3 h-3 xs:w-4 xs:h-4 inline-block text-white" />
-                          </Link>
+                    <motion.div
+                      key={i}
+                      initial={animationVariants.hidden}
+                      animate={animationVariants.visible}
+                      transition={animationTransition}
+                      className="snap-start flex-shrink-0 relative"
+                      style={{ width: "280px", minWidth: "180px" }}
+                    >
+                      <div className="group relative rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-32 xs:h-36 sm:h-40 w-full">
+                        <div
+                          className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-110"
+                          style={{
+                            backgroundImage: `url(${resolvedBgImage})`,
+                          }}
+                        />
+                        <div className={`absolute inset-0 bg-gradient-to-t ${gradientClass} opacity-70`} />
+                        <div className="absolute bottom-0 left-0 right-0 p-3 xs:p-4 sm:p-5 select-none">
+                          <h3 className="text-base xs:text-lg sm:text-xl font-bold text-white">
+                            {spanishCategory}
+                          </h3>
+                          <div className="flex items-center mt-1 xs:mt-2 text-xs sm:text-sm text-blue-50">
+                            <Link
+                              href={`/categories/${encodeURIComponent(englishCategory)}`}
+                              className="flex items-center text-blue-100 hover:text-white transition-colors"
+                            >
+                              Explorar{" "}
+                              <ArrowRight className="ml-1 w-3 h-3 xs:w-4 xs:h-4 inline-block text-white" />
+                            </Link>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                )})
+                    </motion.div>
+                  )
+                })
               ) : (
                 <div className="w-full py-12 flex flex-col items-center justify-center bg-blue-50 dark:bg-blue-900/20 rounded-xl">
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-800/30 mb-4">
@@ -1026,20 +1025,20 @@ const HomePage = () => {
                 </div>
               )}
             </div>
-            
+
             {/* Controles de navegación */}
             <div className="flex justify-center mt-4 space-x-2">
-              <Button 
-                variant="outline" 
-                size="icon" 
+              <Button
+                variant="outline"
+                size="icon"
                 className="h-7 w-7 xs:h-8 xs:w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200 flex items-center justify-center"
                 onClick={scrollLeftHandler}
               >
                 <span className="text-lg font-bold">&lt;</span>
               </Button>
-              <Button 
-                variant="outline" 
-                size="icon" 
+              <Button
+                variant="outline"
+                size="icon"
                 className="h-7 w-7 xs:h-8 xs:w-8 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg text-gray-800 dark:text-gray-200 flex items-center justify-center"
                 onClick={scrollRightHandler}
               >
@@ -1104,19 +1103,51 @@ const HomePage = () => {
                           >
                             <div className="flex items-center w-full">
                               <Avatar className="h-10 w-10 flex-shrink-0 border-2 border-white dark:border-gray-800 shadow-sm mr-3 sm:mr-4">
-                                {activity.user.image?.startsWith("https://") ? (
-                                  <CldImage
+                                {activity.user.image?.includes('googleusercontent.com') ? (
+                                  // Imágenes de Google (manejo directo sin Cloudinary)
+                                  <Image
                                     src={activity.user.image}
                                     alt={activity.user.name || "Usuario"}
                                     width={40}
                                     height={40}
                                     className="h-full w-full rounded-full object-cover"
-                                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = "/images/AvatarPredeterminado.webp";
+                                    }}
+                                  />
+                                ) : activity.user.image?.includes('cloudinary') ? (
+                                  // URLs completas de Cloudinary
+                                  <CldImage
+                                    src={activity.user.image}
+                                    alt={activity.user.name || "Usuario"}
+                                    width={40}
+                                    height={40}
+                                    crop="fill"
+                                    gravity="face"
+                                    className="h-full w-full rounded-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = "/images/AvatarPredeterminado.webp";
+                                    }}
+                                  />
+                                ) : activity.user.image && !activity.user.image.startsWith('/') && !activity.user.image.startsWith('http') ? (
+                                  // Public IDs de Cloudinary
+                                  <CldImage
+                                    src={activity.user.image}
+                                    alt={activity.user.name || "Usuario"}
+                                    width={40}
+                                    height={40}
+                                    crop="fill"
+                                    gravity="face"
+                                    className="h-full w-full rounded-full object-cover"
+                                    onError={(e) => {
                                       const target = e.target as HTMLImageElement;
                                       target.src = "/images/AvatarPredeterminado.webp";
                                     }}
                                   />
                                 ) : (
+                                  // Imágenes locales o fallback
                                   <Image
                                     src={activity.user.image || "/images/AvatarPredeterminado.webp"}
                                     alt={activity.user.name || "Usuario"}
@@ -1130,7 +1161,7 @@ const HomePage = () => {
                                   />
                                 )}
                               </Avatar>
-                              
+
                               <div className="flex flex-grow items-center justify-between flex-wrap sm:flex-nowrap gap-2">
                                 <div className="flex items-center flex-wrap gap-1">
                                   <span className="font-medium text-sm text-gray-800 dark:text-white">
@@ -1195,7 +1226,7 @@ const HomePage = () => {
                                     {activity.sourceName || activity.targetName || ""}
                                   </span>
                                 </div>
-                                
+
                                 <p className="text-xs text-gray-500 dark:text-gray-400 sm:ml-auto">
                                   {new Date(activity.createdAt).toLocaleString(
                                     "es-ES",
@@ -1246,11 +1277,11 @@ const isExternalImageValid = (url: string): boolean => {
     'politico.com',
     'static.politico.com',
   ];
-  
+
   try {
     const urlObj = new URL(url);
     return !blockedDomains.some(domain => urlObj.hostname.includes(domain));
-  } catch  {
+  } catch {
     return false;
   }
 };
