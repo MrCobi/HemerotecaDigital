@@ -1,0 +1,100 @@
+**Posibles Preguntas del Jurado y Puntos Clave para Respuestas:**
+
+**A. Preguntas Generales y de Motivación:**
+
+1.  **P: ¿Cuál fue la principal motivación o inspiración para desarrollar esta Hemeroteca Digital?**
+    *   **Clave:** Habla sobre un interés personal en el consumo de noticias, la identificación de un problema (sobrecarga informativa, necesidad de interacción), o el deseo de aplicar conocimientos adquiridos en una plataforma completa y útil.
+    *   *Ejemplo:* "Siempre me ha interesado cómo la gente consume información y noté que faltaba una plataforma que no solo agregara noticias sino que también fomentara una comunidad activa alrededor de ellas. Quería crear un espacio donde los usuarios pudieran descubrir contenido de forma personalizada y discutirlo."
+
+2.  **P: ¿Qué problema específico busca resolver tu proyecto y cuál es su principal propuesta de valor?**
+    *   **Clave:** Reitera el problema de la dispersión de fuentes, la dificultad para encontrar información de calidad y la falta de interacción. La propuesta de valor es la centralización, personalización, y la comunidad.
+    *   *Ejemplo:* "Busca resolver la fragmentación de la información y la experiencia pasiva de leer noticias. La propuesta de valor es ofrecer una hemeroteca centralizada donde los usuarios pueden personalizar sus fuentes, interactuar con otros, calificar contenido y participar en un sistema de mensajería en tiempo real, todo en una interfaz moderna."
+
+3.  **P: ¿A qué tipo de usuario o público objetivo está dirigida la plataforma?**
+    *   **Clave:** Define a tu usuario ideal (ej. estudiantes, profesionales, personas interesadas en temas específicos, comunidades con intereses comunes).
+    *   *Ejemplo:* "Está dirigida a usuarios activos en internet que buscan una forma más organizada y social de consumir noticias. Esto incluye desde estudiantes que necesitan investigar temas específicos hasta cualquier persona interesada en mantenerse informada y debatir sobre actualidad."
+
+4.  **P: ¿Cuáles consideras que son las características más innovadoras o distintivas de tu proyecto en comparación con otras plataformas existentes?**
+    *   **Clave:** Destaca la combinación de agregación de noticias, personalización de fuentes locales, y el robusto sistema de interacción social y mensajería en tiempo real. La integración de todo esto en una sola plataforma.
+    *   *Ejemplo:* "La principal innovación radica en la integración de una hemeroteca personalizable con un completo sistema de interacción social, incluyendo chat en tiempo real y un panel de administración. Mientras algunas plataformas ofrecen agregación y otras son puramente sociales, la nuestra combina estos mundos para crear una experiencia más rica y participativa."
+
+**B. Preguntas de Arquitectura y Diseño Técnico:**
+
+5.  **P: ¿Por qué elegiste Next.js como framework principal? ¿Qué ventajas y desventajas encontraste?**
+    *   **Clave:** Ventajas: Renderizado híbrido (SSR/SSG/ISR), API routes integradas (full-stack), ecosistema React, optimizaciones de rendimiento (imágenes, fuentes), buena experiencia de desarrollo. Desventajas: Puede ser complejo para proyectos pequeños, la gestión del estado puede requerir soluciones adicionales si la app escala mucho.
+    *   *Ejemplo:* "Elegí Next.js por su capacidad para construir aplicaciones full-stack de forma eficiente, su excelente rendimiento gracias al renderizado híbrido y optimizaciones automáticas. Las API routes integradas facilitaron mucho el desarrollo del backend. Una posible desventaja es que para funcionalidades muy complejas de estado global, se necesita una planificación cuidadosa o librerías adicionales, aunque para este proyecto su manejo de estado fue adecuado."
+
+6.  **P: Explica cómo funciona la obtención y gestión de artículos. ¿Por qué decidiste no almacenar los artículos en tu propia base de datos?**
+    *   **Clave:** Artículos obtenidos de NewsAPI en tiempo real. No se almacenan localmente para evitar problemas de copyright, asegurar actualidad, y reducir la carga de almacenamiento y mantenimiento de la BD. Las "fuentes locales" sirven para la interacción del usuario.
+    *   *Ejemplo:* "Los artículos se obtienen dinámicamente de NewsAPI. Cuando un usuario accede a una sección de noticias o a una fuente específica, realizamos una petición a NewsAPI filtrando por los criterios relevantes. Decidí no almacenar los artículos localmente principalmente por la actualidad de la información – NewsAPI siempre tendrá lo último – y para evitar la complejidad de gestionar grandes volúmenes de datos y posibles problemas de derechos de autor. Las fuentes que los usuarios guardan y califican en nuestra BD son referencias a estas fuentes externas."
+
+7.  **P: ¿Podrías detallar la arquitectura de la funcionalidad de mensajería en tiempo real? ¿Qué tecnologías usaste y por qué?**
+    *   **Clave:** Servidor Socket.io dedicado (Node.js), hook `useSocket` en el cliente. Eventos clave: `identify`, `join_conversation`, `send_message`, `new_message`, `message_ack`. Uso de salas de Socket.io. Webhook para sincronización.
+    *   *Ejemplo:* "Utilicé Socket.io sobre un servidor Node.js dedicado. El cliente (React) usa un hook personalizado `useSocket` para gestionar la conexión y los eventos. Cuando un usuario se conecta, se identifica y puede unirse a salas de conversación. Al enviar un mensaje, este va al servidor, se persiste en Prisma, se envía un `ack` al remitente, y luego se emite a los demás miembros de la sala. También implementé un webhook para que la API principal pueda notificar al servidor de sockets, por ejemplo, si un mensaje se crea por otro medio."
+
+8.  **P: ¿Qué desafíos técnicos enfrentaste al implementar la mensajería y cómo los superaste?**
+    *   **Clave:** Gestión del estado de conexión, sincronización de mensajes, manejo de múltiples instancias del hook `useSocket` (reutilización de conexión global), evitar duplicados, reconexiones.
+    *   *Ejemplo:* "Uno de los principales desafíos fue asegurar una conexión estable y la correcta sincronización de mensajes entre múltiples usuarios y dispositivos. Implementé un sistema de `ack` para los mensajes y un mecanismo para evitar el procesamiento duplicado en el cliente. La gestión de la instancia del socket en el frontend para evitar múltiples conexiones también requirió atención, solucionándolo con una instancia global referenciada por el hook."
+
+9.  **P: ¿Cómo se maneja la autenticación y la autorización en tu aplicación? ¿Qué medidas de seguridad implementaste?**
+    *   **Clave:** NextAuth.js para autenticación (credenciales, OAuth si estuviera). Roles de usuario (admin/user) para autorización, protegiendo rutas de API y del panel de admin. `withAuth` para proteger rutas.
+    *   *Ejemplo:* "La autenticación se gestiona con NextAuth.js, que maneja el flujo de inicio de sesión, registro y sesiones. Para la autorización, implementé un sistema de roles (usuario y administrador). Las rutas de API sensibles y el panel de administración están protegidos, verificando el rol del usuario en el backend y en el layout del admin. También se usan variables de entorno para claves secretas y se siguen prácticas como la validación de entradas (con Zod)."
+
+10. **P: ¿Por qué elegiste Prisma como ORM y MySQL como base de datos?**
+    *   **Clave:** Prisma: Seguridad de tipos, autocompletado, migraciones sencillas, abstracción de SQL. MySQL: Base de datos relacional robusta, ampliamente utilizada y bien soportada.
+    *   *Ejemplo:* "Elegí Prisma por su excelente integración con TypeScript, lo que proporciona seguridad de tipos y autocompletado, facilitando mucho el desarrollo. Sus sistema de migraciones es muy intuitivo. Opté por MySQL porque es una base de datos relacional madura, robusta y ampliamente soportada, adecuada para la estructura de datos del proyecto que incluye múltiples relaciones entre entidades."
+
+11. **P: Háblanos sobre la estructura de tu base de datos. ¿Cuáles son las entidades más importantes y cómo se relacionan?**
+    *   **Clave:** Muestra tu `schema.prisma`. Entidades principales: `User`, `Source`, `Comment`, `FavoriteSource`, `Rating`, `Follow`, `Conversation`, `DirectMessage`. Explica las relaciones clave (ej. User-Source vía FavoriteSource, User-User vía Follow, User-Message).
+    *   *Ejemplo:* "Las entidades centrales son `User` y `Source`. Los usuarios pueden tener muchas interacciones con las fuentes, como `FavoriteSource`, `Rating` y `Comment`. Los usuarios también interactúan entre sí a través de `Follow`. Para la mensajería, tenemos `Conversation` (que puede ser grupal) y `DirectMessage`, con `ConversationParticipant` uniendo usuarios a conversaciones. El esquema está diseñado para ser relacional y permitir consultas eficientes para las funcionalidades de la plataforma." *(Idealmente, tener una diapositiva con el diagrama ER simplificado)*.
+
+12. **P: ¿Cómo funciona el panel de administración y qué se puede gestionar desde él?**
+    *   **Clave:** CRUD para usuarios y fuentes. Visualización de comentarios, ratings, etc. Estadísticas en el dashboard. Subida de imágenes a Cloudinary.
+    *   *Ejemplo:* "El panel de administración permite gestionar los datos fundamentales. Los administradores pueden realizar operaciones CRUD sobre usuarios (crear, ver, editar, eliminar, cambiar rol) y fuentes (añadir nuevas fuentes locales, editar sus detalles, subir imágenes asociadas a Cloudinary). También pueden visualizar y moderar comentarios, ver valoraciones, y obtener estadísticas generales de uso de la plataforma."
+
+13. **P: ¿Cómo se gestiona la subida y el almacenamiento de imágenes (ej. avatares, imágenes de fuentes)?**
+    *   **Clave:** Lado cliente prepara `FormData`. API endpoint (`/api/upload`) recibe el archivo y lo sube a Cloudinary usando su SDK o una petición directa. La URL de Cloudinary se guarda en la BD.
+    *   *Ejemplo:* "Para la subida de imágenes, como los avatares de usuario o las imágenes de las fuentes en el panel de admin, el cliente envía el archivo a un endpoint `/api/upload`. Este endpoint en el backend utiliza la librería de Cloudinary para subir el archivo de forma segura a mi cuenta de Cloudinary. Una vez subida, Cloudinary devuelve una URL optimizada que es la que se almacena en la base de datos asociada al usuario o la fuente."
+
+**C. Preguntas sobre Funcionalidades Específicas:**
+
+14. **P: ¿Cómo se determinan o calculan las "tendencias populares" en tu plataforma?**
+    *   **Clave:** Actualmente hay un endpoint (`/api/trends/popular`). Explica cómo *podría* funcionar si no está completamente implementado (ej. basado en fuentes más vistas, comentadas, artículos más leídos de NewsAPI, etc.). Si es una maqueta, sé honesto.
+    *   *Ejemplo:* "Actualmente, existe un endpoint de API para tendencias populares. Aunque la lógica exacta de cálculo no está completamente implementada en esta fase, la idea es que podría basarse en una combinación de factores como las fuentes más visitadas o comentadas recientemente en nuestra plataforma, o incluso los artículos más leídos obtenidos de NewsAPI en un periodo determinado. Se podrían agregar contadores de vistas o interacciones para mejorar este cálculo."
+
+15. **P: ¿Cómo se realiza la categorización de las fuentes y artículos?**
+    *   **Clave:** Fuentes locales tienen un campo `category` (definido por el admin). Artículos de NewsAPI ya vienen con categorías o se pueden filtrar por ellas.
+    *   *Ejemplo:* "Las fuentes que se registran en nuestra plataforma a través del panel de administración tienen un campo 'categoría' asignado por el administrador de una lista predefinida (Tecnología, Deportes, etc.). Cuando obtenemos artículos de NewsAPI, esta API a menudo proporciona la categoría del artículo, o podemos solicitar artículos de categorías específicas. Esto nos permite filtrar y presentar contenido organizado temáticamente."
+
+16. **P: ¿El sistema de WebSockets (`socket-server.js`) es independiente del servidor principal de Next.js? ¿Cómo se gestiona su despliegue y comunicación?**
+    *   **Clave:** Sí, es un proceso Node.js separado. Se ejecuta en un puerto diferente. La comunicación desde Next.js al server de sockets puede ser vía HTTP (ej. el webhook). El cliente se conecta directamente al server de sockets.
+    *   *Ejemplo:* "Sí, el servidor de Socket.io es un proceso Node.js independiente que se ejecuta en un puerto diferente (3001) al servidor de Next.js (3000). Esto permite escalar cada parte de forma independiente si fuera necesario. Para el despliegue, se ejecutarían como dos servicios separados. La aplicación Next.js puede comunicarse con el servidor de sockets, por ejemplo, a través del webhook HTTP que implementé para notificar nuevos mensajes, y los clientes se conectan directamente al servidor de Socket.io mediante su URL y puerto específicos."
+
+**D. Preguntas sobre el Proceso de Desarrollo, Pruebas y Futuro:**
+
+17. **P: ¿Cuál fue el desafío técnico más grande que enfrentaste durante el desarrollo de este TFG y cómo lo resolviste?**
+    *   **Clave:** Sé honesto. Podría ser la mensajería en tiempo real, la integración con NextAuth, la estructura de la base de datos, la gestión del estado en el frontend, etc. Explica el problema y tu solución.
+    *   *Ejemplo:* "El mayor desafío fue la implementación del sistema de mensajería en tiempo real con Socket.io. Asegurar la correcta sincronización de mensajes, la gestión de salas, el estado de conexión de los usuarios y la persistencia en la base de datos de forma eficiente requirió bastante depuración y ajuste fino, especialmente en la coordinación entre el cliente y el servidor para los `ack` y la actualización de la interfaz."
+
+18. **P: ¿Cómo abordaste las pruebas de la aplicación? ¿Qué tipo de pruebas realizaste?**
+    *   **Clave:** Pruebas manuales de funcionalidades, pruebas de componentes individuales, uso de herramientas de desarrollo del navegador. Si usaste alguna librería de testing, menciónala.
+    *   *Ejemplo:* "Principalmente realicé pruebas manuales exhaustivas de todas las funcionalidades, cubriendo diferentes escenarios de usuario. Utilicé las herramientas de desarrollo del navegador para inspeccionar el estado, las peticiones de red y depurar el código JavaScript. También probé la API con herramientas como Postman para algunos endpoints. Para un desarrollo futuro, implementaría pruebas unitarias con Jest/React Testing Library y pruebas E2E con Cypress."
+
+19. **P: Si tuvieras más tiempo, ¿qué funcionalidades adicionales te gustaría implementar o qué aspectos mejorarías?**
+    *   **Clave:** Muestra visión a futuro. Notificaciones push, sistema de recomendación, búsqueda avanzada, analíticas para el admin, tests automatizados.
+    *   *Ejemplo:* "Mejoraría el sistema de recomendación de artículos y fuentes. También implementaría notificaciones push para nuevos mensajes o actividad relevante. Añadiría más opciones de personalización para el usuario y un sistema de búsqueda más avanzado con filtros más granulares. Desde el punto de vista técnico, dedicaría tiempo a escribir un conjunto completo de pruebas automatizadas."
+
+20. **P: ¿Qué has aprendido durante la realización de este TFG?**
+    *   **Clave:** Habilidades técnicas (Next.js, Prisma, Sockets), gestión de proyectos, resolución de problemas, diseño de software.
+    *   *Ejemplo:* "He aprendido enormemente sobre el desarrollo full-stack con Next.js, la gestión de bases de datos con Prisma, y la complejidad de implementar sistemas en tiempo real con WebSockets. También he mejorado mis habilidades en la planificación de proyectos, la resolución de problemas técnicos y el diseño de una aplicación completa desde cero."
+
+**E. Preguntas Específicas del Código (Menos Comunes pero Posibles):**
+
+21. **P: Vi que tienes dos archivos para el servidor de WebSockets (`socket-server.js` y `websocket-server.js`) y otro en `lib/websocket.ts`. ¿Cuál es la diferencia y cuál está en uso?**
+    *   **Clave:** Explica que `socket-server.js` (con Socket.io) es el principal y los otros son exploraciones o versiones alternativas.
+    *   *Ejemplo:* "`socket-server.js` es el servidor principal que utiliza Socket.io y está completamente integrado con la lógica de la aplicación, incluyendo la base de datos Prisma y el webhook. Los otros archivos, `websocket-server.js` y `lib/websocket.ts`, fueron exploraciones iniciales o pruebas con la librería `ws` nativa, pero el sistema de mensajería final se basa en Socket.io por su robustez y características como las salas."
+
+22. **P: En `src/hooks/useSocket.ts`, ¿puedes explicar la lógica detrás de `globalSocket` y `connectionAttemptInProgress`?**
+    *   **Clave:** Evitar múltiples conexiones del mismo usuario, gestionar intentos de conexión.
+    *   *Ejemplo:* "`globalSocket` intenta mantener una única instancia de conexión de Socket.io por usuario en toda la aplicación, para evitar que diferentes componentes abran conexiones separadas innecesariamente. `connectionAttemptInProgress` es una bandera para prevenir que se inicien múltiples intentos de conexión al mismo tiempo si, por ejemplo, varios componentes intentan inicializar el socket simultáneamente."
+---

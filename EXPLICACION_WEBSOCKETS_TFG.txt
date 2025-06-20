@@ -1,0 +1,106 @@
+---
+**Explicación Detallada del Flujo de Comunicación en Tiempo Real (WebSockets, Socket.io, Webhook)**
+
+**Conceptos Clave:**
+
+*   **WebSockets:** Es una tecnología que permite una comunicación bidireccional y en tiempo real entre un cliente (tu navegador) y un servidor. A diferencia de HTTP tradicional (donde el cliente siempre inicia la petición), con WebSockets, una vez establecida la conexión, tanto el cliente como el servidor pueden enviar mensajes al otro en cualquier momento.
+*   **Socket.io:** Es una librería que facilita el trabajo con WebSockets. Ofrece funcionalidades adicionales como la reconexión automática, el manejo de "salas" (para agrupar clientes), y un fallback a técnicas más antiguas si WebSockets no está disponible (aunque esto último es raro hoy en día). `socket-server.js` usa Socket.io en el lado del servidor, y `useSocket` usa la librería cliente de Socket.io.
+
+**1. El Cliente: `useSocket.ts` (Hook de React)**
+
+Este hook es el corazón de la comunicación en tiempo real en tu frontend (la aplicación Next.js que corre en el navegador del usuario).
+
+*   **Propósito:**
+    *   Establecer y mantener una conexión WebSocket con tu `socket-server.js`.
+    *   Proporcionar funciones para que tus componentes de React puedan enviar mensajes/eventos al servidor.
+    *   Escuchar los mensajes/eventos que vienen del servidor y permitir que tus componentes reaccionen a ellos (ej. mostrar un nuevo mensaje en el chat).
+
+*   **Funcionamiento Simplificado:**
+    1.  **Inicialización:**
+        *   Cuando un componente que necesita chat (ej. tu página de mensajes) usa el hook `useSocket`, este intenta conectarse al `socket-server.js` (que especificaste está en `http://localhost:3001`).
+        *   **`globalSocket` y `globalSocketUserId`:** Para evitar que cada componente abra una nueva conexión si el usuario ya tiene una activa, el hook intenta reutilizar una conexión existente si es para el mismo `userId`. Esto es una optimización.
+    2.  **Identificación:**
+        *   Una vez conectado, el hook envía un evento `identify` al servidor con el `userId` y `username` del usuario actual. Esto le dice al servidor "Hola, soy el usuario X y estoy conectado con este socket".
+    3.  **Envío de Mensajes/Eventos (Ej. `sendMessage`):**
+        *   Cuando el usuario escribe un mensaje en el chat y presiona enviar, tu componente de chat llama a la función `sendMessage` que provee el hook.
+        *   Esta función toma el contenido del mensaje, el `senderId`, `conversationId`, etc., y emite un evento `send_message` al `socket-server.js` a través de la conexión WebSocket.
+    4.  **Recepción de Mensajes/Eventos (Ej. `onNewMessage`):**
+        *   El hook configura "escuchadores" (listeners) para varios eventos que puede enviar el servidor. Por ejemplo, tiene un listener para el evento `new_message`.
+        *   Cuando el `socket-server.js` emite un evento `new_message` a este cliente, el listener en `useSocket` se activa.
+        *   Este listener luego llama a la función `onNewMessage` que tú le pasaste al hook (esta función es la que actualiza el estado de tu componente React para mostrar el nuevo mensaje en la pantalla).
+    5.  **Otros Eventos:**
+        *   **`join_conversation`:** Cuando entras a un chat específico, el hook emite esto para que el servidor te una a la "sala" de esa conversación.
+        *   **`typing`:** Para mostrar "Usuario está escribiendo...".
+        *   **`mark_read`:** Para notificar que un mensaje ha sido leído.
+        *   **`heartbeat`:** El hook envía periódicamente un "latido" al servidor para indicarle que sigue activo y para mantener la conexión abierta, especialmente si hay proxies o firewalls en medio.
+    6.  **Manejo de Conexión:** Gestiona la reconexión si se pierde la conexión, muestra el estado de conexión, etc.
+
+**2. El Servidor de Sockets: `socket-server.js`**
+
+Este es un servidor Node.js independiente que se ejecuta (probablemente en el puerto 3001) y está dedicado a manejar las conexiones WebSocket y la lógica de chat en tiempo real.
+
+*   **Propósito:**
+    *   Aceptar conexiones WebSocket de los clientes (navegadores).
+    *   Recibir mensajes/eventos de los clientes.
+    *   Procesar esos mensajes (ej. guardar un mensaje de chat en la base de datos).
+    *   Retransmitir mensajes/eventos a otros clientes relevantes.
+    *   Gestionar "salas" para que los mensajes de un grupo solo lleguen a los miembros de ese grupo.
+
+*   **Funcionamiento Simplificado (en respuesta a los eventos del cliente):**
+    1.  **Nueva Conexión y `identify`:**
+        *   Cuando un cliente se conecta, el servidor registra su `socket.id` (un identificador único para esa conexión WebSocket).
+        *   Cuando recibe el evento `identify` con un `userId`, asocia ese `userId` con el `socket.id` (en `userSocketMap`). Esto es crucial para saber a qué usuario enviarle mensajes directos más tarde.
+        *   Une al socket a una sala personal (`user_${userId}`).
+    2.  **`join_conversation`:**
+        *   Cuando un cliente emite `join_conversation` para, por ejemplo, `conversation-123`, el servidor toma el socket de ese cliente y lo une a una "sala" de Socket.io llamada `conversation-conversation-123`.
+        *   Ahora, si el servidor emite un mensaje a la sala `conversation-conversation-123`, todos los sockets unidos a esa sala lo recibirán.
+    3.  **`send_message`:**
+        *   El servidor recibe el contenido del mensaje, `senderId`, `conversationId`, `receiverId` (si es directo), etc.
+        *   **Persistencia:** Guarda el mensaje en tu base de datos MySQL usando Prisma (`prisma.directMessage.create`). Esto es importante para que los mensajes no se pierdan si el servidor se reinicia o si un usuario no está conectado en ese momento.
+        *   **Confirmación al Remitente (`message_ack`):** Envía un evento `message_ack` de vuelta *solo al socket del remitente* para decirle "OK, recibí y guardé tu mensaje con este ID definitivo y este `tempId` que me enviaste".
+        *   **Retransmisión (`new_message`):**
+            *   Si el mensaje tiene un `conversationId` (es de un grupo/sala): Emite el evento `new_message` (con el mensaje completo guardado) a la sala correspondiente (ej. `conversation-conversation-123`). Socket.io se encarga de que todos los sockets en esa sala reciban este evento, *excepto* el remitente si se usa `socket.to(roomName).emit(...)`.
+            *   Si el mensaje tiene un `receiverId` (es un mensaje directo): Busca el `socket.id` del `receiverId` en `userSocketMap`. Si lo encuentra (el receptor está online), le envía el evento `new_message` directamente a ese socket.
+    4.  **`read_message`:**
+        *   Actualiza el estado del mensaje en la base de datos.
+        *   Notifica a los involucrados (al remitente o a la sala) que el mensaje fue leído.
+    5.  **Desconexión:** Limpia los registros del usuario que se desconectó.
+
+**3. El Webhook: `app.post('/webhook/new-message', ...)` en `socket-server.js`**
+
+Esto es un poco diferente. No es comunicación WebSocket directa del cliente al servidor de sockets, sino una forma en que tu **API principal de Next.js** (la que maneja las peticiones HTTP normales, en el puerto 3000) puede "hablarle" a tu `socket-server.js`.
+
+*   **Propósito:**
+    *   Permitir que acciones que ocurren fuera del flujo normal de chat en tiempo real (es decir, no iniciadas por un cliente a través de su conexión WebSocket activa) puedan aun así disparar notificaciones en tiempo real a los clientes conectados.
+    *   Un ejemplo podría ser: un sistema envía una notificación automática, o un moderador borra un mensaje a través del panel de admin y quieres que ese cambio se refleje inmediatamente para los usuarios en el chat.
+
+*   **Funcionamiento Simplificado:**
+    1.  Tu API principal de Next.js (en el puerto 3000), después de realizar alguna acción (ej. guardar un mensaje que llegó por una vía que no fue un socket, o una notificación del sistema), hace una petición HTTP POST a `http://localhost:3001/webhook/new-message`.
+    2.  Esta petición HTTP POST lleva la información del mensaje en su cuerpo (body).
+    3.  El `socket-server.js` tiene un pequeño servidor Express escuchando estas peticiones HTTP en `/webhook/new-message`.
+    4.  **Autenticación del Webhook:** Verifica un encabezado `Authorization` para asegurarse de que la petición viene de una fuente confiable (en este caso, tu propia API de Next.js). Esto es una medida de seguridad simple.
+    5.  **Procesamiento:** Una vez que el webhook recibe el mensaje:
+        *   Usa la lógica de Socket.io (el objeto `io`) para emitir el evento `new_message` a los sockets/salas relevantes, tal como lo haría si el mensaje hubiera llegado a través de un evento `send_message` de un cliente.
+        *   Busca el `senderSocket` y `receiverSocket` en `userSocketMap` y/o emite a la `roomName` de la conversación.
+
+**Flujo Combinado (Ejemplo: Usuario A envía un mensaje a Usuario B en una conversación grupal):**
+
+1.  **Usuario A (Cliente):**
+    *   Escribe "Hola" en el chat de la conversación "GrupoX".
+    *   El componente React llama a `sendMessage` del hook `useSocket`.
+    *   `useSocket` emite un evento `send_message` al `socket-server.js` con `{ content: "Hola", senderId: "A", conversationId: "GrupoX", tempId: "temp123" }`.
+2.  **`socket-server.js` (Servidor de Sockets):**
+    *   Recibe el evento `send_message`.
+    *   Guarda el mensaje en Prisma. Supongamos que obtiene el ID "msg789".
+    *   Emite `message_ack` de vuelta *solo al socket del Usuario A*: `{ messageId: "msg789", tempId: "temp123", status: "sent" }`.
+    *   Emite `new_message` a la sala `conversation-GrupoX`: `{ id: "msg789", content: "Hola", senderId: "A", conversationId: "GrupoX", ... }`.
+3.  **Usuario A (Cliente):**
+    *   Su `useSocket` recibe `message_ack`. Actualiza el estado del mensaje "temp123" a "enviado" y le asigna el ID "msg789".
+    *   Su `useSocket` también recibe el `new_message` (porque él está en la sala `conversation-GrupoX`). Probablemente lo ignore o lo use para confirmar que su UI está perfectamente sincronizada, ya que él mismo lo envió.
+4.  **Usuario B (Cliente, que también está en "GrupoX"):**
+    *   Su `useSocket` (que está escuchando en la sala `conversation-GrupoX`) recibe el evento `new_message` con los datos del mensaje "msg789".
+    *   El callback `onNewMessage` de su hook se dispara.
+    *   El componente React del Usuario B se actualiza y muestra "Hola" de Usuario A en el chat de "GrupoX".
+5.  **Otros Usuarios en "GrupoX" (Clientes):**
+    *   Reciben el `new_message` de la misma forma que el Usuario B y actualizan su UI.
+---
